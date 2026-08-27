@@ -8320,6 +8320,424 @@ a {
   }
 }
 
+/* Final layout guarantees for the shared Settings surfaces.  Keep these at
+   the end of the cascade because the legacy launcher theme contains older
+   responsive rules for the same components. */
+.app-shell .settings-workspace-content .settings-model-mode-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.app-shell .settings-workspace-content .settings-model-mode-row > strong {
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--text);
+  font-size: 0.98rem;
+}
+
+.app-shell .settings-workspace-content .settings-model-access-mode {
+  display: inline-flex !important;
+  flex: 0 0 auto;
+  flex-direction: row !important;
+  align-items: center;
+  width: auto !important;
+  min-width: 330px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg-subtle);
+}
+
+.app-shell .settings-workspace-content .settings-model-access-mode > button {
+  display: inline-flex !important;
+  flex: 1 1 0;
+  align-items: center;
+  justify-content: center;
+  width: auto !important;
+  min-width: 154px;
+  min-height: 40px;
+  padding: 0 18px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  color: var(--text-muted);
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.app-shell .settings-workspace-content .settings-model-access-mode > button.selected {
+  color: var(--text) !important;
+  background: var(--bg-elev) !important;
+  box-shadow: 0 5px 16px rgba(17, 13, 24, 0.12) !important;
+}
+
+.app-shell .settings-workspace-content .settings-model-access-mode > button strong {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.app-shell .settings-workspace-content .settings-course-panel {
+  min-height: calc(100dvh - 90px);
+}
+
+.app-shell .settings-workspace-content .settings-course-toolbar {
+  min-height: 58px;
+}
+
+.app-shell .settings-workspace-content .settings-course-toolbar > a {
+  color: #ffffff !important;
+}
+
+.app-shell .settings-workspace-content .settings-course-editions {
+  grid-template-columns: 1fr !important;
+}
+
+.app-shell .settings-workspace-content .settings-course-editions article,
+.app-shell .settings-workspace-content .settings-course-editions article:nth-child(4),
+.app-shell .settings-workspace-content .settings-course-editions article:nth-child(5) {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  align-items: center !important;
+  min-height: clamp(112px, 14vh, 156px);
+  margin: 0 !important;
+  padding: 20px 0 !important;
+}
+
+.app-shell .settings-workspace-content .settings-course-editions .brand-lockup {
+  width: min(100%, 290px) !important;
+  height: 38px !important;
+  justify-self: start;
+}
+
+.app-shell .settings-workspace-content .settings-course-editions p {
+  overflow: hidden;
+  margin: 0 !important;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.app-shell .settings-workspace-content .settings-course-edition-link {
+  grid-column: auto !important;
+  justify-self: end;
+  width: auto !important;
+  color: #ffffff !important;
+}
+
+@media (max-width: 760px) {
+  .app-shell .settings-workspace-content .settings-model-mode-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .app-shell .settings-workspace-content .settings-model-access-mode {
+    width: 100% !important;
+    min-width: 0;
+  }
+
+  .app-shell .settings-workspace-content .settings-model-access-mode > button {
+    min-width: 0;
+  }
+
+  .app-shell .settings-workspace-content .settings-course-editions article,
+  .app-shell .settings-workspace-content .settings-course-editions article:nth-child(4),
+  .app-shell .settings-workspace-content .settings-course-editions article:nth-child(5) {
+    grid-template-columns: 1fr !important;
+    gap: 14px;
+  }
+
+  .app-shell .settings-workspace-content .settings-course-edition-link {
+    justify-self: stretch;
+    width: 100% !important;
+  }
+}
+
+.app-shell:not(.app-shell-launcher) .app-workspaces {
+  flex: 0 1 auto !important;
+  max-height: min(38vh, 19rem);
+  margin-top: 0.45rem;
+  padding-top: 0.58rem;
+}
+
+.app-shell:not(.app-shell-launcher) .app-sidebar-footer {
+  margin-top: auto;
+}
+
+.app-shell .settings-runtime-status-pending,
+.app-shell .settings-runtime-check-steps > li[data-state="pending"],
+.app-shell .settings-runtime-check-steps > li[data-state="pending"] strong,
+.app-shell .settings-runtime-check-steps > li[data-state="pending"] small,
+.app-shell .settings-runtime-check-steps > li[data-state="pending"] em {
+  color: #f5b934 !important;
+}
+
+.app-shell .settings-runtime-status-pending {
+  border-color: color-mix(in srgb, #f5b934 42%, var(--border)) !important;
+  background: color-mix(in srgb, #f5b934 9%, var(--bg-elev)) !important;
+}
+
+.app-shell .settings-runtime-status-checking,
+.app-shell .settings-runtime-check-steps > li[data-state="checking"],
+.app-shell .settings-runtime-check-steps > li[data-state="checking"] strong,
+.app-shell .settings-runtime-check-steps > li[data-state="checking"] small,
+.app-shell .settings-runtime-check-steps > li[data-state="checking"] em {
+  color: #4da8ff !important;
+}
+
+.app-shell .settings-runtime-status-checking {
+  border-color: color-mix(in srgb, #4da8ff 42%, var(--border)) !important;
+  background: color-mix(in srgb, #4da8ff 9%, var(--bg-elev)) !important;
+}
+
+.app-shell .settings-runtime-check-steps > li[data-state="success"],
+.app-shell .settings-runtime-check-steps > li[data-state="success"] strong,
+.app-shell .settings-runtime-check-steps > li[data-state="success"] small,
+.app-shell .settings-runtime-check-steps > li[data-state="success"] em {
+  color: #32d989 !important;
+}
+
+.app-shell .settings-runtime-check-steps > li[data-state="error"],
+.app-shell .settings-runtime-check-steps > li[data-state="error"] strong,
+.app-shell .settings-runtime-check-steps > li[data-state="error"] small,
+.app-shell .settings-runtime-check-steps > li[data-state="error"] em {
+  color: #ff656f !important;
+}
+
+/* ---------- August 27 settings and sidebar refinement ---------- */
+
+/* Workspace headings follow the navigation immediately; the account remains
+   anchored to the bottom of the sidebar even when there are no experiments. */
+.app-shell:not(.app-shell-launcher) .app-workspaces {
+  flex: 0 1 auto;
+  max-height: min(38vh, 19rem);
+  margin-top: 0.45rem;
+  padding-top: 0.58rem;
+}
+
+.app-shell:not(.app-shell-launcher) .app-sidebar-footer {
+  margin-top: auto;
+}
+
+/* Model access is one setting row with a compact two-state control. */
+.settings-workspace-content .settings-model-mode-row {
+  display: grid;
+  min-height: 3.65rem;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.55rem 0.2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-workspace-content .settings-model-mode-row > strong {
+  font-size: 0.95rem;
+}
+
+.settings-workspace-content .settings-model-access-mode {
+  display: grid;
+  width: min(100%, 330px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  padding: 3px;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 24%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-elev-2) 82%, transparent);
+}
+
+.settings-workspace-content .settings-model-access-mode > button {
+  min-height: 2.35rem;
+  padding: 0.38rem 0.72rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  text-align: center;
+}
+
+.settings-workspace-content .settings-model-access-mode > button.selected {
+  border: 0;
+  color: #ffffff;
+  background: var(--dd-brand-gradient);
+  box-shadow: 0 5px 16px color-mix(in srgb, var(--dd-brand-middle) 20%, transparent);
+}
+
+.settings-workspace-content .settings-model-access-mode > button strong {
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+/* Gift-card copy was previously forced to white in every appearance. */
+:root[data-dd-appearance="light"] .app-shell .settings-reset-card-trigger.has-card,
+:root[data-dd-appearance="light"] .app-shell .settings-model-reset-row .settings-reset-card-trigger-copy strong {
+  color: #211923;
+}
+
+:root[data-dd-appearance="light"] .app-shell .settings-model-reset-row .settings-reset-card-trigger-copy small,
+:root[data-dd-appearance="light"] .app-shell .settings-reset-card-trigger-arrow {
+  color: #625668;
+}
+
+:root[data-dd-appearance="dark"] .app-shell .settings-reset-card-trigger.has-card,
+:root[data-dd-appearance="dark"] .app-shell .settings-model-reset-row .settings-reset-card-trigger-copy strong,
+:root[data-dd-appearance="dark"] .app-shell .settings-reset-card-trigger-arrow {
+  color: #ffffff;
+}
+
+:root[data-dd-appearance="dark"] .app-shell .settings-model-reset-row .settings-reset-card-trigger-copy small {
+  color: #dce2ef;
+}
+
+/* ECE498BH is a single five-row table: equal logo, description and action
+   columns, consistent lockup sizing, and vertically centered content. */
+.settings-workspace-content .settings-course-panel {
+  display: grid;
+  height: 100%;
+  min-height: 100%;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-self: stretch;
+}
+
+.settings-course-toolbar {
+  display: flex;
+  min-height: 3.45rem;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0.35rem 0.2rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-course-toolbar > a,
+.settings-course-edition-link {
+  display: inline-flex;
+  min-height: 2.45rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
+  padding: 0.48rem 0.82rem;
+  border: 0;
+  border-radius: 0.72rem;
+  color: #ffffff;
+  background: var(--dd-brand-gradient);
+  font-size: 0.82rem;
+  font-weight: 780;
+  text-decoration: none;
+}
+
+.settings-course-toolbar > a:is(:visited, :hover, :focus-visible) {
+  color: #ffffff;
+}
+
+.settings-course-toolbar svg,
+.settings-course-edition-link svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.settings-workspace-content .settings-course-editions {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: repeat(5, minmax(5.4rem, 1fr));
+  gap: 0;
+}
+
+.settings-workspace-content .settings-course-editions article,
+.settings-workspace-content .settings-course-editions article:nth-child(4),
+.settings-workspace-content .settings-course-editions article:nth-child(5) {
+  display: grid;
+  min-width: 0;
+  grid-column: 1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: minmax(0, 1fr);
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 0.2rem;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-workspace-content .settings-course-editions .brand-lockup {
+  width: min(100%, 290px);
+  height: 38px;
+  max-width: 290px;
+  justify-self: start;
+  object-position: left center;
+}
+
+.settings-workspace-content .settings-course-editions .brand-lockup[data-brand-edition="autonomy"] {
+  height: 38px;
+}
+
+.settings-workspace-content .settings-course-editions p {
+  width: 100%;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 0.84rem;
+  line-height: 1.35;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-workspace-content .settings-course-edition-link {
+  min-width: 10.5rem;
+  justify-self: end;
+}
+
+/* Runtime: queued rows are yellow, the active probe is blue, and only
+   completed rows become green. The overall row follows the same phases. */
+.settings-runtime-check-steps > li[data-state="pending"],
+.settings-runtime-status-pending,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-status-pending {
+  color: #f2bc35;
+}
+
+.settings-runtime-check-steps > li[data-state="checking"],
+.settings-runtime-status-checking,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-status-checking {
+  color: #4da3ff;
+}
+
+:root[data-dd-appearance="light"] .app-shell .settings-workspace-host .settings-runtime-status-pending {
+  color: #966600;
+}
+
+:root[data-dd-appearance="light"] .app-shell .settings-workspace-host .settings-runtime-status-checking {
+  color: #146ac4;
+}
+
+.settings-runtime-status-pending small,
+.settings-runtime-status-checking small {
+  color: inherit !important;
+  opacity: 0.82;
+}
+
+@media (max-width: 820px) {
+  .settings-workspace-content .settings-model-mode-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-workspace-content .settings-model-access-mode {
+    width: 100%;
+  }
+
+  .settings-workspace-content .settings-course-editions article,
+  .settings-workspace-content .settings-course-editions article:nth-child(4),
+  .settings-workspace-content .settings-course-editions article:nth-child(5) {
+    grid-template-columns: minmax(170px, 0.8fr) minmax(0, 1.2fr) auto;
+  }
+}
+
 /* Keep desktop navigation and account controls in one full-height column.
    `display: contents` did not reliably pass flex growth through the wrapper in
    the desktop webview, which let the account block sit directly below the

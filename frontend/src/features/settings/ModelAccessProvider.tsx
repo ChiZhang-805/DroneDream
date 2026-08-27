@@ -440,19 +440,26 @@ export function ModelAccessProvider({
     });
   }, []);
 
-  const removeActiveProfile = useCallback(() => {
+  const removeProfile = useCallback((profileId: string) => {
     setState((current) => {
       if (current.profiles.length <= 1) return current;
       const profiles = current.profiles.filter(
-        (profile) => profile.id !== current.activeProfileId,
+        (profile) => profile.id !== profileId,
       );
+      if (profiles.length === current.profiles.length) return current;
       return {
         storageKey: current.storageKey,
-        activeProfileId: profiles[0].id,
+        activeProfileId: current.activeProfileId === profileId
+          ? profiles[0].id
+          : current.activeProfileId,
         profiles,
       };
     });
   }, []);
+
+  const removeActiveProfile = useCallback(() => {
+    removeProfile(state.activeProfileId);
+  }, [removeProfile, state.activeProfileId]);
 
   const value = useMemo<ModelAccessContextValue>(() => ({
     settings,
@@ -465,9 +472,11 @@ export function ModelAccessProvider({
     selectProvider,
     selectProfile,
     addProfile,
+    removeProfile,
     removeActiveProfile,
   }), [
     addProfile,
+    removeProfile,
     removeActiveProfile,
     selectProfile,
     selectManagedProvider,

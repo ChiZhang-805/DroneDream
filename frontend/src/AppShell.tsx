@@ -24,7 +24,6 @@ import {
   Download,
   FlaskConical,
   Gift,
-  GraduationCap,
   Gauge,
   History,
   ImagePlus,
@@ -1541,20 +1540,31 @@ function SettingsDialog({
   const level = runtimeHealthLevel(access);
   const snapshot = access.snapshot;
   const runtimeCheckStepCount = 5 + (snapshot?.runtime.components.length ?? 0);
-  const [runtimeCheckStepIndex, setRuntimeCheckStepIndex] = useState(0);
-  useEffect(() => {
-    if (!access.isChecking) {
-      setRuntimeCheckStepIndex(0);
-      return undefined;
+  const [runtimeCheckStepIndex, setRuntimeCheckStepIndex] = useState(-1);
+  const [runtimeVisualChecking, setRuntimeVisualChecking] = useState(false);
+  const runtimeCheckActive = access.isChecking || runtimeVisualChecking;
+  const runRuntimeCheck = async () => {
+    if (runtimeCheckActive) return;
+    // Keep the progress legible even when the local health endpoint answers
+    // immediately: first queue every row, then visit the checks in order, and
+    // only publish the authoritative result after both work streams finish.
+    setRuntimeVisualChecking(true);
+    setRuntimeCheckStepIndex(-1);
+    const refreshPromise = access.refresh();
+    const visualPromise = (async () => {
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 320));
+      for (let index = 0; index < runtimeCheckStepCount; index += 1) {
+        setRuntimeCheckStepIndex(index);
+        await new Promise<void>((resolve) => window.setTimeout(resolve, 360));
+      }
+    })();
+    try {
+      await Promise.all([refreshPromise, visualPromise]);
+    } finally {
+      setRuntimeVisualChecking(false);
+      setRuntimeCheckStepIndex(-1);
     }
-    setRuntimeCheckStepIndex(0);
-    const timer = window.setInterval(() => {
-      setRuntimeCheckStepIndex((current) =>
-        Math.min(current + 1, Math.max(0, runtimeCheckStepCount - 1)),
-      );
-    }, 700);
-    return () => window.clearInterval(timer);
-  }, [access.isChecking, runtimeCheckStepCount]);
+  };
   const runtimeCheckCopy = interfaceLocale === "zh-CN"
     ? {
         title: "环境检查",
@@ -1584,7 +1594,11 @@ function SettingsDialog({
     index: number,
     result: boolean | null,
   ): RuntimeCheckVisualState => {
-    if (access.isChecking && index === runtimeCheckStepIndex) return "checking";
+    if (runtimeCheckActive) {
+      if (runtimeCheckStepIndex < 0 || index > runtimeCheckStepIndex) return "pending";
+      if (index === runtimeCheckStepIndex) return "checking";
+      return "success";
+    }
     if (result === null) return "pending";
     return result ? "success" : "error";
   };
@@ -1662,12 +1676,17 @@ function SettingsDialog({
       );
     }
     details.push(...runtime.diagnostics);
-  } else if (!access.isChecking) {
+  } else if (!runtimeCheckActive) {
     details.push(t("settings.runtime.noResult"));
   }
   const uniqueDetails = [...new Set(details.filter(Boolean))];
-  const statusLabel = access.isChecking
-    ? t("settings.runtime.checking")
+  const runtimeCheckVisualPhase = runtimeCheckActive
+    ? (runtimeCheckStepIndex < 0 ? "pending" : "checking")
+    : null;
+  const statusLabel = runtimeCheckVisualPhase === "pending"
+    ? runtimeCheckCopy.pending
+    : runtimeCheckVisualPhase === "checking"
+      ? runtimeCheckCopy.checking
     : level === "healthy"
       ? t("settings.runtime.healthy")
       : level === "warning"
@@ -2025,11 +2044,8 @@ function SettingsDialog({
       </EditionSettingsPanel>
       <EditionSettingsPanel active={activeSettingsTab === "course"} id="course">
         <section className="settings-course-panel" aria-labelledby="settings-course-title">
-          <div className="settings-course-overview">
-            <div className="settings-course-mark" aria-hidden="true">
-              <GraduationCap />
-            </div>
-            <h3 id="settings-course-title">ECE498BH</h3>
+          <h3 id="settings-course-title" className="sr-only">ECE498BH</h3>
+          <div className="settings-course-toolbar">
             <a
               href={ECE498BH_COURSE_URL}
               target="_blank"
@@ -2395,25 +2411,26 @@ function SettingsDialog({
             )}
           </span>
         </div>
-        <div className="settings-model-access-mode" role="group" aria-label={t("settings.model.accessMode")}>
-          <button
-            type="button"
-            className={modelAccess.accessMode === "platform" ? "selected" : undefined}
-            aria-pressed={modelAccess.accessMode === "platform"}
-            onClick={() => selectAccessMode("platform")}
-          >
-            <strong>{t("settings.model.includedAllowance")}</strong>
-            <span>{t("settings.model.includedAllowanceDetail")}</span>
-          </button>
-          <button
-            type="button"
-            className={modelAccess.accessMode === "byok" ? "selected" : undefined}
-            aria-pressed={modelAccess.accessMode === "byok"}
-            onClick={() => selectAccessMode("byok")}
-          >
-            <strong>{t("settings.model.byok")}</strong>
-            <span>{t("settings.model.byokDetail")}</span>
-          </button>
+        <div className="settings-model-mode-row">
+          <strong>{t("settings.model.accessMode")}</strong>
+          <div className="settings-model-access-mode" role="group" aria-label={t("settings.model.accessMode")}>
+            <button
+              type="button"
+              className={modelAccess.accessMode === "platform" ? "selected" : undefined}
+              aria-pressed={modelAccess.accessMode === "platform"}
+              onClick={() => selectAccessMode("platform")}
+            >
+              <strong>{t("settings.model.includedAllowance")}</strong>
+            </button>
+            <button
+              type="button"
+              className={modelAccess.accessMode === "byok" ? "selected" : undefined}
+              aria-pressed={modelAccess.accessMode === "byok"}
+              onClick={() => selectAccessMode("byok")}
+            >
+              <strong>{t("settings.model.byok")}</strong>
+            </button>
+          </div>
         </div>
         {modelAccess.accessMode === "platform" ? (
           <div className="settings-model-usage">
@@ -2648,22 +2665,24 @@ function SettingsDialog({
             <button
               type="button"
               className="btn settings-runtime-check"
-              disabled={access.isChecking}
-              onClick={() => void access.refresh()}
+              disabled={runtimeCheckActive}
+              onClick={() => void runRuntimeCheck()}
             >
-              {access.isChecking
+              {runtimeCheckActive
                 ? t("settings.runtime.checking")
                 : t("settings.runtime.checkNow")}
             </button>
           </div>
           <div
-            className={`settings-runtime-status settings-runtime-status-${access.isChecking ? "checking" : level}`}
+            className={`settings-runtime-status settings-runtime-status-${runtimeCheckVisualPhase ?? level}`}
             role="status"
             aria-live="polite"
           >
             <span className="settings-runtime-status-icon" aria-hidden="true">
-              {access.isChecking ? (
+              {runtimeCheckVisualPhase === "checking" ? (
                 <LoaderCircle className="is-spinning" />
+              ) : runtimeCheckVisualPhase === "pending" ? (
+                <Circle />
               ) : level === "healthy" ? (
                 <CircleCheckBig />
               ) : level === "error" || level === "warning" ? (
@@ -2706,7 +2725,7 @@ function SettingsDialog({
               );
             })}
           </ol>
-          {!access.isChecking && level !== "healthy" && uniqueDetails.length > 0 ? (
+          {!runtimeCheckActive && level !== "healthy" && uniqueDetails.length > 0 ? (
             <ul className="settings-runtime-diagnostics" aria-label={t("settings.runtime.viewDetails")}>
               {uniqueDetails.map((detail) => <li key={detail}>{detail}</li>)}
             </ul>

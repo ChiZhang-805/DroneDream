@@ -3989,3 +3989,16 @@ html[lang="zh-CN"] .site-hero h1 {
     padding-block: 12px;
   }
 }
+
+/* Keep the global brand lockup visually balanced with the Download control
+   on every public page, and place auth forms slightly above optical center. */
+@media (min-width: 901px) {
+  .site-brand .brand-lockup {
+    height: 44px;
+  }
+
+  .site-auth-dialog,
+  .site-auth-dialog.is-oauth-page {
+    transform: translateY(clamp(-54px, -4vh, -26px));
+  }
+}

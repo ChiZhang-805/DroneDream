@@ -73,7 +73,7 @@ export function CustomModelSettingsPanel({ locale, edition }: CustomModelSetting
     updateSettings,
     selectProfile,
     addProfile,
-    removeActiveProfile,
+    removeProfile,
   } = useModelAccess();
   const [draft, setDraft] = useState<ModelProfileDraft>(() => draftFromProfile({
     id: activeProfileId,
@@ -270,8 +270,7 @@ export function CustomModelSettingsPanel({ locale, edition }: CustomModelSetting
     }
   };
 
-  const removeProfile = async () => {
-    const profile = profiles.find((item) => item.id === activeProfileId);
+  const removeProfileEntry = async (profile: ModelAccessProfile) => {
     if (profile?.agentCoreProfileId) {
       setSaving(true);
       try {
@@ -288,7 +287,12 @@ export function CustomModelSettingsPanel({ locale, edition }: CustomModelSetting
       }
       setSaving(false);
     }
-    removeActiveProfile();
+    removeProfile(profile.id);
+  };
+
+  const removeSelectedProfile = async () => {
+    const profile = profiles.find((item) => item.id === activeProfileId);
+    if (profile) await removeProfileEntry(profile);
   };
 
   return (
@@ -321,13 +325,48 @@ export function CustomModelSettingsPanel({ locale, edition }: CustomModelSetting
         <button
           type="button"
           className="btn custom-model-icon-button"
-          onClick={() => void removeProfile()}
+          onClick={() => void removeSelectedProfile()}
           disabled={profiles.length <= 1 || saving}
           aria-label={chinese ? "删除模型配置" : "Remove model profile"}
           title={chinese ? "删除模型配置" : "Remove model profile"}
         >
           <Trash2 aria-hidden="true" />
         </button>
+      </div>
+
+      <div
+        className="custom-model-profile-list"
+        aria-label={chinese ? "已添加的模型" : "Added models"}
+      >
+        {profiles.map((profile) => (
+          <div
+            key={profile.id}
+            className={profile.id === activeProfileId ? "is-active" : undefined}
+          >
+            <button
+              type="button"
+              className="custom-model-profile-select"
+              aria-pressed={profile.id === activeProfileId}
+              onClick={() => selectProfile(profile.id)}
+            >
+              <ModelProviderLogo provider={profile.provider} />
+              <span>
+                <strong>{profileLabel(profile)}</strong>
+                <small>{modelProviderDefinition(profile.provider).label} · {profile.model || (chinese ? "未配置" : "Not configured")}</small>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="custom-model-profile-delete"
+              disabled={profiles.length <= 1 || saving}
+              aria-label={chinese ? `删除 ${profileLabel(profile)}` : `Delete ${profileLabel(profile)}`}
+              title={chinese ? "删除模型配置" : "Delete model profile"}
+              onClick={() => void removeProfileEntry(profile)}
+            >
+              <Trash2 aria-hidden="true" />
+            </button>
+          </div>
+        ))}
       </div>
 
       <div className="custom-model-endpoint-row">

@@ -44,6 +44,7 @@ export interface ModelAccessContextValue {
   selectProvider: (provider: ModelProvider) => void;
   selectProfile: (profileId: string) => void;
   addProfile: () => void;
+  removeProfile: (profileId: string) => void;
   removeActiveProfile: () => void;
 }
 
