@@ -6,8 +6,9 @@ import {
 import "@xyflow/react/dist/style.css";
 import {
   AlertTriangle, ArrowLeft, BadgeCheck, BrainCircuit, Check, ChevronDown,
-  ChevronRight, CircleDot, Database, GitBranch, Inbox, Play, PlugZap, Redo2,
-  RefreshCw, RotateCcw, ScrollText, ShieldCheck, Undo2, Waypoints, Wrench, X,
+  ChevronRight, CircleDot, Database, Eye, GitBranch, Grip, Inbox, Play, PlugZap,
+  Redo2, RefreshCw, RotateCcw, ScrollText, Settings2, ShieldCheck, Trash2, Undo2,
+  Waypoints, Wrench, X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { NavLink } from "react-router-dom";
@@ -24,7 +25,7 @@ import {
 import {
   MODEL_BAR_HEIGHT, MODEL_BAR_WIDTH, PUZZLE_HEIGHT, PUZZLE_TAB_DEPTH,
   categoryLabel, flowCertainty, harnessCategoryColors, layoutHarnessItems,
-  puzzleBodyWidth, puzzlePath, type FlowCertainty, type HarnessVisualPlacement,
+  puzzlePath, type FlowCertainty, type HarnessVisualPlacement,
 } from "../features/autonomy/harnessVisualLayout";
 import { useI18n } from "../i18n/I18nProvider";
 import "./AutonomyHarness.css";
@@ -39,6 +40,7 @@ type HarnessNodeData = Record<string, unknown> & {
   policyValue: string | null;
   preview: boolean;
   focus: boolean;
+  justSnapped: boolean;
   placement: HarnessVisualPlacement;
   runtimeNodeCount: number;
   onPluginDrop?: (pluginId: string, slotId: string) => void;
@@ -97,7 +99,7 @@ function catalogLabel(chinese: boolean, name: string, identifier: string): strin
 function HarnessPuzzleNode({ data, selected }: NodeProps<HarnessFlowNode>) {
   const {
     item, node, chinese, issueCodes, plugin, policyValue: value, preview, focus,
-    placement, runtimeNodeCount, onPluginDrop,
+    justSnapped, placement, runtimeNodeCount, onPluginDrop,
   } = data;
   const title = chinese ? item.title_zh : item.title;
   const subtitle = item.kind === "phase"
@@ -119,7 +121,7 @@ function HarnessPuzzleNode({ data, selected }: NodeProps<HarnessFlowNode>) {
 
   return (
     <article
-      className={`harness-visual-node is-${item.visual_kind} is-${item.kind} ${selected ? "is-selected" : ""} ${issueCodes.length ? "has-issue" : ""} ${preview ? "is-drop-preview" : ""} ${focus ? "is-focus" : ""}`}
+      className={`harness-visual-node is-${item.visual_kind} is-${item.kind} ${selected ? "is-selected" : ""} ${issueCodes.length ? "has-issue" : ""} ${preview ? "is-drop-preview" : ""} ${focus ? "is-focus" : ""} ${justSnapped ? "is-just-snapped" : ""}`}
       style={style}
       aria-label={title}
       onDragOver={item.kind === "plugin-slot" ? (event) => event.preventDefault() : undefined}
@@ -166,13 +168,12 @@ function HarnessFlowEdgeView({
 const nodeTypes = { harness: HarnessPuzzleNode };
 const edgeTypes = { "harness-flow": HarnessFlowEdgeView };
 
-const INITIAL_CANVAS_ZOOM: Record<1 | 2 | 3, number> = {
+const INITIAL_CANVAS_ZOOM: Record<1 | 2, number> = {
   1: 0.78,
   2: 0.82,
-  3: 0.84,
 };
 
-function CanvasInitialViewport({ signature, level }: { signature: string; level: 1 | 2 | 3 }) {
+function CanvasInitialViewport({ signature, level }: { signature: string; level: 1 | 2 }) {
   const nodesInitialized = useNodesInitialized();
   const { getNodes, getNodesBounds, getZoom, setCenter } = useReactFlow<HarnessFlowNode, HarnessFlowEdge>();
 
@@ -295,7 +296,29 @@ export function AutonomyHarness() {
   const [dryRun, setDryRun] = useState<AgentCoreHarnessDryRun | null>(null);
   const [receipts, setReceipts] = useState<Array<Record<string, unknown>> | null>(null);
   const [contextMenu, setContextMenu] = useState<{ itemId: string; x: number; y: number } | null>(null);
+  const [snappedItemId, setSnappedItemId] = useState<string | null>(null);
   const dragRef = useRef<{ id: string; originalIndex: number; targetIndex: number } | null>(null);
+  const snapTimerRef = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (snapTimerRef.current !== null) window.clearTimeout(snapTimerRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (!contextMenu) return undefined;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setContextMenu(null);
+    };
+    const close = () => setContextMenu(null);
+    window.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("blur", close);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("blur", close);
+      window.removeEventListener("resize", close);
+    };
+  }, [contextMenu]);
 
   const load = useCallback(async () => {
     try {
@@ -350,7 +373,7 @@ export function AutonomyHarness() {
   const nodeMap = useMemo(
     () => new Map((harness?.current.candidate.nodes ?? []).map((node) => [node.node_id, node])), [harness],
   );
-  const level = Math.min(3, path.length + 1) as 1 | 2 | 3;
+  const level = Math.min(2, path.length + 1) as 1 | 2;
   const parentId = path.at(-1) ?? null;
   const parentKey = parentId ?? "root";
 
@@ -373,16 +396,7 @@ export function AutonomyHarness() {
     return [...counts.entries()];
   }, [visibleItems]);
 
-  const displayItems = useMemo(() => {
-    if (level !== 3) return visibleItems;
-    const categoryOrder = ["orchestration", "safety", "memory", "control", "integration", "assurance"];
-    return [...visibleItems].sort((left, right) => {
-      const leftCategory = categoryOrder.indexOf(left.category_id);
-      const rightCategory = categoryOrder.indexOf(right.category_id);
-      const categoryDifference = (leftCategory < 0 ? 99 : leftCategory) - (rightCategory < 0 ? 99 : rightCategory);
-      return categoryDifference || left.order - right.order;
-    });
-  }, [level, visibleItems]);
+  const displayItems = visibleItems;
 
   const buildNodes = useCallback((
     items: AgentCoreHarnessCompositionItem[], previewIndex: number | null = null,
@@ -393,12 +407,12 @@ export function AutonomyHarness() {
       if (issue.node_id) issues.set(issue.node_id, [...(issues.get(issue.node_id) ?? []), issue.code]);
     }
     const placements = layoutHarnessItems(items, {
-      maxWidth: level === 3 ? 900 : 1140,
-      startX: level === 3 ? 62 : 54,
-      startY: level === 3 ? 190 : 86,
-      rowGap: level === 3 ? 144 : 166,
-      previewIndex, previewGap: 30,
-      breakOnCategory: level === 3,
+      maxWidth: 1140,
+      startX: 54,
+      startY: 86,
+      rowGap: 166,
+      previewIndex,
+      previewGap: 30,
     });
     const nextNodes = items.map((item, index): HarnessFlowNode => {
       const node = item.member_node_ids.length === 1 ? nodeMap.get(item.member_node_ids[0]) ?? null : null;
@@ -410,50 +424,21 @@ export function AutonomyHarness() {
         type: "harness",
         position: { x: placement.x, y: placement.y },
         data: {
-          item, node, chinese,
+          item: level === 2 ? { ...item, enterable: false } : item, node, chinese,
           issueCodes: item.member_node_ids.flatMap((id) => issues.get(id) ?? []),
           plugin, policyValue: policyValue(item, node, chinese), preview: false, focus: false,
-          placement, runtimeNodeCount: item.member_node_ids.filter((id) => nodeMap.has(id)).length,
+          placement, justSnapped: item.item_id === snappedItemId,
+          runtimeNodeCount: item.member_node_ids.filter((id) => nodeMap.has(id)).length,
           onPluginDrop: activatePlugin,
         },
         draggable: true,
       };
     });
-    if (level === 3 && parentId) {
-      const focusItem = itemMap.get(parentId);
-      const focusNode = focusItem?.member_node_ids.length === 1
-        ? nodeMap.get(focusItem.member_node_ids[0]) ?? null : null;
-      if (focusItem) {
-        const focusIsModel = focusItem.visual_kind === "model";
-        const focusBodyWidth = focusIsModel ? MODEL_BAR_WIDTH : puzzleBodyWidth(focusItem);
-        const focusPlacement: HarnessVisualPlacement = {
-          id: `focus:${focusItem.item_id}`,
-          x: focusIsModel ? 366 : 426,
-          y: focusIsModel ? 54 : 24,
-          row: 0,
-          bodyWidth: focusBodyWidth,
-          height: focusIsModel ? MODEL_BAR_HEIGHT : PUZZLE_HEIGHT,
-          kind: focusIsModel ? "model" : "puzzle",
-          left: { profile: "round", sign: 0 }, right: { profile: "round", sign: 0 },
-        };
-        nextNodes.unshift({
-          id: focusPlacement.id, type: "harness",
-          position: { x: focusPlacement.x, y: focusPlacement.y },
-          data: {
-            item: { ...focusItem, enterable: false },
-            node: focusNode, chinese, issueCodes: [], plugin: null, policyValue: null,
-            preview: false, focus: true, placement: focusPlacement,
-            runtimeNodeCount: focusItem.member_node_ids.filter((id) => nodeMap.has(id)).length,
-          },
-          draggable: false,
-        });
-      }
-    }
     return nextNodes;
-  }, [activatePlugin, catalog, chinese, harness, itemMap, level, nodeMap, parentId]);
+  }, [activatePlugin, catalog, chinese, harness, level, nodeMap, snappedItemId]);
 
   const buildEdges = useCallback((): HarnessFlowEdge[] => {
-    if (!harness || level === 3) return [];
+    if (!harness) return [];
     const nextEdges: HarnessFlowEdge[] = [];
     if (level === 1) {
       const owner = new Map<string, string>();
@@ -500,14 +485,19 @@ export function AutonomyHarness() {
   const selectedItem = selectedItemId ? itemMap.get(selectedItemId) ?? null : null;
   const selectedNode = selectedItem?.member_node_ids.length === 1
     ? nodeMap.get(selectedItem.member_node_ids[0]) ?? null : null;
-  const selectedSlot = selectedItem?.kind === "plugin-slot" ? selectedItem.plugin_slot_ids[0] : null;
-  const selectedSlotPlugins = selectedSlot ? (catalog?.plugins ?? []).filter((plugin) => plugin.slot_id === selectedSlot) : [];
-  const stageForLevel = level === 3 && parentId ? itemMap.get(parentId) ?? null : null;
-  const smallPlugins = (catalog?.plugins ?? []).filter((plugin) => (stageForLevel?.plugin_slot_ids ?? []).includes(plugin.slot_id));
+  const selectedDetails = selectedItem
+    ? (catalog?.composition_items ?? [])
+      .filter((item) => item.level === 3 && item.parent_item_id === selectedItem.item_id)
+      .sort((left, right) => left.order - right.order)
+    : [];
+  const selectedSlots = [...new Set([
+    ...(selectedItem?.plugin_slot_ids ?? []),
+    ...selectedDetails.flatMap((item) => item.plugin_slot_ids),
+  ])];
 
   const enterItem = (item: AgentCoreHarnessCompositionItem) => {
-    if (!item.enterable || item.level >= 3) return;
-    setPath((current) => item.level === 1 ? [item.item_id] : [current[0], item.item_id]);
+    if (!item.enterable || item.level !== 1) return;
+    setPath([item.item_id]);
     setSelectedItemId(null);
     setContextMenu(null);
   };
@@ -554,9 +544,7 @@ export function AutonomyHarness() {
     const drag = dragRef.current;
     if (!drag) return;
     const basePlacements = layoutHarnessItems(displayItems, {
-      maxWidth: level === 3 ? 900 : 1140, startX: level === 3 ? 62 : 54,
-      startY: level === 3 ? 190 : 86, rowGap: level === 3 ? 144 : 166,
-      breakOnCategory: level === 3,
+      maxWidth: 1140, startX: 54, startY: 86, rowGap: 166,
     });
     let targetIndex = 0;
     let distance = Number.POSITIVE_INFINITY;
@@ -585,6 +573,12 @@ export function AutonomyHarness() {
     const reordered = [...displayItems];
     const [moved] = reordered.splice(drag.originalIndex, 1);
     reordered.splice(drag.targetIndex, 0, moved);
+    setSnappedItemId(drag.id);
+    if (snapTimerRef.current !== null) window.clearTimeout(snapTimerRef.current);
+    snapTimerRef.current = window.setTimeout(() => {
+      setSnappedItemId(null);
+      snapTimerRef.current = null;
+    }, 460);
     setOrderByParent((current) => ({ ...current, [parentKey]: reordered.map((item) => item.item_id) }));
     setNodes(buildNodes(reordered));
     if (level === 2) {
@@ -631,9 +625,9 @@ export function AutonomyHarness() {
     <section className="harness-editor-page" onClick={() => setContextMenu(null)}>
       <header className="harness-editor-header">
         <div className="harness-editor-heading">
-          <h1>{chinese ? "编排器" : "Harness Composer"}</h1>
+          <h1>{chinese ? "Harness 编排器" : "Harness Composer"}</h1>
           <nav aria-label={chinese ? "插件页面" : "Plugin pages"}>
-            <NavLink to="/autonomy/plugins">{chinese ? "插件库" : "Plugin library"}</NavLink>
+            <NavLink end to="/autonomy/plugins">{chinese ? "插件库" : "Plugin library"}</NavLink>
             <NavLink to="/autonomy/plugins/harness">{chinese ? "编排器" : "Composer"}</NavLink>
           </nav>
         </div>
@@ -669,50 +663,41 @@ export function AutonomyHarness() {
       <div className="harness-level-bar">
         <nav aria-label={chinese ? "编排层级" : "Harness levels"}>
           <button type="button" className={!path.length ? "is-current" : ""}
-            onClick={() => { setPath([]); setSelectedItemId(null); }}>{chinese ? "完整流程" : "Workflow"}</button>
+            onClick={() => { setPath([]); setSelectedItemId(null); }}>{chinese ? "一级组合插件" : "Level-one blocks"}</button>
           {breadcrumbs.map((item, index) => <span key={item.item_id}><ChevronRight />
             <button type="button" className={index === breadcrumbs.length - 1 ? "is-current" : ""}
               onClick={() => { setPath(path.slice(0, index + 1)); setSelectedItemId(null); }}>
               {chinese ? item.title_zh : item.title}
             </button></span>)}
         </nav>
-        {level < 3 ? <div className="harness-flow-legend">
+        <div className="harness-flow-legend">
           <span><i className="is-solid" />{chinese ? "确定" : "Definite"}</span>
           <span><i className="is-dashed" />{chinese ? "可能" : "Possible"}</span>
           <span><b><BrainCircuit /></b>{chinese ? "模型" : "Model"}</span>
-        </div> : null}
+        </div>
       </div>
 
       {error ? <div className="harness-editor-error" role="alert"><AlertTriangle />{error}</div> : null}
 
       <div className={`harness-editor-workspace ${selectedItem ? "has-inspector" : ""}`}>
         <aside className="harness-palette">
-          <header><h2>{level === 1 ? (chinese ? "流程" : "Workflow") : level === 2 ? (chinese ? "节点" : "Nodes") : (chinese ? "插件" : "Plugins")}</h2><span>{displayItems.length}</span></header>
+          <header><h2>{level === 1 ? (chinese ? "一级插件" : "Level one") : (chinese ? "二级插件" : "Level two")}</h2><span>{displayItems.length}</span></header>
           <div className="harness-category-list">
             {categorySummary.map(([categoryId, count]) => <span key={categoryId}
               style={{ "--category-color": harnessCategoryColors[categoryId] } as CSSProperties}>
               <i />{categoryLabel(categoryId, chinese)}<b>{count}</b>
             </span>)}
           </div>
-          {level === 3 ? <div className="harness-plugin-pieces">
-            {[...new Set(smallPlugins.map((plugin) => plugin.slot_id))].map((slotId) => <section key={slotId}>
-              <h3>{slotTitle(slotId, chinese)}</h3>
-              {smallPlugins.filter((plugin) => plugin.slot_id === slotId).map((plugin) => <button
-                type="button" draggable disabled={busy !== null} className={plugin.enabled ? "is-enabled" : ""}
-                key={plugin.plugin_id}
-                onDragStart={(event) => {
-                  event.dataTransfer.effectAllowed = "move";
-                  event.dataTransfer.setData("application/x-dronedream-plugin", plugin.plugin_id);
-                }}
-                onClick={() => void activatePlugin(plugin.plugin_id, slotId)}>
-                <PlugZap /><span>{catalogLabel(chinese, plugin.name, plugin.plugin_id)}</span>
-              </button>)}
-            </section>)}
-          </div> : null}
-          <NavLink className="harness-switch-link" to="/autonomy/plugins"><ArrowLeft />{chinese ? "插件开关" : "Plugin switches"}</NavLink>
+          <p className="harness-level-explainer">{level === 1
+            ? (chinese ? "3–5 块即可构成一套中等长度 Harness。" : "Three to five blocks compose a medium Harness.")
+            : (chinese ? "原子能力可替换；策略作为内部设置呈现。" : "Atomic capabilities are replaceable; policies remain internal settings.")}</p>
+          <NavLink end className="harness-switch-link" to="/autonomy/plugins"><ArrowLeft />{chinese ? "返回插件概览" : "Back to overview"}</NavLink>
         </aside>
 
         <main className="harness-canvas" aria-label={chinese ? "Harness 拼图画布" : "Harness puzzle canvas"}>
+          <div className="harness-canvas-guide" aria-hidden="true"><Grip />
+            <span>{chinese ? "拖动拼接 · 双击展开 · 右键操作" : "Drag to join · Double-click to open · Right-click for actions"}</span>
+          </div>
           {harness && catalog ? <ReactFlow
             nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes}
             onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={connect}
@@ -726,7 +711,11 @@ export function AutonomyHarness() {
               event.preventDefault();
               const item = flowNode.data.item;
               setSelectedItemId(item.item_id);
-              setContextMenu({ itemId: item.item_id, x: event.clientX, y: event.clientY });
+              setContextMenu({
+                itemId: item.item_id,
+                x: Math.max(8, Math.min(event.clientX, window.innerWidth - 206)),
+                y: Math.max(8, Math.min(event.clientY, window.innerHeight - 154)),
+              });
             }}
             defaultViewport={{ x: 0, y: 0, zoom: INITIAL_CANVAS_ZOOM[level] }}
             minZoom={typeof window !== "undefined" && window.innerWidth <= 560 ? 0.2 : 0.45} maxZoom={1.7}
@@ -745,24 +734,36 @@ export function AutonomyHarness() {
             <span style={{ color: harnessCategoryColors[selectedItem.category_id] }}>{itemIcon(selectedItem, selectedNode?.node_kind)}</span>
             <div><strong>{chinese ? selectedItem.title_zh : selectedItem.title}</strong><small>{categoryLabel(selectedItem.category_id, chinese)}</small></div>
           </div>
-          {selectedItem.enterable ? <button type="button" className="harness-enter-level" onClick={() => enterItem(selectedItem)}><ChevronRight />{chinese ? "进入下一级" : "Enter next level"}</button> : null}
-          {selectedNode && selectedItem.kind === "policy" ? <>
-            {selectedItem.item_id.endsWith(".timeout") ? <label><span>{chinese ? "超时（秒）" : "Timeout (seconds)"}</span><input type="number" min={0.1} max={600} value={selectedNode.policy.timeout_seconds}
-              onChange={(event) => void edit("update_node", { node_id: selectedNode.node_id, policy: { timeout_seconds: Number(event.target.value) } })} /></label> : null}
-            {selectedItem.item_id.endsWith(".retry") ? <label><span>{chinese ? "重试次数" : "Retry limit"}</span><input type="number" min={0} max={5} value={selectedNode.policy.retry_limit}
-              onChange={(event) => void edit("update_node", { node_id: selectedNode.node_id, policy: { retry_limit: Number(event.target.value) } })} /></label> : null}
-            {selectedItem.item_id.endsWith(".failure") ? <label><span>{chinese ? "失败处理" : "Failure mode"}</span><select value={selectedNode.policy.failure_mode} disabled={selectedItem.protected}
-              onChange={(event) => void edit("update_node", { node_id: selectedNode.node_id, policy: { failure_mode: event.target.value } })}>
-              <option value="fail-closed">{chinese ? "失败即关闭" : "Fail closed"}</option><option value="isolate">{chinese ? "隔离" : "Isolate"}</option><option value="fallback">{chinese ? "回退" : "Fallback"}</option>
-            </select></label> : null}
-            {selectedItem.item_id.endsWith(".cache") ? <label className="harness-check-label"><input type="checkbox" checked={selectedNode.policy.cacheable}
-              onChange={(event) => void edit("update_node", { node_id: selectedNode.node_id, policy: { cacheable: event.target.checked } })} /><span>{chinese ? "允许节点缓存" : "Allow node cache"}</span></label> : null}
-          </> : null}
-          {selectedSlot ? <section className="harness-slot-options"><h3>{chinese ? "替换插件" : "Replace plugin"}</h3>
-            {selectedSlotPlugins.map((plugin) => <button type="button" className={plugin.enabled ? "is-active" : ""} key={plugin.plugin_id}
-              onClick={() => void activatePlugin(plugin.plugin_id, selectedSlot)} disabled={busy !== null}>
-              <span /><strong>{catalogLabel(chinese, plugin.name, plugin.plugin_id)}</strong>{plugin.enabled ? <Check /> : <PlugZap />}
-            </button>)}
+          {selectedItem.enterable && selectedItem.level === 1 ? <button type="button" className="harness-enter-level" onClick={() => enterItem(selectedItem)}><ChevronRight />{chinese ? "展开二级插件" : "Open level two"}</button> : null}
+          {selectedItem.level === 2 && (selectedDetails.length > 0 || selectedSlots.length > 0) ? <section className="harness-internal-settings">
+            <header><div><h3>{chinese ? "内部设置" : "Internal settings"}</h3><small>{chinese ? "不形成第三层插件" : "Not another plug-in level"}</small></div></header>
+            {selectedDetails.filter((detail) => detail.kind === "policy").map((detail) => {
+              const detailNode = detail.member_node_ids.length === 1 ? nodeMap.get(detail.member_node_ids[0]) ?? null : null;
+              if (!detailNode) return null;
+              return <div className="harness-policy-setting" key={detail.item_id}>
+                <strong>{chinese ? detail.title_zh : detail.title}</strong>
+                {detail.item_id.endsWith(".timeout") ? <label><span>{chinese ? "秒" : "Seconds"}</span><input type="number" min={0.1} max={600} value={detailNode.policy.timeout_seconds}
+                  onChange={(event) => void edit("update_node", { node_id: detailNode.node_id, policy: { timeout_seconds: Number(event.target.value) } })} /></label> : null}
+                {detail.item_id.endsWith(".retry") ? <label><span>{chinese ? "次数" : "Attempts"}</span><input type="number" min={0} max={5} value={detailNode.policy.retry_limit}
+                  onChange={(event) => void edit("update_node", { node_id: detailNode.node_id, policy: { retry_limit: Number(event.target.value) } })} /></label> : null}
+                {detail.item_id.endsWith(".failure") ? <label><span>{chinese ? "处理方式" : "Mode"}</span><select value={detailNode.policy.failure_mode} disabled={detail.protected}
+                  onChange={(event) => void edit("update_node", { node_id: detailNode.node_id, policy: { failure_mode: event.target.value } })}>
+                  <option value="fail-closed">{chinese ? "失败即关闭" : "Fail closed"}</option><option value="isolate">{chinese ? "隔离" : "Isolate"}</option><option value="fallback">{chinese ? "回退" : "Fallback"}</option>
+                </select></label> : null}
+                {detail.item_id.endsWith(".cache") ? <label className="harness-check-label"><input type="checkbox" checked={detailNode.policy.cacheable}
+                  onChange={(event) => void edit("update_node", { node_id: detailNode.node_id, policy: { cacheable: event.target.checked } })} /><span>{chinese ? "允许缓存" : "Allow cache"}</span></label> : null}
+              </div>;
+            })}
+            {selectedSlots.map((slotId) => {
+              const slotPlugins = (catalog?.plugins ?? []).filter((plugin) => plugin.slot_id === slotId);
+              if (!slotPlugins.length) return null;
+              return <section className="harness-slot-options" key={slotId}><h3>{slotTitle(slotId, chinese)}</h3>
+                {slotPlugins.map((plugin) => <button type="button" className={plugin.enabled ? "is-active" : ""} key={plugin.plugin_id}
+                  onClick={() => void activatePlugin(plugin.plugin_id, slotId)} disabled={busy !== null}>
+                  <span /><strong>{catalogLabel(chinese, plugin.name, plugin.plugin_id)}</strong>{plugin.enabled ? <Check /> : <PlugZap />}
+                </button>)}
+              </section>;
+            })}
           </section> : null}
           {selectedItem.protected ? <p className="harness-protected-note"><ShieldCheck />{chinese ? "安全边界不可绕过" : "Safety boundary cannot be bypassed"}</p> : null}
         </aside> : null}
@@ -787,12 +788,13 @@ export function AutonomyHarness() {
         }) : <li><span>{chinese ? "暂无记录" : "No receipts yet"}</span></li>}</ol>
       </section> : null}
 
-      {contextMenu && selectedItem ? <div className="harness-context-menu" style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(event) => event.stopPropagation()}>
-        {selectedItem.enterable ? <button type="button" onClick={() => enterItem(selectedItem)}>{chinese ? "进入下一级" : "Enter next level"}<ChevronRight /></button> : null}
-        <button type="button" onClick={() => { setSelectedItemId(selectedItem.item_id); setContextMenu(null); }}>{chinese ? "查看详情" : "Inspect"}</button>
-        {selectedItem.kind === "plugin-slot" ? <NavLink to="/autonomy/plugins">{chinese ? "插件开关" : "Plugin switches"}</NavLink> : null}
-        <button type="button" onClick={() => void runDry()}>{chinese ? "试运行" : "Dry run"}</button>
-        {selectedNode?.capabilities.removable ? <button type="button" className="is-danger" onClick={() => void edit("remove_node", { node_id: selectedNode.node_id })}>{chinese ? "移除节点" : "Remove node"}</button> : null}
+      {contextMenu && selectedItem ? <div className="harness-context-menu" role="menu" aria-label={chinese ? "拼图操作" : "Puzzle actions"} style={{ left: contextMenu.x, top: contextMenu.y }} onClick={(event) => event.stopPropagation()}>
+        {selectedItem.enterable && selectedItem.level === 1 ? <button role="menuitem" type="button" onClick={() => enterItem(selectedItem)}><Settings2 /><span>{chinese ? "展开二级插件" : "Open level two"}</span><ChevronRight className="is-trailing" /></button> : null}
+        <button role="menuitem" type="button" onClick={() => { setSelectedItemId(selectedItem.item_id); setContextMenu(null); }}><Eye /><span>{chinese ? "查看详情" : "Inspect"}</span></button>
+        {selectedItem.level === 2 ? (selectedItem.kind === "plugin-slot" ? <NavLink role="menuitem" to="/autonomy/plugins"><PlugZap /><span>{chinese ? "更换插件" : "Replace plug-in"}</span></NavLink>
+          : selectedNode?.capabilities.removable ? <button role="menuitem" type="button" className="is-danger" onClick={() => void edit("remove_node", { node_id: selectedNode.node_id })}><Trash2 /><span>{chinese ? "移除拼图" : "Remove piece"}</span></button>
+            : <button role="menuitem" type="button" onClick={() => void runDry()}><Play /><span>{chinese ? "试运行 Harness" : "Dry run Harness"}</span></button>) : null}
+        {selectedItem.level === 1 ? <button role="menuitem" type="button" onClick={() => void runDry()}><Play /><span>{chinese ? "试运行 Harness" : "Dry run Harness"}</span></button> : null}
       </div> : null}
     </section>
   );

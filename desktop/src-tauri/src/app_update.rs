@@ -1,9 +1,152 @@
 //! Same-display-version updater ordering for the 1.0.0 internal-test channel.
 
+use serde::Serialize;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
+use tauri::{Emitter, Manager};
+use tauri_plugin_updater::{Error as UpdaterError, UpdaterExt};
+
 const BUILD_NUMBER_PREFIX: &str = "build-number: ";
 const EDITION_ID_PREFIX: &str = "edition-id: ";
 const SOURCE_COMMIT_PREFIX: &str = "source-commit: ";
 const COMPILED_EDITION_ID: &str = env!("DRONEDREAM_DESKTOP_EDITION_ID");
+const UPDATE_PROGRESS_EVENT: &str = "dronedream-app-update-progress";
+const LEGACY_RUNTIME_IDLE_PROBE_UNAVAILABLE: &str =
+    "The Runtime Base must be upgraded before DroneDream can update safely.";
+
+#[derive(Default)]
+pub(crate) struct AppUpdateCoordinator {
+    running: AtomicBool,
+}
+
+struct AppUpdateGuard<'a>(&'a AtomicBool);
+
+impl Drop for AppUpdateGuard<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+    }
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AppUpdateProgress {
+    phase: &'static str,
+    progress: u8,
+    attempt: u32,
+}
+
+fn emit_progress(app: &tauri::AppHandle, phase: &'static str, progress: u8, attempt: u32) {
+    let _ = app.emit(
+        UPDATE_PROGRESS_EVENT,
+        AppUpdateProgress {
+            phase,
+            progress,
+            attempt,
+        },
+    );
+}
+
+fn updater_announced_size(raw: &serde_json::Value) -> Option<u64> {
+    raw.get("platforms")?
+        .get("windows-x86_64")?
+        .get("size")?
+        .as_u64()
+        .filter(|size| *size > 0)
+}
+
+fn retryable_download_error(error: &UpdaterError) -> bool {
+    matches!(
+        error,
+        UpdaterError::Io(_) | UpdaterError::Reqwest(_) | UpdaterError::Network(_)
+    )
+}
+
+fn ensure_update_idle_allowing_legacy_runtime() -> Result<(), String> {
+    match crate::engine_pack::ensure_app_update_idle() {
+        Ok(()) => Ok(()),
+        Err(error) if error.trim() == LEGACY_RUNTIME_IDLE_PROBE_UNAVAILABLE => Ok(()),
+        Err(error) => Err(error),
+    }
+}
+
+/// Own the complete update operation in the native process. WebView2 is free
+/// to throttle or suspend a minimized page without cancelling the download,
+/// signature verification, installer handoff, or final application restart.
+#[tauri::command]
+pub(crate) async fn download_install_app_update(
+    app: tauri::AppHandle,
+    coordinator: tauri::State<'_, AppUpdateCoordinator>,
+) -> Result<(), String> {
+    coordinator
+        .running
+        .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+        .map_err(|_| "An application update is already in progress.".to_string())?;
+    let _guard = AppUpdateGuard(&coordinator.running);
+
+    ensure_update_idle_allowing_legacy_runtime()?;
+    emit_progress(&app, "preflight", 5, 0);
+
+    let updater = app
+        .updater()
+        .map_err(|error| format!("Unable to initialize the signed updater: {error}"))?;
+    let update = updater
+        .check()
+        .await
+        .map_err(|error| format!("Unable to refresh the signed update: {error}"))?
+        .ok_or_else(|| "The signed update is no longer available.".to_string())?;
+    let announced_size = updater_announced_size(&update.raw_json);
+    let mut attempt = 0_u32;
+    let mut highest_progress = 5_u8;
+
+    let bytes = loop {
+        attempt = attempt.saturating_add(1);
+        let mut downloaded = 0_u64;
+        let chunk_app = app.clone();
+        let finish_app = app.clone();
+        let result = update
+            .download(
+                |chunk_length, content_length| {
+                    downloaded = downloaded.saturating_add(chunk_length as u64);
+                    let total = content_length.or(announced_size).unwrap_or(0);
+                    if total == 0 {
+                        return;
+                    }
+                    let next = (5_u64 + downloaded.saturating_mul(94) / total).min(99) as u8;
+                    if next > highest_progress {
+                        highest_progress = next;
+                        emit_progress(&chunk_app, "downloading", next, attempt);
+                    }
+                },
+                || emit_progress(&finish_app, "verifying", 99, attempt),
+            )
+            .await;
+
+        match result {
+            Ok(bytes) => break bytes,
+            Err(error) if retryable_download_error(&error) => {
+                emit_progress(&app, "retrying", highest_progress, attempt);
+                let delay = Duration::from_secs(2_u64.pow(attempt.min(4)));
+                tauri::async_runtime::spawn_blocking(move || std::thread::sleep(delay))
+                    .await
+                    .map_err(|join_error| {
+                        format!("Updater retry scheduling failed: {join_error}")
+                    })?;
+            }
+            Err(error) => return Err(format!("Signed update download failed: {error}")),
+        }
+    };
+
+    // A task could have started while the update downloaded. Re-check the
+    // native Runtime lease immediately before any process is stopped.
+    ensure_update_idle_allowing_legacy_runtime()?;
+    emit_progress(&app, "installing", 100, attempt);
+    crate::runtime_keepalive::stop_runtime_for_exit(app.clone(), app.state()).await?;
+    update
+        .install(bytes)
+        .map_err(|error| format!("Signed update installation failed: {error}"))?;
+    emit_progress(&app, "restarting", 100, attempt);
+    app.restart();
+}
 
 fn local_build_number() -> Option<u64> {
     env!("DRONEDREAM_BUILD_NUMBER").parse().ok()

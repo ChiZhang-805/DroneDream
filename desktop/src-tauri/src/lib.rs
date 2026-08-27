@@ -110,12 +110,14 @@ pub fn run() {
         });
 
     let builder = builder
+        .manage(app_update::AppUpdateCoordinator::default())
         .manage(runtime_installer::RuntimeInstaller::default())
         .manage(runtime_keepalive::RuntimeKeepalive::default())
         .manage(desktop_api_bridge::DesktopApiBridge::default());
 
     #[cfg(dronedream_field)]
     let builder = builder.invoke_handler(tauri::generate_handler![
+        app_update::download_install_app_update,
         browser_auth::begin_browser_auth,
         browser_auth::cancel_browser_auth,
         browser_auth::clear_browser_auth_vault,
@@ -170,6 +172,7 @@ pub fn run() {
 
     #[cfg(all(dronedream_hardware_domain, not(dronedream_lab), not(dronedream_field)))]
     let builder = builder.invoke_handler(tauri::generate_handler![
+        app_update::download_install_app_update,
         browser_auth::begin_browser_auth,
         browser_auth::cancel_browser_auth,
         browser_auth::clear_browser_auth_vault,
@@ -224,6 +227,7 @@ pub fn run() {
 
     #[cfg(dronedream_lab)]
     let builder = builder.invoke_handler(tauri::generate_handler![
+        app_update::download_install_app_update,
         browser_auth::begin_browser_auth,
         browser_auth::cancel_browser_auth,
         browser_auth::clear_browser_auth_vault,
@@ -279,6 +283,7 @@ pub fn run() {
 
     #[cfg(all(not(dronedream_hardware_domain), not(dronedream_field)))]
     let builder = builder.invoke_handler(tauri::generate_handler![
+        app_update::download_install_app_update,
         browser_auth::begin_browser_auth,
         browser_auth::cancel_browser_auth,
         browser_auth::clear_browser_auth_vault,

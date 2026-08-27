@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { check, type Update } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
 
 import {
   checkComponentUpdates as checkSignedComponentUpdates,
   ensureAppUpdateIdle,
   getEnginePackStatus,
+  installAppUpdateInBackground,
   installEmbeddedEnginePack,
   installComponentUpdate,
   isDesktopRuntime,
   probeRuntimeStatus,
-  stopRuntimeForExit,
   type ComponentUpdateId,
   type ComponentUpdateCandidate,
   type ComponentUpdateReport,
@@ -212,7 +211,6 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
   const enabled = options.enabled ?? true;
   const desktopRuntime = isDesktopRuntime();
   const updateRef = useRef<Update | null>(null);
-  const updateDownloadedRef = useRef(false);
   const checkGenerationRef = useRef(0);
   const installInFlightRef = useRef(false);
   const [state, setState] = useState<AppUpdateState>(() => (
@@ -397,7 +395,6 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
     try {
       const previousUpdate = updateRef.current;
       updateRef.current = null;
-      updateDownloadedRef.current = false;
       await previousUpdate?.close();
       if (generation !== checkGenerationRef.current) return;
       const update = await check({
@@ -469,7 +466,6 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
       }
       if (!update) return;
       updateRef.current = update;
-      updateDownloadedRef.current = false;
       setState({
         status: "available",
         availableVersion: update.version,
@@ -494,8 +490,6 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
       || installInFlightRef.current
     ) return;
     installInFlightRef.current = true;
-    let downloaded = 0;
-    let contentLength = updaterDownloadSize(update.rawJson);
     setState((current) => ({
       ...current,
       status: "downloading",
@@ -514,49 +508,23 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
         }));
         return;
       }
-      setState((current) => ({ ...current, progress: 5 }));
-      if (!updateDownloadedRef.current) {
-        await update.download((event) => {
-          if (event.event === "Started") {
-            contentLength = event.data.contentLength ?? contentLength;
-            setState((current) => ({ ...current, progress: 5 }));
-            return;
-          }
-          if (event.event === "Progress") {
-            downloaded += event.data.chunkLength;
-            if (contentLength > 0) {
-              const progress = Math.min(
-                99,
-                5 + Math.floor((downloaded / contentLength) * 94),
-              );
-              setState((current) => ({ ...current, progress }));
-            }
-            return;
-          }
-          setState((current) => ({ ...current, progress: 100 }));
-        });
-        updateDownloadedRef.current = true;
-      }
-      const finalBlock = await detectRunningUpdateBlock();
-      if (finalBlock) {
+      await installAppUpdateInBackground((event) => {
+        const installing = event.phase === "installing" || event.phase === "restarting";
         setState((current) => ({
           ...current,
-          status: "available",
-          progress: null,
-          blockedActivity: finalBlock,
+          status: installing ? "installing" : "downloading",
+          progress: Math.max(current.progress ?? 0, event.progress),
+          error: null,
         }));
-        return;
-      }
-      setState((current) => ({ ...current, status: "installing", progress: 100 }));
-      await stopRuntimeForExit();
-      await update.install();
-      await relaunch();
+      });
     } catch (error) {
+      const lateBlock = await detectRunningUpdateBlock();
       setState((current) => ({
         ...current,
         status: "available",
         progress: null,
         error: errorMessage(error),
+        blockedActivity: lateBlock,
       }));
     } finally {
       installInFlightRef.current = false;
@@ -612,20 +580,23 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
 
   useEffect(() => {
     if (!enabled) {
+      // Authentication refreshes can briefly remove the account from React
+      // state. Once the user has started an update, ownership has moved to the
+      // native process and must never be cancelled or visually reset.
+      if (installInFlightRef.current) return undefined;
       checkGenerationRef.current += 1;
       void updateRef.current?.close();
       updateRef.current = null;
-      updateDownloadedRef.current = false;
       setState(CURRENT_STATE);
       return;
     }
     if (import.meta.env.MODE === "test") {
       void checkForUpdates();
       return () => {
+        if (installInFlightRef.current) return;
         checkGenerationRef.current += 1;
         void updateRef.current?.close();
         updateRef.current = null;
-        updateDownloadedRef.current = false;
       };
     }
     void checkForAppUpdateSilently();
@@ -634,10 +605,10 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
     }, AUTOMATIC_UPDATE_CHECK_INTERVAL_MS);
     return () => {
       window.clearInterval(timer);
+      if (installInFlightRef.current) return;
       checkGenerationRef.current += 1;
       void updateRef.current?.close();
       updateRef.current = null;
-      updateDownloadedRef.current = false;
     };
   }, [checkForAppUpdateSilently, checkForUpdates, enabled]);
 

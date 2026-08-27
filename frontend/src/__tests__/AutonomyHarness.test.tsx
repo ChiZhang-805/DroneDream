@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -175,12 +175,14 @@ describe("visual Harness composer", () => {
 
     expect(await screen.findByText("任务接入")).toBeVisible();
     expect(screen.getByRole("link", { name: "插件库" })).toHaveAttribute("href", "/autonomy/plugins");
-    expect(screen.getByRole("link", { name: "插件开关" })).toHaveAttribute("href", "/autonomy/plugins");
+    expect(screen.getByRole("link", { name: "返回插件概览" })).toHaveAttribute("href", "/autonomy/plugins");
     expect(screen.getByText("R4")).toBeVisible();
     expect(screen.getByText("已激活")).toBeVisible();
 
     fireEvent.contextMenu(screen.getByRole("button", { name: "任务接入" }));
-    fireEvent.click(screen.getAllByRole("button", { name: /进入下一级/ }).at(-1)!);
+    const menu = screen.getByRole("menu", { name: "拼图操作" });
+    expect(within(menu).getAllByRole("menuitem")).toHaveLength(3);
+    fireEvent.click(within(menu).getByRole("menuitem", { name: /展开二级插件/ }));
     expect(await screen.findByRole("button", { name: "接收任务" })).toBeVisible();
   });
 });

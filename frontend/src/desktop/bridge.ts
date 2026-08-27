@@ -867,8 +867,20 @@ interface TauriWindowApi {
   getCurrentWindow(): DesktopWindowHandle;
 }
 
+interface TauriEvent<T = unknown> {
+  payload: T;
+}
+
+interface TauriEventApi {
+  listen<T>(
+    event: string,
+    handler: (event: TauriEvent<T>) => void,
+  ): Promise<() => void>;
+}
+
 interface TauriGlobal {
   core?: TauriCore;
+  event?: TauriEventApi;
   window?: TauriWindowApi;
 }
 
@@ -1423,6 +1435,64 @@ export function getEnginePackStatus(): Promise<EnginePackStatus> {
 
 export function ensureAppUpdateIdle(): Promise<void> {
   return invokeDesktop("ensure_app_update_idle", () => undefined);
+}
+
+export type AppUpdateProgressPhase =
+  | "preflight"
+  | "downloading"
+  | "retrying"
+  | "verifying"
+  | "installing"
+  | "restarting";
+
+export interface NativeAppUpdateProgress {
+  phase: AppUpdateProgressPhase;
+  progress: number;
+  attempt: number;
+}
+
+const APP_UPDATE_PROGRESS_PHASES = new Set<AppUpdateProgressPhase>([
+  "preflight",
+  "downloading",
+  "retrying",
+  "verifying",
+  "installing",
+  "restarting",
+]);
+
+function parseNativeAppUpdateProgress(value: unknown): NativeAppUpdateProgress {
+  const record = expectRecord(value, "app update progress");
+  const phase = expectString(record.phase, "app update progress.phase") as AppUpdateProgressPhase;
+  if (!APP_UPDATE_PROGRESS_PHASES.has(phase)) {
+    throw new Error("app update progress.phase is unsupported");
+  }
+  const progress = expectFiniteNumber(record.progress, "app update progress.progress");
+  const attempt = expectFiniteNumber(record.attempt, "app update progress.attempt");
+  if (!Number.isInteger(progress) || progress < 0 || progress > 100) {
+    throw new Error("app update progress.progress must be an integer from 0 to 100");
+  }
+  if (!Number.isInteger(attempt) || attempt < 0) {
+    throw new Error("app update progress.attempt must be a non-negative integer");
+  }
+  return { phase, progress, attempt };
+}
+
+export async function installAppUpdateInBackground(
+  onProgress: (progress: NativeAppUpdateProgress) => void,
+): Promise<void> {
+  const eventApi = typeof window === "undefined" ? undefined : window.__TAURI__?.event;
+  if (!eventApi || typeof eventApi.listen !== "function") {
+    throw new DesktopRuntimeUnavailableError();
+  }
+  const unlisten = await eventApi.listen<unknown>(
+    "dronedream-app-update-progress",
+    (event) => onProgress(parseNativeAppUpdateProgress(event.payload)),
+  );
+  try {
+    await invokeDesktop("download_install_app_update", () => undefined);
+  } finally {
+    unlisten();
+  }
 }
 
 export function installEmbeddedEnginePack(): Promise<EnginePackStatus> {

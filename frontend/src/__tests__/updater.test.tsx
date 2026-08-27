@@ -6,6 +6,7 @@ const {
   checkComponentUpdatesMock,
   ensureAppUpdateIdleMock,
   getEnginePackStatusMock,
+  installAppUpdateInBackgroundMock,
   installEmbeddedEnginePackMock,
   installComponentUpdateMock,
   listJobsMock,
@@ -17,6 +18,7 @@ const {
   checkComponentUpdatesMock: vi.fn(),
   ensureAppUpdateIdleMock: vi.fn(),
   getEnginePackStatusMock: vi.fn(),
+  installAppUpdateInBackgroundMock: vi.fn(),
   installEmbeddedEnginePackMock: vi.fn(),
   installComponentUpdateMock: vi.fn(),
   listJobsMock: vi.fn(),
@@ -36,6 +38,7 @@ vi.mock("../desktop/bridge", () => ({
   ensureAppUpdateIdle: ensureAppUpdateIdleMock,
   checkComponentUpdates: checkComponentUpdatesMock,
   getEnginePackStatus: getEnginePackStatusMock,
+  installAppUpdateInBackground: installAppUpdateInBackgroundMock,
   installEmbeddedEnginePack: installEmbeddedEnginePackMock,
   installComponentUpdate: installComponentUpdateMock,
   probeRuntimeStatus: probeRuntimeStatusMock,
@@ -109,6 +112,13 @@ beforeEach(() => {
     message: null,
   });
   installEmbeddedEnginePackMock.mockReset();
+  installAppUpdateInBackgroundMock.mockReset();
+  installAppUpdateInBackgroundMock.mockImplementation(async (onProgress: (event: {
+    phase: string; progress: number; attempt: number;
+  }) => void) => {
+    onProgress({ phase: "downloading", progress: 48, attempt: 1 });
+    onProgress({ phase: "installing", progress: 100, attempt: 1 });
+  });
   checkComponentUpdatesMock.mockReset();
   checkComponentUpdatesMock.mockResolvedValue({
     catalogSequence: 1,
@@ -213,9 +223,8 @@ describe("useAppUpdater", () => {
 
   it("starts only one installer when invoked twice before rerender", async () => {
     const installing = deferred<void>();
-    const availableUpdate = update("1.0.2", {
-      install: vi.fn(() => installing.promise),
-    });
+    const availableUpdate = update("1.0.2");
+    installAppUpdateInBackgroundMock.mockReturnValue(installing.promise);
     checkMock.mockResolvedValue(availableUpdate);
     const hook = renderHook(() => useAppUpdater());
     await waitFor(() => expect(hook.result.current.status).toBe("available"));
@@ -226,12 +235,11 @@ describe("useAppUpdater", () => {
       firstInstall = hook.result.current.installAvailableUpdate();
       secondInstall = hook.result.current.installAvailableUpdate();
     });
-    await waitFor(() => expect(availableUpdate.download).toHaveBeenCalledOnce());
-    await waitFor(() => expect(availableUpdate.install).toHaveBeenCalledOnce());
+    await waitFor(() => expect(installAppUpdateInBackgroundMock).toHaveBeenCalledOnce());
 
     installing.resolve();
     await act(async () => Promise.all([firstInstall, secondInstall]));
-    expect(relaunchMock).toHaveBeenCalledOnce();
+    expect(installAppUpdateInBackgroundMock).toHaveBeenCalledOnce();
     hook.unmount();
   });
 
@@ -259,10 +267,8 @@ describe("useAppUpdater", () => {
 
     await act(async () => hook.result.current.installAvailableUpdate());
 
-    expect(availableUpdate.download).not.toHaveBeenCalled();
-    expect(availableUpdate.install).not.toHaveBeenCalled();
+    expect(installAppUpdateInBackgroundMock).not.toHaveBeenCalled();
     expect(stopRuntimeForExitMock).not.toHaveBeenCalled();
-    expect(relaunchMock).not.toHaveBeenCalled();
     expect(hook.result.current.status).toBe("available");
     expect(hook.result.current.blockedActivity).toMatchObject({
       kind: "running",
@@ -271,32 +277,50 @@ describe("useAppUpdater", () => {
     hook.unmount();
   });
 
-  it("downloads through 100 percent and bootstraps an app update over a legacy Runtime", async () => {
-    const availableUpdate = update("1.0.2", {
-      rawJson: {
-        platforms: { "windows-x86_64": { size: 100 } },
-      },
-      download: vi.fn(async (onEvent: (event: unknown) => void) => {
-        onEvent({ event: "Started", data: {} });
-        onEvent({ event: "Progress", data: { chunkLength: 40 } });
-        onEvent({ event: "Progress", data: { chunkLength: 60 } });
-        onEvent({ event: "Finished" });
-      }),
-    });
+  it("hands the complete download, install, and restart lifecycle to the native process", async () => {
+    const availableUpdate = update("1.0.2");
     checkMock.mockResolvedValue(availableUpdate);
     const hook = renderHook(() => useAppUpdater());
     await waitFor(() => expect(hook.result.current.status).toBe("available"));
 
     await act(async () => hook.result.current.installAvailableUpdate());
 
-    expect(availableUpdate.download).toHaveBeenCalledOnce();
-    expect(stopRuntimeForExitMock).toHaveBeenCalledOnce();
-    expect(availableUpdate.install).toHaveBeenCalledOnce();
-    expect(relaunchMock).toHaveBeenCalledOnce();
-    expect(probeRuntimeStatusMock).toHaveBeenCalledTimes(2);
-    expect(availableUpdate.download.mock.invocationCallOrder[0]).toBeLessThan(
-      availableUpdate.install.mock.invocationCallOrder[0],
+    expect(installAppUpdateInBackgroundMock).toHaveBeenCalledOnce();
+    expect(hook.result.current.progress).toBe(100);
+    expect(hook.result.current.status).toBe("installing");
+    expect(probeRuntimeStatusMock).toHaveBeenCalledOnce();
+    hook.unmount();
+  });
+
+  it("does not cancel or reset a native update during a transient auth disable", async () => {
+    const nativeUpdate = deferred<void>();
+    installAppUpdateInBackgroundMock.mockImplementation(async (onProgress: (event: {
+      phase: string; progress: number; attempt: number;
+    }) => void) => {
+      onProgress({ phase: "downloading", progress: 41, attempt: 1 });
+      await nativeUpdate.promise;
+    });
+    const availableUpdate = update("1.0.2");
+    checkMock.mockResolvedValue(availableUpdate);
+    const hook = renderHook(
+      ({ enabled }) => useAppUpdater({ enabled }),
+      { initialProps: { enabled: true } },
     );
+    await waitFor(() => expect(hook.result.current.status).toBe("available"));
+
+    let installation!: Promise<void>;
+    act(() => {
+      installation = hook.result.current.installAvailableUpdate();
+    });
+    await waitFor(() => expect(hook.result.current.progress).toBe(41));
+
+    hook.rerender({ enabled: false });
+    expect(hook.result.current.status).toBe("downloading");
+    expect(hook.result.current.progress).toBe(41);
+    expect(availableUpdate.close).not.toHaveBeenCalled();
+
+    nativeUpdate.resolve();
+    await act(async () => installation);
     hook.unmount();
   });
 

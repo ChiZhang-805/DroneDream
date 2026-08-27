@@ -136,7 +136,10 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             },
             {
               path: "plugins/harness",
-              element: <Navigate to="/autonomy/plugins" replace />,
+              lazy: async () => {
+                const { AutonomyHarness } = await import("./pages/AutonomyHarness");
+                return { Component: AutonomyHarness };
+              },
             },
             {
               path: "mission",
