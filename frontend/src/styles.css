@@ -10924,7 +10924,7 @@ a {
 .launcher-brand .brand-lockup {
   display: block;
   width: auto;
-  height: 43px;
+  height: 38px;
   object-fit: contain;
 }
 
@@ -15146,7 +15146,7 @@ a {
 @media (max-width: 620px) {
   .app-shell-launcher { --launcher-chrome-height: 62px; }
   .launcher-chrome { padding: 0 0.85rem; }
-  .launcher-brand .brand-lockup { height: 36px; }
+  .launcher-brand .brand-lockup { height: 32px; }
   .launcher-runtime-indicator { display: none; }
   .launcher-settings-button { width: 36px; height: 36px; }
   .launcher-language-options { grid-template-columns: 1fr; }
@@ -15178,7 +15178,7 @@ a {
 @media (max-height: 780px) and (min-width: 621px) {
   .app-shell-launcher { --launcher-chrome-height: 58px; }
   .launcher-chrome { padding: 0 1.4rem; }
-  .launcher-brand .brand-lockup { height: 39px; }
+  .launcher-brand .brand-lockup { height: 35px; }
   .launcher-hero { margin-top: 0; }
   .launcher-hero-copy { bottom: 1.2rem; }
   .launcher-hero-copy h1 { font-size: clamp(1.7rem, 3.2vw, 2.8rem); }

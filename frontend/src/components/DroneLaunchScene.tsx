@@ -666,24 +666,62 @@ function buildNightCity(
     return mesh;
   };
 
-  addFlatBox(31, 1.3, 0, 1.6, road);
-  addFlatBox(1.35, 31, 0, 0, road);
-  addFlatBox(31, 1.05, 0, -6.2, road);
+  // Road surfaces and paint must remain coplanar. Thin boxes made the lane
+  // paint behave like a curb, so wheels appeared to intersect the markings.
+  const addRoadSurface = (
+    width: number,
+    depth: number,
+    x: number,
+    z: number,
+    material: THREE.Material,
+    y = 0.006,
+  ) => {
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), material);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(x, y, z);
+    mesh.receiveShadow = true;
+    group.add(mesh);
+    return mesh;
+  };
+
+  addRoadSurface(31, 1.3, 0, 1.6, road);
+  addRoadSurface(1.35, 31, 0, 0, road);
+  addRoadSurface(31, 1.05, 0, -6.2, road);
 
   const sidewalk = new THREE.MeshStandardMaterial({
     color: 0x2b2e3d,
     roughness: 0.88,
     metalness: 0.08,
   });
-  for (const z of [0.8, 2.4, -6.86, -5.55]) addFlatBox(31, 0.23, 0, z, sidewalk, 0.07);
-  for (const x of [-0.82, 0.82]) addFlatBox(0.23, 31, x, 0, sidewalk, 0.07);
+  const addHorizontalCurb = (z: number) => {
+    for (const x of [-8.24, 8.24]) addFlatBox(14.52, 0.23, x, z, sidewalk, 0.055);
+  };
+  for (const z of [0.8, 2.4, -6.86, -5.55]) addHorizontalCurb(z);
+  const verticalCurbSegments: Array<[number, number]> = [
+    [-11.18, 8.64],
+    [-2.38, 5.98],
+    [8.98, 13.04],
+  ];
+  for (const x of [-0.82, 0.82]) {
+    for (const [z, depth] of verticalCurbSegments) {
+      addFlatBox(0.23, depth, x, z, sidewalk, 0.055);
+    }
+  }
 
   for (let x = -14; x <= 14; x += 1.7) {
-    addFlatBox(0.76, 0.055, x, 1.6, roadLine, 0.052);
-    addFlatBox(0.76, 0.05, x, -6.2, roadLine, 0.052);
+    // A centre line terminates before an intersection; it never crosses the
+    // pedestrian zone or continues through the junction itself.
+    if (Math.abs(x) > 1.42) {
+      addRoadSurface(0.76, 0.05, x, 1.6, roadLine, 0.012);
+      addRoadSurface(0.76, 0.05, x, -6.2, roadLine, 0.012);
+    }
   }
   for (let z = -14; z <= 14; z += 1.7) {
-    addFlatBox(0.05, 0.76, 0, z, roadLine, 0.052);
+    const insideNorthJunction = Math.abs(z - 1.6) < 1.18;
+    const insideSouthJunction = Math.abs(z + 6.2) < 1.05;
+    if (!insideNorthJunction && !insideSouthJunction) {
+      addRoadSurface(0.05, 0.76, 0, z, roadLine, 0.012);
+    }
   }
 
   const crosswalkMaterial = new THREE.MeshBasicMaterial({
@@ -692,9 +730,36 @@ function buildNightCity(
     opacity: 0.68,
     toneMapped: false,
   });
-  for (const crossingZ of [1.6, -6.2]) {
-    for (let stripe = -3; stripe <= 3; stripe += 1) {
-      addFlatBox(0.13, 0.62, stripe * 0.22, crossingZ, crosswalkMaterial, 0.061);
+  for (const junctionZ of [1.6, -6.2]) {
+    const horizontalRoadDepth = junctionZ > 0 ? 1.3 : 1.05;
+    // Two crossings across the east-west road, one on each side of the
+    // junction. The bars run in the walking direction and stop at the curbs.
+    for (const crossingX of [-1.12, 1.12]) {
+      for (let stripe = -2; stripe <= 2; stripe += 1) {
+        addRoadSurface(
+          0.12,
+          horizontalRoadDepth * 0.76,
+          crossingX + stripe * 0.17,
+          junctionZ,
+          crosswalkMaterial,
+          0.014,
+        );
+      }
+    }
+    // North and south crossings span the vertical road. Keeping them outside
+    // the turning box prevents the unrealistic white grid seen at the centre.
+    const crossingOffset = horizontalRoadDepth / 2 + 0.34;
+    for (const crossingZ of [junctionZ - crossingOffset, junctionZ + crossingOffset]) {
+      for (let stripe = -2; stripe <= 2; stripe += 1) {
+        addRoadSurface(
+          1.02,
+          0.11,
+          0,
+          crossingZ + stripe * 0.17,
+          crosswalkMaterial,
+          0.014,
+        );
+      }
     }
   }
 
@@ -751,7 +816,9 @@ function buildNightCity(
   const buildingPositions: Array<[number, number]> = [];
   for (const x of [-12.6, -10.2, -7.8, -5.4, -2.8, 2.4, 4.1, 8.5, 11, 13]) {
     for (const z of [-11.8, -9.1, -3.9, -1.1, 4.5, 7.3, 10.2, 12.6]) {
-      const stadiumZone = x < -6.1 && z > -5.7 && z < -0.3;
+      // Reserve the full stadium footprint plus a visual buffer. Buildings at
+      // x=-5.4 previously sat directly in front of the track from the camera.
+      const stadiumZone = x < -5.05 && z > -6.05 && z < 0.2;
       const riverZone = x > 4.45 && x < 7.9;
       const roadZone = Math.abs(z - 1.6) < 1.15 || Math.abs(z + 6.2) < 1.0;
       const launchClearance = Math.hypot(x, z) < 4.45;
