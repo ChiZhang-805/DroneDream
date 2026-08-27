@@ -711,14 +711,14 @@ function buildNightCity(
   for (let x = -14; x <= 14; x += 1.7) {
     // A centre line terminates before an intersection; it never crosses the
     // pedestrian zone or continues through the junction itself.
-    if (Math.abs(x) > 1.42) {
+    if (Math.abs(x) > 1.82) {
       addRoadSurface(0.76, 0.05, x, 1.6, roadLine, 0.012);
       addRoadSurface(0.76, 0.05, x, -6.2, roadLine, 0.012);
     }
   }
   for (let z = -14; z <= 14; z += 1.7) {
-    const insideNorthJunction = Math.abs(z - 1.6) < 1.18;
-    const insideSouthJunction = Math.abs(z + 6.2) < 1.05;
+    const insideNorthJunction = Math.abs(z - 1.6) < 1.62;
+    const insideSouthJunction = Math.abs(z + 6.2) < 1.48;
     if (!insideNorthJunction && !insideSouthJunction) {
       addRoadSurface(0.05, 0.76, 0, z, roadLine, 0.012);
     }
