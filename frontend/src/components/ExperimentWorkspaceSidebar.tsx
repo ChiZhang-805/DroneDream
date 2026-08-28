@@ -43,7 +43,7 @@ interface ExperimentWorkspaceSidebarProps {
 
 const COPY = {
   en: {
-    heading: "Experiments",
+    heading: "Experiment",
     archived: "Archived",
     scrollDown: "Show more experiments",
     rename: "Rename",
@@ -63,7 +63,7 @@ const COPY = {
       `Permanently delete draft “${name}”? This cannot be undone.`,
   },
   zh: {
-    heading: "实验",
+    heading: "Experiment",
     archived: "已归档",
     scrollDown: "查看更多实验",
     rename: "重命名",

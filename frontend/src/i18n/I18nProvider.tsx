@@ -48,7 +48,7 @@ const enTranslations = {
     "app.platformField": "Field Operations & Tuning",
     "app.platformAutonomy": "Natural-Language Autonomous Missions",
     "app.primaryNav": "Primary navigation",
-    "app.navSectionAutonomy": "Autonomous tasks",
+    "app.navSectionAutonomy": "Autonomous Task",
     "app.navSectionExperiment": "Experiments & validation",
     "app.navSectionWorkspace": "Workspace",
     "app.navSectionOperations": "Field operations",

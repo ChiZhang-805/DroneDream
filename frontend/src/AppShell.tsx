@@ -234,9 +234,8 @@ const SIM_NAV_ITEMS: NavigationItem[] = [
     to: "/jobs/new",
     labelKey: "app.experimentBuilder",
     icon: SlidersHorizontal,
-    sectionKey: "app.navSectionExperiment",
   },
-  { ...DASHBOARD_NAV_ITEM, sectionKey: "app.navSectionWorkspace" },
+  DASHBOARD_NAV_ITEM,
   SCENARIOS_NAV_ITEM,
   HISTORY_NAV_ITEM,
 ];
@@ -262,12 +261,11 @@ const LAB_NAV_ITEMS: NavigationItem[] = [
     to: "/jobs/new",
     labelKey: "app.experimentBuilder",
     icon: SlidersHorizontal,
-    sectionKey: "app.navSectionExperiment",
   },
   LAB_WORKSPACE_NAV_ITEMS[0],
   LAB_WORKSPACE_NAV_ITEMS[1],
   { to: "/lab/validation", labelKey: "app.labValidation", icon: ShieldCheck },
-  { ...HISTORY_NAV_ITEM, sectionKey: "app.navSectionRecords" },
+  HISTORY_NAV_ITEM,
 ];
 
 const FIELD_NAV_ITEMS: NavigationItem[] = [
@@ -278,7 +276,6 @@ const FIELD_NAV_ITEMS: NavigationItem[] = [
     labelKey: "app.fieldDeviceSetup",
     end: true,
     icon: RadioTower,
-    sectionKey: "app.navSectionOperations",
   },
   {
     to: "/field/tuning",
@@ -292,7 +289,7 @@ const FIELD_NAV_ITEMS: NavigationItem[] = [
     end: true,
     icon: ShieldCheck,
   },
-  { ...HISTORY_NAV_ITEM, sectionKey: "app.navSectionRecords" },
+  HISTORY_NAV_ITEM,
 ];
 
 const AUTONOMY_NAV_ITEMS: NavigationItem[] = [
@@ -301,6 +298,7 @@ const AUTONOMY_NAV_ITEMS: NavigationItem[] = [
     labelKey: "app.conversation",
     end: true,
     icon: BotMessageSquare,
+    sectionKey: "app.navSectionAutonomy",
   },
   {
     to: "/autonomy/aircraft",
@@ -718,7 +716,6 @@ function AllowanceUsageHistory({
     `${copy.tokens}: ${number.format(day.total_tokens)}`,
     `${copy.requests}: ${number.format(day.request_count)}`,
   ].join(" · ");
-  const hasUsage = visibleDays.some((day) => day.consumed_ai_credits > 0);
   const linePoints = range === 30
     ? visibleDays.map((day, index) => {
         const x = visibleDays.length <= 1 ? 0 : (index / (visibleDays.length - 1)) * 300;
@@ -803,7 +800,6 @@ function AllowanceUsageHistory({
           ) : null}
         </div>
       )}
-      {!hasUsage ? <p className="settings-allowance-empty">{copy.empty}</p> : null}
     </section>
   );
 }
@@ -2421,51 +2417,21 @@ function SettingsDialog({
         </section>
         {modelAccess.accessMode === "platform" ? (
           <div className="settings-model-usage">
-            <section className="settings-model-section settings-model-included-section" aria-labelledby="settings-included-model-title">
-              <header className="settings-model-section-heading">
-                <h3 id="settings-included-model-title">{t("settings.model.includedModel")}</h3>
-              </header>
-              <div className="settings-managed-model-row">
-              <AssistantModelPicker
-                ariaLabel={t("settings.model.includedModel")}
-                chooseModelLabel={locale === "zh-CN" ? "选择模型" : "Choose model"}
-                defaultGroupLabel={locale === "zh-CN" ? "默认" : "Default"}
-                customGroupLabel={locale === "zh-CN" ? "自定义" : "Custom"}
-                addCustomModelLabel={locale === "zh-CN" ? "添加自定义模型" : "Add custom model"}
-                temporarilyUnavailableLabel={locale === "zh-CN" ? "暂时不可用" : "Temporarily unavailable"}
-                defaultModels={managedModels}
-                customProfiles={[]}
-                selectedDefault={managedModels.find((model) =>
-                  model.provider === modelAccess.managedProvider
-                    && model.model === modelAccess.managedModel
-                    && managedModelAvailableForAssistant(model)
-                ) ?? null}
-                selectedCustomId={null}
-                disabled={!managedModels.some(managedModelAvailableForAssistant)}
-                onSelectDefault={(model) => selectManagedModel(model.provider, model.model)}
-                onSelectCustom={() => undefined}
-                onOpenSettings={() => undefined}
-                showCustomSection={false}
-              />
-              </div>
-            </section>
             <section className="settings-model-section settings-model-current-plan-section" aria-labelledby="settings-current-plan-title">
-              <header className="settings-model-section-heading">
-                <h3 id="settings-current-plan-title">{t("settings.model.currentPlan")}</h3>
-              </header>
               <div className="settings-model-plan-row">
-              <div>
-                <strong>{managedUsage?.plan.name ?? "Free / Plus / Pro"}</strong>
-              </div>
-              <a
-                href="https://getdronedream.com/pricing/"
-                target="_blank"
-                rel="noreferrer"
-                className="btn"
-                onClick={openSubscriptionPage}
-              >
-                {t("settings.model.manageSubscription")}
-              </a>
+                <div className="settings-model-plan-title" id="settings-current-plan-title">
+                  <span>{t("settings.model.currentPlan")}:</span>
+                  <strong>{managedUsage?.plan.name ?? "Free / Plus / Pro"}</strong>
+                </div>
+                <a
+                  href="https://getdronedream.com/pricing/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn"
+                  onClick={openSubscriptionPage}
+                >
+                  {t("settings.model.manageSubscription")}
+                </a>
               </div>
             {!auth.account && !docsPreview ? (
               <p className="settings-model-usage-message">
@@ -3141,13 +3107,11 @@ function AccountPlanLabel({ authenticated }: { authenticated: boolean }) {
 function AccountMenuPopover({
   menuRef,
   onClose,
-  onOpenProfile,
   onOpenAllowance,
   onOpenSettings,
 }: {
   menuRef: RefObject<HTMLDivElement>;
   onClose: () => void;
-  onOpenProfile: () => void;
   onOpenAllowance: () => void;
   onOpenSettings: () => void;
 }) {
@@ -3200,19 +3164,6 @@ function AccountMenuPopover({
 
   return (
     <div ref={menuRef} className="account-menu-popover" role="menu" aria-label={copy.account}>
-      <button
-        type="button"
-        className="account-menu-profile"
-        role="menuitem"
-        aria-label="Edit profile"
-        onClick={onOpenProfile}
-      >
-        <AccountAvatar account={auth.account} className="account-menu-avatar" />
-        <span>
-          <strong>{auth.account?.displayName ?? copy.account}</strong>
-          <small>{copy.account}</small>
-        </span>
-      </button>
       <button type="button" className="account-menu-row account-menu-token" role="menuitem" onClick={onOpenAllowance}>
         <Gauge aria-hidden="true" strokeWidth={1.8} />
         <span>{copy.remainingAllowance}</span>
@@ -4102,9 +4053,6 @@ function AppShellContent() {
           ? FIELD_NAV_ITEMS
           : AUTONOMY_NAV_ITEMS
     : MODE_NAV_ITEMS[universalMode];
-  const autonomySidebarActive = EDITION_IS_FIXED
-    ? BUILD_EDITION === "autonomy"
-    : universalMode === "autonomy";
   const sidebarUpdateLabel = sidebarUpdateBusy
     ? `${t("updater.sidebarProgress")} ${sidebarUpdateProgress}%`
     : updater.error
@@ -4836,22 +4784,16 @@ function AppShellContent() {
             </NavLink>
           ) : null}
           </nav>
-          {!autonomySidebarActive ? (
-            <ExperimentWorkspaceSidebar
-              ownerId={auth.account?.id ?? "local"}
-              locale={locale}
-              edition={activeThemeEdition}
-            />
-          ) : null}
+          <ExperimentWorkspaceSidebar
+            ownerId={auth.account?.id ?? "local"}
+            locale={locale}
+            edition={activeThemeEdition}
+          />
           <div className="app-sidebar-footer">
             {accountMenuOpen && auth.account ? (
               <AccountMenuPopover
                 menuRef={accountMenuRef}
                 onClose={() => setAccountMenuOpen(false)}
-                onOpenProfile={() => {
-                  setAccountMenuOpen(false);
-                  setAccountOpen(true);
-                }}
                 onOpenAllowance={() => {
                   openSettingsWorkspace("model", "account");
                 }}

@@ -54,7 +54,7 @@ describe("ExperimentWorkspaceSidebar", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("region", { name: "Experiments" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Experiment" })).toBeInTheDocument();
   });
 
   it("submits a job rename only once when the button receives focus", async () => {

@@ -23310,6 +23310,76 @@ body {
   padding-inline: 0;
 }
 
+/* August 28: keep the default-model surface compact and visually aligned.
+   The plan label, value and action are one row; every module shares the same
+   inset and the same vertical rhythm. */
+.app-shell .settings-workspace-content .settings-model-panel,
+.app-shell .settings-workspace-content .settings-model-usage {
+  gap: clamp(0.85rem, 1.4vh, 1.15rem);
+}
+
+.app-shell .settings-workspace-content .settings-model-section.settings-model-mode-row {
+  padding-inline: 1.1rem;
+}
+
+.app-shell .settings-workspace-content .settings-model-current-plan-section {
+  padding: 1rem 1.1rem;
+}
+
+.app-shell .settings-workspace-content .settings-model-current-plan-section .settings-model-plan-row {
+  min-height: 3rem;
+  padding: 0 0 0.75rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
+}
+
+.app-shell .settings-workspace-content .settings-model-plan-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.42rem;
+  min-width: 0;
+}
+
+.app-shell .settings-workspace-content .settings-model-plan-title > span,
+.app-shell .settings-workspace-content .settings-model-plan-title > strong {
+  margin: 0;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 760;
+  line-height: 1.3;
+}
+
+.app-shell .settings-workspace-content .settings-model-plan-row > .btn {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+/* The history label is sentence case and sits directly under the navigation,
+   matching the requested Codex-style conversation list. */
+.app-shell:not(.app-shell-launcher) .app-workspaces-header {
+  padding-inline: 0.72rem;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.app-shell:not(.app-shell-launcher) .app-mobile-menu-panel > .app-nav {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 760px) {
+  .app-shell .settings-workspace-content .settings-model-current-plan-section .settings-model-plan-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .app-shell .settings-workspace-content .settings-model-plan-row > .btn {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
 .settings-workspace-content .settings-memory-domain-consent {
   min-height: 3.15rem;
   grid-template-columns: minmax(220px, 1fr) minmax(140px, auto) minmax(140px, auto);

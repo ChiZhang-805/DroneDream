@@ -60,7 +60,7 @@ describe("workspace account entry", () => {
 
     const accountButton = screen.getByRole("button", { name: "Account" });
     expect(accountButton).toHaveTextContent("Local user");
-    expect(accountButton).toHaveTextContent("Local workspace");
+    expect(accountButton).toHaveTextContent("Free");
     fireEvent.click(accountButton);
 
     const dialog = screen.getByRole("dialog", { name: "Local workspace" });
@@ -106,8 +106,8 @@ describe("workspace account entry", () => {
     };
 
     expect(navigationLabels()).toEqual([
-      "Tuning Chat",
-      "Agent",
+      "Chatbot",
+      "Autonomy",
       "Dashboard",
       "Run History",
       "Scenarios",
@@ -115,8 +115,8 @@ describe("workspace account entry", () => {
 
     selectEdition(/DroneDream.*SIM/);
     expect(navigationLabels()).toEqual([
-      "Tuning Chat",
-      "Agent",
+      "Chatbot",
+      "Autonomy",
       "Experiment",
       "Dashboard",
       "Scenarios",
@@ -125,8 +125,8 @@ describe("workspace account entry", () => {
 
     selectEdition(/DroneDream.*LAB/);
     expect(navigationLabels()).toEqual([
-      "Tuning Chat",
-      "Agent",
+      "Chatbot",
+      "Autonomy",
       "Experiment",
       "Lab workspace",
       "Hardware Lab",
@@ -136,8 +136,8 @@ describe("workspace account entry", () => {
 
     selectEdition(/DroneDream.*FIELD/);
     expect(navigationLabels()).toEqual([
-      "Tuning Chat",
-      "Agent",
+      "Chatbot",
+      "Autonomy",
       "Device & Vehicle",
       "Tuning Plan",
       "Safety & Recovery",
@@ -147,14 +147,17 @@ describe("workspace account entry", () => {
 
     selectEdition(/DroneDream.*AGENT/);
     expect(navigationLabels()).toEqual([
-      "Tuning Chat",
-      "Agent",
+      "Chatbot",
+      "Aircraft",
+      "Maps",
+      "Plug-ins",
+      "Live",
       "Run History",
     ]);
     expect(Array.from(
       container.querySelectorAll<HTMLElement>(".app-nav-section-label"),
       (label) => label.textContent?.trim(),
-    )).toEqual(["Autonomous tasks", "Records"]);
+    )).toEqual(["Autonomous Task"]);
 
     router.dispose();
   });
@@ -183,7 +186,7 @@ describe("workspace account entry", () => {
     const settingsEntry = within(panel!).getByRole("button", { name: "Settings" });
     fireEvent.click(settingsEntry);
     expect(panel).toHaveAttribute("hidden");
-    const quickSettings = screen.getByRole("dialog", { name: "Quick settings" });
+    const quickSettings = screen.getByRole("dialog", { name: "Settings" });
     expect(quickSettings).toBeVisible();
     expect(screen.queryByRole("link", { name: "ECE498BH" })).not.toBeInTheDocument();
     fireEvent.click(within(quickSettings).getByRole("button", { name: "All settings" }));

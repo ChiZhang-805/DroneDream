@@ -165,17 +165,26 @@ describe("sidebar account menu", () => {
 
     const menu = screen.getByRole("menu", { name: "Account" });
     expect(await within(menu).findByText("80%")).toBeVisible();
+    expect(within(menu).getAllByRole("menuitem")).toHaveLength(3);
+    expect(within(menu).queryByRole("menuitem", { name: "Edit profile" }))
+      .not.toBeInTheDocument();
     expect(within(menu).queryByText("Pro")).not.toBeInTheDocument();
     expect(within(menu).queryByRole("progressbar")).not.toBeInTheDocument();
 
     fireEvent.click(within(menu).getByRole("menuitem", { name: /Token/ }));
     const settings = screen.getByRole("region", { name: "Settings" });
     expect(within(settings).getByRole("tab", { name: "Models" })).toHaveAttribute("aria-selected", "true");
+    expect(within(settings).queryByRole("heading", { name: "Included model" }))
+      .not.toBeInTheDocument();
+    expect(within(settings).getByText("Current plan:")).toBeVisible();
+    expect(within(settings).getByRole("link", { name: "Manage subscription" })).toBeVisible();
     const sevenDays = await within(settings).findByText("7 days");
     expect(sevenDays.closest("button")).toHaveAttribute("aria-selected", "true");
     fireEvent.click(within(settings).getByRole("tab", { name: "1 year" }));
     expect(within(settings).getByTestId("settings-allowance-chart")).toHaveClass("settings-allowance-heatmap");
     expect(within(settings).getByText(String(new Date().getUTCFullYear()))).toBeVisible();
+    expect(within(settings).queryByText("No usage in this period"))
+      .not.toBeInTheDocument();
     fireEvent.click(within(settings).getByRole("button", { name: "Back to app" }));
     expect(screen.queryByRole("region", { name: "Settings" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Workspace count 1" })).toBeVisible();
