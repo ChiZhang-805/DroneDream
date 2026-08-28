@@ -204,7 +204,7 @@ try {
   const customizeMetrics = await auditActivePanel(page, viewports[0], "en", "customize");
 
   await workspace.locator(".settings-workspace-sidebar").getByRole("tab", {
-    name: "Models & allowance",
+    name: "Models",
   }).click();
   const readyLabelMetrics = await page.locator(".settings-model-reset-summary span").last().evaluate((label) => {
     const element = /** @type {HTMLElement} */ (label);

@@ -1,6 +1,41 @@
 .custom-model-settings {
   display: grid;
-  gap: 0.88rem;
+  gap: 1rem;
+}
+
+.custom-model-section {
+  display: grid;
+  gap: 0.86rem;
+  padding: 1rem 1.1rem;
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+.custom-model-section-heading {
+  min-height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
+}
+
+.custom-model-section-heading h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 760;
+  line-height: 1.3;
+}
+
+.custom-model-section-heading > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
 }
 
 .custom-model-settings label {
@@ -70,11 +105,14 @@
   min-width: 0;
   grid-template-columns: minmax(0, 1fr) 38px;
   align-items: stretch;
-  border-bottom: 1px solid var(--border);
+  border: 1px solid color-mix(in srgb, var(--border) 86%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 90%, transparent);
+  overflow: hidden;
 }
 
 .custom-model-profile-list > div.is-active {
-  border-bottom-color: var(--dd-brand-start);
+  border-color: var(--dd-brand-start);
   background: color-mix(in srgb, var(--dd-brand-start) 5%, transparent);
 }
 
@@ -253,6 +291,25 @@
   color: var(--muted);
 }
 
+.custom-model-empty-state {
+  min-height: 4.5rem;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0.9rem;
+  color: var(--muted);
+  border: 1px dashed color-mix(in srgb, var(--border) 84%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
+:root[data-dd-appearance="dark"] .custom-model-section {
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 36%, var(--bg-elev));
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
+}
+
 @media (max-width: 1100px) {
   .custom-model-identity-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -271,5 +328,13 @@
 
   .custom-model-actions > :first-child {
     grid-column: 1 / -1;
+  }
+
+  .custom-model-profile-toolbar {
+    grid-template-columns: minmax(0, 1fr) 42px 42px;
+  }
+
+  .custom-model-section {
+    padding: 0.85rem;
   }
 }

@@ -8320,6 +8320,219 @@ a {
   }
 }
 
+/* Settings information architecture: every model area is a discrete module,
+   while row controls always consume the full workspace and align to its edge. */
+.universal-mode-switch-trigger .workspace-switch-brand img {
+  height: 1.875rem;
+}
+
+.universal-mode-switch-trigger {
+  gap: 0.5rem;
+  padding-right: 0.24rem;
+}
+
+.universal-mode-switch-menu > button {
+  gap: 0.5rem;
+}
+
+.settings-workspace-content .settings-memory-defaults,
+.settings-workspace-content .settings-memory-grid {
+  width: 100%;
+  max-width: none;
+  align-self: stretch;
+}
+
+.settings-workspace-content .settings-memory-grid label {
+  width: 100%;
+  max-width: none;
+  grid-template-columns: minmax(220px, 1fr) minmax(320px, 520px);
+  column-gap: clamp(1.5rem, 4vw, 4.5rem);
+}
+
+.settings-workspace-content .settings-memory-grid input,
+.settings-workspace-content .settings-memory-grid select {
+  width: 100%;
+  max-width: 520px;
+  justify-self: end;
+}
+
+.settings-workspace-content .settings-model-panel {
+  gap: 1rem;
+}
+
+.settings-workspace-content .settings-model-usage {
+  display: grid;
+  gap: 1rem;
+}
+
+.settings-workspace-content .settings-model-section {
+  display: grid;
+  gap: 0;
+  padding: 1rem 1.1rem;
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel) 94%, transparent);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+.settings-workspace-content .settings-model-section-heading {
+  min-height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 74%, transparent);
+}
+
+.settings-workspace-content .settings-model-section-heading h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 760;
+  line-height: 1.3;
+}
+
+.settings-workspace-content .settings-model-section.settings-model-mode-row {
+  min-height: 4.75rem;
+  grid-template-columns: minmax(200px, 1fr) minmax(320px, 390px);
+  align-items: center;
+  column-gap: clamp(1.5rem, 4vw, 4.5rem);
+}
+
+.settings-workspace-content .settings-model-mode-row .settings-model-section-heading {
+  padding: 0;
+  border: 0;
+}
+
+.settings-workspace-content .settings-model-access-mode {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  justify-self: end;
+  gap: 0.32rem;
+  padding: 0.28rem;
+  border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 8%, transparent);
+}
+
+.settings-workspace-content .settings-model-access-mode > button {
+  min-height: 2.55rem;
+  justify-content: center;
+  padding: 0.5rem 0.9rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-workspace-content .settings-model-access-mode > button.selected {
+  color: var(--text);
+  border: 0;
+  background: var(--panel);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--text) 10%, transparent);
+}
+
+.settings-workspace-content .settings-managed-model-row,
+.settings-workspace-content .settings-model-plan-row,
+.settings-workspace-content .settings-model-quota-heading,
+.settings-workspace-content .settings-model-reset-row,
+.settings-workspace-content .settings-model-usage-footer {
+  padding-inline: 0;
+}
+
+.settings-workspace-content .settings-managed-model-row {
+  justify-content: flex-end;
+}
+
+.settings-workspace-content .settings-managed-model-row .assistant-model-picker {
+  width: min(100%, 390px);
+  margin-left: auto;
+}
+
+.settings-workspace-content .settings-managed-model-row .assistant-model-button {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.settings-workspace-content .settings-model-usage-grid {
+  padding-top: 0.25rem;
+}
+
+.settings-workspace-content .settings-model-usage-grid > div {
+  min-height: 3.1rem;
+  padding-inline: 0;
+}
+
+.settings-workspace-content .settings-model-usage-grid > div > strong {
+  margin-left: auto;
+  text-align: right;
+}
+
+.settings-workspace-content .settings-model-history-section .settings-allowance-history {
+  padding-inline: 0;
+}
+
+.settings-workspace-content .settings-model-history-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 0.75rem;
+  border-top: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+.settings-workspace-content .settings-model-history-footer:empty {
+  display: none;
+}
+
+:root[data-dd-appearance="dark"] .settings-workspace-content .settings-model-section {
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 36%, var(--bg-elev));
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
+}
+
+:root[data-dd-appearance="dark"] .settings-workspace-content .settings-model-access-mode > button.selected {
+  color: #f7f8ff;
+  background: color-mix(in srgb, var(--dd-brand-middle) 22%, var(--bg-elev));
+}
+
+.settings-workspace-content .custom-model-section .btn:not(.btn-primary),
+.settings-workspace-content .settings-model-current-plan-section .btn,
+.settings-workspace-content .settings-model-history-footer .btn {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--border) 92%, transparent);
+  background: color-mix(in srgb, var(--panel) 96%, transparent);
+}
+
+:root[data-dd-appearance="dark"] .settings-workspace-content .custom-model-section .btn:not(.btn-primary),
+:root[data-dd-appearance="dark"] .settings-workspace-content .settings-model-current-plan-section .btn,
+:root[data-dd-appearance="dark"] .settings-workspace-content .settings-model-history-footer .btn {
+  color: #f7f8ff;
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 42%, var(--border));
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 62%, var(--bg-elev));
+}
+
+@media (max-width: 760px) {
+  .settings-workspace-content .settings-memory-grid label,
+  .settings-workspace-content .settings-model-section.settings-model-mode-row {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0.6rem;
+  }
+
+  .settings-workspace-content .settings-memory-grid input,
+  .settings-workspace-content .settings-memory-grid select {
+    max-width: none;
+  }
+
+  .settings-workspace-content .settings-model-section {
+    padding: 0.85rem;
+  }
+
+  .settings-workspace-content .settings-model-access-mode {
+    max-width: none;
+  }
+}
+
 /* Final layout guarantees for the shared Settings surfaces.  Keep these at
    the end of the cascade because the legacy launcher theme contains older
    responsive rules for the same components. */
@@ -23091,6 +23304,12 @@ body {
   margin-left: auto;
 }
 
+/* Keep action columns on the same right edge across peer settings modules. */
+.app-shell .settings-workspace-content .settings-model-reset-row,
+.app-shell .settings-workspace-content .settings-model-usage-footer {
+  padding-inline: 0;
+}
+
 .settings-workspace-content .settings-memory-domain-consent {
   min-height: 3.15rem;
   grid-template-columns: minmax(220px, 1fr) minmax(140px, auto) minmax(140px, auto);
@@ -23826,4 +24045,10 @@ body {
     height: auto;
     min-height: calc(5 * 8.75rem);
   }
+}
+
+/* Final settings alignment guard: peer-module actions share one right edge. */
+.app-shell .settings-workspace-content .settings-model-reset-row,
+.app-shell .settings-workspace-content .settings-model-usage-footer {
+  padding-inline: 0;
 }

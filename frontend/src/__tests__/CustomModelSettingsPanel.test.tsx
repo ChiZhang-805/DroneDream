@@ -64,4 +64,37 @@ describe("CustomModelSettingsPanel", () => {
     expect(persisted).toContain("glm-4.5");
     expect(persisted).not.toContain("private-zhipu-key");
   });
+
+  it("separates the editor from the saved-model library and can delete the last saved model", async () => {
+    renderPanel();
+
+    expect(screen.getByRole("heading", { name: "模型配置" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "自定义模型" })).toBeVisible();
+    expect(screen.getByText("尚未保存可使用的自定义模型。")).toBeVisible();
+
+    fireEvent.change(screen.getByLabelText("API 地址"), {
+      target: { value: "http://127.0.0.1:11434/v1" },
+    });
+    fireEvent.change(screen.getByLabelText("供应商"), {
+      target: { value: "ollama" },
+    });
+    fireEvent.change(screen.getByLabelText("模型 ID"), {
+      target: { value: "qwen3:8b" },
+    });
+    fireEvent.change(screen.getByLabelText("显示名称"), {
+      target: { value: "Local Qwen" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "删除 Local Qwen" })).toBeVisible();
+    });
+    expect(screen.getByLabelText("已保存的自定义模型")).toHaveTextContent("Local Qwen");
+
+    fireEvent.click(screen.getByRole("button", { name: "删除 Local Qwen" }));
+    await waitFor(() => {
+      expect(screen.getByText("尚未保存可使用的自定义模型。")).toBeVisible();
+    });
+    expect(screen.getByLabelText("模型配置")).toBeVisible();
+  });
 });

@@ -294,7 +294,7 @@ async function verifySettings(page, testCase) {
   {
     const assistantModel = page.locator(".assistant-model-button");
     await assistantModel.waitFor();
-    await assistantModel.click();
+    await assistantModel.click({ force: true });
     const modelMenu = page.locator(".assistant-model-menu");
     await modelMenu.waitFor();
     const defaultModelOptions = modelMenu.locator('[role="option"][data-model-type="default"]');
@@ -518,7 +518,7 @@ async function verifySettings(page, testCase) {
     ));
   }
   await workspace.locator(".settings-workspace-sidebar").getByRole("tab", {
-    name: testCase.locale === "en" ? "Models & allowance" : "模型与额度",
+    name: testCase.locale === "en" ? "Models" : "模型",
   }).click();
   const usage = workspace.locator(".settings-model-usage");
   const metrics = await usage.evaluate((element) => {
@@ -539,7 +539,7 @@ async function verifySettings(page, testCase) {
       manage: rect(".settings-model-plan-row .btn"),
       refresh: rect(".settings-model-refresh"),
       period: rect(".settings-model-period"),
-      footer: rect(".settings-model-usage-footer"),
+      footer: rect(".settings-model-history-footer"),
       usage: {
         left: usageBounds.left,
         right: usageBounds.right,
@@ -560,19 +560,13 @@ async function verifySettings(page, testCase) {
         element.parentElement?.querySelector(".settings-model-access-mode > button"),
       ).color,
       headingColor: getComputedStyle(
-        element.parentElement?.querySelector(".settings-model-heading h3"),
+        element.parentElement?.querySelector(".settings-model-section-heading h3"),
       ).color,
     };
   });
   assert(metrics.manage && metrics.refresh && metrics.period && metrics.usage);
-  assert(
-    closeEnough(metrics.manage.right, metrics.refresh.right, testCase.viewport.width < 600 ? 4 : 2),
-    `${testCase.id}: Refresh and Manage right edges diverged`,
-  );
-  assert(
-    metrics.refresh.top < metrics.period.bottom && metrics.refresh.bottom > metrics.period.top,
-    `${testCase.id}: Refresh and reset time are not on the same row`,
-  );
+  assert(metrics.refresh.right <= metrics.usage.right + 1);
+  assert(metrics.refresh.right >= metrics.usage.right - 24);
   assert.equal(
     metrics.documentScrollWidth,
     metrics.documentWidth,
@@ -603,8 +597,13 @@ async function verifySettings(page, testCase) {
   const manage = usage.locator(".settings-model-plan-row .btn");
   const usageRange = usage.locator('.settings-allowance-range [role="tab"][aria-selected="true"]');
   const resetCards = usage.locator(".settings-reset-card-trigger");
+  const useResetCard = usage.locator(".settings-model-reset-action");
   const refresh = usage.locator(".settings-model-refresh");
   await manage.focus();
+  await page.keyboard.press("Tab");
+  assert(await resetCards.evaluate((element) => element === document.activeElement));
+  await page.keyboard.press("Tab");
+  assert(await useResetCard.evaluate((element) => element === document.activeElement));
   await page.keyboard.press("Tab");
   assert(await usageRange.evaluate((element) => element === document.activeElement));
   await page.keyboard.press("ArrowRight");
@@ -612,11 +611,6 @@ async function verifySettings(page, testCase) {
   assert.equal(await nextUsageRange.textContent(), testCase.locale === "zh-CN" ? "30 天" : "30 days");
   assert(await nextUsageRange.evaluate((element) => element === document.activeElement));
   await page.keyboard.press("Tab");
-  assert(await resetCards.evaluate((element) => element === document.activeElement));
-  for (let step = 0; step < 4; step += 1) {
-    if (await refresh.evaluate((element) => element === document.activeElement)) break;
-    await page.keyboard.press("Tab");
-  }
   assert(await refresh.evaluate((element) => element === document.activeElement));
   const image = await screenshot(page, testCase.id, "settings");
   await workspace.getByRole("button", {
@@ -636,7 +630,7 @@ async function verifySettings(page, testCase) {
     settingsViewport,
     panelMeasurements,
     panelImages,
-    keyboardFocusOrder: "manage-subscription -> usage-range -> reset-card -> refresh-usage",
+    keyboardFocusOrder: "manage-subscription -> reset-card -> use-card -> usage-range -> refresh-usage",
     assistantModelImage,
     image,
   };

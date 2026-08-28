@@ -100,6 +100,11 @@ export function CustomModelSettingsPanel({ locale, edition }: CustomModelSetting
     || profile.model.trim()
     || modelProviderDefinition(profile.provider).label
   );
+  const savedProfiles = profiles.filter((profile) => (
+    Boolean(profile.model.trim())
+    || Boolean(profile.displayName.trim())
+    || Boolean(profile.agentCoreProfileId)
+  ));
 
   const chooseProvider = (nextProvider: ModelProvider) => {
     const defaults = modelProviderDefaults(nextProvider);
@@ -297,79 +302,52 @@ export function CustomModelSettingsPanel({ locale, edition }: CustomModelSetting
 
   return (
     <div className="custom-model-settings">
-      <div className="custom-model-profile-toolbar">
-        <label htmlFor="settings_model_profile">
-          <span>{chinese ? "模型配置" : "Model profile"}</span>
-          <select
-            id="settings_model_profile"
-            value={activeProfileId}
-            onChange={(event) => selectProfile(event.target.value)}
-          >
-            {profiles.map((profile) => (
-              <option key={profile.id} value={profile.id}>
-                {modelProviderDefinition(profile.provider).label} · {profileLabel(profile)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          type="button"
-          className="btn custom-model-icon-button"
-          onClick={addProfile}
-          disabled={profiles.length >= 12}
-          aria-label={chinese ? "添加模型配置" : "Add model profile"}
-          title={chinese ? "添加模型配置" : "Add model profile"}
-        >
-          <Plus aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          className="btn custom-model-icon-button"
-          onClick={() => void removeSelectedProfile()}
-          disabled={profiles.length <= 1 || saving}
-          aria-label={chinese ? "删除模型配置" : "Remove model profile"}
-          title={chinese ? "删除模型配置" : "Remove model profile"}
-        >
-          <Trash2 aria-hidden="true" />
-        </button>
-      </div>
-
-      <div
-        className="custom-model-profile-list"
-        aria-label={chinese ? "已添加的模型" : "Added models"}
+      <section
+        className="custom-model-section custom-model-editor-section"
+        aria-label={chinese ? "模型配置编辑器" : "Model profile editor"}
       >
-        {profiles.map((profile) => (
-          <div
-            key={profile.id}
-            className={profile.id === activeProfileId ? "is-active" : undefined}
+        <header className="custom-model-section-heading">
+          <h3 id="custom-model-editor-title">{chinese ? "模型配置" : "Model profile"}</h3>
+        </header>
+        <div className="custom-model-profile-toolbar">
+          <label htmlFor="settings_model_profile">
+            <span>{chinese ? "正在编辑" : "Profile to edit"}</span>
+            <select
+              id="settings_model_profile"
+              aria-label={chinese ? "模型配置" : "Model profile"}
+              value={activeProfileId}
+              onChange={(event) => selectProfile(event.target.value)}
+            >
+              {profiles.map((profile) => (
+                <option key={profile.id} value={profile.id}>
+                  {modelProviderDefinition(profile.provider).label} · {profileLabel(profile)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            className="btn custom-model-icon-button"
+            onClick={addProfile}
+            disabled={profiles.length >= 12}
+            aria-label={chinese ? "添加模型配置" : "Add model profile"}
+            title={chinese ? "添加模型配置" : "Add model profile"}
           >
-            <button
-              type="button"
-              className="custom-model-profile-select"
-              aria-pressed={profile.id === activeProfileId}
-              onClick={() => selectProfile(profile.id)}
-            >
-              <ModelProviderLogo provider={profile.provider} />
-              <span>
-                <strong>{profileLabel(profile)}</strong>
-                <small>{modelProviderDefinition(profile.provider).label} · {profile.model || (chinese ? "未配置" : "Not configured")}</small>
-              </span>
-            </button>
-            <button
-              type="button"
-              className="custom-model-profile-delete"
-              disabled={profiles.length <= 1 || saving}
-              aria-label={chinese ? `删除 ${profileLabel(profile)}` : `Delete ${profileLabel(profile)}`}
-              title={chinese ? "删除模型配置" : "Delete model profile"}
-              onClick={() => void removeProfileEntry(profile)}
-            >
-              <Trash2 aria-hidden="true" />
-            </button>
-          </div>
-        ))}
-      </div>
+            <Plus aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className="btn custom-model-icon-button"
+            onClick={() => void removeSelectedProfile()}
+            disabled={saving}
+            aria-label={chinese ? "删除模型配置" : "Remove model profile"}
+            title={chinese ? "删除模型配置" : "Remove model profile"}
+          >
+            <Trash2 aria-hidden="true" />
+          </button>
+        </div>
 
-      <div className="custom-model-endpoint-row">
+        <div className="custom-model-endpoint-row">
         <label htmlFor="settings_model_base_url">
           <span>{chinese ? "API 地址" : "API URL"}</span>
           <input
@@ -411,9 +389,9 @@ export function CustomModelSettingsPanel({ locale, edition }: CustomModelSetting
             </button>
           </span>
         </label>
-      </div>
+        </div>
 
-      <div className="custom-model-identity-row">
+        <div className="custom-model-identity-row">
         <label htmlFor="settings_model_provider">
           <span>{chinese ? "供应商" : "Provider"}</span>
           <span className="custom-model-provider-select">
@@ -465,9 +443,9 @@ export function CustomModelSettingsPanel({ locale, edition }: CustomModelSetting
             ))}
           </select>
         </label>
-      </div>
+        </div>
 
-      <div className="custom-model-actions">
+        <div className="custom-model-actions">
         {message ? (
           <p className={`custom-model-message custom-model-message-${message.kind}`} role={message.kind === "error" ? "alert" : "status"}>
             {message.text}
@@ -480,16 +458,67 @@ export function CustomModelSettingsPanel({ locale, edition }: CustomModelSetting
          <button type="button" className="btn btn-primary" disabled={saving} onClick={() => void save()}>
            {saving ? (chinese ? "正在保存" : "Saving") : (chinese ? "保存" : "Save")}
         </button>
-      </div>
-      <p className="custom-model-security-note">
-        {chinese
-          ? usesAgentCoreVault
-            ? "识别过程仅在本机完成。API Key 由 AGENT Core 加密保存到 Windows 当前用户凭证库，不写入浏览器存储、任务草稿或日志。"
-            : "识别过程仅在本机完成。API Key 不写入本地存储、任务草稿或日志。"
-          : usesAgentCoreVault
-            ? "Detection runs locally. AGENT Core encrypts the API key in the current Windows user's credential vault; it is never written to browser storage, task drafts, or logs."
-            : "Detection runs locally. The API key is never written to local storage, task drafts, or logs."}
-      </p>
+        </div>
+        <p className="custom-model-security-note">
+          {chinese
+            ? usesAgentCoreVault
+              ? "识别过程仅在本机完成。API Key 由 AGENT Core 加密保存到 Windows 当前用户凭证库，不写入浏览器存储、任务草稿或日志。"
+              : "识别过程仅在本机完成。API Key 不写入本地存储、任务草稿或日志。"
+            : usesAgentCoreVault
+              ? "Detection runs locally. AGENT Core encrypts the API key in the current Windows user's credential vault; it is never written to browser storage, task drafts, or logs."
+              : "Detection runs locally. The API key is never written to local storage, task drafts, or logs."}
+        </p>
+      </section>
+
+      <section
+        className="custom-model-section custom-model-library-section"
+        aria-label={chinese ? "自定义模型库" : "Custom model library"}
+      >
+        <header className="custom-model-section-heading">
+          <h3 id="custom-model-library-title">{chinese ? "自定义模型" : "Custom models"}</h3>
+          <span>{savedProfiles.length} / 12</span>
+        </header>
+        {savedProfiles.length > 0 ? (
+          <div
+            className="custom-model-profile-list"
+            aria-label={chinese ? "已保存的自定义模型" : "Saved custom models"}
+          >
+            {savedProfiles.map((profile) => (
+              <div
+                key={profile.id}
+                className={profile.id === activeProfileId ? "is-active" : undefined}
+              >
+                <button
+                  type="button"
+                  className="custom-model-profile-select"
+                  aria-pressed={profile.id === activeProfileId}
+                  onClick={() => selectProfile(profile.id)}
+                >
+                  <ModelProviderLogo provider={profile.provider} />
+                  <span>
+                    <strong>{profileLabel(profile)}</strong>
+                    <small>{modelProviderDefinition(profile.provider).label} · {profile.model}</small>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="custom-model-profile-delete"
+                  disabled={saving}
+                  aria-label={chinese ? `删除 ${profileLabel(profile)}` : `Delete ${profileLabel(profile)}`}
+                  title={chinese ? "删除模型配置" : "Delete model profile"}
+                  onClick={() => void removeProfileEntry(profile)}
+                >
+                  <Trash2 aria-hidden="true" />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="custom-model-empty-state">
+            {chinese ? "尚未保存可使用的自定义模型。" : "No usable custom models have been saved yet."}
+          </p>
+        )}
+      </section>
     </div>
   );
 }

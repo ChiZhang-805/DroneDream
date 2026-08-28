@@ -442,7 +442,17 @@ export function ModelAccessProvider({
 
   const removeProfile = useCallback((profileId: string) => {
     setState((current) => {
-      if (current.profiles.length <= 1) return current;
+      if (current.profiles.length === 1) {
+        if (current.profiles[0]?.id !== profileId) return current;
+        return {
+          storageKey: current.storageKey,
+          activeProfileId: DEFAULT_PROFILE_ID,
+          profiles: [{
+            ...defaultProfile(),
+            accessMode: "byok",
+          }],
+        };
+      }
       const profiles = current.profiles.filter(
         (profile) => profile.id !== profileId,
       );

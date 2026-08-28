@@ -562,7 +562,7 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     memoryDefaults: ["Default vehicle", "Default objective", "Default safety profile", "Default units", "Default report format"],
     courseOpen: "Open course",
     courseActions: ["Read manual", "Explore product"],
-    courseEditions: ["Unified UAV workflow across all five editions.", "Reproducible PX4 and Gazebo experiments.", "Calibration and Sim-to-Real validation.", "Real-device tuning with safety and rollback."],
+    courseEditions: ["Unified tools for all five editions.", "Reproducible PX4 + Gazebo simulation.", "Calibration and sim-to-real validation.", "Safe real-device tuning and rollback."],
   },
   "zh-CN": {
     title: "设置",
@@ -584,7 +584,7 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
 };
 
 const AUTONOMY_COURSE_COPY: Readonly<Record<InterfaceLocale, string>> = {
-  en: "Natural-language mission planning and supervised execution.",
+  en: "Natural-language planning and execution.",
   "zh-CN": "自然语言任务规划与受监督执行。",
 };
 
@@ -644,9 +644,11 @@ function AllowanceCardIcon({
 function AllowanceUsageHistory({
   days,
   locale,
+  hideTitle = false,
 }: {
   days: ManagedModelUsageDay[];
   locale: "en" | "zh-CN";
+  hideTitle?: boolean;
 }) {
   const [range, setRange] = useState<7 | 30 | 365>(7);
   const copy = locale === "zh-CN"
@@ -730,7 +732,7 @@ function AllowanceUsageHistory({
   return (
     <section className="settings-allowance-history">
       <header>
-        <div><h4>{copy.title}</h4><p>{copy.description}</p></div>
+        <div>{hideTitle ? null : <h4>{copy.title}</h4>}<p>{copy.description}</p></div>
         <div className="settings-allowance-range" role="tablist" aria-label={copy.title}>
           {([[7, copy.sevenDays], [30, copy.thirtyDays], [365, copy.oneYear]] as const)
             .map(([value, label]) => (
@@ -2394,8 +2396,10 @@ function SettingsDialog({
           className={`settings-model-panel${modelAccess.accessMode === "byok" ? " settings-model-panel-byok" : ""}`}
           aria-label={t("settings.model.title")}
         >
-        <div className="settings-model-mode-row">
-          <strong>{t("settings.model.accessMode")}</strong>
+        <section className="settings-model-section settings-model-mode-row" aria-labelledby="settings-model-access-title">
+          <header className="settings-model-section-heading">
+            <h3 id="settings-model-access-title">{t("settings.model.accessMode")}</h3>
+          </header>
           <div className="settings-model-access-mode" role="group" aria-label={t("settings.model.accessMode")}>
             <button
               type="button"
@@ -2414,13 +2418,16 @@ function SettingsDialog({
               <strong>{t("settings.model.byok")}</strong>
             </button>
           </div>
-        </div>
+        </section>
         {modelAccess.accessMode === "platform" ? (
           <div className="settings-model-usage">
-            <div className="settings-managed-model-row">
-              <span>{locale === "zh-CN" ? "包含的模型" : "Included model"}</span>
+            <section className="settings-model-section settings-model-included-section" aria-labelledby="settings-included-model-title">
+              <header className="settings-model-section-heading">
+                <h3 id="settings-included-model-title">{t("settings.model.includedModel")}</h3>
+              </header>
+              <div className="settings-managed-model-row">
               <AssistantModelPicker
-                ariaLabel={locale === "zh-CN" ? "包含的模型" : "Included model"}
+                ariaLabel={t("settings.model.includedModel")}
                 chooseModelLabel={locale === "zh-CN" ? "选择模型" : "Choose model"}
                 defaultGroupLabel={locale === "zh-CN" ? "默认" : "Default"}
                 customGroupLabel={locale === "zh-CN" ? "自定义" : "Custom"}
@@ -2440,10 +2447,14 @@ function SettingsDialog({
                 onOpenSettings={() => undefined}
                 showCustomSection={false}
               />
-            </div>
-            <div className="settings-model-plan-row">
+              </div>
+            </section>
+            <section className="settings-model-section settings-model-current-plan-section" aria-labelledby="settings-current-plan-title">
+              <header className="settings-model-section-heading">
+                <h3 id="settings-current-plan-title">{t("settings.model.currentPlan")}</h3>
+              </header>
+              <div className="settings-model-plan-row">
               <div>
-                <span>{t("settings.model.currentPlan")}</span>
                 <strong>{managedUsage?.plan.name ?? "Free / Plus / Pro"}</strong>
               </div>
               <a
@@ -2455,7 +2466,7 @@ function SettingsDialog({
               >
                 {t("settings.model.manageSubscription")}
               </a>
-            </div>
+              </div>
             {!auth.account && !docsPreview ? (
               <p className="settings-model-usage-message">
                 {t("settings.model.signInForAllowance")}
@@ -2481,28 +2492,6 @@ function SettingsDialog({
                 >
                   <span style={{ width: `${remainingCreditRatio}%` }} />
                 </div>
-                <div className="settings-model-usage-grid">
-                  <div>
-                    <span>{t("settings.model.remaining")}</span>
-                    <strong>{numberFormatter.format(managedUsage.usage.remaining_ai_credits)}</strong>
-                  </div>
-                  <div>
-                    <span>{t("settings.model.requests")}</span>
-                    <strong>{numberFormatter.format(managedUsage.usage.request_count)}</strong>
-                  </div>
-                  <div>
-                    <span>{t("settings.model.inputTokens")}</span>
-                    <strong>{numberFormatter.format(managedUsage.usage.input_tokens)}</strong>
-                  </div>
-                  <div>
-                    <span>{t("settings.model.outputTokens")}</span>
-                    <strong>{numberFormatter.format(managedUsage.usage.output_tokens)}</strong>
-                  </div>
-                </div>
-                <AllowanceUsageHistory
-                  days={managedUsage.daily_usage ?? []}
-                  locale={locale === "zh-CN" ? "zh-CN" : "en"}
-                />
                 <div className="settings-model-reset-row">
                   <div className="settings-model-reset-summary">
                     <span>{allowanceResetCopy.cards}</span>
@@ -2621,17 +2610,56 @@ function SettingsDialog({
                     : ""}
                 </p>
               ) : <span aria-hidden="true" />}
-              {auth.account || docsPreview ? (
-                <button
-                  type="button"
-                  className="btn settings-model-refresh"
-                  disabled={managedUsageState === "loading"}
-                  onClick={() => void refreshManagedUsage()}
-                >
-                  {allowanceResetCopy.refresh}
-                </button>
-              ) : null}
             </div>
+            </section>
+            <section className="settings-model-section settings-model-history-section" aria-labelledby="settings-model-history-title">
+              <header className="settings-model-section-heading">
+                <h3 id="settings-model-history-title">{t("settings.model.usageHistory")}</h3>
+              </header>
+              {managedUsage ? (
+                <>
+                  <div className="settings-model-usage-grid">
+                    <div>
+                      <span>{t("settings.model.requests")}</span>
+                      <strong>{numberFormatter.format(managedUsage.usage.request_count)}</strong>
+                    </div>
+                    <div>
+                      <span>{t("settings.model.inputTokens")}</span>
+                      <strong>{numberFormatter.format(managedUsage.usage.input_tokens)}</strong>
+                    </div>
+                    <div>
+                      <span>{t("settings.model.outputTokens")}</span>
+                      <strong>{numberFormatter.format(managedUsage.usage.output_tokens)}</strong>
+                    </div>
+                  </div>
+                  <AllowanceUsageHistory
+                    days={managedUsage.daily_usage ?? []}
+                    locale={locale}
+                    hideTitle
+                  />
+                </>
+              ) : (
+                <p className="settings-model-usage-message" role="status">
+                  {!auth.account && !docsPreview
+                    ? t("settings.model.signInForAllowance")
+                    : managedUsageState === "loading"
+                      ? t("settings.model.loadingUsage")
+                      : managedUsageError ?? t("settings.model.usageUnavailable")}
+                </p>
+              )}
+              <div className="settings-model-history-footer">
+                {auth.account || docsPreview ? (
+                  <button
+                    type="button"
+                    className="btn settings-model-refresh"
+                    disabled={managedUsageState === "loading"}
+                    onClick={() => void refreshManagedUsage()}
+                  >
+                    {allowanceResetCopy.refresh}
+                  </button>
+                ) : null}
+              </div>
+            </section>
           </div>
         ) : (
           <CustomModelSettingsPanel locale={locale} edition={edition} />
@@ -3113,11 +3141,13 @@ function AccountPlanLabel({ authenticated }: { authenticated: boolean }) {
 function AccountMenuPopover({
   menuRef,
   onClose,
+  onOpenProfile,
   onOpenAllowance,
   onOpenSettings,
 }: {
   menuRef: RefObject<HTMLDivElement>;
   onClose: () => void;
+  onOpenProfile: () => void;
   onOpenAllowance: () => void;
   onOpenSettings: () => void;
 }) {
@@ -3170,6 +3200,19 @@ function AccountMenuPopover({
 
   return (
     <div ref={menuRef} className="account-menu-popover" role="menu" aria-label={copy.account}>
+      <button
+        type="button"
+        className="account-menu-profile"
+        role="menuitem"
+        aria-label="Edit profile"
+        onClick={onOpenProfile}
+      >
+        <AccountAvatar account={auth.account} className="account-menu-avatar" />
+        <span>
+          <strong>{auth.account?.displayName ?? copy.account}</strong>
+          <small>{copy.account}</small>
+        </span>
+      </button>
       <button type="button" className="account-menu-row account-menu-token" role="menuitem" onClick={onOpenAllowance}>
         <Gauge aria-hidden="true" strokeWidth={1.8} />
         <span>{copy.remainingAllowance}</span>
@@ -4805,6 +4848,10 @@ function AppShellContent() {
               <AccountMenuPopover
                 menuRef={accountMenuRef}
                 onClose={() => setAccountMenuOpen(false)}
+                onOpenProfile={() => {
+                  setAccountMenuOpen(false);
+                  setAccountOpen(true);
+                }}
                 onOpenAllowance={() => {
                   openSettingsWorkspace("model", "account");
                 }}
