@@ -12,6 +12,7 @@ from app.autonomy.px4_x500_vehicle import (
     PX4_X500_MAXIMUM_THRUST_N,
     TAKEOUT_PAYLOAD_CENTER_ABOVE_MODEL_ROOT_M,
     TAKEOUT_PAYLOAD_MASS_KG,
+    TAKEOUT_PAYLOAD_MAXIMUM_ATTACHMENT_ERROR_M,
     TAKEOUT_PAYLOAD_SIZE_M,
     get_my_drone_gazebo_artifact,
     px4_x500_loaded_thrust_to_weight,
@@ -57,6 +58,9 @@ def test_my_drone_artifact_binds_x500_and_dynamic_payload_joint() -> None:
     assert payload.findtext(".//link/inertial/mass") == "0.1"
     assert summary["control_interface"] == "mavsdk"
     assert summary["mission_payload"]["loaded_thrust_to_weight"] >= 1.6
+    assert summary["mission_payload"]["maximum_attachment_error_m"] == pytest.approx(
+        TAKEOUT_PAYLOAD_MAXIMUM_ATTACHMENT_ERROR_M
+    )
     assert set(summary["payload_files_sha256"]) == {
         "model.config",
         "model.sdf",

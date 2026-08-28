@@ -166,6 +166,7 @@ def get_my_drone_gazebo_artifact() -> MyDroneGazeboArtifact:
             "mass_kg": TAKEOUT_PAYLOAD_MASS_KG,
             "size_m": TAKEOUT_PAYLOAD_SIZE_M,
             "center_above_model_root_m": TAKEOUT_PAYLOAD_CENTER_ABOVE_MODEL_ROOT_M,
+            "maximum_attachment_error_m": TAKEOUT_PAYLOAD_MAXIMUM_ATTACHMENT_ERROR_M,
             "loaded_mass_kg": loaded_mass,
             "loaded_thrust_to_weight": px4_x500_loaded_thrust_to_weight(TAKEOUT_PAYLOAD_MASS_KG),
             "attach_topic": MY_DRONE_PAYLOAD_ATTACH_TOPIC,
