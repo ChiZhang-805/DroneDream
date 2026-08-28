@@ -104,6 +104,25 @@ function renderDashboard() {
   return { ...page, router };
 }
 
+function renderUniversalAssistant() {
+  const router = createMemoryRouter([
+    {
+      path: "/",
+      element: <AppShell />,
+      children: [
+        { path: "assistant", element: <div>Assistant content</div> },
+        { path: "autonomy", element: <div>Autonomy content</div> },
+      ],
+    },
+  ], { initialEntries: ["/assistant?edition=sim"] });
+  const page = render(
+    <I18nProvider>
+      <RouterProvider router={router} />
+    </I18nProvider>,
+  );
+  return { ...page, router };
+}
+
 async function openRuntimeSettings(locale: "en" | "zh-CN" = "en") {
   fireEvent.click(screen.getByRole("button", {
     name: locale === "zh-CN" ? "设置" : "Settings",
@@ -251,6 +270,26 @@ describe("workspace sidebar version module", () => {
     expect(progress).toBeDisabled();
     expect(progress).toHaveTextContent("100%");
 
+    router.dispose();
+  });
+
+  it("keeps one live progress indicator while Universal switches integrated workspaces", () => {
+    updaterState.current = {
+      ...updaterState.current,
+      status: "downloading",
+      progress: 30,
+    };
+    installReadyDesktopBridge();
+    window.history.replaceState(null, "", "/?docsPreview=1");
+    const { router } = renderUniversalAssistant();
+
+    expect(screen.getByRole("button", { name: /30%/ })).toBeDisabled();
+    updaterState.current.progress = 31;
+    fireEvent.click(screen.getByRole("button", { name: "Switch DroneDream edition" }));
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "DroneDream · LAB" }));
+
+    expect(screen.getByRole("button", { name: /31%/ })).toBeDisabled();
+    expect(router.state.location.pathname).toBe("/assistant");
     router.dispose();
   });
 

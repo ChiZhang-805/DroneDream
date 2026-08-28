@@ -140,6 +140,32 @@
     ${EndIf}
   ${EndIf}
 
+  ; ShellExecute starts the passive updater before the old process has always
+  ; released its mapped executable.  Wait only in update mode for that exact
+  ; file lock to clear before Tauri's standard process check and File command.
+  ; This closes the race without killing processes or ignoring write errors.
+  ${If} $UpdateMode != 0
+  ${AndIf} ${FileExists} "$INSTDIR\${MAINBINARYNAME}.exe"
+    StrCpy $0 0
+    dronedream_wait_main_binary:
+      ClearErrors
+      FileOpen $1 "$INSTDIR\${MAINBINARYNAME}.exe" a
+      IfErrors dronedream_main_binary_still_locked dronedream_main_binary_released
+    dronedream_main_binary_released:
+      FileClose $1
+      Goto dronedream_main_binary_ready
+    dronedream_main_binary_still_locked:
+      IntOp $0 $0 + 1
+      IntCmp $0 450 dronedream_main_binary_timeout dronedream_main_binary_retry dronedream_main_binary_timeout
+    dronedream_main_binary_retry:
+      Sleep 100
+      Goto dronedream_wait_main_binary
+    dronedream_main_binary_timeout:
+      Call DroneDreamBestEffortEndRuntimeQuiesce
+      Abort "$(DD_UpdateAppStillRunning)"
+    dronedream_main_binary_ready:
+  ${EndIf}
+
   Pop $1
   Pop $0
 !macroend

@@ -5,11 +5,13 @@ const {
   checkMock,
   checkComponentUpdatesMock,
   ensureAppUpdateIdleMock,
+  getAppUpdateProgressMock,
   getEnginePackStatusMock,
   installAppUpdateInBackgroundMock,
   installEmbeddedEnginePackMock,
   installComponentUpdateMock,
   listJobsMock,
+  listenAppUpdateProgressMock,
   probeRuntimeStatusMock,
   relaunchMock,
   stopRuntimeForExitMock,
@@ -17,11 +19,13 @@ const {
   checkMock: vi.fn(),
   checkComponentUpdatesMock: vi.fn(),
   ensureAppUpdateIdleMock: vi.fn(),
+  getAppUpdateProgressMock: vi.fn(),
   getEnginePackStatusMock: vi.fn(),
   installAppUpdateInBackgroundMock: vi.fn(),
   installEmbeddedEnginePackMock: vi.fn(),
   installComponentUpdateMock: vi.fn(),
   listJobsMock: vi.fn(),
+  listenAppUpdateProgressMock: vi.fn(),
   probeRuntimeStatusMock: vi.fn(),
   relaunchMock: vi.fn(),
   stopRuntimeForExitMock: vi.fn(),
@@ -37,10 +41,12 @@ vi.mock("../desktop/bridge", () => ({
   isDesktopRuntime: () => true,
   ensureAppUpdateIdle: ensureAppUpdateIdleMock,
   checkComponentUpdates: checkComponentUpdatesMock,
+  getAppUpdateProgress: getAppUpdateProgressMock,
   getEnginePackStatus: getEnginePackStatusMock,
   installAppUpdateInBackground: installAppUpdateInBackgroundMock,
   installEmbeddedEnginePack: installEmbeddedEnginePackMock,
   installComponentUpdate: installComponentUpdateMock,
+  listenAppUpdateProgress: listenAppUpdateProgressMock,
   probeRuntimeStatus: probeRuntimeStatusMock,
   stopRuntimeForExit: stopRuntimeForExitMock,
 }));
@@ -84,6 +90,10 @@ beforeEach(() => {
   checkMock.mockReset();
   ensureAppUpdateIdleMock.mockReset();
   ensureAppUpdateIdleMock.mockResolvedValue(undefined);
+  getAppUpdateProgressMock.mockReset();
+  getAppUpdateProgressMock.mockResolvedValue({ running: false, progress: null });
+  listenAppUpdateProgressMock.mockReset();
+  listenAppUpdateProgressMock.mockResolvedValue(vi.fn());
   relaunchMock.mockReset();
   relaunchMock.mockResolvedValue(undefined);
   stopRuntimeForExitMock.mockReset();
@@ -322,6 +332,28 @@ describe("useAppUpdater", () => {
     nativeUpdate.resolve();
     await act(async () => installation);
     hook.unmount();
+  });
+
+  it("restores one process-owned download after the updater view remounts", async () => {
+    getAppUpdateProgressMock.mockResolvedValue({
+      running: true,
+      progress: { phase: "downloading", progress: 31, attempt: 1 },
+    });
+    const firstView = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(firstView.result.current.progress).toBe(31));
+    expect(firstView.result.current.status).toBe("downloading");
+    expect(checkMock).not.toHaveBeenCalled();
+    firstView.unmount();
+
+    getAppUpdateProgressMock.mockResolvedValue({
+      running: true,
+      progress: { phase: "downloading", progress: 32, attempt: 1 },
+    });
+    const secondView = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(secondView.result.current.progress).toBe(32));
+    expect(secondView.result.current.status).toBe("downloading");
+    expect(checkMock).not.toHaveBeenCalled();
+    secondView.unmount();
   });
 
   it("queries only exact RUNNING jobs when a ready Runtime is active", async () => {

@@ -4,16 +4,19 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import {
   checkComponentUpdates as checkSignedComponentUpdates,
   ensureAppUpdateIdle,
+  getAppUpdateProgress,
   getEnginePackStatus,
   installAppUpdateInBackground,
   installEmbeddedEnginePack,
   installComponentUpdate,
   isDesktopRuntime,
+  listenAppUpdateProgress,
   probeRuntimeStatus,
   type ComponentUpdateId,
   type ComponentUpdateCandidate,
   type ComponentUpdateReport,
   type EnginePackStatus,
+  type NativeAppUpdateProgress,
 } from "./bridge";
 import { apiClient } from "../api/client";
 
@@ -219,6 +222,33 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
       : CURRENT_STATE
   ));
 
+  const applyNativeAppUpdateProgress = useCallback((event: NativeAppUpdateProgress) => {
+    installInFlightRef.current = true;
+    const installing = event.phase === "installing" || event.phase === "restarting";
+    setState((current) => ({
+      ...current,
+      status: installing ? "installing" : "downloading",
+      progress: Math.max(current.progress ?? 0, event.progress),
+      error: null,
+      blockedActivity: null,
+    }));
+  }, []);
+
+  const restoreNativeAppUpdate = useCallback(async (): Promise<boolean> => {
+    if (!desktopRuntime || import.meta.env.MODE === "test") return false;
+    try {
+      const snapshot = await getAppUpdateProgress();
+      if (!snapshot.running) return false;
+      installInFlightRef.current = true;
+      if (snapshot.progress) applyNativeAppUpdateProgress(snapshot.progress);
+      return true;
+    } catch {
+      // An older or temporarily unavailable bridge must not block an explicit
+      // signed update check. The native single-flight guard remains final.
+      return installInFlightRef.current;
+    }
+  }, [applyNativeAppUpdateProgress, desktopRuntime]);
+
   const reconcileComponentPacks = useCallback(async (
     generation?: number,
     enginePack?: EnginePackStatus | null,
@@ -390,6 +420,7 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
       return;
     }
     if (installInFlightRef.current) return;
+    if (await restoreNativeAppUpdate()) return;
     const generation = ++checkGenerationRef.current;
     setState((current) => ({ ...current, status: "checking", error: null, progress: null }));
     try {
@@ -447,7 +478,7 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
         componentUpdates: null,
       });
     }
-  }, [desktopRuntime, ensureEnginePackCurrent, reconcileComponentPacks]);
+  }, [desktopRuntime, ensureEnginePackCurrent, reconcileComponentPacks, restoreNativeAppUpdate]);
 
   const checkForAppUpdateSilently = useCallback(async () => {
     if (
@@ -457,6 +488,7 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
       || installInFlightRef.current
       || updateRef.current
     ) return;
+    if (await restoreNativeAppUpdate()) return;
     const generation = ++checkGenerationRef.current;
     try {
       const update = await check({ timeout: 15_000, allowDowngrades: false });
@@ -480,7 +512,7 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
       // Scheduled checks are deliberately invisible. The next six-hour poll,
       // an explicit settings check, or the next authenticated launch retries.
     }
-  }, [desktopRuntime, enabled]);
+  }, [desktopRuntime, enabled, restoreNativeAppUpdate]);
 
   const installAvailableUpdate = useCallback(async () => {
     const update = updateRef.current;
@@ -508,15 +540,7 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
         }));
         return;
       }
-      await installAppUpdateInBackground((event) => {
-        const installing = event.phase === "installing" || event.phase === "restarting";
-        setState((current) => ({
-          ...current,
-          status: installing ? "installing" : "downloading",
-          progress: Math.max(current.progress ?? 0, event.progress),
-          error: null,
-        }));
-      });
+      await installAppUpdateInBackground(applyNativeAppUpdateProgress);
     } catch (error) {
       const lateBlock = await detectRunningUpdateBlock();
       setState((current) => ({
@@ -529,7 +553,7 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
     } finally {
       installInFlightRef.current = false;
     }
-  }, [state.status]);
+  }, [applyNativeAppUpdateProgress, state.status]);
 
   const dismissBlockedActivity = useCallback(() => {
     setState((current) => ({ ...current, blockedActivity: null }));
@@ -577,6 +601,32 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
       installInFlightRef.current = false;
     }
   }, [reconcileComponentPacks, state.componentUpdates, state.enginePack, state.status]);
+
+  useEffect(() => {
+    if (!desktopRuntime || import.meta.env.MODE === "test") return undefined;
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
+    void (async () => {
+      try {
+        const nextUnlisten = await listenAppUpdateProgress((event) => {
+          if (!disposed) applyNativeAppUpdateProgress(event);
+        });
+        if (disposed) {
+          nextUnlisten();
+          return;
+        }
+        unlisten = nextUnlisten;
+        await restoreNativeAppUpdate();
+      } catch {
+        // The persistent listener is a continuity enhancement. The installer
+        // invocation still owns its own listener and reports actionable errors.
+      }
+    })();
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, [applyNativeAppUpdateProgress, desktopRuntime, restoreNativeAppUpdate]);
 
   useEffect(() => {
     if (!enabled) {

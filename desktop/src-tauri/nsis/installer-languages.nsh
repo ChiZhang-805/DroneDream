@@ -65,6 +65,8 @@ LangString DD_UpdateBusy ${LANG_ENGLISH} "DroneDreamRuntime is busy, or another 
 LangString DD_UpdateBusy ${LANG_SIMPCHINESE} "DroneDreamRuntime 正忙，或另一个安装器正在维护它。"
 LangString DD_UpdateIsolationInvalid ${LANG_ENGLISH} "Unable to validate safe Runtime update isolation. The application was not replaced."
 LangString DD_UpdateIsolationInvalid ${LANG_SIMPCHINESE} "无法验证安全的 Runtime 升级隔离，应用程序未被覆盖。"
+LangString DD_UpdateAppStillRunning ${LANG_ENGLISH} "DroneDream is still closing and its application file is in use. Setup stopped without replacing the installed application. Close DroneDream completely, then try the update again."
+LangString DD_UpdateAppStillRunning ${LANG_SIMPCHINESE} "DroneDream 仍在关闭，应用程序文件正被占用。安装程序已安全停止，未替换当前软件。请完全关闭 DroneDream 后重新尝试更新。"
 LangString DD_LegacyRuntimeBusy ${LANG_ENGLISH} "DroneDreamRuntime is busy. Cancel or wait for it in DroneDream, then try again."
 LangString DD_LegacyRuntimeBusy ${LANG_SIMPCHINESE} "DroneDreamRuntime 正在运行安装或维护。请先在软件中取消任务或等待完成后重试。"
 LangString DD_RuntimeStateUnknown ${LANG_ENGLISH} "Unable to verify the DroneDreamRuntime operation state. Setup stopped safely."

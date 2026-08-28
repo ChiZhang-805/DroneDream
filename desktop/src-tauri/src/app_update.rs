@@ -1,7 +1,10 @@
 //! Same-display-version updater ordering for the 1.0.0 internal-test channel.
 
 use serde::Serialize;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Mutex,
+};
 use std::time::Duration;
 use tauri::{Emitter, Manager};
 use tauri_plugin_updater::{Error as UpdaterError, UpdaterExt};
@@ -17,6 +20,7 @@ const LEGACY_RUNTIME_IDLE_PROBE_UNAVAILABLE: &str =
 #[derive(Default)]
 pub(crate) struct AppUpdateCoordinator {
     running: AtomicBool,
+    progress: Mutex<Option<AppUpdateProgress>>,
 }
 
 struct AppUpdateGuard<'a>(&'a AtomicBool);
@@ -35,15 +39,48 @@ struct AppUpdateProgress {
     attempt: u32,
 }
 
-fn emit_progress(app: &tauri::AppHandle, phase: &'static str, progress: u8, attempt: u32) {
-    let _ = app.emit(
-        UPDATE_PROGRESS_EVENT,
-        AppUpdateProgress {
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct AppUpdateSnapshot {
+    running: bool,
+    progress: Option<AppUpdateProgress>,
+}
+
+impl AppUpdateCoordinator {
+    fn publish(
+        &self,
+        app: &tauri::AppHandle,
+        phase: &'static str,
+        progress: u8,
+        attempt: u32,
+    ) {
+        let progress = AppUpdateProgress {
             phase,
             progress,
             attempt,
-        },
-    );
+        };
+        if let Ok(mut current) = self.progress.lock() {
+            *current = Some(progress.clone());
+        }
+        let _ = app.emit(UPDATE_PROGRESS_EVENT, progress);
+    }
+
+    fn snapshot(&self) -> AppUpdateSnapshot {
+        AppUpdateSnapshot {
+            running: self.running.load(Ordering::Acquire),
+            progress: self.progress.lock().ok().and_then(|progress| progress.clone()),
+        }
+    }
+}
+
+/// Return the process-owned update state so a newly mounted WebView page can
+/// immediately resume the same Universal download indicator. Edition routing,
+/// authentication refreshes and window minimization never own this state.
+#[tauri::command]
+pub(crate) fn get_app_update_progress(
+    coordinator: tauri::State<'_, AppUpdateCoordinator>,
+) -> AppUpdateSnapshot {
+    coordinator.snapshot()
 }
 
 fn updater_announced_size(raw: &serde_json::Value) -> Option<u64> {
@@ -83,8 +120,9 @@ pub(crate) async fn download_install_app_update(
         .map_err(|_| "An application update is already in progress.".to_string())?;
     let _guard = AppUpdateGuard(&coordinator.running);
 
+    coordinator.publish(&app, "preflight", 0, 0);
     ensure_update_idle_allowing_legacy_runtime()?;
-    emit_progress(&app, "preflight", 5, 0);
+    coordinator.publish(&app, "preflight", 5, 0);
 
     let updater = app
         .updater()
@@ -114,17 +152,17 @@ pub(crate) async fn download_install_app_update(
                     let next = (5_u64 + downloaded.saturating_mul(94) / total).min(99) as u8;
                     if next > highest_progress {
                         highest_progress = next;
-                        emit_progress(&chunk_app, "downloading", next, attempt);
+                        coordinator.publish(&chunk_app, "downloading", next, attempt);
                     }
                 },
-                || emit_progress(&finish_app, "verifying", 99, attempt),
+                || coordinator.publish(&finish_app, "verifying", 99, attempt),
             )
             .await;
 
         match result {
             Ok(bytes) => break bytes,
             Err(error) if retryable_download_error(&error) => {
-                emit_progress(&app, "retrying", highest_progress, attempt);
+                coordinator.publish(&app, "retrying", highest_progress, attempt);
                 let delay = Duration::from_secs(2_u64.pow(attempt.min(4)));
                 tauri::async_runtime::spawn_blocking(move || std::thread::sleep(delay))
                     .await
@@ -139,12 +177,12 @@ pub(crate) async fn download_install_app_update(
     // A task could have started while the update downloaded. Re-check the
     // native Runtime lease immediately before any process is stopped.
     ensure_update_idle_allowing_legacy_runtime()?;
-    emit_progress(&app, "installing", 100, attempt);
+    coordinator.publish(&app, "installing", 100, attempt);
     crate::runtime_keepalive::stop_runtime_for_exit(app.clone(), app.state()).await?;
     update
         .install(bytes)
         .map_err(|error| format!("Signed update installation failed: {error}"))?;
-    emit_progress(&app, "restarting", 100, attempt);
+    coordinator.publish(&app, "restarting", 100, attempt);
     app.restart();
 }
 

@@ -50,6 +50,15 @@ Assert-Contract ($updateSource.Contains('remote_source_commit != env!("DRONEDREA
     "Equal-version updates must reject the currently installed source commit."
 Assert-Contract ($updateSource.Contains('edition_id == COMPILED_EDITION_ID')) `
     "Every updater version must match the compiled desktop edition."
+foreach ($requiredText in @(
+    'progress: Mutex<Option<AppUpdateProgress>>',
+    'pub(crate) fn get_app_update_progress',
+    'running: self.running.load(Ordering::Acquire)',
+    'coordinator.publish(&app, "preflight", 0, 0)'
+)) {
+    Assert-Contract ($updateSource.Contains($requiredText)) `
+        "The native updater is missing its process-owned resumable progress contract: $requiredText"
+}
 Assert-Contract ($buildScript.Contains('cargo:rerun-if-env-changed=DRONEDREAM_RELEASE_SOURCE_COMMIT')) `
     "The embedded Engine Pack must be rebuilt when frozen release provenance changes."
 Assert-Contract ($buildScript.Contains('cargo:rerun-if-env-changed=DRONEDREAM_EDITION_PROFILE')) `

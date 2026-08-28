@@ -357,7 +357,8 @@ foreach ($required in @(
     'DD_InstallButton',
     'DD_NoEligibleDrive',
     'DD_PlannerUnavailable',
-    'DD_ShortcutConflict'
+    'DD_ShortcutConflict',
+    'DD_UpdateAppStillRunning'
 )) {
     if ($required -notin $englishNames) {
         throw "Installer language contract is missing: $required"
@@ -421,6 +422,16 @@ foreach ($required in @(
 )) {
     if (-not $installerHook.Contains($required)) {
         throw "Durable installer quiesce contract is missing: $required"
+    }
+}
+foreach ($required in @(
+    '${If} $UpdateMode != 0',
+    'FileOpen $1 "$INSTDIR\${MAINBINARYNAME}.exe" a',
+    'Sleep 100',
+    'Abort "$(DD_UpdateAppStillRunning)"'
+)) {
+    if (-not $installerHook.Contains($required)) {
+        throw "Updater executable-release wait contract is missing: $required"
     }
 }
 if ($installerHook -notmatch '(?ms)!if "\$\{DRONEDREAM_EDITION_ID\}" == "field"\s+.*?DeleteRegValue SHCTX "\$\{MANUPRODUCTKEY\}" "DroneDreamRuntimeOperationProtocol"\s+!else') {

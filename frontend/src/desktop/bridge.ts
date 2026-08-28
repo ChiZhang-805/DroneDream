@@ -1451,6 +1451,11 @@ export interface NativeAppUpdateProgress {
   attempt: number;
 }
 
+export interface NativeAppUpdateSnapshot {
+  running: boolean;
+  progress: NativeAppUpdateProgress | null;
+}
+
 const APP_UPDATE_PROGRESS_PHASES = new Set<AppUpdateProgressPhase>([
   "preflight",
   "downloading",
@@ -1477,17 +1482,37 @@ function parseNativeAppUpdateProgress(value: unknown): NativeAppUpdateProgress {
   return { phase, progress, attempt };
 }
 
-export async function installAppUpdateInBackground(
+function parseNativeAppUpdateSnapshot(value: unknown): NativeAppUpdateSnapshot {
+  const record = expectRecord(value, "app update snapshot");
+  return {
+    running: expectBoolean(record.running, "app update snapshot.running"),
+    progress: record.progress == null
+      ? null
+      : parseNativeAppUpdateProgress(record.progress),
+  };
+}
+
+export function getAppUpdateProgress(): Promise<NativeAppUpdateSnapshot> {
+  return invokeDesktop("get_app_update_progress", parseNativeAppUpdateSnapshot);
+}
+
+export async function listenAppUpdateProgress(
   onProgress: (progress: NativeAppUpdateProgress) => void,
-): Promise<void> {
+): Promise<() => void> {
   const eventApi = typeof window === "undefined" ? undefined : window.__TAURI__?.event;
   if (!eventApi || typeof eventApi.listen !== "function") {
     throw new DesktopRuntimeUnavailableError();
   }
-  const unlisten = await eventApi.listen<unknown>(
+  return eventApi.listen<unknown>(
     "dronedream-app-update-progress",
     (event) => onProgress(parseNativeAppUpdateProgress(event.payload)),
   );
+}
+
+export async function installAppUpdateInBackground(
+  onProgress: (progress: NativeAppUpdateProgress) => void,
+): Promise<void> {
+  const unlisten = await listenAppUpdateProgress(onProgress);
   try {
     await invokeDesktop("download_install_app_update", () => undefined);
   } finally {
