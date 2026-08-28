@@ -2641,78 +2641,80 @@ function SettingsDialog({
       {access.desktopRuntime ? (
         <EditionSettingsPanel active={activeSettingsTab === "runtime"} id="runtime">
           <section className="settings-runtime-panel" aria-labelledby="settings-runtime-title">
-          <div className="settings-runtime-heading">
-            <div>
-              <h3 id="settings-runtime-title">{runtimeCheckCopy.title}</h3>
+          <section className="settings-runtime-module settings-runtime-environment-module">
+            <div className="settings-runtime-heading">
+              <div>
+                <h3 id="settings-runtime-title">{runtimeCheckCopy.title}</h3>
+              </div>
+              <button
+                type="button"
+                className="btn settings-runtime-check"
+                disabled={runtimeCheckActive}
+                onClick={() => void runRuntimeCheck()}
+              >
+                {runtimeCheckActive
+                  ? t("settings.runtime.checking")
+                  : t("settings.runtime.checkNow")}
+              </button>
             </div>
-            <button
-              type="button"
-              className="btn settings-runtime-check"
-              disabled={runtimeCheckActive}
-              onClick={() => void runRuntimeCheck()}
+            <div
+              className={`settings-runtime-status settings-runtime-status-${runtimeCheckVisualPhase ?? level}`}
+              role="status"
+              aria-live="polite"
             >
-              {runtimeCheckActive
-                ? t("settings.runtime.checking")
-                : t("settings.runtime.checkNow")}
-            </button>
-          </div>
-          <div
-            className={`settings-runtime-status settings-runtime-status-${runtimeCheckVisualPhase ?? level}`}
-            role="status"
-            aria-live="polite"
-          >
-            <span className="settings-runtime-status-icon" aria-hidden="true">
-              {runtimeCheckVisualPhase === "checking" ? (
-                <LoaderCircle className="is-spinning" />
-              ) : runtimeCheckVisualPhase === "pending" ? (
-                <Circle />
-              ) : level === "healthy" ? (
-                <CircleCheckBig />
-              ) : level === "error" || level === "warning" ? (
-                <CircleX />
-              ) : (
-                <Circle />
-              )}
-            </span>
-            <div>
-              <strong>{statusLabel}</strong>
-              <small>{t("settings.runtime.lastChecked")}: {lastChecked}</small>
+              <span className="settings-runtime-status-icon" aria-hidden="true">
+                {runtimeCheckVisualPhase === "checking" ? (
+                  <LoaderCircle className="is-spinning" />
+                ) : runtimeCheckVisualPhase === "pending" ? (
+                  <Circle />
+                ) : level === "healthy" ? (
+                  <CircleCheckBig />
+                ) : level === "error" || level === "warning" ? (
+                  <CircleX />
+                ) : (
+                  <Circle />
+                )}
+              </span>
+              <div>
+                <strong>{statusLabel}</strong>
+                <small>{t("settings.runtime.lastChecked")}: {lastChecked}</small>
+              </div>
             </div>
-          </div>
-          <ol className="settings-runtime-check-steps" aria-label={runtimeCheckCopy.title}>
-            {runtimeCheckSteps.map((step) => {
-              const visualLabel = step.state === "checking"
-                ? runtimeCheckCopy.checking
-                : step.state === "success"
-                  ? runtimeCheckCopy.success
-                  : step.state === "error"
-                    ? runtimeCheckCopy.failed
-                    : runtimeCheckCopy.pending;
-              return (
-                <li key={step.id} data-state={step.state}>
-                  <span className="settings-runtime-step-icon" aria-hidden="true">
-                    {step.state === "checking" ? (
-                      <LoaderCircle className="is-spinning" />
-                    ) : step.state === "success" ? (
-                      <CircleCheckBig />
-                    ) : step.state === "error" ? (
-                      <CircleX />
-                    ) : (
-                      <Circle />
-                    )}
-                  </span>
-                  <strong>{step.label}</strong>
-                  {step.detail ? <small>{step.detail}</small> : <span aria-hidden="true" />}
-                  <em>{visualLabel}</em>
-                </li>
-              );
-            })}
-          </ol>
-          {!runtimeCheckActive && level !== "healthy" && uniqueDetails.length > 0 ? (
-            <ul className="settings-runtime-diagnostics" aria-label={t("settings.runtime.viewDetails")}>
-              {uniqueDetails.map((detail) => <li key={detail}>{detail}</li>)}
-            </ul>
-          ) : null}
+            <ol className="settings-runtime-check-steps" aria-label={runtimeCheckCopy.title}>
+              {runtimeCheckSteps.map((step) => {
+                const visualLabel = step.state === "checking"
+                  ? runtimeCheckCopy.checking
+                  : step.state === "success"
+                    ? runtimeCheckCopy.success
+                    : step.state === "error"
+                      ? runtimeCheckCopy.failed
+                      : runtimeCheckCopy.pending;
+                return (
+                  <li key={step.id} data-state={step.state}>
+                    <span className="settings-runtime-step-icon" aria-hidden="true">
+                      {step.state === "checking" ? (
+                        <LoaderCircle className="is-spinning" />
+                      ) : step.state === "success" ? (
+                        <CircleCheckBig />
+                      ) : step.state === "error" ? (
+                        <CircleX />
+                      ) : (
+                        <Circle />
+                      )}
+                    </span>
+                    <strong>{step.label}</strong>
+                    {step.detail ? <small>{step.detail}</small> : <span aria-hidden="true" />}
+                    <em>{visualLabel}</em>
+                  </li>
+                );
+              })}
+            </ol>
+            {!runtimeCheckActive && level !== "healthy" && uniqueDetails.length > 0 ? (
+              <ul className="settings-runtime-diagnostics" aria-label={t("settings.runtime.viewDetails")}>
+                {uniqueDetails.map((detail) => <li key={detail}>{detail}</li>)}
+              </ul>
+            ) : null}
+          </section>
           <SettingsUpdateCenter
             onOpenRuntimeBase={() => {
               onClose();

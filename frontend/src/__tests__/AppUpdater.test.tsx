@@ -282,8 +282,9 @@ describe("Settings update center", () => {
 
     const dialog = await openRuntimeSettings();
     expect(within(dialog).getByRole("heading", { name: "Software updates" })).toBeVisible();
-    expect(within(dialog).getByText("DroneDream is up to date. Click to check again."))
-      .toBeVisible();
+    expect(within(dialog).getByRole("status", {
+      name: "software version state: up-to-date",
+    })).toBeVisible();
     fireEvent.click(within(dialog).getByRole("button", { name: "Check for updates" }));
 
     expect(checkForUpdates).toHaveBeenCalledOnce();
@@ -305,16 +306,16 @@ describe("Settings update center", () => {
     const { router } = renderDashboard();
 
     const dialog = await openRuntimeSettings();
-    expect(within(dialog).getByText("Version 1.0.1 is available. Click to update."))
-      .toBeVisible();
-    expect(within(dialog).getByText("Required")).toBeVisible();
+    expect(within(dialog).getByRole("status", {
+      name: "software version state: old-version · v1.0.1",
+    })).toBeVisible();
     fireEvent.click(within(dialog).getByRole("button", { name: "Install update" }));
 
     expect(installAvailableUpdate).toHaveBeenCalledOnce();
     router.dispose();
   });
 
-  it("lists signed pack urgency and installs the selected pack update set", async () => {
+  it("summarizes the signed pack version and installs the selected update set", async () => {
     const installComponentUpdates = vi.fn(async () => undefined);
     updaterState.current = {
       ...updaterState.current,
@@ -344,9 +345,9 @@ describe("Settings update center", () => {
     const { router } = renderDashboard();
 
     const dialog = await openRuntimeSettings();
-    expect(within(dialog).getByText("Workflow pack")).toBeVisible();
-    expect(within(dialog).getByText("v1.2.0")).toBeVisible();
-    expect(within(dialog).getAllByText("Required").length).toBeGreaterThan(0);
+    expect(within(dialog).getByRole("status", {
+      name: "software version state: old-version · v1.2.0",
+    })).toBeVisible();
     fireEvent.click(within(dialog).getByRole("button", { name: "Install pack updates" }));
 
     expect(installComponentUpdates).toHaveBeenCalledOnce();
@@ -366,7 +367,9 @@ describe("Settings update center", () => {
     const dialog = await openRuntimeSettings();
     expect(within(dialog).getByRole("progressbar", { name: "Update progress" }))
       .toHaveValue(42);
-    expect(within(dialog).getByText("42%")).toBeVisible();
+    expect(within(dialog).getByRole("status", {
+      name: "software version state: downloading · 42%",
+    })).toBeVisible();
     router.dispose();
   });
 
@@ -397,8 +400,9 @@ describe("Settings update center", () => {
 
     const dialog = await openRuntimeSettings("zh-CN");
     expect(within(dialog).getByRole("heading", { name: "软件更新" })).toBeVisible();
-    expect(within(dialog).getByText("DroneDream 已是最新版本，点击可再次检查。"))
-      .toBeVisible();
+    expect(within(dialog).getByRole("status", {
+      name: "软件版本状态： 已是最新版本",
+    })).toBeVisible();
     expect(within(dialog).getByRole("button", { name: "检查更新" })).toBeEnabled();
     router.dispose();
   });

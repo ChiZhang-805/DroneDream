@@ -23619,3 +23619,211 @@ body {
     width: 100%;
   }
 }
+
+/* 2026-08-28 Settings composition: the course directory consumes its complete
+   canvas in five equal rows, while Runtime is presented as two unmistakable
+   modules instead of one long undifferentiated list. */
+.settings-workspace-content > .launcher-settings-panels:has(> [data-settings-panel="course"]:not([hidden])) {
+  overflow-y: hidden;
+  padding-bottom: 0.75rem;
+}
+
+.settings-workspace-content [data-settings-panel="course"]:not([hidden]) {
+  height: 100%;
+  min-height: 0;
+}
+
+.settings-workspace-content [data-settings-panel="course"] .settings-course-panel {
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  align-self: stretch;
+  padding-top: 0.75rem;
+}
+
+.settings-workspace-content [data-settings-panel="course"] .settings-course-editions {
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: repeat(5, minmax(5.25rem, 1fr));
+}
+
+.settings-workspace-content [data-settings-panel="course"] .settings-course-editions article,
+.settings-workspace-content [data-settings-panel="course"] .settings-course-editions article:nth-child(4),
+.settings-workspace-content [data-settings-panel="course"] .settings-course-editions article:nth-child(5) {
+  min-height: 0;
+}
+
+.settings-workspace-content .settings-runtime-panel {
+  gap: 1rem;
+  padding: 1rem 0 2rem;
+}
+
+.settings-runtime-module {
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 0.95rem 1.1rem;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 20%, var(--border));
+  border-radius: 0.9rem;
+  background: color-mix(in srgb, var(--dd-brand-light-surface) 24%, var(--bg-elev));
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--dd-brand-dark-surface) 8%, transparent);
+}
+
+.settings-runtime-environment-module {
+  display: grid;
+  gap: 0;
+}
+
+.settings-runtime-module .settings-runtime-heading,
+.settings-runtime-module .settings-update-heading {
+  min-height: 3.2rem;
+  align-items: center;
+  padding: 0 0.1rem 0.75rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+}
+
+.settings-runtime-module .settings-runtime-heading h3,
+.settings-runtime-module .settings-update-heading h3 {
+  margin: 0;
+  font-size: 1.08rem;
+}
+
+.settings-runtime-module .settings-runtime-status {
+  padding-inline: 0.1rem;
+}
+
+.settings-runtime-module.settings-update-center {
+  display: grid;
+  gap: 0;
+  padding: 0.95rem 1.1rem;
+  border-top: 1px solid color-mix(in srgb, var(--dd-brand-middle) 20%, var(--border));
+}
+
+.settings-runtime-module .settings-update-heading {
+  display: flex;
+  justify-content: space-between;
+}
+
+.settings-runtime-module .settings-update-state,
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-module .settings-update-state {
+  min-height: 3.8rem;
+  display: grid;
+  grid-template-columns: 1.65rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.75rem 0.1rem 0;
+  color: var(--text);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-runtime-module .settings-update-icon {
+  width: 1.65rem;
+  height: 1.65rem;
+  color: #45d997;
+  border: 0;
+  background: transparent;
+}
+
+.settings-runtime-module .settings-update-icon svg {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+
+.settings-runtime-module .settings-update-state-busy .settings-update-icon {
+  color: #4da8ff;
+}
+
+.settings-runtime-module .settings-update-state-attention .settings-update-icon {
+  color: #f2b632;
+}
+
+.settings-runtime-module .settings-update-state-error .settings-update-icon {
+  color: #ff6576;
+}
+
+.settings-runtime-module .settings-update-copy {
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.38rem;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 0.92rem;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.settings-runtime-module .settings-update-copy span,
+.settings-runtime-module .settings-update-copy strong {
+  min-width: 0;
+}
+
+.settings-runtime-module .settings-update-copy strong {
+  overflow: hidden;
+  color: inherit;
+  text-overflow: ellipsis;
+}
+
+.settings-runtime-module .settings-update-state-current .settings-update-copy strong {
+  color: #15935f;
+}
+
+.settings-runtime-module .settings-update-state-busy .settings-update-copy strong {
+  color: #237fda;
+}
+
+.settings-runtime-module .settings-update-state-attention .settings-update-copy strong {
+  color: #9a6800;
+}
+
+.settings-runtime-module .settings-update-state-error .settings-update-copy strong {
+  color: #c83d50;
+}
+
+:root[data-dd-appearance="dark"] .settings-runtime-module {
+  background: color-mix(in srgb, var(--dd-brand-dark-surface) 38%, var(--bg-elev));
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
+}
+
+:root[data-dd-appearance="dark"] .settings-runtime-module .settings-update-copy,
+:root[data-dd-appearance="dark"] .settings-runtime-module .settings-update-copy span {
+  color: #edf1fb;
+}
+
+:root[data-dd-appearance="dark"] .settings-runtime-module .settings-update-state-current .settings-update-copy strong {
+  color: #45efa0;
+}
+
+:root[data-dd-appearance="dark"] .settings-runtime-module .settings-update-state-busy .settings-update-copy strong {
+  color: #63b6ff;
+}
+
+:root[data-dd-appearance="dark"] .settings-runtime-module .settings-update-state-attention .settings-update-copy strong {
+  color: #ffd05a;
+}
+
+:root[data-dd-appearance="dark"] .settings-runtime-module .settings-update-state-error .settings-update-copy strong {
+  color: #ff7f8d;
+}
+
+@media (max-width: 980px) {
+  .settings-workspace-content > .launcher-settings-panels:has(> [data-settings-panel="course"]:not([hidden])) {
+    overflow-y: auto;
+  }
+
+  .settings-workspace-content [data-settings-panel="course"]:not([hidden]),
+  .settings-workspace-content [data-settings-panel="course"] .settings-course-panel {
+    height: auto;
+    min-height: 100%;
+  }
+
+  .settings-workspace-content [data-settings-panel="course"] .settings-course-editions {
+    height: auto;
+    min-height: calc(5 * 8.75rem);
+  }
+}
