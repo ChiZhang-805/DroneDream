@@ -330,12 +330,12 @@ describe("DroneDream public website", () => {
   it("validates release metadata and formats binary sizes", () => {
     expect(fallbackRelease).toMatchObject({
       edition: "universal",
-      buildNumber: 1827,
+      buildNumber: 1830,
       version: "1.0.0",
       fileName: "DroneDream-Universal_1.0.0_x64-setup.exe",
-      sha256: "e4a71207bce8214676247ccfff489b455b9859bb36af388f8cd30102354ceecb",
-      sizeBytes: 83_276_442,
-      publishedAt: "2026-08-28",
+      sha256: "9e4abb73a6bde86bb55b23ddb0d9a26682f0ca4f361f318c538d86a8bbfb9e27",
+      sizeBytes: 85_491_253,
+      publishedAt: "2026-08-30",
     });
     expect(isWebsiteRelease(fallbackRelease)).toBe(true);
     expect(isWebsiteRelease({ ...fallbackRelease, sha256: "unsafe" })).toBe(false);
@@ -436,8 +436,8 @@ describe("DroneDream public website", () => {
       ...fallbackRelease,
       version: "1.0.1",
       fileName: "DroneDream-Universal_1.0.1_x64-setup.exe",
-      downloadUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.1-build-1827/DroneDream-Universal_1.0.1_x64-setup.exe",
-      checksumUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.1-build-1827/DroneDream-Universal_1.0.1_x64-setup.exe.sha256",
+      downloadUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.1-build-1830/DroneDream-Universal_1.0.1_x64-setup.exe",
+      checksumUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.1-build-1830/DroneDream-Universal_1.0.1_x64-setup.exe.sha256",
       sha256: "b".repeat(64),
       sizeBytes: 5_500_000,
       publishedAt: "2026-07-22",
