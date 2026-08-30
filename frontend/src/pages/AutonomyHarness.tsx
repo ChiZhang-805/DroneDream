@@ -654,7 +654,6 @@ export function AutonomyHarness() {
               : activeIsCurrent ? (chinese ? "已激活" : "Active")
                 : (chinese ? "下一任务生效" : "Next task")}
           </span>
-          {harness && !previewMode ? <code>R{harness.current.revision}</code> : null}
           <button type="button" onClick={() => void load()} aria-label={chinese ? "刷新" : "Refresh"}><RefreshCw /></button>
         </div>
       </header>

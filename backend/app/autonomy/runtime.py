@@ -145,26 +145,79 @@ def _safety_decision(
     for entity in observation.perceived_entities:
         if entity.confidence < 0.5 or entity.age_ms > 1_000:
             continue
-        distance = math.dist(
-            (observation.position_m.x, observation.position_m.y, observation.position_m.z),
-            (entity.position_m.x, entity.position_m.y, entity.position_m.z),
+        vehicle_position = (
+            observation.position_m.x,
+            observation.position_m.y,
+            observation.position_m.z,
         )
+        entity_position = (
+            entity.position_m.x,
+            entity.position_m.y,
+            entity.position_m.z,
+        )
+        distance = math.dist(vehicle_position, entity_position)
         aircraft_speed = math.sqrt(
             observation.velocity_mps.x**2
             + observation.velocity_mps.y**2
             + observation.velocity_mps.z**2
         )
+        braking_time_s = aircraft_speed / vehicle.max_acceleration_mps2
+        prediction_horizon_s = min(6.0, max(2.0, braking_time_s + 1.0))
+        relative_position = tuple(
+            entity_position[index] - vehicle_position[index] for index in range(3)
+        )
+        relative_velocity = (
+            entity.velocity_mps.x - observation.velocity_mps.x,
+            entity.velocity_mps.y - observation.velocity_mps.y,
+            entity.velocity_mps.z - observation.velocity_mps.z,
+        )
+        relative_speed_squared = sum(value * value for value in relative_velocity)
+        closest_time_s = (
+            max(
+                0.0,
+                min(
+                    prediction_horizon_s,
+                    -sum(
+                        relative_position[index] * relative_velocity[index]
+                        for index in range(3)
+                    )
+                    / relative_speed_squared,
+                ),
+            )
+            if relative_speed_squared > 1e-9
+            else 0.0
+        )
+        predicted_separation_m = math.sqrt(
+            sum(
+                (
+                    relative_position[index]
+                    + relative_velocity[index] * closest_time_s
+                )
+                ** 2
+                for index in range(3)
+            )
+        )
+        track_uncertainty_m = (1.0 - entity.confidence) * 0.75
+        track_uncertainty_m += entity.age_ms / 1_000 * math.sqrt(
+            entity.velocity_mps.x**2
+            + entity.velocity_mps.y**2
+            + entity.velocity_mps.z**2
+        )
         stop_envelope = (
             vehicle.radius_m
             + entity.safety_radius_m
+            + track_uncertainty_m
             + max(
                 0.5,
-                aircraft_speed * 0.75,
+                aircraft_speed * braking_time_s / 2.0,
             )
         )
         if distance <= stop_envelope:
             suffix = "person" if entity.kind == "person" else "dynamic-entity"
             escalate("hold", f"safety.{suffix}-envelope")
+        elif closest_time_s > 0.0 and predicted_separation_m <= stop_envelope:
+            suffix = "person" if entity.kind == "person" else "dynamic-entity"
+            escalate("hold", f"safety.predicted-{suffix}-conflict")
         elif distance <= stop_envelope + 1.5:
             codes.append("world.dynamic-entity-nearby")
     if not codes:
@@ -1051,8 +1104,8 @@ class RuntimeSessionRegistry:
                 if all_entity_ids
                 else _runtime_text(
                     record.mission.mission.locale,
-                    f"Task graph revision {task_graph.revision}; safety action {decision.action}.",
-                    f"任务图修订为 R{task_graph.revision}；安全动作："
+                    f"Task graph updated; safety action {decision.action}.",
+                    "任务图已更新；安全动作："
                     f"{_runtime_action_label(record.mission.mission.locale, decision.action)}。",
                 )
             )

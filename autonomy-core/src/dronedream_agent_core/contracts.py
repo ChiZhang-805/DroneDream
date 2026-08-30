@@ -46,6 +46,108 @@ class Vector3(StrictModel):
     z: float
 
 
+class RangeRayObservation(StrictModel):
+    """One metric free-space ray ending at a hit or at sensor range."""
+
+    origin_m: Vector3
+    endpoint_m: Vector3
+    hit: bool
+    confidence: float = Field(ge=0.0, le=1.0)
+    observed_at_monotonic_seconds: float = Field(ge=0.0)
+
+
+class MetricVoxelMapSnapshot(StrictModel):
+    schema_version: Literal["dronedream.metric-voxel-map.v1"] = (
+        "dronedream.metric-voxel-map.v1"
+    )
+    resolution_m: float = Field(gt=0.02, le=5.0)
+    minimum_bound_m: Vector3
+    maximum_bound_m: Vector3
+    occupied_voxels: list[tuple[int, int, int]] = Field(default_factory=list, max_length=250_000)
+    free_voxels: list[tuple[int, int, int]] = Field(default_factory=list, max_length=250_000)
+    observation_count: int = Field(ge=0)
+    latest_observation_monotonic_seconds: float | None = Field(default=None, ge=0.0)
+
+
+class DynamicObstacleObservation(StrictModel):
+    obstacle_id: str = Field(pattern=r"^[a-z0-9][a-z0-9._-]*$")
+    position_m: Vector3
+    velocity_mps: Vector3
+    radius_m: float = Field(gt=0.0, le=20.0)
+    height_m: float = Field(gt=0.0, le=50.0)
+    confidence: float = Field(ge=0.0, le=1.0)
+    age_seconds: float = Field(ge=0.0, le=30.0)
+
+
+class LocalPlannerRequest(StrictModel):
+    schema_version: Literal["dronedream.local-planner-request.v1"] = (
+        "dronedream.local-planner-request.v1"
+    )
+    current_position_m: Vector3
+    current_velocity_mps: Vector3
+    target_position_m: Vector3
+    dynamic_obstacles: list[DynamicObstacleObservation] = Field(
+        default_factory=list, max_length=512
+    )
+    vehicle_radius_m: float = Field(gt=0.0, le=5.0)
+    vehicle_height_m: float = Field(gt=0.0, le=10.0)
+    max_speed_mps: float = Field(gt=0.0, le=20.0)
+    max_acceleration_mps2: float = Field(gt=0.0, le=30.0)
+    required_clearance_m: float = Field(ge=0.0, le=20.0)
+    prediction_horizon_seconds: float = Field(gt=0.1, le=15.0)
+    prediction_step_seconds: float = Field(gt=0.02, le=1.0)
+    perception_stream_healthy: bool = True
+    perception_stream_age_seconds: float = Field(default=0.0, ge=0.0, le=30.0)
+    maximum_perception_age_seconds: float = Field(default=0.5, gt=0.02, le=5.0)
+    localization_covariance_m2: float = Field(default=0.0, ge=0.0, le=10_000.0)
+    maximum_localization_covariance_m2: float = Field(default=0.25, gt=0.0, le=100.0)
+
+
+class PredictiveSafetyDecision(StrictModel):
+    schema_version: Literal["dronedream.predictive-safety-decision.v1"] = (
+        "dronedream.predictive-safety-decision.v1"
+    )
+    action: Literal["continue", "slow", "hold", "replan"]
+    selected_velocity_mps: Vector3
+    predicted_path_m: list[Vector3] = Field(min_length=1, max_length=1_000)
+    minimum_predicted_clearance_m: float
+    time_to_minimum_clearance_seconds: float = Field(ge=0.0, le=15.0)
+    threat_obstacle_id: str | None = None
+    evaluated_candidate_count: int = Field(ge=1, le=1_000)
+    issue_codes: list[str] = Field(default_factory=list, max_length=32)
+
+
+class RuntimeLocalSafetyObservation(StrictModel):
+    schema_version: Literal["dronedream.runtime-local-safety-observation.v1"] = (
+        "dronedream.runtime-local-safety-observation.v1"
+    )
+    sequence: int = Field(ge=1)
+    observed_at_unix_ms: int = Field(ge=0)
+    source: Literal["simulation-ground-truth", "onboard", "external"]
+    stream_healthy: bool
+    stream_age_seconds: float = Field(ge=0.0, le=30.0)
+    localization_covariance_m2: float = Field(ge=0.0, le=10_000.0)
+    current_position_m: Vector3
+    current_velocity_mps: Vector3
+    target_position_m: Vector3
+    dynamic_obstacles: list[DynamicObstacleObservation] = Field(
+        default_factory=list, max_length=512
+    )
+
+
+class RuntimeLocalSafetyCommand(StrictModel):
+    schema_version: Literal["dronedream.runtime-local-safety-command.v1"] = (
+        "dronedream.runtime-local-safety-command.v1"
+    )
+    observation_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    observation_sequence: int = Field(ge=1)
+    generated_at_unix_ms: int = Field(ge=0)
+    valid_until_unix_ms: int = Field(ge=0)
+    source: Literal["simulation-ground-truth", "onboard", "external"]
+    command_position_m: Vector3
+    decision: PredictiveSafetyDecision
+
+
 class VehicleAsset(StrictModel):
     schema_version: Literal["dronedream.vehicle.v1"] = "dronedream.vehicle.v1"
     asset_id: str = Field(pattern=r"^[a-z0-9][a-z0-9._-]*$")
@@ -191,6 +293,28 @@ class IntentArtifact(StrictModel):
     constraints: list[str] = Field(default_factory=list, max_length=32)
     missing_critical_fields: list[str] = Field(default_factory=list, max_length=16)
     assumptions: list[str] = Field(default_factory=list, max_length=16)
+    environment_mode: Literal[
+        "qualified-static-map",
+        "known-map-with-dynamic-obstacles",
+        "unknown-indoor-environment",
+    ] = "qualified-static-map"
+
+
+class NavigationReadinessReport(StrictModel):
+    schema_version: Literal["dronedream.navigation-readiness.v1"] = (
+        "dronedream.navigation-readiness.v1"
+    )
+    static_map_planning_ready: bool
+    static_collision_geometry_ready: bool
+    occupancy_esdf_ready: bool
+    indoor_localization_ready: bool
+    onboard_obstacle_perception_ready: bool
+    dynamic_obstacle_tracking_ready: bool
+    qualified_static_simulation_ready: bool
+    known_dynamic_map_autonomy_ready: bool
+    arbitrary_indoor_autonomy_ready: bool
+    sensor_evidence: list[str] = Field(default_factory=list, max_length=32)
+    issue_codes: list[str] = Field(default_factory=list, max_length=32)
 
 
 class IntentCritique(StrictModel):
@@ -317,6 +441,14 @@ class SemanticPlan(StrictModel):
     schema_version: Literal["dronedream.semantic-plan.v1"] = "dronedream.semantic-plan.v1"
     ordered_targets: list[str] = Field(min_length=1, max_length=64)
     rationale_summary: str = Field(min_length=1, max_length=600)
+    route_objective: Literal[
+        "balanced",
+        "clearance-first",
+        "energy-first",
+        "stability-first",
+        "shortest-safe",
+    ] = "clearance-first"
+    map_risk_flags: list[str] = Field(default_factory=list, max_length=16)
 
 
 class PlannerContribution(StrictModel):
@@ -1057,6 +1189,9 @@ class Px4GazeboGates(StrictModel):
     no_live_abort: bool
     px4_ulog_present: bool
     static_route_clearance_bound: bool
+    local_safety_observation_present: bool | None = None
+    local_safety_command_present: bool | None = None
+    local_safety_observation_sequence_advanced: bool | None = None
 
 
 class Px4GazeboMeasurements(StrictModel):
@@ -1070,12 +1205,20 @@ class Px4GazeboMeasurements(StrictModel):
     minimum_tolerated_landing_clearance_m: float | None = None
 
 
+class Px4GazeboLocalSafetyEvidence(StrictModel):
+    supported_by_executor: bool
+    observation_sequence: int = Field(ge=0)
+    observation_path: str | None = None
+    command_path: str | None = None
+
+
 class Px4GazeboRunEvidence(StrictModel):
     schema_version: Literal["dronedream.generic-px4-gazebo-run.v1"]
     status: Literal["verified", "failed"]
     world: str
     vehicle: str
     gates: Px4GazeboGates
+    local_safety: Px4GazeboLocalSafetyEvidence | None = None
     measurements: Px4GazeboMeasurements
     artifacts: Px4GazeboArtifactBindings
 

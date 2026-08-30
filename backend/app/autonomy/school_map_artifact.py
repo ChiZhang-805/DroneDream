@@ -449,7 +449,11 @@ BIKE_SHELTER_CENTER = (-42.0, 30.2)
 BIKE_SHELTER_COLUMN_RADIUS_M = 0.08
 BIKE_SHELTER_COLUMN_HEIGHT_M = 2.89
 PICKUP_CENTER = (48.5, 1.5)
-PICKUP_ROUTE_CENTER = (48.5, 1.25)
+# Keep the hover/pickup envelope far enough south of the shelf to preserve the
+# qualified X500 body radius plus the operational localization/tracking/local-
+# avoidance reserve.  The former y=1.25 pose left only about 0.355 m of physical
+# clearance to the shelf, effectively consuming the entire 0.35 m reserve.
+PICKUP_ROUTE_CENTER = (48.5, 1.0)
 PICKUP_ROUTE_ENVELOPE_CENTER_Z_M = 1.35
 PICKUP_COLUMN_RADIUS_M = 0.075
 PICKUP_COLUMN_HEIGHT_M = 2.71
@@ -673,13 +677,19 @@ SCHOOL_MAP_GAZEBO_ARTIFACT_SUMMARY: dict[str, object] = {
     "format": "sdf",
     "sdf_version": "1.9",
     "model_sdf_sha256": "114f85f2465c37df5d87d001138f4f472e1ed1a7dcb89273e742397b6ac8a7f8",
-    "semantic_sha256": "7a57164f956a60bb68c90644bbe0a6585674bf33bbfb4d31147eb324b637d2df",
+    "semantic_sha256": "1bcd05290405e92f7ae8617427de2fbb64e729e94509103fd026df4f1edea531",
     "world_sdf_sha256": "ef9d4e976dbd2b128f80aa2ff11f41a1cfffb8ccb58e763d206d9f9163ce7e8c",
     "physics_world_sdf_sha256": (
         "8494319a9afaf6822ea3cd422d663e7d5c9a85e8167e419e2273a57c95a8d9f2"
     ),
     "physics_model_sdf_sha256": (
         "82f46a355019f9d9e840e546b50626c6c19b567002d1bf3e8b9568922aaa4f6e"
+    ),
+    "perception_world_sdf_sha256": (
+        "8fb41fc64279b0e846645bca058d0ce47c62411379b3382870311823ced4eafb"
+    ),
+    "perception_model_sdf_sha256": (
+        "5d356a51a83c7003d816fd4ff202a8dec4e7e07d3eb08306e47964301bd65e69"
     ),
     "model_config_sha256": "eb06bf2d09e16f6e7b4c5ca379b5aea4c16b7a082f3e8a6e41c020049646dcf5",
     "package_file_sha256": {
@@ -701,16 +711,23 @@ SCHOOL_MAP_GAZEBO_ARTIFACT_SUMMARY: dict[str, object] = {
         ),
         "model.config": "eb06bf2d09e16f6e7b4c5ca379b5aea4c16b7a082f3e8a6e41c020049646dcf5",
         "model.physics.sdf": ("82f46a355019f9d9e840e546b50626c6c19b567002d1bf3e8b9568922aaa4f6e"),
+        "model.perception.sdf": (
+            "5d356a51a83c7003d816fd4ff202a8dec4e7e07d3eb08306e47964301bd65e69"
+        ),
         "model.sdf": "114f85f2465c37df5d87d001138f4f472e1ed1a7dcb89273e742397b6ac8a7f8",
         "ros_gz_bridge.yaml": ("89220ef78125348776575b1a14fa1727c9cb098d9c46d84a74e27e5e8715f0b1"),
-        "semantic.json": "7a57164f956a60bb68c90644bbe0a6585674bf33bbfb4d31147eb324b637d2df",
+        "semantic.json": "1bcd05290405e92f7ae8617427de2fbb64e729e94509103fd026df4f1edea531",
         "world.physics.sdf": ("8494319a9afaf6822ea3cd422d663e7d5c9a85e8167e419e2273a57c95a8d9f2"),
+        "world.perception.sdf": (
+            "8fb41fc64279b0e846645bca058d0ce47c62411379b3382870311823ced4eafb"
+        ),
         "world.sdf": "ef9d4e976dbd2b128f80aa2ff11f41a1cfffb8ccb58e763d206d9f9163ce7e8c",
     },
-    "package_manifest_sha256": ("f99ce8f4c45c8fd69aa66671f4bb7159be24f6b453d48d3f014ff9929b3a9298"),
-    "package_file_count": 13,
+    "package_manifest_sha256": ("3c274113994c06c6cdb5cebac080b4e79dad117530c6826974df0bf01996f015"),
+    "package_file_count": 15,
     "collision_primitive_count": 1535,
     "visual_primitive_count": 3930,
+    "perception_visual_primitive_count": 1535,
     "geometry_scope": "simulation-static-scene-v2",
     "known_export_limit_count": 5,
     "gazebo_asset_contract_generated": True,
@@ -2854,6 +2871,7 @@ def _model_for(
     *,
     include_visuals: bool,
     visual_primitives: list[CollisionPrimitive] | None = None,
+    visualize_capsules: bool = False,
 ) -> ElementTree.Element:
     model = ElementTree.Element("model", {"name": "school_map"})
     ElementTree.SubElement(model, "static").text = "true"
@@ -2883,7 +2901,7 @@ def _model_for(
         element_primitives.extend(
             ("visual", primitive)
             for primitive in (visual_primitives or collision_primitives)
-            if not isinstance(primitive, CapsulePrimitive)
+            if visualize_capsules or not isinstance(primitive, CapsulePrimitive)
         )
     for element_name, primitive in element_primitives:
         element = ElementTree.SubElement(
@@ -3108,8 +3126,10 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
         "simulation_bindings": {
             "gazebo_world_file": "world.sdf",
             "gazebo_headless_physics_world_file": "world.physics.sdf",
+            "gazebo_onboard_perception_world_file": "world.perception.sdf",
             "gazebo_model_file": "model.sdf",
             "gazebo_headless_physics_model_file": "model.physics.sdf",
+            "gazebo_onboard_perception_model_file": "model.perception.sdf",
             "gazebo_model_name": "school_map",
             "physics_step_seconds": SCHOOL_MAP_PHYSICS_STEP_SECONDS,
             "physics_update_rate_hz": SCHOOL_MAP_PHYSICS_UPDATE_RATE_HZ,
@@ -3181,6 +3201,9 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
             "runtime_primitive_count": len(runtime_collision_primitives),
             "coverage_rule": "every-omitted-solid-contained-by-a-named-runtime-envelope",
             "visual_geometry_preserved": True,
+            "onboard_perception_geometry": (
+                "one-depth-visible-primitive-per-runtime-collision"
+            ),
             "physics_step_seconds": SCHOOL_MAP_PHYSICS_STEP_SECONDS,
         },
         "visual_only_primitives": [
@@ -3246,10 +3269,23 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
         visual_primitives=primitives,
     )
     physics_model = _model_for(runtime_collision_primitives, include_visuals=False)
+    # This representation is authoritative for onboard perception
+    # qualification: every conservative runtime collision has exactly one
+    # depth-visible counterpart with the same pose and dimensions.  It omits
+    # decorative/detail-only draw calls, which otherwise starve PX4 and depth
+    # telemetry on large indoor scenes without adding safety information.
+    perception_model = _model_for(
+        runtime_collision_primitives,
+        include_visuals=True,
+        visual_primitives=runtime_collision_primitives,
+        visualize_capsules=True,
+    )
     model_sdf = _sdf_for(model)
     physics_model_sdf = _sdf_for(physics_model)
+    perception_model_sdf = _sdf_for(perception_model)
     world_sdf = _world_sdf(model)
     physics_world_sdf = _world_sdf(physics_model)
+    perception_world_sdf = _world_sdf(perception_model)
     model_config = _model_config()
     mesh_files = {
         f"meshes/training-gate-{index}.obj": _torus_obj(radius_m, TRAINING_GATE_TUBE_RADIUS_M)
@@ -3260,9 +3296,11 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
     package_files = {
         "model.sdf": model_sdf,
         "model.physics.sdf": physics_model_sdf,
+        "model.perception.sdf": perception_model_sdf,
         "model.config": model_config,
         "world.sdf": world_sdf,
         "world.physics.sdf": physics_world_sdf,
+        "world.perception.sdf": perception_world_sdf,
         "README.md": _runtime_readme(),
         "ros_gz_bridge.yaml": _ros_gz_bridge_yaml(),
         "semantic.json": semantic_json,
@@ -3285,7 +3323,9 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
         "semantic_sha256": semantic_sha,
         "world_sdf_sha256": package_hashes["world.sdf"],
         "physics_world_sdf_sha256": package_hashes["world.physics.sdf"],
+        "perception_world_sdf_sha256": package_hashes["world.perception.sdf"],
         "physics_model_sdf_sha256": package_hashes["model.physics.sdf"],
+        "perception_model_sdf_sha256": package_hashes["model.perception.sdf"],
         "model_config_sha256": package_hashes["model.config"],
         "package_file_sha256": package_hashes,
         "package_manifest_sha256": package_manifest_sha,
@@ -3296,6 +3336,7 @@ def get_school_map_gazebo_artifact() -> SchoolMapGazeboArtifact:
         "visual_primitive_count": sum(
             not isinstance(primitive, CapsulePrimitive) for primitive in primitives
         ),
+        "perception_visual_primitive_count": len(runtime_collision_primitives),
         "geometry_scope": "simulation-static-scene-v2",
         "known_export_limit_count": len(semantic["known_export_limits"]),
         "gazebo_asset_contract_generated": True,

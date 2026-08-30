@@ -22,6 +22,8 @@ const DESCRIPTOR_FILENAME: &str = "engine-pack-bundle.json";
 const MANIFEST_FILENAME: &str = "engine-pack-manifest.json";
 const RECONCILER_FILENAME: &str = "reconcile_engine_pack_runtime_env.py";
 const RUNTIME_ENVIRONMENT_PATH: &str = "/etc/dronedream/runtime.env";
+const RUNTIME_API_SERVICE_PATH: &str = "/etc/systemd/system/dronedream-api.service";
+const RUNTIME_WORKER_SERVICE_PATH: &str = "/etc/systemd/system/dronedream-worker.service";
 const ENGINE_PACK_ACTIVE_ROOT: &str = "/opt/dronedream/engine/current";
 const ENGINE_PACK_ACTIVE_MANIFEST: &str =
     "/opt/dronedream/engine/current/engine-pack-manifest.json";
@@ -30,6 +32,28 @@ const EXPECTED_RUNTIME_EXECUTION_LINES: &[&str] = &[
     "PX4_GAZEBO_WORKDIR=/opt/dronedream/engine/current",
     "PX4_GAZEBO_LAUNCH_COMMAND=\"/opt/dronedream/venv/bin/python /opt/dronedream/engine/current/scripts/simulators/local_px4_launch_wrapper.py --run-dir {run_dir} --input {trial_input} --params {params_json} --px4-params {px4_params_json} --track {track_json} --telemetry {telemetry_json} --stdout-log {stdout_log} --stderr-log {stderr_log} --vehicle {vehicle} --airframe {airframe} --simulator-model {simulator_model} --world {world} --px4-version {px4_version} --headless {headless}\"",
     "PX4_OFFBOARD_EXECUTOR_COMMAND=\"/opt/dronedream/venv/bin/python /opt/dronedream/engine/current/scripts/simulators/px4_offboard_track_executor.py\"",
+];
+const EXPECTED_RUNTIME_SERVICE_LINES: &[(&str, &str)] = &[
+    (
+        RUNTIME_API_SERVICE_PATH,
+        "WorkingDirectory=/opt/dronedream/engine/current/backend",
+    ),
+    (
+        RUNTIME_API_SERVICE_PATH,
+        "Environment=PYTHONPATH=/opt/dronedream/engine/current/backend",
+    ),
+    (
+        RUNTIME_API_SERVICE_PATH,
+        "ExecStartPre=/opt/dronedream/venv/bin/alembic -c /opt/dronedream/engine/current/backend/alembic.ini upgrade head",
+    ),
+    (
+        RUNTIME_WORKER_SERVICE_PATH,
+        "WorkingDirectory=/opt/dronedream/engine/current",
+    ),
+    (
+        RUNTIME_WORKER_SERVICE_PATH,
+        "Environment=PYTHONPATH=/opt/dronedream/engine/current/backend:/opt/dronedream/engine/current/worker",
+    ),
 ];
 const EMBEDDED_ARCHIVE: &[u8] = include_bytes!(concat!(
     env!("OUT_DIR"),
@@ -114,6 +138,8 @@ pub(crate) struct EnginePackStatus {
     installed_pack_id: Option<String>,
     installed_source_commit: Option<String>,
     message: Option<String>,
+    #[serde(skip_serializing)]
+    pack_update_required: bool,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -337,7 +363,7 @@ fn manager_supports_manifest_schema(schema_version: u32) -> bool {
 
 #[cfg(target_os = "windows")]
 fn runtime_execution_paths_current() -> bool {
-    EXPECTED_RUNTIME_EXECUTION_LINES.iter().all(|line| {
+    let environment_current = EXPECTED_RUNTIME_EXECUTION_LINES.iter().all(|line| {
         wsl_output(
             "/usr/bin/grep",
             &[
@@ -352,7 +378,24 @@ fn runtime_execution_paths_current() -> bool {
             "Runtime execution path probe",
         )
         .is_ok()
-    })
+    });
+    environment_current
+        && EXPECTED_RUNTIME_SERVICE_LINES.iter().all(|(path, line)| {
+            wsl_output(
+                "/usr/bin/grep",
+                &[
+                    "--fixed-strings",
+                    "--line-regexp",
+                    "--quiet",
+                    "--",
+                    line,
+                    path,
+                ],
+                Duration::from_secs(8),
+                "Runtime service execution path probe",
+            )
+            .is_ok()
+        })
 }
 
 #[cfg(target_os = "windows")]
@@ -439,6 +482,7 @@ fn status() -> Result<EnginePackStatus, String> {
             embedded_source_commit: embedded.source_commit,
             installed_pack_id: None,
             installed_source_commit: None,
+            pack_update_required: false,
             message: Some(
                 "The Runtime Base is not installed yet; a fresh install includes this Engine Pack."
                     .to_string(),
@@ -463,6 +507,7 @@ fn status() -> Result<EnginePackStatus, String> {
             embedded_source_commit: embedded.source_commit,
             installed_pack_id: None,
             installed_source_commit: None,
+            pack_update_required: true,
             message: Some(upgrade.message),
         });
     }
@@ -482,6 +527,7 @@ fn status() -> Result<EnginePackStatus, String> {
             embedded_source_commit: embedded.source_commit,
             installed_pack_id: None,
             installed_source_commit: None,
+            pack_update_required: true,
             message: Some(upgrade.message),
         });
     }
@@ -501,12 +547,6 @@ fn status() -> Result<EnginePackStatus, String> {
         }
         None => true,
     };
-    if installed_is_newer && !execution_paths_current {
-        return Err(
-            "The installed Engine Pack is newer than this application, but its Runtime execution paths need repair; refusing to downgrade it."
-                .to_string(),
-        );
-    }
     Ok(EnginePackStatus {
         supported: true,
         update_required: pack_update_required || !execution_paths_current,
@@ -515,9 +555,15 @@ fn status() -> Result<EnginePackStatus, String> {
         embedded_source_commit: embedded.source_commit,
         installed_pack_id,
         installed_source_commit,
+        pack_update_required,
         message: installed_is_newer.then(|| {
-            "The installed Engine Pack is newer than this application; it was preserved."
-                .to_string()
+            if execution_paths_current {
+                "The installed Engine Pack is newer than this application; it was preserved."
+                    .to_string()
+            } else {
+                "The installed Engine Pack is newer than this application; it will be preserved while its Runtime execution paths are repaired."
+                    .to_string()
+            }
         }),
     })
 }
@@ -533,6 +579,7 @@ fn status() -> Result<EnginePackStatus, String> {
         embedded_source_commit: embedded.source_commit,
         installed_pack_id: None,
         installed_source_commit: None,
+        pack_update_required: false,
         message: Some("Engine Pack activation is available only on Windows.".to_string()),
     })
 }
@@ -684,19 +731,22 @@ pub(crate) async fn install_embedded_engine_pack(
             // reconciler to validate that symlink and switch runtime.env onto
             // it. The manager keeps the legacy execution path healthy during
             // this one-time transition.
-            let output = wsl_output(
-                MANAGER_PATH,
-                &[
-                    "--descriptor",
-                    descriptor_wsl.as_str(),
-                    "--archive",
-                    archive_wsl.as_str(),
-                ],
-                Duration::from_secs(420),
-                "Engine Pack activation",
-            )?;
-            serde_json::from_slice::<serde_json::Value>(&output)
-                .map_err(|error| format!("Engine Pack activation receipt was invalid: {error}"))?;
+            if current.pack_update_required {
+                let output = wsl_output(
+                    MANAGER_PATH,
+                    &[
+                        "--descriptor",
+                        descriptor_wsl.as_str(),
+                        "--archive",
+                        archive_wsl.as_str(),
+                    ],
+                    Duration::from_secs(420),
+                    "Engine Pack activation",
+                )?;
+                serde_json::from_slice::<serde_json::Value>(&output).map_err(|error| {
+                    format!("Engine Pack activation receipt was invalid: {error}")
+                })?;
+            }
             if execution_paths_need_reconciliation {
                 ensure_manager_idle("pre-reconciliation Engine Pack idle check")?;
                 wsl_output(
@@ -739,6 +789,12 @@ pub(crate) async fn install_embedded_engine_pack(
                             "Runtime execution path reconciliation was not verified.".to_string()
                         );
                     }
+                    wsl_output(
+                        "/usr/bin/systemctl",
+                        &["daemon-reload"],
+                        Duration::from_secs(20),
+                        "Runtime service definition reload",
+                    )?;
                     wsl_output(
                         "/usr/bin/systemctl",
                         &[
@@ -931,6 +987,19 @@ mod tests {
         let reconciler = std::str::from_utf8(EMBEDDED_RECONCILER).expect("UTF-8 reconciler");
         assert!(reconciler.contains("_LEGACY_ROOT = \"/opt/dronedream/source\""));
         assert!(reconciler.contains("_ENGINE_ROOT = \"/opt/dronedream/engine/current\""));
+        assert!(reconciler.contains("dronedream-api.service"));
+        assert!(reconciler.contains("dronedream-worker.service"));
+        let api_service = include_str!("../../../runtime/systemd/dronedream-api.service");
+        let worker_service = include_str!("../../../runtime/systemd/dronedream-worker.service");
+        for (path, expected) in EXPECTED_RUNTIME_SERVICE_LINES {
+            assert!(reconciler.contains(path));
+            let template = if *path == RUNTIME_API_SERVICE_PATH {
+                api_service
+            } else {
+                worker_service
+            };
+            assert!(template.lines().any(|line| line == *expected));
+        }
     }
 
     #[cfg(target_os = "windows")]

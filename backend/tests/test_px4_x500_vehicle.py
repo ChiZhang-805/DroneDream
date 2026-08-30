@@ -25,9 +25,9 @@ from app.autonomy.school_map_artifact import (
 
 
 def test_pinned_px4_x500_contract_matches_runtime_sdf_calculation() -> None:
-    assert pytest.approx(2.0643076923076924) == PX4_X500_DRY_MASS_KG
+    assert pytest.approx(2.1253076923076923) == PX4_X500_DRY_MASS_KG
     assert pytest.approx(34.19432) == PX4_X500_MAXIMUM_THRUST_N
-    assert px4_x500_maximum_qualified_payload_kg() == pytest.approx(0.114974, abs=1e-6)
+    assert px4_x500_maximum_qualified_payload_kg() == pytest.approx(0.053974, abs=1e-6)
     assert px4_x500_loaded_thrust_to_weight(TAKEOUT_PAYLOAD_MASS_KG) >= 1.6
 
 
@@ -51,11 +51,11 @@ def test_my_drone_artifact_binds_x500_and_dynamic_payload_joint() -> None:
     payload = ElementTree.fromstring(artifact.files["takeout-payload.sdf"])
     summary = json.loads(artifact.files["summary.json"])
 
-    assert model.findtext(".//include/uri") == "model://x500"
+    assert model.findtext(".//include/uri") == "model://x500_depth"
     assert model.findtext(".//plugin/parent_link") == "base_link"
     assert model.findtext(".//plugin/child_model") == "takeout_payload"
     assert model.findtext(".//plugin/output_topic") == MY_DRONE_PAYLOAD_STATE_TOPIC
-    assert payload.findtext(".//link/inertial/mass") == "0.1"
+    assert payload.findtext(".//link/inertial/mass") == "0.04"
     assert summary["control_interface"] == "mavsdk"
     assert summary["mission_payload"]["loaded_thrust_to_weight"] >= 1.6
     assert summary["mission_payload"]["maximum_attachment_error_m"] == pytest.approx(

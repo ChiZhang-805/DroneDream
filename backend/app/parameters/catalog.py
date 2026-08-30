@@ -28,7 +28,7 @@ from app.parameters.models import (
     TuningPreset,
 )
 
-CATALOG_VERSION = "dronedream.px4.multicopter.2026-07-r2"
+CATALOG_VERSION = "dronedream.px4.multicopter.builtin"
 CATALOG_SOURCE = "PX4 v1.16, v1.17, and main parameter references checked 2026-07-10"
 CATALOG_SOURCE_URL = "https://docs.px4.io/main/en/advanced_config/parameter_reference"
 SUPPORTED_PX4_VERSIONS = ("v1.16", "v1.17", "main")
@@ -51,11 +51,9 @@ SUPPORTED_TRIAL_METRICS = (
     "instability_flag",
 )
 
-# These identifiers were emitted by earlier DroneDream clients. They remain
-# explicit aliases instead of becoming a wildcard: an unknown identifier must
+# Explicit compatibility aliases remain narrow: an unknown identifier must
 # never silently select whatever catalog happens to be installed on the server.
 CATALOG_VERSION_ALIASES: dict[str, str] = {
-    "dronedream.px4.multicopter.2026-07-r1": CATALOG_VERSION,
     "builtin-v1": CATALOG_VERSION,
     "px4-v1.16": CATALOG_VERSION,
     "px4-v1.17": CATALOG_VERSION,

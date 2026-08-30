@@ -11,9 +11,27 @@ from dronedream_agent_core.plugin_contracts import (
 
 def plugin_definition() -> PluginDefinition:
     models = [
-        {"id": "gpt-4.1", "label": "GPT 4.1", "provider": "openai"},
-        {"id": "gpt-5.1", "label": "GPT 5.1", "provider": "openai"},
-        {"id": "gpt-5.4", "label": "GPT 5.4", "provider": "openai"},
+        {
+            "id": "gpt-4.1",
+            "label": "GPT 4.1",
+            "provider": "openai",
+            "input_modalities": ["text", "image"],
+            "supports_image_input": True,
+        },
+        {
+            "id": "gpt-5.1",
+            "label": "GPT 5.1",
+            "provider": "openai",
+            "input_modalities": ["text", "image"],
+            "supports_image_input": True,
+        },
+        {
+            "id": "gpt-5.4",
+            "label": "GPT 5.4",
+            "provider": "openai",
+            "input_modalities": ["text", "image"],
+            "supports_image_input": True,
+        },
     ]
     return PluginDefinition(
         manifest=PluginManifest(

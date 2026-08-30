@@ -8,6 +8,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import shutil
 import signal
 import struct
@@ -20,7 +21,17 @@ from pathlib import Path
 from typing import Any
 
 from .collision import _clearance  # same conservative envelope used by static gate
-from .contracts import GraphRoute, Px4Track, RouteClearanceReport
+from .contracts import (
+    DynamicObstacleObservation,
+    GraphRoute,
+    LocalPlannerRequest,
+    Px4Track,
+    RouteClearanceReport,
+    RuntimeLocalSafetyCommand,
+    RuntimeLocalSafetyObservation,
+    Vector3,
+)
+from .dynamic_safety import predictive_safety_decision
 from .hashing import sha256_json
 
 
@@ -426,6 +437,13 @@ def run_px4_gazebo_track(
     copied_params = run_dir / "controller_params.json"
     shutil.copy2(track_path, copied_track)
     shutil.copy2(controller_params_path, copied_params)
+    controller_params = json.loads(controller_params_path.read_text(encoding="utf-8"))
+    local_max_speed_mps = float(controller_params.get("vel_limit", 2.0))
+    local_max_acceleration_mps2 = float(controller_params.get("accel_limit", 4.0))
+    local_safety_supported = "--local-safety-command" in executor_help.stdout
+    local_safety_target_path = run_dir / "local-safety-target.json"
+    local_safety_observation_path = run_dir / "local-safety-observation.json"
+    local_safety_command_path = run_dir / "local-safety-command.json"
 
     env = os.environ.copy()
     partition = f"dronedream_agent_{os.getpid()}_{int(time.time())}"
@@ -505,34 +523,188 @@ def run_px4_gazebo_track(
     from gz.transport13 import Node as GazeboNode
 
     gazebo_node = GazeboNode()
+    pose_lock = threading.Lock()
+    previous_vehicle_pose: tuple[float, tuple[float, float, float]] | None = None
+    dynamic_pose_history: dict[str, tuple[float, tuple[float, float, float]]] = {}
+    local_safety_sequence = 0
+    last_local_safety_at = 0.0
+    runtime_primitives = semantic.get("runtime_collision_primitives", primitives)
+
+    def dynamic_model_name(name: str) -> bool:
+        normalized = name.casefold()
+        return "::" not in name and normalized.startswith(
+            ("dronedream_dynamic_", "person_", "pedestrian_", "vehicle_dynamic_")
+        )
+
+    def nearby_primitives(position: tuple[float, float, float]) -> list[dict[str, Any]]:
+        search_radius = max(5.0, local_max_speed_mps * 3.0 + 2.0)
+        selected: list[dict[str, Any]] = []
+        for primitive in runtime_primitives:
+            center = (
+                float(primitive.get("center_x", 0.0)),
+                float(primitive.get("center_y", 0.0)),
+                float(primitive.get("center_z", 0.0)),
+            )
+            half_size = (
+                float(primitive.get("size_x", 0.0)) / 2.0,
+                float(primitive.get("size_y", 0.0)) / 2.0,
+                float(primitive.get("size_z", 0.0)) / 2.0,
+            )
+            if all(
+                abs(position[index] - center[index]) - half_size[index] <= search_radius
+                for index in range(3)
+            ):
+                selected.append(primitive)
+        return selected
 
     def on_pose(message: Any) -> None:
+        nonlocal previous_vehicle_pose, local_safety_sequence, last_local_safety_at
+        elapsed = time.monotonic() - started
+        vehicle_pose: tuple[float, float, float] | None = None
+        dynamic_poses: dict[str, tuple[float, float, float]] = {}
         for pose in message.pose:
+            position = (
+                float(pose.position.x),
+                float(pose.position.y),
+                float(pose.position.z),
+            )
             if pose.name == vehicle_name:
-                elapsed = time.monotonic() - started
-                east = float(pose.position.x)
-                north = float(pose.position.y)
-                up = float(pose.position.z)
-                with sample_lock:
-                    samples.append((elapsed, east, north, up))
-                try:
-                    rendered = json.dumps(
-                        {
-                            "schema_version": "dronedream.live-telemetry.v1",
-                            "mode": "simulation",
-                            "coordinate_frame": "gazebo-enu",
-                            "elapsed_s": elapsed,
-                            "east_m": east,
-                            "north_m": north,
-                            "up_m": up,
-                            "updated_at_unix_ms": int(time.time() * 1000),
-                        },
-                        ensure_ascii=False,
-                        separators=(",", ":"),
-                    ).encode("utf-8")
-                    _write_bytes_atomic(run_dir / "live-telemetry.json", rendered)
-                except OSError:
-                    pass
+                vehicle_pose = position
+            elif dynamic_model_name(str(pose.name)):
+                dynamic_poses[str(pose.name)] = position
+        if vehicle_pose is None:
+            return
+        east, north, up = vehicle_pose
+        with sample_lock:
+            samples.append((elapsed, east, north, up))
+        now_unix_ms = int(time.time() * 1000)
+        try:
+            rendered = json.dumps(
+                {
+                    "schema_version": "dronedream.live-telemetry.v1",
+                    "mode": "simulation",
+                    "coordinate_frame": "gazebo-enu",
+                    "elapsed_s": elapsed,
+                    "east_m": east,
+                    "north_m": north,
+                    "up_m": up,
+                    "updated_at_unix_ms": now_unix_ms,
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            _write_bytes_atomic(run_dir / "live-telemetry.json", rendered)
+        except OSError:
+            pass
+        if not local_safety_supported or not local_safety_target_path.is_file():
+            previous_vehicle_pose = elapsed, vehicle_pose
+            return
+        with pose_lock:
+            if elapsed - last_local_safety_at < 0.08:
+                return
+            previous = previous_vehicle_pose
+            previous_vehicle_pose = elapsed, vehicle_pose
+            dt = elapsed - previous[0] if previous is not None else 0.0
+            velocity = (
+                tuple((vehicle_pose[index] - previous[1][index]) / dt for index in range(3))
+                if previous is not None and dt > 1e-4
+                else (0.0, 0.0, 0.0)
+            )
+            obstacles: list[DynamicObstacleObservation] = []
+            for name, root_position in sorted(dynamic_poses.items()):
+                history = dynamic_pose_history.get(name)
+                obstacle_dt = elapsed - history[0] if history is not None else 0.0
+                obstacle_velocity = (
+                    tuple(
+                        (root_position[index] - history[1][index]) / obstacle_dt
+                        for index in range(3)
+                    )
+                    if history is not None and obstacle_dt > 1e-4
+                    else (0.0, 0.0, 0.0)
+                )
+                dynamic_pose_history[name] = elapsed, root_position
+                obstacle_id = re.sub(r"[^a-z0-9._-]+", "-", name.casefold()).strip("-.")
+                obstacles.append(
+                    DynamicObstacleObservation(
+                        obstacle_id=obstacle_id,
+                        position_m=Vector3(
+                            x=root_position[0],
+                            y=root_position[1],
+                            z=root_position[2] + 0.85,
+                        ),
+                        velocity_mps=Vector3(
+                            x=obstacle_velocity[0],
+                            y=obstacle_velocity[1],
+                            z=obstacle_velocity[2],
+                        ),
+                        radius_m=0.35,
+                        height_m=1.7,
+                        confidence=1.0,
+                        age_seconds=0.0,
+                    )
+                )
+            try:
+                target_payload = json.loads(local_safety_target_path.read_text(encoding="utf-8"))
+                target = Vector3.model_validate(target_payload["target_position_m"])
+                current = Vector3(x=east, y=north, z=up + center_offset)
+                local_safety_sequence += 1
+                observation = RuntimeLocalSafetyObservation(
+                    sequence=local_safety_sequence,
+                    observed_at_unix_ms=now_unix_ms,
+                    source="simulation-ground-truth",
+                    stream_healthy=True,
+                    stream_age_seconds=0.0,
+                    localization_covariance_m2=0.0,
+                    current_position_m=current,
+                    current_velocity_mps=Vector3(
+                        x=velocity[0],
+                        y=velocity[1],
+                        z=velocity[2],
+                    ),
+                    target_position_m=target,
+                    dynamic_obstacles=obstacles,
+                )
+                request = LocalPlannerRequest(
+                    current_position_m=current,
+                    current_velocity_mps=observation.current_velocity_mps,
+                    target_position_m=target,
+                    dynamic_obstacles=obstacles,
+                    vehicle_radius_m=diameter / 2.0,
+                    vehicle_height_m=height,
+                    max_speed_mps=local_max_speed_mps,
+                    max_acceleration_mps2=local_max_acceleration_mps2,
+                    required_clearance_m=0.35,
+                    prediction_horizon_seconds=3.0,
+                    prediction_step_seconds=0.2,
+                )
+                decision = predictive_safety_decision(
+                    request,
+                    nearby_primitives((current.x, current.y, current.z)),
+                )
+                command_position = Vector3(
+                    x=current.x + decision.selected_velocity_mps.x * 0.2,
+                    y=current.y + decision.selected_velocity_mps.y * 0.2,
+                    z=current.z + decision.selected_velocity_mps.z * 0.2,
+                )
+                command = RuntimeLocalSafetyCommand(
+                    observation_sha256=sha256_json(observation),
+                    observation_sequence=observation.sequence,
+                    generated_at_unix_ms=now_unix_ms,
+                    valid_until_unix_ms=now_unix_ms + 500,
+                    source=observation.source,
+                    command_position_m=command_position,
+                    decision=decision,
+                )
+                _write_bytes_atomic(
+                    local_safety_observation_path,
+                    observation.model_dump_json(indent=2).encode("utf-8"),
+                )
+                _write_bytes_atomic(
+                    local_safety_command_path,
+                    command.model_dump_json(indent=2).encode("utf-8"),
+                )
+                last_local_safety_at = elapsed
+            except (KeyError, OSError, ValueError, json.JSONDecodeError):
                 return
 
     def on_live_frame(message: Any) -> None:
@@ -725,6 +897,18 @@ def run_px4_gazebo_track(
                     "1.5",
                     "--log",
                     str(run_dir / "offboard_executor.log"),
+                    *(
+                        [
+                            "--local-safety-command",
+                            str(local_safety_command_path),
+                            "--local-safety-observation",
+                            str(local_safety_observation_path),
+                            "--local-safety-target",
+                            str(local_safety_target_path),
+                        ]
+                        if local_safety_supported
+                        else []
+                    ),
                     *(executor_extra_args or []),
                 ],
                 env=env,
@@ -853,12 +1037,32 @@ def run_px4_gazebo_track(
         "px4_ulog_present": bool(px4_ulogs),
         "static_route_clearance_bound": clearance.accepted,
     }
+    if local_safety_supported:
+        gates.update(
+            {
+                "local_safety_observation_present": local_safety_observation_path.is_file(),
+                "local_safety_command_present": local_safety_command_path.is_file(),
+                "local_safety_observation_sequence_advanced": local_safety_sequence >= 1,
+            }
+        )
     evidence = {
         "schema_version": "dronedream.generic-px4-gazebo-run.v1",
         "status": "verified" if all(gates.values()) else "failed",
         "world": world_name,
         "vehicle": vehicle_name,
         "gates": gates,
+        "local_safety": {
+            "supported_by_executor": local_safety_supported,
+            "observation_sequence": local_safety_sequence,
+            "observation_path": (
+                local_safety_observation_path.name
+                if local_safety_observation_path.is_file()
+                else None
+            ),
+            "command_path": (
+                local_safety_command_path.name if local_safety_command_path.is_file() else None
+            ),
+        },
         "measurements": {
             "pose_sample_count": len(samples),
             "ros_observation_rows": ros_rows,

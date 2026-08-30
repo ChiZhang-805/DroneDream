@@ -170,7 +170,7 @@ describe("desktop close protection", () => {
     renderShell("/dashboard");
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    const quickSettings = screen.getByRole("dialog", { name: "Quick settings" });
+    const quickSettings = screen.getByRole("dialog", { name: "Settings" });
     fireEvent.click(within(quickSettings).getByRole("button", { name: "All settings" }));
     const settingsWorkspace = await screen.findByRole("region", { name: "Settings" });
     const activeSettingsTab = within(settingsWorkspace).getByRole("tab", { name: "General" });

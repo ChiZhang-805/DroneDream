@@ -96,9 +96,9 @@ describe("Field Chatting workspace", () => {
     const { container } = render(<FieldApp initialLocale="en" />);
     await waitFor(() => expect(screen.getByRole("combobox", { name: "Model" })).toBeEnabled());
     expect(screen.getByRole("heading", { name: "What real-device experiment should we prepare?" })).toBeVisible();
+    const quickPrompts = ["Stable hover", "Smoother response", "Wind recovery"];
     expect(screen.getAllByRole("button").filter((button) => (
-      ["Stable hover", "Smoother response", "Wind recovery"].includes(button.textContent?.trim() ?? "")
-      || button.querySelector("strong")
+      quickPrompts.some((prompt) => button.textContent?.startsWith(prompt))
     ))).toHaveLength(3);
     expect(container.querySelector(".field-assistant-plan-card")).toBeNull();
 

@@ -1,8 +1,8 @@
 # PX4 Parameter Catalog and Application Evidence
 
 DroneDream exposes a curated multicopter parameter catalog at
-`GET /api/v1/parameter-catalog`. The current revision is
-`dronedream.px4.multicopter.2026-07-r2` and supports the PX4 version selectors
+`GET /api/v1/parameter-catalog`. The built-in catalog identity is
+`dronedream.px4.multicopter.builtin` and supports the PX4 version selectors
 `v1.16`, `v1.17`, and `main`.
 
 The catalog is intentionally narrower than the complete PX4 parameter set. It
@@ -32,10 +32,9 @@ The values are based on the
 [PX4 parameter reference](https://docs.px4.io/main/en/advanced_config/parameter_reference).
 PX4's declared bounds are used where they are finite. DroneDream supplies a
 finite guardrail for parameters where upstream does not declare a finite
-maximum. The revision is pinned so later PX4 changes can be introduced as a new
-catalog rather than silently changing an existing experiment. The immediately
-preceding `r1` ID and explicit `builtin-v1`/`px4-*` aliases resolve to `r2` for
-persisted compatibility; unknown identifiers are rejected.
+maximum. The catalog content is pinned so later PX4 changes cannot silently
+change an existing experiment. Explicit `builtin-v1` and `px4-*` compatibility
+aliases resolve to the stable built-in identity; unknown identifiers are rejected.
 
 ## API
 

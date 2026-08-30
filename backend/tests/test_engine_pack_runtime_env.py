@@ -45,6 +45,29 @@ def _stub_active_root(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
+def _service_text(service_name: str, *, legacy: bool, custom_line: str = "") -> str:
+    spec = reconciler._SERVICE_SPECS[service_name]
+    transitions = {
+        directive: values[0 if legacy else 1]
+        for directive, values in spec["transitions"].items()
+    }
+    pythonpath = "" if legacy else f"{spec['pythonpath']}\n"
+    return "".join(
+        (
+            "[Unit]\nDescription=test unit\n[Service]\n",
+            f"{transitions['WorkingDirectory=']}\n",
+            pythonpath,
+            (
+                f"{transitions['ExecStartPre=']}\n"
+                if "ExecStartPre=" in transitions
+                else ""
+            ),
+            "ExecStart=/usr/bin/true\n",
+            custom_line,
+        )
+    )
+
+
 def test_runtime_env_reconciler_reports_legacy_without_mutating(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -99,6 +122,124 @@ def test_runtime_env_reconciler_is_idempotent(
     assert receipt["status"] == "current"
     assert receipt["changed"] is False
     assert receipt["updatedKeys"] == []
+
+
+def test_runtime_reconciler_moves_api_and_worker_services_atomically(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _stub_active_root(monkeypatch)
+    environment = tmp_path / "runtime.env"
+    environment.write_text(_environment_text(legacy=False), encoding="utf-8")
+    api_service = tmp_path / "dronedream-api.service"
+    worker_service = tmp_path / "dronedream-worker.service"
+    api_service.write_text(
+        _service_text("dronedream-api.service", legacy=True),
+        encoding="utf-8",
+    )
+    worker_service.write_text(
+        _service_text("dronedream-worker.service", legacy=True),
+        encoding="utf-8",
+    )
+    api_service.chmod(0o644)
+    worker_service.chmod(0o640)
+
+    dry_run = reconciler.reconcile(
+        environment,
+        tmp_path / "current",
+        apply=False,
+        api_service=api_service,
+        worker_service=worker_service,
+    )
+    assert dry_run["status"] == "legacy"
+    assert dry_run["changed"] is False
+    assert dry_run["updatedKeys"] == []
+    assert dry_run["updatedServices"] == [
+        "dronedream-api.service",
+        "dronedream-worker.service",
+    ]
+    assert "/opt/dronedream/source" in api_service.read_text(encoding="utf-8")
+
+    receipt = reconciler.reconcile(
+        environment,
+        tmp_path / "current",
+        apply=True,
+        api_service=api_service,
+        worker_service=worker_service,
+    )
+    assert receipt["status"] == "reconciled"
+    assert receipt["updatedServices"] == dry_run["updatedServices"]
+    for service_name, service_path in (
+        ("dronedream-api.service", api_service),
+        ("dronedream-worker.service", worker_service),
+    ):
+        updated = service_path.read_text(encoding="utf-8")
+        assert "/opt/dronedream/source" not in updated
+        assert reconciler._SERVICE_SPECS[service_name]["pythonpath"] in updated
+    if os.name == "posix":
+        assert stat.S_IMODE(api_service.stat().st_mode) == 0o644
+        assert stat.S_IMODE(worker_service.stat().st_mode) == 0o640
+
+    current = reconciler.reconcile(
+        environment,
+        tmp_path / "current",
+        apply=True,
+        api_service=api_service,
+        worker_service=worker_service,
+    )
+    assert current["status"] == "current"
+    assert current["changed"] is False
+    assert current["updatedServices"] == []
+
+
+def test_runtime_reconciler_rejects_custom_or_duplicate_service_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _stub_active_root(monkeypatch)
+    environment = tmp_path / "runtime.env"
+    environment.write_text(_environment_text(legacy=False), encoding="utf-8")
+    api_service = tmp_path / "dronedream-api.service"
+    worker_service = tmp_path / "dronedream-worker.service"
+    worker_service.write_text(
+        _service_text("dronedream-worker.service", legacy=True),
+        encoding="utf-8",
+    )
+
+    api_service.write_text(
+        _service_text("dronedream-api.service", legacy=True).replace(
+            "WorkingDirectory=/opt/dronedream/source/backend",
+            "WorkingDirectory=/operator/custom",
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(reconciler.ReconcileError, match="custom managed WorkingDirectory"):
+        reconciler.reconcile(
+            environment,
+            tmp_path / "current",
+            apply=True,
+            api_service=api_service,
+            worker_service=worker_service,
+        )
+
+    api_service.write_text(
+        _service_text(
+            "dronedream-api.service",
+            legacy=False,
+            custom_line=(
+                f"{reconciler._SERVICE_SPECS['dronedream-api.service']['pythonpath']}\n"
+            ),
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(reconciler.ReconcileError, match="duplicate managed PYTHONPATH"):
+        reconciler.reconcile(
+            environment,
+            tmp_path / "current",
+            apply=True,
+            api_service=api_service,
+            worker_service=worker_service,
+        )
 
 
 def test_runtime_env_reconciler_matches_fresh_runtime_template() -> None:

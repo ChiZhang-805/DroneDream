@@ -293,6 +293,7 @@ export type AgentCoreHarnessOperation = {
     | "move_node"
     | "update_layout"
     | "update_node"
+    | "replace_node"
     | "apply_profile"
     | "apply_template";
   payload: Record<string, unknown>;

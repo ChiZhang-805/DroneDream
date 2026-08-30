@@ -2,7 +2,7 @@
   "schema_version": "dronedream.portable-acceptance-manifest.v1",
   "recorded_at": "2026-08-18T07:20:00Z",
   "scope": "simulation_only",
-  "run_id": "nl-campus-gate-checkpointed-r5",
+  "run_id": "nl-campus-gate-checkpointed",
   "status": "verified",
   "contract_id": "mission-10dcee665a6341148419d60f",
   "runtime": {
@@ -87,8 +87,8 @@
     "workflow_evidence_chain_head": "1c485ac167e13317a497f7dd720079f0c6e437afd82c90f5290ece188c3587df"
   },
   "local_provenance": {
-    "prepared_mission": "artifacts/acceptance/deepseek-campus-gate-prepared-r2/prepared-mission.json",
-    "workflow_result": "artifacts/runs/nl-campus-gate-checkpointed-r5/workflow-result.json",
+    "prepared_mission": "private-test-artifact/prepared-mission.json",
+    "workflow_result": "private-test-artifact/workflow-result.json",
     "px4_ulog": "px4_rootfs/log/2026-08-18/07_13_48.ulg",
     "large_artifacts_committed": false
   },

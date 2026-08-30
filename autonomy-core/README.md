@@ -59,7 +59,7 @@ destination and requested an immediate safe return to the third-floor office pad
 
 The earlier checkpoint-only acceptance remains useful historical evidence:
 
-The recorded acceptance run is `nl-campus-gate-checkpointed-r5`:
+The recorded checkpoint acceptance evidence shows:
 
 - 10 real DeepSeek calls: 5 planning, 4 in-flight checkpoints, 1 completion review;
 - 4/4 checkpoint decisions accepted and independently authorized by code;
@@ -72,7 +72,7 @@ See [`evidence/verified-simulation-run.json`](evidence/verified-simulation-run.j
 for the portable evidence manifest. Large generated run artifacts and flight logs stay
 outside Git; the manifest binds their immutable hashes and locations.
 
-The negative-path acceptance `runtime-interrupt-r3` injected a real user message while
+The recorded negative-path runtime-interruption acceptance injected a real user message while
 the aircraft was tracking. The executor detected it in 43 ms, reached stable hover in
 1.617 s, held throughout a 28.272 s real DeepSeek classification, then landed with PX4
 state `ON_GROUND`. The original mission was correctly recorded as failed/superseded, not

@@ -1386,7 +1386,7 @@ def test_repro_manifest_generated_for_real_cli_job(ctx, tmp_path, monkeypatch):
                 "simulation_speed_factor": 2.0,
                 "instance_id": 3,
             },
-            parameter_catalog_version="dronedream.px4.multicopter.2026-07-r2",
+            parameter_catalog_version="dronedream.px4.multicopter.builtin",
             parameter_space_json=[
                 {
                     "name": "MPC_XY_P",
@@ -1450,7 +1450,7 @@ def test_repro_manifest_generated_for_real_cli_job(ctx, tmp_path, monkeypatch):
         config = payload["job"]["job_config"]
         assert config["vehicle_profile_json"]["simulation_speed_factor"] == 2.0
         assert config["vehicle_profile_json"]["instance_id"] == 3
-        assert config["parameter_catalog_version"].endswith("2026-07-r2")
+        assert config["parameter_catalog_version"] == "dronedream.px4.multicopter.builtin"
         assert config["parameter_space_json"][0]["name"] == "MPC_XY_P"
         assert config["objective_config_json"]["objectives"][0]["metric"] == "rmse"
         assert config["scenario_suite_json"]["cases"][0]["seeds"] == [101]

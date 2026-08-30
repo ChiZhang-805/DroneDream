@@ -235,8 +235,18 @@ describe("autonomy mission harness", () => {
 
   it("restores public assets when the persisted asset library is malformed", () => {
     const workspace = defaultAutonomyWorkspace(new Date("2026-08-15T00:00:00.000Z"));
-    workspace.aircraft = { ...workspace.aircraft, id: "aircraft-custom", name: "Custom aircraft" };
-    workspace.mapPack = { ...workspace.mapPack, id: "map-custom", name: "Custom map" };
+    workspace.aircraft = {
+      ...workspace.aircraft,
+      id: "aircraft-custom",
+      name: "Custom aircraft",
+      agentCoreAssetId: null,
+    };
+    workspace.mapPack = {
+      ...workspace.mapPack,
+      id: "map-custom",
+      name: "Custom map",
+      agentCoreAssetId: null,
+    };
 
     const library = loadAutonomyAssetLibrary("local", "universal", workspace, {
       getItem: () => "{malformed-json",

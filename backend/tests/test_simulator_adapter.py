@@ -147,12 +147,12 @@ def test_mock_adapter_is_deterministic_for_same_inputs():
     adapter = MockSimulatorAdapter()
     ctx = _make_ctx(scenario="nominal", seed=101)
 
-    r1 = adapter.run_trial(ctx)
-    r2 = adapter.run_trial(ctx)
+    first_result = adapter.run_trial(ctx)
+    second_result = adapter.run_trial(ctx)
 
-    assert r1.success and r2.success
-    assert r1.metrics is not None and r2.metrics is not None
-    assert r1.metrics.as_dict() == r2.metrics.as_dict()
+    assert first_result.success and second_result.success
+    assert first_result.metrics is not None and second_result.metrics is not None
+    assert first_result.metrics.as_dict() == second_result.metrics.as_dict()
 
 
 def test_mock_adapter_catalog_parameters_have_explicit_synthetic_effect():

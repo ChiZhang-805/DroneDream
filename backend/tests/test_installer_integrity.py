@@ -520,7 +520,7 @@ def test_formal_release_workflow_fails_closed_on_signing_and_source_binding() ->
     assert "release already exists and will never be overwritten" in workflow
 
 
-def test_desktop_workflow_bounds_pr_concurrency_and_artifact_retention() -> None:
+def test_desktop_workflow_bounds_concurrency_and_artifact_retention() -> None:
     repository_root = Path(__file__).resolve().parents[2]
     workflow = (repository_root / ".github" / "workflows" / "desktop-installer.yml").read_text(
         encoding="utf-8"
@@ -541,4 +541,4 @@ def test_desktop_workflow_bounds_pr_concurrency_and_artifact_retention() -> None
         assert f'      - "desktop-{edition}-v*-build-*"' in workflow
     assert 'tags:\n      - "desktop-v*"' not in workflow
     assert "workflow_dispatch:" in workflow
-    assert "pull_request:" in workflow
+    assert "pull_request:" not in workflow

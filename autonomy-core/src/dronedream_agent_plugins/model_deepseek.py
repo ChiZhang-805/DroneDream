@@ -11,8 +11,20 @@ from dronedream_agent_core.plugin_contracts import (
 
 def plugin_definition() -> PluginDefinition:
     models = [
-        {"id": "deepseek-v4-flash", "label": "DeepSeek V4 Flash", "provider": "deepseek"},
-        {"id": "deepseek-v4-pro", "label": "DeepSeek V4 Pro", "provider": "deepseek"},
+        {
+            "id": "deepseek-v4-flash",
+            "label": "DeepSeek V4 Flash",
+            "provider": "deepseek",
+            "input_modalities": ["text"],
+            "supports_image_input": False,
+        },
+        {
+            "id": "deepseek-v4-pro",
+            "label": "DeepSeek V4 Pro",
+            "provider": "deepseek",
+            "input_modalities": ["text"],
+            "supports_image_input": False,
+        },
     ]
     return PluginDefinition(
         manifest=PluginManifest(

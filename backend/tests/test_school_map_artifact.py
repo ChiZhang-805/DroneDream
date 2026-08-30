@@ -377,6 +377,23 @@ def test_school_map_material_contract_preserves_realtime_rigid_contact() -> None
     physics_root = ElementTree.fromstring(artifact.package_files["model.physics.sdf"])
     assert len(physics_root.findall("./model/link/collision")) == len(collisions)
     assert physics_root.findall("./model/link/visual") == []
+    perception_root = ElementTree.fromstring(
+        artifact.package_files["model.perception.sdf"]
+    )
+    perception_collisions = perception_root.findall("./model/link/collision")
+    perception_visuals = perception_root.findall("./model/link/visual")
+    assert len(perception_collisions) == len(collisions)
+    assert len(perception_visuals) == len(perception_collisions)
+    assert len(perception_visuals) == artifact.summary[
+        "perception_visual_primitive_count"
+    ]
+    for collision, visual in zip(
+        perception_collisions, perception_visuals, strict=True
+    ):
+        assert collision.findtext("./pose") == visual.findtext("./pose")
+        assert ElementTree.tostring(collision.find("./geometry")) == ElementTree.tostring(
+            visual.find("./geometry")
+        )
 
 
 def test_school_map_world_declares_px4_sensor_environment() -> None:
@@ -424,9 +441,11 @@ def test_school_map_export_materializes_digest_bound_files(tmp_path: Path) -> No
     assert set(hashes) == {
         "model.sdf",
         "model.physics.sdf",
+        "model.perception.sdf",
         "model.config",
         "world.sdf",
         "world.physics.sdf",
+        "world.perception.sdf",
         "README.md",
         "ros_gz_bridge.yaml",
         "semantic.json",

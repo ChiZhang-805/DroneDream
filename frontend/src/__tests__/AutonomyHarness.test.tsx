@@ -177,7 +177,6 @@ describe("visual Harness composer", () => {
     expect(await screen.findByText("任务接入")).toBeVisible();
     expect(screen.getByRole("link", { name: "插件库" })).toHaveAttribute("href", "/autonomy/plugins");
     expect(screen.getByRole("link", { name: "返回插件概览" })).toHaveAttribute("href", "/autonomy/plugins");
-    expect(screen.getByText("R4")).toBeVisible();
     expect(screen.getByText("已激活")).toBeVisible();
 
     fireEvent.contextMenu(screen.getByRole("button", { name: "任务接入" }));

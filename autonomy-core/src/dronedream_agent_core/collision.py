@@ -70,7 +70,7 @@ def _point_segment_distance(point: Point, start: Point, end: Point) -> float:
     return math.dist(point, closest)
 
 
-def _clearance(
+def vehicle_clearance(
     point: Point,
     primitive: dict[str, Any],
     *,
@@ -115,6 +115,11 @@ def _clearance(
     return math.dist(point, center) - primitive_radius - conservative_radius
 
 
+# Kept as a compatibility alias for older runtime integrations.  New safety code
+# uses the public name so the geometry contract is explicit and testable.
+_clearance = vehicle_clearance
+
+
 def _samples(points: list[Vector3], interval_m: float) -> list[Point]:
     if not points:
         raise ValueError("route contains no points")
@@ -157,7 +162,7 @@ def validate_route_clearance(
         for primitive in primitives:
             if not isinstance(primitive, dict):
                 raise ValueError("collision primitive is not an object")
-            clearance = _clearance(
+            clearance = vehicle_clearance(
                 point,
                 primitive,
                 radius_m=vehicle_diameter_m / 2,

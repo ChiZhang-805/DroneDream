@@ -165,9 +165,9 @@ describe("sidebar account menu", () => {
 
     const menu = screen.getByRole("menu", { name: "Account" });
     expect(await within(menu).findByText("80%")).toBeVisible();
-    expect(within(menu).getAllByRole("menuitem")).toHaveLength(3);
-    expect(within(menu).queryByRole("menuitem", { name: "Edit profile" }))
-      .not.toBeInTheDocument();
+    expect(within(menu).getAllByRole("menuitem")).toHaveLength(4);
+    expect(within(menu).getByRole("menuitem", { name: "Edit profile" }))
+      .toBeVisible();
     expect(within(menu).queryByText("Pro")).not.toBeInTheDocument();
     expect(within(menu).queryByRole("progressbar")).not.toBeInTheDocument();
 

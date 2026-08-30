@@ -1767,7 +1767,7 @@ export function AutonomyLab({
             <span className="autonomy-brain-rate">{chinese ? "20 Hz PX4 设定点" : "20 Hz PX4 setpoints"}</span>
           </div>
           {!embedded ? <div className="autonomy-task-graph-heading">
-            <span>{chinese ? "任务图" : "GRAPH"} R{activeTaskGraph.revision} · {activeTaskGraph.change_reason}</span>
+            <span>{chinese ? "任务图" : "GRAPH"} · {activeTaskGraph.change_reason}</span>
             <button type="button" onClick={() => setTaskGraphView((current) => current === "summary" ? "engineering" : "summary")}>
               {taskGraphView === "summary" ? (chinese ? "工程详情" : "Engineering") : (chinese ? "简洁视图" : "Summary")}
             </button>

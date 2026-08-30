@@ -4,6 +4,8 @@ import pytest
 
 from app.autonomy.catalog import get_scene
 from app.autonomy.school_map_artifact import (
+    PICKUP_ROUTE_CENTER,
+    PICKUP_ROUTE_ENVELOPE_CENTER_Z_M,
     school_map_collision_primitives,
     school_map_stair_route_points,
 )
@@ -68,6 +70,18 @@ def test_reference_route_has_no_static_penetration_at_40_mm_sampling() -> None:
     assert result.sample_count > 10_000
     assert result.collision_count == 0, result.collisions
     assert result.minimum_clearance_m >= -0.001
+
+
+def test_pickup_hover_preserves_operational_clearance_from_shelf() -> None:
+    primitives = {item.name: item for item in school_map_collision_primitives()}
+    clearance = vehicle_clearance_to_primitive_m(
+        (*PICKUP_ROUTE_CENTER, PICKUP_ROUTE_ENVELOPE_CENTER_Z_M),
+        primitives["pickup-shelf"],
+    )
+
+    # 0.35 m is the runtime operating reserve; retain another 0.20 m at the
+    # semantic endpoint so localization and tracking error do not erase it.
+    assert clearance >= 0.55
 
 
 def test_stair_route_turns_square_on_landings_with_tracking_margin() -> None:

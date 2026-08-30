@@ -78,11 +78,9 @@ Jobs must use the exact `catalog_version` returned by the API or an explicit
 compatibility alias (`builtin-v1`, `px4-v1.16`, `px4-v1.17`, `px4-main`). Unknown
 identifiers are rejected, and a version-specific alias must agree with
 `vehicle_profile.px4_version`; this prevents an arbitrary label from silently
-selecting a newer installed catalog. The immediately preceding canonical `r1`
-identifier is also retained as a migration alias for already persisted jobs.
-Aliases are normalized at the API boundary: every newly created job, rerun,
-LLM prompt, report, and reproducibility manifest stores the canonical `r2`
-identifier that actually performed validation.
+selecting a different installed catalog. Aliases are normalized at the API
+boundary: every newly created job, rerun, LLM prompt, report, and reproducibility
+manifest stores the stable built-in catalog identifier that performed validation.
 
 ## Local setup
 

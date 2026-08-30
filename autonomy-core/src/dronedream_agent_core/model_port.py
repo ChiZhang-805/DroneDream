@@ -39,6 +39,7 @@ class ProviderSettings:
     api_key_env: str
     base_url: str | None
     api_style: Literal["responses", "chat-completions"]
+    supports_image_input: bool | None = None
 
     @classmethod
     def from_env(cls, name: ProviderName) -> ProviderSettings:
@@ -136,6 +137,23 @@ class StructuredModelPort:
     @property
     def supports_provider_context(self) -> bool:
         return self.settings.api_style == "responses"
+
+    @property
+    def supports_image_input(self) -> bool:
+        """Return a conservative capability decision; unknown models fail closed."""
+
+        if self.settings.supports_image_input is not None:
+            return self.settings.supports_image_input
+        provider = self.settings.name.strip().lower()
+        model = self.settings.model.strip().lower()
+        if provider == "deepseek":
+            return False
+        if provider == "openai":
+            return model.startswith(("gpt-4.1", "gpt-4o", "gpt-5", "o3", "o4"))
+        # OpenAI-compatible providers must use an explicitly visual model ID or
+        # advertise the capability through ProviderSettings.  Text-only fallback is
+        # safer than silently dropping a safety-relevant image.
+        return any(marker in model for marker in ("-vl", "vision", "-omni"))
 
     def restore_provider_context(self, context_id: str, response_id: str) -> None:
         """Restore a durable Responses API chain without treating it as mission memory."""

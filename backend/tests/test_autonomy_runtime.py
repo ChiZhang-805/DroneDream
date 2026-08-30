@@ -638,6 +638,54 @@ def test_dynamic_person_inserts_a_bounded_recovery_branch() -> None:
     )
 
 
+def test_crossing_person_is_held_before_entering_the_current_distance_envelope() -> None:
+    registry = RuntimeSessionRegistry(max_sessions=4)
+    created = registry.create(
+        "user-a",
+        RuntimeSessionCreateRequest(
+            mission=mission(),
+            client_request_id="request-runtime-predictive-person",
+        ),
+    )
+
+    held = registry.observe(
+        "user-a",
+        created.session_id,
+        observation(
+            1,
+            100,
+            position_m=Vector3(x=0.0, y=0.0, z=1.5),
+            velocity_mps=Vector3(x=1.0, y=0.0, z=0.0),
+            perceived_entities=[
+                {
+                    "track_id": "person-crossing",
+                    "kind": "person",
+                    "position_m": {"x": 2.0, "y": 2.0, "z": 1.5},
+                    "velocity_mps": {"x": 0.0, "y": -1.0, "z": 0.0},
+                    "confidence": 0.98,
+                    "age_ms": 25,
+                    "safety_radius_m": 0.8,
+                    "source_stream": "front-depth",
+                }
+            ],
+            stream_health=[
+                {
+                    "stream_id": "front-depth",
+                    "kind": "depth",
+                    "status": "healthy",
+                    "rate_hz": 30.0,
+                    "latency_ms": 30.0,
+                    "dropped_percent": 0.0,
+                    "source": "onboard",
+                }
+            ],
+        ),
+    )
+
+    assert held.phase == "holding"
+    assert "safety.predicted-person-conflict" in held.decision.codes
+
+
 def test_runtime_graph_and_decision_log_remain_bounded_and_monotonic() -> None:
     registry = RuntimeSessionRegistry(max_sessions=4)
     created = registry.create(

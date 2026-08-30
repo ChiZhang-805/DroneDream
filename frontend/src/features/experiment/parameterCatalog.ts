@@ -106,11 +106,11 @@ function builtinParameter(
   };
 }
 
-// Curated 31-parameter offline core subset. The backend r2 catalog exposes a
+// Curated 31-parameter offline core subset. The backend catalog exposes a
 // broader 45-parameter set when reachable; the server always performs the
 // authoritative version, applicability, coupling, and range validation.
 export const BUILTIN_PARAMETER_CATALOG: ParameterCatalogResponse = {
-  catalog_version: "dronedream.px4.multicopter.2026-07-r1",
+  catalog_version: "dronedream.px4.multicopter.builtin",
   px4_version: "v1.16",
   source: "builtin",
   parameters: [

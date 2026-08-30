@@ -11,9 +11,9 @@
     ]
   },
   "qualified_assets": {
-    "world": "school-map-px4-office-roundtrip-20260818-r12/school-map/world.physics.sdf",
+    "world": "private-test-artifact/school-map/world.physics.sdf",
     "world_sha256": "f5a861691a24fab815f7f1800bd29ab2483fe77ea9be9eb9af721e1677303bae",
-    "vehicle": "school-map-px4-office-roundtrip-20260818-r12/my-drone/model.sdf",
+    "vehicle": "private-test-artifact/my-drone/model.sdf",
     "vehicle_sha256": "05a2c5a34f91f76592b83e4dae46cf156020dd272c46a30deac3fd6e96356568"
   },
   "checks": {

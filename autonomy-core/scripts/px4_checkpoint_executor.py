@@ -32,6 +32,8 @@ from dronedream_agent_core.contracts import (
     RuntimeControlSession,
     RuntimeHoldAcknowledgement,
     RuntimeInterruptionDecision,
+    RuntimeLocalSafetyCommand,
+    RuntimeLocalSafetyObservation,
     RuntimeOperatorControlCommand,
     RuntimeOperatorTakeoverAdoption,
     RuntimeOperatorTakeoverGrant,
@@ -1108,6 +1110,112 @@ def _world_enu_setpoint(
     )
 
 
+def _publish_local_safety_target(
+    *,
+    path: Path | None,
+    setpoint: Any,
+    coordinate_contract: Px4CoordinateContract,
+) -> None:
+    if path is None:
+        return
+    target = _setpoint_world_enu(setpoint, coordinate_contract)
+    _atomic_json(
+        path,
+        {
+            "schema_version": "dronedream.local-safety-target.v1",
+            "target_position_m": target.model_dump(mode="json"),
+            "updated_at_unix_ms": int(time.time() * 1_000),
+        },
+    )
+
+
+def _read_local_safety_command(args: argparse.Namespace) -> RuntimeLocalSafetyCommand | None:
+    if args.local_safety_command is None or not args.local_safety_command.is_file():
+        return None
+    try:
+        command = RuntimeLocalSafetyCommand.model_validate_json(
+            args.local_safety_command.read_text(encoding="utf-8")
+        )
+        if command.valid_until_unix_ms < int(time.time() * 1_000):
+            return None
+        if args.local_safety_observation is not None:
+            observation = RuntimeLocalSafetyObservation.model_validate_json(
+                args.local_safety_observation.read_text(encoding="utf-8")
+            )
+            if command.observation_sequence != observation.sequence:
+                return None
+            if command.observation_sha256 != sha256_json(observation):
+                raise RuntimeError("local safety observation hash mismatch")
+        return command
+    except FileNotFoundError:
+        return None
+
+
+async def _apply_local_safety(
+    *,
+    args: argparse.Namespace,
+    base: ModuleType,
+    client: Any,
+    planned_setpoint: Any,
+    coordinate_contract: Px4CoordinateContract,
+    phase_path: Path,
+) -> None:
+    """Hold schedule advancement while a live local repair command is active."""
+
+    _publish_local_safety_target(
+        path=args.local_safety_target,
+        setpoint=planned_setpoint,
+        coordinate_contract=coordinate_contract,
+    )
+    if args.local_safety_command is None:
+        await client.set_position_ned(planned_setpoint)
+        return
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + args.local_safety_repair_timeout_seconds
+    waited_for_first_command = False
+    while True:
+        command = _read_local_safety_command(args)
+        if command is None:
+            if not waited_for_first_command:
+                waited_for_first_command = True
+                await client.set_position_ned(planned_setpoint)
+                await asyncio.sleep(min(0.1, 1.0 / args.setpoint_rate_hz))
+                continue
+            await client.set_position_ned(planned_setpoint)
+            return
+        action = command.decision.action
+        if action == "continue":
+            await client.set_position_ned(planned_setpoint)
+            return
+        if loop.time() >= deadline:
+            raise UserDirectedLanding("local safety repair exceeded its bounded hold window")
+        safe_setpoint = _world_enu_setpoint(
+            base=base,
+            world=command.command_position_m,
+            yaw_deg=float(planned_setpoint.yaw_deg),
+            coordinate_contract=coordinate_contract,
+        )
+        _atomic_json(
+            phase_path,
+            {
+                "phase": "HOLDING" if action == "hold" else "LOCAL_REPLAN",
+                "local_safety_action": action,
+                "observation_sequence": command.observation_sequence,
+                "threat_obstacle_id": command.decision.threat_obstacle_id,
+                "minimum_predicted_clearance_m": (
+                    command.decision.minimum_predicted_clearance_m
+                ),
+            },
+        )
+        await client.set_position_ned(safe_setpoint)
+        await asyncio.sleep(1.0 / args.setpoint_rate_hz)
+        _publish_local_safety_target(
+            path=args.local_safety_target,
+            setpoint=planned_setpoint,
+            coordinate_contract=coordinate_contract,
+        )
+
+
 async def _follow_runtime_target(
     *,
     args: argparse.Namespace,
@@ -1345,6 +1453,10 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--runtime-hold-timeout-seconds", type=float, default=12.0)
     parser.add_argument("--runtime-decision-timeout-seconds", type=float, default=180.0)
     parser.add_argument("--runtime-replan-hold-seconds", type=float, default=30.0)
+    parser.add_argument("--local-safety-command", type=Path)
+    parser.add_argument("--local-safety-observation", type=Path)
+    parser.add_argument("--local-safety-target", type=Path)
+    parser.add_argument("--local-safety-repair-timeout-seconds", type=float, default=15.0)
     parser.add_argument("--semantic", type=Path)
     parser.add_argument("--vehicle-metadata", type=Path)
     return parser.parse_args()
@@ -1469,7 +1581,14 @@ async def _fly_runtime_replacement(
                             "replacement_sequence": replacement.replacement_sequence,
                         },
                     )
-                await client.set_position_ned(setpoint)
+                await _apply_local_safety(
+                    args=args,
+                    base=base,
+                    client=client,
+                    planned_setpoint=setpoint,
+                    coordinate_contract=replacement.coordinate_contract,
+                    phase_path=phase_path,
+                )
                 last_setpoint = setpoint
                 await asyncio.sleep(1.0 / args.setpoint_rate_hz)
             if replacement.amendment_action == "follow_target":
@@ -1686,7 +1805,14 @@ async def _run(args: argparse.Namespace, base: ModuleType) -> None:
                 )
                 pending_interruption = None
                 _atomic_json(phase_path, {"phase": "TRACK", "checkpoint_id": None})
-            await client.set_position_ned(setpoint)
+            await _apply_local_safety(
+                args=args,
+                base=base,
+                client=client,
+                planned_setpoint=setpoint,
+                coordinate_contract=coordinate_contract,
+                phase_path=phase_path,
+            )
             last_setpoint = setpoint
             if index == plan.track_start_index:
                 timing["track_start_t"] = time.monotonic() - started

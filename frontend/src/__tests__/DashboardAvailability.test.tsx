@@ -47,7 +47,7 @@ describe("Dashboard availability", () => {
 
     expect(await screen.findByText("Runtime disconnected"))
       .toBeVisible();
-    expect(screen.getByText("Status summary")).toBeVisible();
+    expect(screen.getByRole("region", { name: "Status summary" })).toBeVisible();
     expect(screen.getByText("Recent jobs")).toBeVisible();
     expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
     queryClient.clear();

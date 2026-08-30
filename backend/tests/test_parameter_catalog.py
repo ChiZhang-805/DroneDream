@@ -47,7 +47,7 @@ def test_parameter_catalog_lists_versioned_bilingual_entries(client) -> None:
     assert xy_p["evidence_signals"]
     assert xy_p["apply_policy"] == "live"
     assert payload["presets"]
-    assert "dronedream.px4.multicopter.2026-07-r1" in payload["catalog_version_aliases"]
+    assert payload["catalog_version"] == CATALOG_VERSION
 
 
 def test_parameter_catalog_can_filter_group_and_read_one_entry(client) -> None:

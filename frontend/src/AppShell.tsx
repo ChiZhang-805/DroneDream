@@ -3107,11 +3107,13 @@ function AccountPlanLabel({ authenticated }: { authenticated: boolean }) {
 function AccountMenuPopover({
   menuRef,
   onClose,
+  onEditProfile,
   onOpenAllowance,
   onOpenSettings,
 }: {
   menuRef: RefObject<HTMLDivElement>;
   onClose: () => void;
+  onEditProfile: () => void;
   onOpenAllowance: () => void;
   onOpenSettings: () => void;
 }) {
@@ -3164,6 +3166,10 @@ function AccountMenuPopover({
 
   return (
     <div ref={menuRef} className="account-menu-popover" role="menu" aria-label={copy.account}>
+      <button type="button" className="account-menu-row" role="menuitem" onClick={onEditProfile}>
+        <CircleUserRound aria-hidden="true" strokeWidth={1.8} />
+        <span>{copy.editProfile}</span>
+      </button>
       <button type="button" className="account-menu-row account-menu-token" role="menuitem" onClick={onOpenAllowance}>
         <Gauge aria-hidden="true" strokeWidth={1.8} />
         <span>{copy.remainingAllowance}</span>
@@ -4794,6 +4800,10 @@ function AppShellContent() {
               <AccountMenuPopover
                 menuRef={accountMenuRef}
                 onClose={() => setAccountMenuOpen(false)}
+                onEditProfile={() => {
+                  setAccountMenuOpen(false);
+                  setAccountOpen(true);
+                }}
                 onOpenAllowance={() => {
                   openSettingsWorkspace("model", "account");
                 }}

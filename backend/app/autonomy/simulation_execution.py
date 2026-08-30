@@ -71,7 +71,7 @@ CANONICAL_FIXED_ADAPTER_VEHICLE_REQUEST = VehiclePackQualificationRequest.model_
         "dry_mass_kg": PX4_X500_DRY_MASS_KG,
         # Keep the exact published Vehicle Pack decimal; its credential hash is
         # content-addressed and therefore stricter than the later numeric gate.
-        "max_takeoff_mass_kg": 2.164307692307692,
+        "max_takeoff_mass_kg": 2.1653076923076924,
         "max_total_thrust_n": PX4_X500_MAXIMUM_THRUST_N,
         "body_size_m": {"x": 0.36, "y": 0.36, "z": 0.33},
         "rotor_radius_m": 0.127,
@@ -97,7 +97,17 @@ CANONICAL_FIXED_ADAPTER_VEHICLE_REQUEST = VehiclePackQualificationRequest.model_
                 "roll_pitch_yaw_deg": {"x": 0.0, "y": 0.0, "z": 0.0},
                 "rate_hz": 10.0,
                 "calibration_age_days": 0.0,
-            }
+            },
+            {
+                "sensor_id": "oakd-lite-depth",
+                "kind": "depth",
+                "calibrated": True,
+                "calibration_status": "verified",
+                "position_m": {"x": 0.13233, "y": 0.0, "z": 0.03278},
+                "roll_pitch_yaw_deg": {"x": 0.0, "y": 0.0, "z": 0.0},
+                "rate_hz": 30.0,
+                "calibration_age_days": 0.0,
+            },
         ],
     }
 )
@@ -368,7 +378,7 @@ class SimulationExecutionRegistry:
         if abs(mission.vehicle.pickup_payload_kg - TAKEOUT_PAYLOAD_MASS_KG) > 1e-9:
             raise AutonomyRuntimeError(
                 "SIMULATION_PAYLOAD_CONTRACT_MISMATCH",
-                "The School Map adapter requires the qualified 0.10 kg payload.",
+                "The School Map adapter requires the qualified 0.04 kg payload.",
             )
         capabilities = self.capabilities()
         if capabilities["available"] is not True:

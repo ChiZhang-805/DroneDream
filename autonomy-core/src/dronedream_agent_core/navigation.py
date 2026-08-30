@@ -189,8 +189,8 @@ def build_school_map_graph(
                 named_entities[str(entity_id)] = node_id
 
     return MapAsset(
-        asset_id="school-map-r12-hybrid-graph",
-        name="School Map r12 verified spine plus road topology",
+        asset_id="school-map-hybrid-graph",
+        name="School Map verified spine plus road topology",
         nodes=nodes,
         edges=edges,
         named_entities=named_entities,

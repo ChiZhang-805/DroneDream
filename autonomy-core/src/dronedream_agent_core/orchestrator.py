@@ -56,12 +56,14 @@ from .harness_graph import (
 )
 from .hashing import sha256_json
 from .lifecycle import LifecycleTransitionError
+from .map_reasoning import build_map_reasoning_context
 from .model_port import (
     ModelInvocationError,
     ProviderName,
     StructuredCallResult,
     StructuredModelPort,
 )
+from .navigation_readiness import assess_navigation_readiness, enforce_environment_readiness
 from .plugin_api import (
     ToolEnvironment,
     build_discovered_extension_registry,
@@ -96,6 +98,43 @@ IMMUTABLE_SAFETY_RULES = [
     "Execution must remain inside the qualified map and vehicle asset hashes.",
     "Landing or abort remains available at every runtime phase.",
 ]
+ROUTE_OBJECTIVE_WEIGHTS: dict[str, dict[str, float]] = {
+    "balanced": {
+        "distance_m": 0.20,
+        "minimum_clearance_m": 0.46,
+        "energy_proxy": 0.14,
+        "transition_count": 0.10,
+        "qualification_penalty": 0.10,
+    },
+    "clearance-first": {
+        "distance_m": 0.10,
+        "minimum_clearance_m": 0.62,
+        "energy_proxy": 0.08,
+        "transition_count": 0.08,
+        "qualification_penalty": 0.12,
+    },
+    "energy-first": {
+        "distance_m": 0.18,
+        "minimum_clearance_m": 0.30,
+        "energy_proxy": 0.34,
+        "transition_count": 0.10,
+        "qualification_penalty": 0.08,
+    },
+    "stability-first": {
+        "distance_m": 0.12,
+        "minimum_clearance_m": 0.34,
+        "energy_proxy": 0.08,
+        "transition_count": 0.22,
+        "qualification_penalty": 0.24,
+    },
+    "shortest-safe": {
+        "distance_m": 0.54,
+        "minimum_clearance_m": 0.28,
+        "energy_proxy": 0.08,
+        "transition_count": 0.05,
+        "qualification_penalty": 0.05,
+    },
+}
 EXPLICIT_CONSTRAINT_PHRASES = {
     "safety_priority": ("安全优先", "safety first", "prioritize safety"),
     "plan_only": ("先给我看计划", "plan only", "show me the plan"),
@@ -671,7 +710,16 @@ class MissionOrchestrator:
         candidate_ports = [
             value for value in candidates if isinstance(value, str) and value in self.model_ports
         ]
+        requires_image_input = role == "intent_parser" and bool(self._model_media)
+        if requires_image_input:
+            candidate_ports = [
+                value
+                for value in candidate_ports
+                if self.model_ports[value].supports_image_input
+            ]
         if not candidate_ports:
+            if requires_image_input:
+                raise MissionPreparationBlocked("MODEL_ROUTER_NO_IMAGE_CAPABLE_PORT")
             raise MissionPreparationBlocked("MODEL_ROUTER_NO_AVAILABLE_PORT")
         consensus = self._invoke_single_extension(
             "models.consensus-policy",
@@ -1189,6 +1237,24 @@ class MissionOrchestrator:
             raise MissionPreparationBlocked(error.code) from error
         evidence.append("harness.stage", context_stage.model_dump(mode="json"))
         explicit_constraint_hints = _explicit_constraint_hints(request)
+        general_map_context = build_map_reasoning_context(
+            self.map_graph,
+            self.map_catalog,
+            self.semantic_path,
+        )
+        navigation_readiness = assess_navigation_readiness(
+            self.map_graph,
+            self.map_catalog,
+            self.semantic_path,
+            self.vehicle,
+        )
+        _write_artifact(output_dir / "00-model-map-context.json", general_map_context)
+        _write_artifact(output_dir / "00-navigation-readiness.json", navigation_readiness)
+        evidence.append("mission.model-map-context", general_map_context)
+        evidence.append(
+            "mission.navigation-readiness",
+            navigation_readiness.model_dump(mode="json"),
+        )
         model_calls: list[ModelCallRecord] = []
         tool_receipts: list[ToolReceipt] = []
 
@@ -1218,6 +1284,8 @@ class MissionOrchestrator:
                     "request_features": request_features,
                     "conversation_window": compact_context,
                     "map_catalog": self.map_catalog.model_dump(mode="json"),
+                    "structured_map_context": general_map_context,
+                    "navigation_readiness": navigation_readiness.model_dump(mode="json"),
                     "domain_action_catalog": domain_actions.model_dump(mode="json"),
                     "previous_candidate": prior_intent,
                     "critic_feedback": prior_critique,
@@ -1278,6 +1346,7 @@ class MissionOrchestrator:
                         "candidate_intent": intent.model_dump(mode="json"),
                         "explicit_constraint_hints": explicit_constraint_hints,
                         "map_catalog": self.map_catalog.model_dump(mode="json"),
+                        "navigation_readiness": navigation_readiness.model_dump(mode="json"),
                         "domain_action_catalog": domain_actions.model_dump(mode="json"),
                     },
                     conversation_id=request.conversation_id,
@@ -1352,6 +1421,18 @@ class MissionOrchestrator:
             evidence.append("harness.stage", stage_receipt.model_dump(mode="json"))
         _write_artifact(output_dir / "01-intent.json", intent)
         _write_artifact(output_dir / "02-intent-critique.json", intent_critique)
+        try:
+            enforce_environment_readiness(intent.environment_mode, navigation_readiness)
+        except ValueError as error:
+            evidence.append(
+                "mission.navigation-readiness-rejected",
+                {
+                    "environment_mode": intent.environment_mode,
+                    "issue_code": str(error),
+                    "readiness": navigation_readiness.model_dump(mode="json"),
+                },
+            )
+            raise MissionPreparationBlocked(str(error)) from error
 
         contract = MissionContract(
             contract_id=f"mission-{uuid4().hex[:24]}",
@@ -1374,6 +1455,14 @@ class MissionOrchestrator:
         )
         _write_artifact(output_dir / "03-mission-contract.json", contract)
         evidence.append("mission.contract", contract.model_dump(mode="json"))
+        focused_map_context = build_map_reasoning_context(
+            self.map_graph,
+            self.map_catalog,
+            self.semantic_path,
+            focus_nodes=[contract.start_node, contract.target_node, contract.return_node],
+        )
+        _write_artifact(output_dir / "03a-focused-model-map-context.json", focused_map_context)
+        evidence.append("mission.focused-model-map-context", focused_map_context)
         try:
             contract_stage = stage_runtime.complete(
                 "mission.contract-freeze",
@@ -1596,6 +1685,7 @@ class MissionOrchestrator:
                     "round": planning_attempts,
                     "mission_contract": contract.model_dump(mode="json"),
                     "available_node_ids": [node.node_id for node in self.map_graph.nodes],
+                    "structured_map_context": focused_map_context,
                     "domain_action_catalog": domain_actions.model_dump(mode="json"),
                     "optional_plugin_advice": plugin_advice,
                     "harness_profile": harness_profile,
@@ -1641,6 +1731,7 @@ class MissionOrchestrator:
                     "mission_contract": contract.model_dump(mode="json"),
                     "task_graph": task_graph.model_dump(mode="json"),
                     "available_node_ids": [node.node_id for node in self.map_graph.nodes],
+                    "structured_map_context": focused_map_context,
                     "hard_output_rules": {
                         "first_target_must_not_equal": contract.start_node,
                         "must_include_target": contract.target_node,
@@ -1808,13 +1899,7 @@ class MissionOrchestrator:
             alternative_set = RouteAlternativeSet(
                 contract_id=contract.contract_id,
                 candidates=route_alternatives,
-                objective_weights={
-                    "distance_m": 0.20,
-                    "minimum_clearance_m": 0.46,
-                    "energy_proxy": 0.14,
-                    "transition_count": 0.10,
-                    "qualification_penalty": 0.10,
-                },
+                objective_weights=ROUTE_OBJECTIVE_WEIGHTS[semantic_plan.route_objective],
             )
             decision_value, decision_receipt = registry.call_slot(
                 "planning.alternative-ranker", alternative_set

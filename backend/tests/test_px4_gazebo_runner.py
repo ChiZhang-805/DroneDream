@@ -841,10 +841,14 @@ def test_px4_runner_returns_adapter_unavailable_when_command_missing(tmp_path: P
 
 
 def test_px4_runner_dry_run_is_deterministic(tmp_path: Path):
-    proc1, result1 = _run_runner(tmp_path / "r1", env_overrides={"PX4_GAZEBO_DRY_RUN": "true"})
-    proc2, result2 = _run_runner(tmp_path / "r2", env_overrides={"PX4_GAZEBO_DRY_RUN": "true"})
+    proc1, result1 = _run_runner(
+        tmp_path / "same-seed-first", env_overrides={"PX4_GAZEBO_DRY_RUN": "true"}
+    )
+    proc2, result2 = _run_runner(
+        tmp_path / "same-seed-second", env_overrides={"PX4_GAZEBO_DRY_RUN": "true"}
+    )
     proc3, result3 = _run_runner(
-        tmp_path / "r3",
+        tmp_path / "different-seed",
         env_overrides={"PX4_GAZEBO_DRY_RUN": "true"},
         seed=43,
     )

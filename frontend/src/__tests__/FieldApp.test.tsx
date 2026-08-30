@@ -162,7 +162,7 @@ describe("FieldApp", () => {
     expect(screen.getByRole("heading", { name: "设备与适配器" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "观察状态" })).toHaveValue("firmware-drift");
     fireEvent.click(screen.getByRole("button", { name: "打开账户菜单" }));
-    expect(screen.getByRole("menuitem", { name: "剩余额度" })).toBeVisible();
+    expect(screen.getByRole("menuitem", { name: /^Token/ })).toBeVisible();
     expect(screen.getByRole("menuitem", { name: "设置" })).toBeVisible();
   });
 
@@ -218,7 +218,7 @@ describe("FieldApp", () => {
     fireEvent.click(accountButton);
     expect(screen.getByRole("menu", { name: "Account" })).toBeVisible();
     expect(screen.queryByRole("region", { name: "Settings" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("menuitem", { name: "Remaining allowance" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: /^Token/ }));
 
     expect(screen.getByRole("tab", { name: "Models" })).toHaveAttribute("aria-selected", "true");
     fireEvent.click(screen.getByRole("button", { name: "Back to app" }));

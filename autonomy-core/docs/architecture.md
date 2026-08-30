@@ -71,7 +71,7 @@ mission can produce a different task graph and checkpoint count.
 A message submitted during execution is a separate event within the same task thread.
 Deterministic code claims it at the next 20 Hz poll, disables old-plan advancement and
 semantic side effects, and stabilizes a current-position hold before the classifier call.
-The measured `runtime-interrupt-r3` provider latency was 28.272 seconds; the vehicle held
+The measured runtime-interruption provider latency was 28.272 seconds; the vehicle held
 through that entire interval. Emergency wording forces landing even if a model were to
 misclassify it. Destination, payload, route, or speed changes force a new plan revision
   and can never resume the old track. A destination amendment is grounded against the

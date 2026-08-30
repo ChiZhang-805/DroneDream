@@ -296,7 +296,7 @@ def _reverify_prepared_run(args: argparse.Namespace) -> int:
         context.close()
     print(
         f"MISSION_REVERIFIED status={result.status} contract={result.contract_id} "
-        f"output={args.run_dir / 'workflow-result-r2.json'}"
+        f"output={args.run_dir / 'workflow-result.json'}"
     )
     return 0 if result.status == "verified" else 2
 

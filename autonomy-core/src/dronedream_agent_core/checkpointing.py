@@ -14,6 +14,8 @@ from .contracts import (
     RuntimeCheckpointContract,
     RuntimeCheckpointDecision,
     RuntimeCheckpointRequest,
+    RuntimeLocalSafetyCommand,
+    RuntimeLocalSafetyObservation,
 )
 from .extensions import ExtensionExecutionError
 from .hashing import sha256_json
@@ -196,6 +198,30 @@ class CheckpointCoordinator:
                     append_hook_receipts(self.receipt_path, [error.receipt])
                     raise
                 append_hook_receipts(self.receipt_path, checkpoint_receipts)
+                local_observation_path = self.run_dir / "local-safety-observation.json"
+                local_command_path = self.run_dir / "local-safety-command.json"
+                live_local_world = {
+                    "available": (
+                        local_observation_path.is_file() and local_command_path.is_file()
+                    )
+                }
+                if live_local_world["available"]:
+                    local_observation = RuntimeLocalSafetyObservation.model_validate_json(
+                        local_observation_path.read_text(encoding="utf-8")
+                    )
+                    local_command = RuntimeLocalSafetyCommand.model_validate_json(
+                        local_command_path.read_text(encoding="utf-8")
+                    )
+                    live_local_world.update(
+                        {
+                            "observation": local_observation.model_dump(mode="json"),
+                            "deterministic_safety_command": local_command.model_dump(mode="json"),
+                            "hash_binding_valid": (
+                                local_command.observation_sha256
+                                == sha256_json(local_observation)
+                            ),
+                        }
+                    )
                 result = self.port.call(
                     role="execution_monitor",
                     output_type=RuntimeAssessment,
@@ -213,6 +239,7 @@ class CheckpointCoordinator:
                             "coordinate_frame": "School Map world ENU",
                         },
                         "checkpoint_request": request.model_dump(mode="json"),
+                        "live_local_world": live_local_world,
                         "checkpoint_index_semantics": (
                             "global zero-based index within complete px4_track.points"
                         ),
