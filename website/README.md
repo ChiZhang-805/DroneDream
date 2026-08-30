@@ -22,6 +22,11 @@ exact versioned GitHub Release asset. It does not duplicate the installer in
 the Pages artifact. This keeps the global download, checksum, CI artifact, and
 future SignPath-signed release traceable to the same bytes.
 
+Each successful Pages workflow retains only the newest successful
+`github-pages` Deployment and deletes all older inactive records. Release, Tag,
+and Deployment retention is governed by
+[`distribution/desktop/RELEASE_POLICY.md`](../distribution/desktop/RELEASE_POLICY.md).
+
 Build the Pages artifact locally with:
 
 ```powershell

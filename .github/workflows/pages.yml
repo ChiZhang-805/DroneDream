@@ -37,6 +37,9 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Verify Pages deployment retention
+        run: node --test website/scripts/prune-github-pages-deployments.test.mjs
+
       - name: Install frontend dependencies
         run: npm ci --prefix frontend
 
@@ -71,3 +74,29 @@ jobs:
       - name: Deploy GitHub Pages
         id: deployment
         uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5
+
+  cleanup:
+    name: Retain latest Pages deployment
+    needs: deploy
+    if: ${{ needs.deploy.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - name: Check out retention policy
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "22"
+
+      - name: Delete inactive Pages deployment history
+        env:
+          DRONEDREAM_DEPLOYMENT_ENVIRONMENT: github-pages
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node website/scripts/prune-github-pages-deployments.mjs

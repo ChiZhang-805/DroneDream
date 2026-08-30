@@ -48,6 +48,21 @@ function Get-ReleaseOrNull {
     return $output | ConvertFrom-Json
 }
 
+function Assert-ExactStringSet {
+    param(
+        [Parameter(Mandatory = $true)][string]$Label,
+        [Parameter(Mandatory = $true)][string[]]$Actual,
+        [Parameter(Mandatory = $true)][string[]]$Expected
+    )
+    $actualSorted = @($Actual | Sort-Object -Unique)
+    $expectedSorted = @($Expected | Sort-Object -Unique)
+    $difference = @(Compare-Object -ReferenceObject $expectedSorted -DifferenceObject $actualSorted)
+    if ($difference.Count -ne 0) {
+        $rendered = ($difference | ForEach-Object { "$($_.SideIndicator) $($_.InputObject)" }) -join "; "
+        throw "$Label drifted from the exact public retention set: $rendered"
+    }
+}
+
 $familyContractPath = Join-Path $repoRoot "distribution\desktop\edition-runtime-update-families.v1.json"
 $familyContract = Get-Content -LiteralPath $familyContractPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $version = [string]$familyContract.productDisplayVersion
@@ -113,10 +128,10 @@ try {
         $editionStage = Join-Path $stageRoot $editionId
         [IO.Directory]::CreateDirectory($editionStage) | Out-Null
         $stagedInstaller = Join-Path $editionStage $installerName
-        Copy-Item -LiteralPath $installerPath -Destination $stagedInstaller
-        Copy-Item -LiteralPath $signaturePath -Destination "$stagedInstaller.sig"
-        Copy-Item -LiteralPath $checksumPath -Destination "$stagedInstaller.sha256"
-        Copy-Item -LiteralPath $receiptPath -Destination "$stagedInstaller.receipt.json"
+        Copy-Item -LiteralPath $installerPath -Destination $stagedInstaller -WhatIf:$false
+        Copy-Item -LiteralPath $signaturePath -Destination "$stagedInstaller.sig" -WhatIf:$false
+        Copy-Item -LiteralPath $checksumPath -Destination "$stagedInstaller.sha256" -WhatIf:$false
+        Copy-Item -LiteralPath $receiptPath -Destination "$stagedInstaller.receipt.json" -WhatIf:$false
         foreach ($assetPath in @(
             $stagedInstaller,
             "$stagedInstaller.sig",
@@ -273,6 +288,26 @@ try {
                 ) | Out-Null
             }
         }
+
+        if (-not $WhatIfPreference) {
+            $expectedPublicTags = @($channelTags + $keepCombined + $keepRuntime | Sort-Object -Unique)
+            $finalReleaseList = Invoke-GitHubCli -Arguments @(
+                "release", "list", "--repo", $Repository,
+                "--limit", "100", "--json", "tagName"
+            ) | ConvertFrom-Json
+            $finalReleaseTags = @($finalReleaseList | ForEach-Object { [string]$_.tagName })
+            $remoteTagOutput = Invoke-GitHubCli -Arguments @(
+                "api", "--paginate", "repos/$Repository/git/matching-refs/tags",
+                "--jq", ".[].ref"
+            )
+            $remoteTags = @(
+                $remoteTagOutput -split "`r?`n" |
+                    Where-Object { $_ } |
+                    ForEach-Object { $_ -replace '^refs/tags/', '' }
+            )
+            Assert-ExactStringSet -Label "GitHub Release inventory" -Actual $finalReleaseTags -Expected $expectedPublicTags
+            Assert-ExactStringSet -Label "GitHub Tag inventory" -Actual $remoteTags -Expected $expectedPublicTags
+        }
     }
 
     Write-Host "Published $releaseTag and advanced all five updater channels."
@@ -281,6 +316,6 @@ try {
     $stageRootFull = [IO.Path]::GetFullPath($stageRoot)
     if ($stageRootFull.StartsWith($tempRoot, [StringComparison]::OrdinalIgnoreCase) -and
         [IO.Path]::GetFileName($stageRootFull).StartsWith("dronedream-five-release-", [StringComparison]::Ordinal)) {
-        Remove-Item -LiteralPath $stageRootFull -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $stageRootFull -Recurse -Force -ErrorAction SilentlyContinue -WhatIf:$false
     }
 }
