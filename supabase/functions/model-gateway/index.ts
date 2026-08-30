@@ -383,11 +383,16 @@ async function usageSnapshot(userId: string): Promise<JsonRecord> {
     p_user_id: userId,
   });
   if (expiryError) throw expiryError;
-  const { data, error } = await adminClient().rpc("model_access_snapshot", {
-    p_user_id: userId,
-  });
+  const [snapshotResult, accountResult] = await Promise.all([
+    adminClient().rpc("model_access_snapshot", { p_user_id: userId }),
+    adminClient().rpc("model_access_account_snapshot", { p_user_id: userId }),
+  ]);
+  const { data, error } = snapshotResult;
   if (error || !isRecord(data)) {
     throw error ?? new Error("MODEL_USAGE_SNAPSHOT_INVALID");
+  }
+  if (accountResult.error || !isRecord(accountResult.data)) {
+    throw accountResult.error ?? new Error("MODEL_ACCOUNT_SNAPSHOT_INVALID");
   }
   const { data: cards, error: cardsError } = await adminClient()
     .from("model_allowance_reset_cards")
@@ -408,6 +413,7 @@ async function usageSnapshot(userId: string): Promise<JsonRecord> {
   }
   return {
     ...data,
+    account: accountResult.data,
     daily_usage: dailyUsage,
     allowance_reset_cards: cards.map((card) => ({
       id: card.card_id,

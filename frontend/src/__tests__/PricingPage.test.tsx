@@ -231,6 +231,27 @@ describe("PricingPage payment channels", () => {
       .not.toHaveClass("is-current");
   });
 
+  it("does not label an authenticated account Free when subscription lookup fails", async () => {
+    billingMock.getManagedModelUsage.mockRejectedValueOnce(
+      new Error("subscription unavailable"),
+    );
+
+    render(
+      <PricingPage
+        locale="en"
+        authenticated
+        onRequireAccount={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(billingMock.getManagedModelUsage).toHaveBeenCalledTimes(1);
+    });
+    expect(document.querySelector(".pricing-card.is-current")).toBeNull();
+    expect(screen.queryByText("Current plan")).toBeNull();
+    expect(screen.getByRole("button", { name: "Start free" })).toBeEnabled();
+  });
+
   it("marks the current business subscription without marking the individual tab", async () => {
     billingMock.getManagedModelUsage.mockResolvedValueOnce({
       plan: {

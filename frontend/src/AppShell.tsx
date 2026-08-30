@@ -3064,11 +3064,14 @@ function AccountAvatar({
   );
 }
 
-function normalizedPlanName(value: string | null | undefined): "Free" | "Plus" | "Pro" {
+function normalizedPlanName(
+  value: string | null | undefined,
+): "Free" | "Plus" | "Pro" | null {
   const plan = value?.trim().toLocaleLowerCase() ?? "";
-  if (plan.includes("pro")) return "Pro";
-  if (plan.includes("plus")) return "Plus";
-  return "Free";
+  if (plan === "pro") return "Pro";
+  if (plan === "plus") return "Plus";
+  if (plan === "free") return "Free";
+  return null;
 }
 
 function AccountPlanLabel({ authenticated }: { authenticated: boolean }) {

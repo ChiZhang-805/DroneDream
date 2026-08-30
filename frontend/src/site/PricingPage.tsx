@@ -232,7 +232,7 @@ export function PricingPage({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("wechat");
   const [availability, setAvailability] = useState<BillingAvailability | null>(null);
   const [currentSubscriptionKey, setCurrentSubscriptionKey] =
-    useState<SubscriptionKey>("individual-free");
+    useState<SubscriptionKey | null>(authenticated ? null : "individual-free");
   const [paymentState, setPaymentState] =
     useState<"idle" | "checking" | "creating" | "qr" | "error">("idle");
   const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
@@ -308,6 +308,7 @@ export function PricingPage({
       setCurrentSubscriptionKey("individual-free");
       return undefined;
     }
+    setCurrentSubscriptionKey(null);
     let active = true;
     void getManagedModelUsage()
       .then((snapshot) => {
@@ -318,7 +319,7 @@ export function PricingPage({
         ));
       })
       .catch(() => {
-        if (active) setCurrentSubscriptionKey("individual-free");
+        if (active) setCurrentSubscriptionKey(null);
       });
     return () => {
       active = false;
