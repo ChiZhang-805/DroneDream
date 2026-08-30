@@ -20,6 +20,7 @@ import {
   modelHarnessProposalLifecycle,
   parseAssistantPlan,
   resolveMemoryPrecedenceForPrompt,
+  resolveConsoleMemoryAccess,
   sanitizedContextValue,
   validatedExplicitMemoryUpdates,
   type AssistantEdition,
@@ -656,6 +657,76 @@ Deno.test("deterministic memory precedence shadows lower layers before prompting
     field_id: "experiment.track_type",
     requires_user_resolution: true,
   }]);
+});
+
+Deno.test("memory access requires both switches and intersects account with edition scope", () => {
+  const consent = {
+    memory_enabled: true,
+    memory_scopes: {
+      chat_preferences: true,
+      experiment_defaults: true,
+      safety_approvals: false,
+    },
+    read_namespaces: ["account.shared", "experiment.simulation", "operations.field"],
+    write_namespaces: ["account.shared", "experiment.simulation", "not-a-memory-domain"],
+  };
+  const preferences = {
+    memory_enabled: true,
+    memory_scopes: {
+      chat_preferences: true,
+      experiment_defaults: false,
+      safety_approvals: true,
+    },
+  };
+  assertEquals(resolveConsoleMemoryAccess(consent, preferences, "simulation_experiment"), {
+    enabled: true,
+    enabled_scopes: ["chat_preferences"],
+    readable_namespaces: ["account.shared", "experiment.simulation"],
+    writable_namespaces: ["account.shared", "experiment.simulation"],
+  });
+  assertEquals(resolveConsoleMemoryAccess(
+    consent,
+    { ...preferences, memory_enabled: false },
+    "simulation_experiment",
+  ), {
+    enabled: false,
+    enabled_scopes: [],
+    readable_namespaces: [],
+    writable_namespaces: [],
+  });
+  assertEquals(resolveConsoleMemoryAccess(
+    { ...consent, memory_enabled: false },
+    preferences,
+    "simulation_experiment",
+  ), {
+    enabled: false,
+    enabled_scopes: [],
+    readable_namespaces: [],
+    writable_namespaces: [],
+  });
+});
+
+Deno.test("memory access fails closed for auto-routing and domains outside task policy", () => {
+  const consent = {
+    memory_enabled: true,
+    memory_scopes: { workflow_tools: true },
+    read_namespaces: ["account.shared", "operations.field", "autonomy.mission"],
+    write_namespaces: ["operations.field", "autonomy.mission"],
+  };
+  const preferences = {
+    memory_enabled: true,
+    memory_scopes: { workflow_tools: true },
+  };
+  assertEquals(resolveConsoleMemoryAccess(consent, preferences, null), {
+    enabled: true,
+    enabled_scopes: ["workflow_tools"],
+    readable_namespaces: ["account.shared"],
+    writable_namespaces: ["autonomy.mission", "operations.field"],
+  });
+  assertEquals(
+    resolveConsoleMemoryAccess(consent, preferences, "field_task").readable_namespaces,
+    ["account.shared", "operations.field"],
+  );
 });
 
 Deno.test("memory precedence uses canonical field identity across scopes and namespaces", () => {

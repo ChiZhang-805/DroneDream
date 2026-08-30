@@ -65,7 +65,7 @@ const CONSOLE_MEMORY_SCOPES = [
   "collaboration_organization",
   "files_artifacts",
 ] as const;
-type ConsoleMemoryScope = typeof CONSOLE_MEMORY_SCOPES[number];
+export type ConsoleMemoryScope = typeof CONSOLE_MEMORY_SCOPES[number];
 
 const CANONICAL_MEMORY_FIELD_ALIASES: Readonly<Record<string, string>> = {
   altitude: "flight.altitude_m",
@@ -237,6 +237,63 @@ export function modelHarnessMemoryNamespacesForRead(
   return task === null
     ? ["account.shared"]
     : [...modelHarnessDomainPolicyForTask(task).readable_memory_domains];
+}
+
+export interface ConsoleMemoryAccess {
+  enabled: boolean;
+  enabled_scopes: ConsoleMemoryScope[];
+  readable_namespaces: ModelHarnessMemoryNamespace[];
+  writable_namespaces: ModelHarnessMemoryNamespace[];
+}
+
+/**
+ * Resolve the effective memory boundary once for both retrieval and persistence.
+ * Account consent and edition preferences must independently opt in; scopes are
+ * intersected, while task policy further narrows what a model may read.
+ */
+export function resolveConsoleMemoryAccess(
+  consent: unknown,
+  preferences: unknown,
+  task: AssistantTaskType | null,
+): ConsoleMemoryAccess {
+  if (
+    !isRecord(consent)
+    || consent.memory_enabled !== true
+    || !isRecord(preferences)
+    || preferences.memory_enabled !== true
+  ) {
+    return {
+      enabled: false,
+      enabled_scopes: [],
+      readable_namespaces: [],
+      writable_namespaces: [],
+    };
+  }
+  const editionScopes = isRecord(preferences.memory_scopes) ? preferences.memory_scopes : {};
+  const accountScopes = isRecord(consent.memory_scopes) ? consent.memory_scopes : {};
+  const enabledScopes = CONSOLE_MEMORY_SCOPES.filter((scope) =>
+    editionScopes[scope] === true && accountScopes[scope] === true
+  );
+  const accountReadable = new Set(
+    Array.isArray(consent.read_namespaces)
+      ? consent.read_namespaces.filter((value): value is string => typeof value === "string")
+      : [],
+  );
+  const accountWritable = new Set(
+    Array.isArray(consent.write_namespaces)
+      ? consent.write_namespaces.filter((value): value is string => typeof value === "string")
+      : [],
+  );
+  const readableNamespaces = modelHarnessMemoryNamespacesForRead(task)
+    .filter((namespace) => accountReadable.has(namespace));
+  const writableNamespaces = MODEL_HARNESS_MEMORY_NAMESPACES
+    .filter((namespace) => accountWritable.has(namespace));
+  return {
+    enabled: enabledScopes.length > 0,
+    enabled_scopes: enabledScopes,
+    readable_namespaces: readableNamespaces,
+    writable_namespaces: writableNamespaces,
+  };
 }
 
 export function modelHarnessControlPlaneRef(
@@ -1360,7 +1417,6 @@ async function loadBoundedConsoleMemory(
     .eq("organization_id", storedOrganization)
     .maybeSingle();
   if (consentError) throw consentError;
-  if (!isRecord(consent) || consent.memory_enabled !== true) return {};
   const { data: preferences, error: preferenceError } = await adminClient()
     .from("console_preferences")
     .select("memory_enabled,memory_scopes,defaults")
@@ -1371,23 +1427,12 @@ async function loadBoundedConsoleMemory(
     .eq("edition", selectedEdition)
     .maybeSingle();
   if (preferenceError) throw preferenceError;
-  if (!isRecord(preferences) || preferences.memory_enabled !== true) return {};
-  const configuredScopes = isRecord(preferences.memory_scopes) ? preferences.memory_scopes : {};
-  const globalScopes = isRecord(consent.memory_scopes) ? consent.memory_scopes : {};
-  const enabledScopes = CONSOLE_MEMORY_SCOPES.filter((scope) =>
-    configuredScopes[scope] === true && globalScopes[scope] === true
-  );
-  if (enabledScopes.length === 0) return {};
+  const memoryAccess = resolveConsoleMemoryAccess(consent, preferences, requestedTask);
+  if (!memoryAccess.enabled) return {};
   // Account-shared preferences are intentionally reusable. Responsibility
   // memory is loaded only after the request explicitly names its task domain;
   // auto-routing therefore fails closed instead of mixing multiple domains.
-  const globallyReadable = new Set(
-    Array.isArray(consent.read_namespaces)
-      ? consent.read_namespaces.filter((value): value is string => typeof value === "string")
-      : [],
-  );
-  const readableNamespaces = modelHarnessMemoryNamespacesForRead(requestedTask)
-    .filter((namespace) => globallyReadable.has(namespace));
+  const readableNamespaces = memoryAccess.readable_namespaces;
   if (readableNamespaces.length === 0) return {};
   const { data: consolidated, error: memoryError } = await adminClient()
     .from("console_memory_records")
@@ -1396,7 +1441,7 @@ async function loadBoundedConsoleMemory(
     .eq("tenant_id", tenantId)
     .eq("organization_id", storedOrganization)
     .in("responsibility_namespace", readableNamespaces)
-    .in("scope", enabledScopes)
+    .in("scope", memoryAccess.enabled_scopes)
     .eq("status", "active")
     .gt("expires_at", new Date().toISOString())
     .order("confidence", { ascending: false })
@@ -1411,20 +1456,20 @@ async function loadBoundedConsoleMemory(
     .eq("organization_id", storedOrganization)
     .eq("conversation_id", conversationId)
     .in("responsibility_namespace", readableNamespaces)
-    .in("scope", enabledScopes)
+    .in("scope", memoryAccess.enabled_scopes)
     .in("status", ["staged", "conflict"])
     .gt("expires_at", new Date().toISOString())
     .order("last_seen", { ascending: false })
     .limit(12);
   if (candidateError) throw candidateError;
-  const safeDefaults = isRecord(preferences.defaults)
+  const safeDefaults = isRecord(preferences) && isRecord(preferences.defaults)
     && isSafeLongTermMemoryValue(preferences.defaults)
     ? memorySafeContextValue(preferences.defaults)
     : {};
   return {
     precedence: ["current_request", "session", "domain_memory", "account_defaults"],
     responsibility_namespaces: readableNamespaces,
-    enabled_scopes: enabledScopes,
+    enabled_scopes: memoryAccess.enabled_scopes,
     saved_defaults: safeDefaults,
     session_candidates: boundedMemoryItems(
       (candidates ?? []).filter((candidate) => isRecord(candidate) && candidate.status === "staged"),
@@ -1674,7 +1719,6 @@ async function persistBoundedConsoleMemory(
     .eq("organization_id", storedOrganization)
     .maybeSingle();
   if (consentError) throw consentError;
-  if (!isRecord(consent) || consent.memory_enabled !== true) return;
   const { data: preferences, error: preferenceError } = await adminClient()
     .from("console_preferences")
     .select("memory_enabled,memory_scopes")
@@ -1685,14 +1729,10 @@ async function persistBoundedConsoleMemory(
     .eq("edition", selectedEdition)
     .maybeSingle();
   if (preferenceError) throw preferenceError;
-  const enabledScopes = isRecord(preferences?.memory_scopes) ? preferences.memory_scopes : {};
-  const globalScopes = isRecord(consent.memory_scopes) ? consent.memory_scopes : {};
-  const writableNamespaces = new Set(
-    Array.isArray(consent.write_namespaces)
-      ? consent.write_namespaces.filter((value): value is string => typeof value === "string")
-      : [],
-  );
-  if (!isRecord(preferences) || preferences.memory_enabled !== true) return;
+  const memoryAccess = resolveConsoleMemoryAccess(consent, preferences, plan.intent as AssistantTaskType);
+  if (!memoryAccess.enabled) return;
+  const enabledScopes = new Set(memoryAccess.enabled_scopes);
+  const writableNamespaces = new Set(memoryAccess.writable_namespaces);
   const failures: unknown[] = [];
   const explicitUpdates = Array.isArray(requestContext.explicit_memory_updates)
     ? requestContext.explicit_memory_updates.filter(isRecord)
@@ -1709,8 +1749,7 @@ async function persistBoundedConsoleMemory(
     if (
       !CONSOLE_MEMORY_SCOPES.includes(scope)
       || fieldId === null
-      || enabledScopes[scope] !== true
-      || globalScopes[scope] !== true
+      || !enabledScopes.has(scope)
       || !isSafeLongTermMemoryValue(update.value)
     ) continue;
     const targetNamespace = ACCOUNT_SHARED_MEMORY_SCOPES.has(scope)
@@ -1760,7 +1799,7 @@ async function persistBoundedConsoleMemory(
   }
 
   for (const enabledScope of CONSOLE_MEMORY_SCOPES) {
-    if (enabledScopes[enabledScope] !== true || globalScopes[enabledScope] !== true) continue;
+    if (!enabledScopes.has(enabledScope)) continue;
     const targetNamespace = ACCOUNT_SHARED_MEMORY_SCOPES.has(enabledScope)
       ? "account.shared"
       : taskNamespace;

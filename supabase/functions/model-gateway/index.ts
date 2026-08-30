@@ -642,6 +642,37 @@ function integerUsage(value: unknown): number | null {
     : null;
 }
 
+export interface ReconciledManagedUsage {
+  input_tokens: number | null;
+  output_tokens: number | null;
+  total_tokens: number | null;
+  consumed_credits: number;
+  estimated: boolean;
+}
+
+export function reconcileManagedUsage(
+  usage: unknown,
+  reservedCredits: number,
+  outputCreditWeight: number,
+): ReconciledManagedUsage {
+  const usageRecord = isRecord(usage) ? usage : null;
+  const inputTokens = integerUsage(usageRecord?.prompt_tokens);
+  const outputTokens = integerUsage(usageRecord?.completion_tokens);
+  const totalTokens = integerUsage(usageRecord?.total_tokens);
+  const hasActualUsage = inputTokens !== null
+    && outputTokens !== null
+    && totalTokens === inputTokens + outputTokens;
+  return {
+    input_tokens: hasActualUsage ? inputTokens : null,
+    output_tokens: hasActualUsage ? outputTokens : null,
+    total_tokens: hasActualUsage ? totalTokens : null,
+    consumed_credits: hasActualUsage
+      ? inputTokens + outputTokens * outputCreditWeight
+      : reservedCredits,
+    estimated: !hasActualUsage,
+  };
+}
+
 async function failReservation(requestId: string, code: string): Promise<void> {
   const { error } = await adminClient().rpc("model_usage_fail", {
     p_request_id: requestId,
@@ -795,23 +826,18 @@ async function handleChatCompletions(request: Request): Promise<Response> {
     );
   }
 
-  const usage = isRecord(providerJson.usage) ? providerJson.usage : null;
-  const inputTokens = integerUsage(usage?.prompt_tokens);
-  const outputTokens = integerUsage(usage?.completion_tokens);
-  const totalTokens = integerUsage(usage?.total_tokens);
-  const hasActualUsage = inputTokens !== null &&
-    outputTokens !== null &&
-    totalTokens === inputTokens + outputTokens;
-  const consumedCredits = hasActualUsage
-    ? inputTokens + outputTokens * config.outputCreditWeight
-    : reservedCredits;
+  const usage = reconcileManagedUsage(
+    providerJson.usage,
+    reservedCredits,
+    config.outputCreditWeight,
+  );
   const { error: settleError } = await adminClient().rpc("model_usage_settle", {
     p_request_id: requestId,
-    p_consumed_ai_credits: consumedCredits,
-    p_input_tokens: hasActualUsage ? inputTokens : null,
-    p_output_tokens: hasActualUsage ? outputTokens : null,
-    p_total_tokens: hasActualUsage ? totalTokens : null,
-    p_usage_estimated: !hasActualUsage,
+    p_consumed_ai_credits: usage.consumed_credits,
+    p_input_tokens: usage.input_tokens,
+    p_output_tokens: usage.output_tokens,
+    p_total_tokens: usage.total_tokens,
+    p_usage_estimated: usage.estimated,
     p_provider_request_id: typeof providerJson.id === "string"
       ? providerJson.id
       : null,
@@ -843,8 +869,8 @@ async function handleChatCompletions(request: Request): Promise<Response> {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store",
-      "X-DroneDream-Usage-Estimated": String(!hasActualUsage),
-      "X-DroneDream-Consumed-Credits": String(consumedCredits),
+      "X-DroneDream-Usage-Estimated": String(usage.estimated),
+      "X-DroneDream-Consumed-Credits": String(usage.consumed_credits),
       ...corsHeaders(request),
     },
   });

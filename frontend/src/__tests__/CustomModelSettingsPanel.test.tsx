@@ -1,16 +1,35 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const agentCoreMock = vi.hoisted(() => ({
+  create: vi.fn(async () => ({
+    profile_id: "cmp-1234567890abcdef12345678",
+    selection_id: "custom:cmp-1234567890abcdef12345678",
+  })),
+  remove: vi.fn(async () => undefined),
+  test: vi.fn(async () => ({ ok: true })),
+}));
+
+vi.mock("../features/autonomy/agentCore", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../features/autonomy/agentCore")>();
+  return {
+    ...original,
+    createAgentCoreCustomModel: agentCoreMock.create,
+    deleteAgentCoreCustomModel: agentCoreMock.remove,
+    testAgentCoreCustomModel: agentCoreMock.test,
+  };
+});
 
 import { CustomModelSettingsPanel } from "../components/CustomModelSettingsPanel";
 import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
 
-function renderPanel() {
+function renderPanel(edition?: "autonomy") {
   return render(
     <ModelAccessProvider
       accountScope="account-model-settings-test"
       initialSettings={{ accessMode: "byok", provider: "custom" }}
     >
-      <CustomModelSettingsPanel locale="zh-CN" />
+      <CustomModelSettingsPanel locale="zh-CN" edition={edition} />
     </ModelAccessProvider>,
   );
 }
@@ -19,6 +38,9 @@ describe("CustomModelSettingsPanel", () => {
   beforeEach(() => {
     window.localStorage.clear();
     window.sessionStorage.clear();
+    agentCoreMock.create.mockClear();
+    agentCoreMock.remove.mockClear();
+    agentCoreMock.test.mockClear();
   });
 
   it("reveals and hides a BYOK credential only on explicit user action", () => {
@@ -96,5 +118,40 @@ describe("CustomModelSettingsPanel", () => {
       expect(screen.getByText("尚未保存可使用的自定义模型。")).toBeVisible();
     });
     expect(screen.getByLabelText("模型配置")).toBeVisible();
+  });
+
+  it("binds an autonomy custom model through AGENT Core without persisting its key", async () => {
+    renderPanel("autonomy");
+    fireEvent.change(screen.getByLabelText("API 地址"), {
+      target: { value: "https://api.deepseek.com/v1" },
+    });
+    fireEvent.change(screen.getByLabelText("供应商"), {
+      target: { value: "deepseek" },
+    });
+    fireEvent.change(screen.getByLabelText("API Key"), {
+      target: { value: "temporary-agent-core-key" },
+    });
+    fireEvent.change(screen.getByLabelText("模型 ID"), {
+      target: { value: "deepseek-chat" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存" }));
+
+    await waitFor(() => expect(agentCoreMock.create).toHaveBeenCalledWith({
+      display_name: "deepseek-chat",
+      base_url: "https://api.deepseek.com",
+      model_id: "deepseek-chat",
+      api_key: "temporary-agent-core-key",
+      api_style: "chat-completions",
+      provider: "deepseek",
+    }));
+    expect(agentCoreMock.test).toHaveBeenCalledWith("cmp-1234567890abcdef12345678");
+    expect(screen.getByText(/Windows 当前用户凭证库/)).toBeVisible();
+    expect(screen.getByLabelText("API Key")).toHaveValue("");
+    const persisted = Array.from({ length: window.localStorage.length }, (_, index) => {
+      const key = window.localStorage.key(index);
+      return key ? window.localStorage.getItem(key) : "";
+    }).join("\n");
+    expect(persisted).toContain("custom:cmp-1234567890abcdef12345678");
+    expect(persisted).not.toContain("temporary-agent-core-key");
   });
 });

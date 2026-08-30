@@ -1,6 +1,7 @@
 import {
   buildModelCatalog,
   MANAGED_MODELS,
+  reconcileManagedUsage,
   type ModelPolicyRow,
 } from "./index.ts";
 
@@ -66,4 +67,30 @@ Deno.test("model catalog rejects malformed provider policy", () => {
     rejected = true;
   }
   assert(rejected, "invalid policy version must be rejected");
+});
+
+Deno.test("managed usage settles actual provider tokens with output weighting", () => {
+  const usage = reconcileManagedUsage({
+    prompt_tokens: 120,
+    completion_tokens: 30,
+    total_tokens: 150,
+  }, 8_000, 4);
+  assert(usage.input_tokens === 120, "input tokens were not preserved");
+  assert(usage.output_tokens === 30, "output tokens were not preserved");
+  assert(usage.total_tokens === 150, "total tokens were not preserved");
+  assert(usage.consumed_credits === 240, "weighted credits were calculated incorrectly");
+  assert(usage.estimated === false, "valid provider usage must not be estimated");
+});
+
+Deno.test("managed usage charges the reservation when provider usage is incomplete", () => {
+  const usage = reconcileManagedUsage({
+    prompt_tokens: 120,
+    completion_tokens: 30,
+    total_tokens: 149,
+  }, 8_000, 4);
+  assert(usage.input_tokens === null, "invalid usage must not be recorded as actual");
+  assert(usage.output_tokens === null, "invalid usage must not be recorded as actual");
+  assert(usage.total_tokens === null, "invalid usage must not be recorded as actual");
+  assert(usage.consumed_credits === 8_000, "invalid usage must consume the reservation");
+  assert(usage.estimated === true, "fallback usage must be marked estimated");
 });

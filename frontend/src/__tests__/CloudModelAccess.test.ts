@@ -261,6 +261,54 @@ describe("cloud model access client", () => {
     });
   });
 
+  it("redeems one reset card idempotently and returns the increased allowance", async () => {
+    const { cloud, auth } = await loadCloudAccess();
+    auth.setAuthAccessToken("signed-user-token");
+    const cardId = "12345678-1234-4123-8123-123456789abc";
+    const snapshot = {
+      plan: {
+        id: "plus",
+        name: "Plus",
+        monthly_price_cny_fen: 3_900,
+        included_ai_credits: 3_000_000,
+        capability_set: "core-v1",
+      },
+      period: {
+        starts_at: "2026-08-01T00:00:00Z",
+        ends_at: "2026-09-01T00:00:00Z",
+      },
+      usage: {
+        reserved_ai_credits: 0,
+        consumed_ai_credits: 1_998_000,
+        remaining_ai_credits: 1_002_000,
+        request_count: 8,
+        input_tokens: 500,
+        output_tokens: 120,
+        total_tokens: 620,
+        estimated_request_count: 0,
+        credit_policy_version: 1,
+      },
+      recent_requests: [],
+      allowance_reset_cards: [],
+      daily_usage: [],
+    };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ data: snapshot }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(cloud.redeemManagedAllowanceResetCard(cardId)).resolves.toEqual(snapshot);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://cloud.example.test/functions/v1/model-gateway/allowance/reset",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer signed-user-token",
+          "Idempotency-Key": `allowance-reset:${cardId}`,
+        }),
+        body: JSON.stringify({ card_id: cardId }),
+      }),
+    );
+  });
+
   it("fails at its deadline when response headers arrive but the body stalls", async () => {
     vi.useFakeTimers();
     const { cloud, auth } = await loadCloudAccess();

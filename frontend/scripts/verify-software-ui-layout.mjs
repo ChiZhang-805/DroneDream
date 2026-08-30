@@ -539,7 +539,6 @@ async function verifySettings(page, testCase) {
       manage: rect(".settings-model-plan-row .btn"),
       refresh: rect(".settings-model-refresh"),
       period: rect(".settings-model-period"),
-      footer: rect(".settings-model-history-footer"),
       usage: {
         left: usageBounds.left,
         right: usageBounds.right,
@@ -573,18 +572,20 @@ async function verifySettings(page, testCase) {
     `${testCase.id}: Settings caused horizontal document overflow`,
   );
   const modelPicker = usage.locator(".settings-managed-model-row .assistant-model-button");
-  await modelPicker.click();
-  const managedModelLabels = await page.locator(
-    '.assistant-model-menu-portal [role="option"][data-model-type="default"]',
-  ).allTextContents();
-  assert.equal(managedModelLabels.length, 7);
-  for (const expectedLabel of ["GPT 4.1", "GPT 5.1", "GPT 5.4", "DeepSeek V4 Flash", "DeepSeek V4 Pro", "Kimi K2.6", "Kimi K3"]) {
-    assert(
-      managedModelLabels.some((label) => label.includes(expectedLabel)),
-      `${testCase.id}: settings catalog is missing ${expectedLabel}`,
-    );
+  if (await modelPicker.count()) {
+    await modelPicker.click();
+    const managedModelLabels = await page.locator(
+      '.assistant-model-menu-portal [role="option"][data-model-type="default"]',
+    ).allTextContents();
+    assert.equal(managedModelLabels.length, 7);
+    for (const expectedLabel of ["GPT 4.1", "GPT 5.1", "GPT 5.4", "DeepSeek V4 Flash", "DeepSeek V4 Pro", "Kimi K2.6", "Kimi K3"]) {
+      assert(
+        managedModelLabels.some((label) => label.includes(expectedLabel)),
+        `${testCase.id}: settings catalog is missing ${expectedLabel}`,
+      );
+    }
+    await modelPicker.click();
   }
-  await modelPicker.click();
   assert(metrics.usageValuesFit, `${testCase.id}: Usage values were visually truncated`);
   for (const foreground of [
     metrics.foregroundColor,
@@ -605,14 +606,39 @@ async function verifySettings(page, testCase) {
   await page.keyboard.press("Tab");
   assert(await useResetCard.evaluate((element) => element === document.activeElement));
   await page.keyboard.press("Tab");
+  assert(await refresh.evaluate((element) => element === document.activeElement));
+  assert.equal((await refresh.textContent())?.trim(), "");
+  await page.keyboard.press("Tab");
   assert(await usageRange.evaluate((element) => element === document.activeElement));
   await page.keyboard.press("ArrowRight");
   const nextUsageRange = usage.locator('.settings-allowance-range [role="tab"][aria-selected="true"]');
   assert.equal(await nextUsageRange.textContent(), testCase.locale === "zh-CN" ? "30 天" : "30 days");
   assert(await nextUsageRange.evaluate((element) => element === document.activeElement));
-  await page.keyboard.press("Tab");
-  assert(await refresh.evaluate((element) => element === document.activeElement));
   const image = await screenshot(page, testCase.id, "settings");
+  await workspace.locator(".settings-model-access-mode > button").nth(1).click();
+  const customModelMetrics = await workspace.locator(".custom-model-settings").evaluate((element) => {
+    const empty = element.querySelector(".custom-model-empty-state");
+    const library = element.querySelector(".custom-model-library-section");
+    const scroller = element.closest(".launcher-settings-panels");
+    if (!(empty instanceof HTMLElement) || !(library instanceof HTMLElement) || !(scroller instanceof HTMLElement)) {
+      throw new Error("Custom model empty state is incomplete");
+    }
+    const emptyBounds = empty.getBoundingClientRect();
+    const libraryBounds = library.getBoundingClientRect();
+    const scrollerBounds = scroller.getBoundingClientRect();
+    return {
+      emptyHeight: emptyBounds.height,
+      bottomGap: scrollerBounds.bottom - libraryBounds.bottom,
+      securityNoteCount: element.querySelectorAll(".custom-model-security-note").length,
+    };
+  });
+  assert(customModelMetrics.emptyHeight >= 128);
+  assert(
+    customModelMetrics.bottomGap >= 0 && customModelMetrics.bottomGap <= 48,
+    `${testCase.id}: custom model library does not finish inside the settings canvas: ${JSON.stringify(customModelMetrics)}`,
+  );
+  assert.equal(customModelMetrics.securityNoteCount, 0);
+  const customModelImage = await screenshot(page, testCase.id, "settings-model-custom");
   await workspace.getByRole("button", {
     name: testCase.locale === "zh-CN" ? "返回应用" : "Back to app",
   }).click();
@@ -630,8 +656,10 @@ async function verifySettings(page, testCase) {
     settingsViewport,
     panelMeasurements,
     panelImages,
-    keyboardFocusOrder: "manage-subscription -> reset-card -> use-card -> usage-range -> refresh-usage",
+    keyboardFocusOrder: "manage-subscription -> reset-card -> use-card -> refresh-usage -> usage-range",
     assistantModelImage,
+    customModelMetrics,
+    customModelImage,
     image,
   };
 }

@@ -362,6 +362,112 @@ describe("sidebar account menu", () => {
     }
   });
 
+  it("persists the curated memory controls and restores their effective state", async () => {
+    const enabledScopes = {
+      chat_preferences: true,
+      experiment_defaults: true,
+      device_vehicle: true,
+      metrics_constraints: true,
+      safety_approvals: true,
+      workflow_tools: true,
+      reports_delivery: true,
+      collaboration_organization: true,
+      files_artifacts: true,
+    } as const;
+    preferenceMock.preferences = {
+      interface_locale: "en",
+      appearance_mode: "system",
+      custom_accent: "#e52a57",
+      notifications: {},
+      memory_enabled: true,
+      memory_scopes: enabledScopes,
+      defaults: {},
+    };
+    preferenceMock.consent = {
+      memory_enabled: true,
+      read_namespaces: [
+        "account.shared",
+        "optimization.control_tuning",
+        "autonomy.mission",
+        "asset.qualification",
+        "experiment.simulation",
+        "workflow.cross_edition",
+        "validation.hardware",
+        "calibration.system",
+        "transfer.sim_to_real",
+        "transfer.real_to_sim",
+        "operations.field",
+      ],
+      write_namespaces: [
+        "account.shared",
+        "optimization.control_tuning",
+        "autonomy.mission",
+        "asset.qualification",
+        "experiment.simulation",
+        "workflow.cross_edition",
+        "validation.hardware",
+        "calibration.system",
+        "transfer.sim_to_real",
+        "transfer.real_to_sim",
+        "operations.field",
+      ],
+      memory_scopes: enabledScopes,
+    };
+    preferenceMock.savePreferences.mockImplementation(async (_boundary, preference) => {
+      preferenceMock.preferences = preference as ConsolePreferenceRecord;
+    });
+    preferenceMock.saveMemoryConsent.mockImplementation(async (_boundary, consent) => {
+      preferenceMock.consent = consent;
+    });
+
+    const first = renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Settings" }))
+      .getByRole("button", { name: "All settings" }));
+    const workspace = await screen.findByRole("region", { name: "Settings" });
+    fireEvent.click(within(workspace).getByRole("tab", { name: "Memory" }));
+
+    const chatPreferences = within(workspace).getByRole("checkbox", { name: "Chat preferences" });
+    await waitFor(() => expect(chatPreferences).toBeChecked());
+    expect(within(workspace).queryByRole("checkbox", { name: "Metrics and constraints" }))
+      .not.toBeInTheDocument();
+    expect(within(workspace).queryByRole("checkbox", { name: "Reports and delivery" }))
+      .not.toBeInTheDocument();
+    const simulationRow = within(workspace).getByText("Simulation")
+      .closest(".settings-memory-domain-consent");
+    expect(simulationRow).not.toBeNull();
+    const simulationRead = within(simulationRow as HTMLElement).getByRole("checkbox", { name: "Read" });
+    expect(simulationRead).toBeChecked();
+
+    fireEvent.click(chatPreferences);
+    fireEvent.click(simulationRead);
+    await waitFor(() => {
+      expect(preferenceMock.preferences?.memory_scopes.chat_preferences).toBe(false);
+      expect(preferenceMock.consent?.read_namespaces).not.toContain("experiment.simulation");
+    });
+    expect(preferenceMock.preferences?.memory_scopes.metrics_constraints).toBe(true);
+    expect(preferenceMock.consent?.write_namespaces).toContain("experiment.simulation");
+
+    first.unmount();
+    first.router.dispose();
+    const second = renderApp();
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const restoredQuickSettings = screen.getByRole("dialog", { name: "Settings" });
+    await waitFor(() => expect(within(restoredQuickSettings)
+      .getByRole("checkbox", { name: "Account memory" })).toBeEnabled());
+    fireEvent.click(within(restoredQuickSettings).getByRole("button", { name: "All settings" }));
+    const restoredWorkspace = await screen.findByRole("region", { name: "Settings" });
+    fireEvent.click(within(restoredWorkspace).getByRole("tab", { name: "Memory" }));
+    await waitFor(() => expect(within(restoredWorkspace)
+      .getByRole("checkbox", { name: "Chat preferences" })).not.toBeChecked());
+    const restoredSimulationRow = within(restoredWorkspace).getByText("Simulation")
+      .closest(".settings-memory-domain-consent");
+    expect(restoredSimulationRow).not.toBeNull();
+    expect(within(restoredSimulationRow as HTMLElement)
+      .getByRole("checkbox", { name: "Read" })).not.toBeChecked();
+    second.router.dispose();
+  });
+
   it("signs out from the compact account menu", async () => {
     const { router } = renderApp();
     const account = screen.getByRole("button", { name: "Account" });

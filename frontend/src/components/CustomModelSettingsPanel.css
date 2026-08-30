@@ -272,8 +272,7 @@
   height: 15px;
 }
 
-.custom-model-message,
-.custom-model-security-note {
+.custom-model-message {
   margin: 0;
   font-size: 0.76rem;
   line-height: 1.45;
@@ -285,10 +284,6 @@
 
 .custom-model-message-error {
   color: #c62d4f;
-}
-
-.custom-model-security-note {
-  color: var(--muted);
 }
 
 .custom-model-empty-state {

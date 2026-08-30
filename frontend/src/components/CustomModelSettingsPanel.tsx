@@ -459,15 +459,6 @@ export function CustomModelSettingsPanel({ locale, edition }: CustomModelSetting
            {saving ? (chinese ? "正在保存" : "Saving") : (chinese ? "保存" : "Save")}
         </button>
         </div>
-        <p className="custom-model-security-note">
-          {chinese
-            ? usesAgentCoreVault
-              ? "识别过程仅在本机完成。API Key 由 AGENT Core 加密保存到 Windows 当前用户凭证库，不写入浏览器存储、任务草稿或日志。"
-              : "识别过程仅在本机完成。API Key 不写入本地存储、任务草稿或日志。"
-            : usesAgentCoreVault
-              ? "Detection runs locally. AGENT Core encrypts the API key in the current Windows user's credential vault; it is never written to browser storage, task drafts, or logs."
-              : "Detection runs locally. The API key is never written to local storage, task drafts, or logs."}
-        </p>
       </section>
 
       <section

@@ -617,6 +617,13 @@ const MEMORY_DOMAIN_LABELS: Readonly<
   },
 };
 
+const USER_CONFIGURABLE_MEMORY_NAMESPACES = [
+  "optimization.control_tuning",
+  "autonomy.mission",
+  "experiment.simulation",
+  "workflow.cross_edition",
+] as const satisfies readonly ModelHarnessMemoryNamespace[];
+
 function AllowanceCardIcon({
   card,
 }: {
@@ -1022,7 +1029,6 @@ function SettingsDialog({
   const [allowanceResetMenuOpen, setAllowanceResetMenuOpen] = useState(false);
   const [allowanceResetState, setAllowanceResetState] =
     useState<"idle" | "redeeming" | "success" | "error">("idle");
-  const [allowanceResetConfirmationOpen, setAllowanceResetConfirmationOpen] = useState(false);
   const [allowanceResetMessage, setAllowanceResetMessage] = useState<string | null>(null);
   const customColorInputRef = useRef<HTMLInputElement>(null);
   const [experiencePreferenceDraft, setExperiencePreferenceDraft] =
@@ -1471,12 +1477,9 @@ function SettingsDialog({
   }, [allowanceResetCards, selectedAllowanceResetCardId]);
   const redeemAllowanceResetCard = async () => {
     if (!selectedAllowanceResetCardId || allowanceResetState === "redeeming") return;
-    if (!allowanceResetConfirmationOpen) {
-      setAllowanceResetConfirmationOpen(true);
-      return;
-    }
     setAllowanceResetState("redeeming");
     setAllowanceResetMessage(null);
+    setAllowanceResetMenuOpen(false);
     try {
       if (docsPreview) {
         const selectedCard = DOCS_PREVIEW_MANAGED_USAGE.allowance_reset_cards?.find(
@@ -1505,7 +1508,6 @@ function SettingsDialog({
         setManagedUsage(await redeemManagedAllowanceResetCard(selectedAllowanceResetCardId));
       }
       setAllowanceResetState("success");
-      setAllowanceResetConfirmationOpen(false);
       setAllowanceResetMessage(
         locale === "zh-CN" ? "额度卡已成功兑换。" : "The allowance card was redeemed.",
       );
@@ -2128,12 +2130,8 @@ function SettingsDialog({
                 ["chat_preferences", Sparkles, settingsCopy.memoryScopes[0]],
                 ["experiment_defaults", SlidersHorizontal, settingsCopy.memoryScopes[1]],
                 ["device_vehicle", RadioTower, settingsCopy.memoryScopes[2]],
-                ["metrics_constraints", Gauge, settingsCopy.memoryScopes[3]],
                 ["safety_approvals", ShieldCheck, settingsCopy.memoryScopes[4]],
                 ["workflow_tools", BotMessageSquare, settingsCopy.memoryScopes[5]],
-                ["reports_delivery", Save, settingsCopy.memoryScopes[6]],
-                ["collaboration_organization", CircleUserRound, settingsCopy.memoryScopes[7]],
-                ["files_artifacts", ImagePlus, settingsCopy.memoryScopes[8]],
               ] as const).map(([scope, ScopeIcon, label]) => (
                 <SettingsToggle
                   key={scope}
@@ -2148,7 +2146,7 @@ function SettingsDialog({
               ))}
             </div>
             <div className="settings-memory-scope-grid settings-memory-domain-grid" aria-label={t("settings.memory.domainConsent")}>
-              {MODEL_HARNESS_MEMORY_NAMESPACES.map((namespace) => {
+              {USER_CONFIGURABLE_MEMORY_NAMESPACES.map((namespace) => {
                 const readable = experiencePreferenceDraft.read_namespaces.includes(namespace);
                 const writable = experiencePreferenceDraft.write_namespaces.includes(namespace);
                 return (
@@ -2503,7 +2501,6 @@ function SettingsDialog({
                               aria-selected={card.id === selectedAllowanceResetCardId}
                               onClick={() => {
                                 setSelectedAllowanceResetCardId(card.id);
-                                setAllowanceResetConfirmationOpen(false);
                                 setAllowanceResetMenuOpen(false);
                               }}
                             >
@@ -2525,23 +2522,14 @@ function SettingsDialog({
                         type="button"
                         className="btn settings-model-reset-action"
                         disabled={!selectedAllowanceResetCardId || allowanceResetState === "redeeming"}
+                        aria-label={allowanceResetState === "redeeming" ? allowanceResetCopy.using : allowanceResetCopy.use}
+                        title={allowanceResetState === "redeeming" ? allowanceResetCopy.using : allowanceResetCopy.use}
                         onClick={() => void redeemAllowanceResetCard()}
                       >
                         {allowanceResetState === "redeeming"
-                          ? allowanceResetCopy.using
-                          : allowanceResetConfirmationOpen
-                            ? allowanceResetCopy.confirm
-                            : allowanceResetCopy.use}
+                          ? <LoaderCircle className="is-spinning" aria-hidden="true" />
+                          : <TicketCheck aria-hidden="true" />}
                       </button>
-                      {allowanceResetConfirmationOpen ? (
-                        <button
-                          type="button"
-                          className="btn settings-model-reset-cancel"
-                          onClick={() => setAllowanceResetConfirmationOpen(false)}
-                        >
-                          {allowanceResetCopy.cancel}
-                        </button>
-                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -2581,6 +2569,21 @@ function SettingsDialog({
             <section className="settings-model-section settings-model-history-section" aria-labelledby="settings-model-history-title">
               <header className="settings-model-section-heading">
                 <h3 id="settings-model-history-title">{t("settings.model.usageHistory")}</h3>
+                {auth.account || docsPreview ? (
+                  <button
+                    type="button"
+                    className="settings-model-refresh"
+                    disabled={managedUsageState === "loading"}
+                    aria-label={allowanceResetCopy.refresh}
+                    title={allowanceResetCopy.refresh}
+                    onClick={() => void refreshManagedUsage()}
+                  >
+                    <RefreshCcw
+                      className={managedUsageState === "loading" ? "is-spinning" : undefined}
+                      aria-hidden="true"
+                    />
+                  </button>
+                ) : null}
               </header>
               {managedUsage ? (
                 <>
@@ -2613,18 +2616,6 @@ function SettingsDialog({
                       : managedUsageError ?? t("settings.model.usageUnavailable")}
                 </p>
               )}
-              <div className="settings-model-history-footer">
-                {auth.account || docsPreview ? (
-                  <button
-                    type="button"
-                    className="btn settings-model-refresh"
-                    disabled={managedUsageState === "loading"}
-                    onClick={() => void refreshManagedUsage()}
-                  >
-                    {allowanceResetCopy.refresh}
-                  </button>
-                ) : null}
-              </div>
             </section>
           </div>
         ) : (

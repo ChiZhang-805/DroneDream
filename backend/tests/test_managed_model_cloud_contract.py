@@ -7,6 +7,9 @@ MIGRATION = (
 SUPABASE_CONFIG = REPOSITORY_ROOT / "supabase" / "config.toml"
 MODEL_GATEWAY = REPOSITORY_ROOT / "supabase" / "functions" / "model-gateway" / "index.ts"
 BILLING_CHECKOUT = REPOSITORY_ROOT / "supabase" / "functions" / "billing-checkout" / "index.ts"
+AGENT_CORE_PLANNING = (
+    REPOSITORY_ROOT / "frontend" / "src" / "features" / "autonomy" / "agentCorePlanning.ts"
+)
 
 
 def _text(path: Path) -> str:
@@ -80,6 +83,23 @@ def test_gateway_uses_hashed_scoped_grants_and_atomic_reservations() -> None:
         .split("throw new GatewayError", maxsplit=1)[0]
     )
     assert "platform_llm_api_key" not in migration.lower()
+
+
+def test_agent_core_platform_requests_remain_inside_the_metered_gateway() -> None:
+    gateway = _text(MODEL_GATEWAY)
+    planning = _text(AGENT_CORE_PLANNING)
+
+    assert "await issueManagedModelGrant(" in planning
+    assert planning.count('"assistant",') >= 2
+    assert "model_grant: grant.grant" in planning
+    assert "gateway_base_url: modelGatewayBaseUrl(grant)" in planning
+    assert planning.count("gateway_base_url: modelGatewayBaseUrl(grant)") >= 2
+    assert 'adminClient().rpc(\n    "model_usage_reserve"' in gateway
+    assert 'adminClient().rpc("model_usage_settle"' in gateway
+    assert "p_input_tokens: usage.input_tokens" in gateway
+    assert "p_output_tokens: usage.output_tokens" in gateway
+    assert "p_total_tokens: usage.total_tokens" in gateway
+    assert "p_usage_estimated: usage.estimated" in gateway
 
 
 def test_non_jwt_edge_routes_implement_explicit_auth_and_payment_verification() -> None:

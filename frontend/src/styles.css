@@ -22154,12 +22154,39 @@ body {
 
 .quick-settings-memory .settings-toggle-row {
   min-height: 2.85rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   padding: 0.35rem 0.15rem;
 }
 
-.quick-settings-model .assistant-model-picker,
-.quick-settings-model .assistant-model-button {
-  width: 100%;
+.quick-settings-memory .settings-toggle-row > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.quick-settings-memory .settings-toggle-row > span svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  flex: 0 0 1.2rem;
+}
+
+.quick-settings-memory .settings-toggle-row > i {
+  align-self: center;
+}
+
+.app-shell .quick-settings-model .assistant-model-picker {
+  width: fit-content;
+  max-width: 100%;
+  justify-self: end;
+}
+
+.app-shell .quick-settings-model .assistant-model-button {
+  width: fit-content;
+  max-width: 100%;
 }
 
 .quick-settings-model .assistant-model-button {
@@ -23308,6 +23335,184 @@ body {
 .app-shell .settings-workspace-content .settings-model-reset-row,
 .app-shell .settings-workspace-content .settings-model-usage-footer {
   padding-inline: 0;
+}
+
+/* Settings detail polish: preserve the single-screen composition while giving
+   each active surface an even rhythm and keeping compact controls content-led. */
+.settings-workspace-content [data-settings-panel="model"]:not([hidden]) {
+  box-sizing: border-box;
+  min-height: 100%;
+  padding-top: 0.72rem;
+}
+
+.settings-workspace-content .settings-model-history-section .settings-model-section-heading {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-workspace-content .settings-model-history-section .settings-model-refresh {
+  display: inline-grid;
+  width: 1.9rem;
+  min-width: 1.9rem;
+  max-width: 1.9rem;
+  height: 1.9rem;
+  min-height: 1.9rem;
+  place-items: center;
+  padding: 0;
+  color: var(--text-muted);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.settings-workspace-content .settings-model-history-section .settings-model-refresh:hover,
+.settings-workspace-content .settings-model-history-section .settings-model-refresh:focus-visible {
+  color: var(--dd-brand-start);
+}
+
+.settings-workspace-content .settings-model-history-section .settings-model-refresh:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+.settings-workspace-content .settings-model-history-section .settings-model-refresh svg {
+  width: 1.12rem;
+  height: 1.12rem;
+}
+
+.app-shell .settings-workspace-content .settings-model-reset-row {
+  background: transparent;
+}
+
+.settings-workspace-content .settings-model-reset-controls {
+  width: auto;
+  max-width: 100%;
+  grid-template-columns: max-content 2.25rem;
+  justify-content: end;
+}
+
+.settings-workspace-content .settings-reset-card-picker {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.settings-workspace-content .settings-reset-card-trigger {
+  width: fit-content;
+  max-width: min(38rem, 100%);
+}
+
+.settings-workspace-content .settings-reset-card-trigger-copy {
+  flex: 0 1 auto;
+}
+
+.settings-workspace-content .settings-reset-card-menu {
+  width: max-content;
+  min-width: 100%;
+  max-width: min(38rem, calc(100vw - 4rem));
+}
+
+.settings-workspace-content .settings-model-reset-actions {
+  min-width: 2.25rem;
+}
+
+.settings-workspace-content .settings-model-reset-action {
+  display: inline-grid;
+  width: 2.25rem;
+  min-width: 2.25rem;
+  max-width: 2.25rem;
+  height: 2.25rem;
+  min-height: 2.25rem;
+  place-items: center;
+  padding: 0;
+  border-radius: 0.58rem;
+}
+
+.settings-workspace-content .settings-model-reset-action svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.settings-workspace-content .settings-memory-domain-consent {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.72rem;
+}
+
+.settings-workspace-content .settings-memory-domain-consent > span {
+  width: 10.5rem;
+  flex: 0 0 10.5rem;
+}
+
+.settings-workspace-content .settings-memory-domain-consent .settings-toggle-row {
+  width: max-content;
+  gap: 0.34rem;
+  padding-inline: 0;
+}
+
+.settings-workspace-content .settings-notification-card,
+.settings-workspace-content .settings-notification-card .settings-toggle-row {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.settings-workspace-content .settings-general-card {
+  padding-block: 0.82rem;
+}
+
+.settings-workspace-content .settings-notification-card {
+  grid-template-rows: repeat(8, minmax(3.2rem, 1fr));
+}
+
+.settings-workspace-content .settings-notification-card .settings-toggle-row {
+  min-height: 3.2rem;
+  padding-block: 0.62rem;
+}
+
+.settings-workspace-content .settings-model-panel-byok {
+  height: 100%;
+  min-height: 100%;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.settings-workspace-content .settings-model-panel-byok > .custom-model-settings {
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: auto minmax(10rem, 1fr);
+}
+
+.settings-workspace-content .settings-model-panel-byok .custom-model-library-section {
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.settings-workspace-content .settings-model-panel-byok .custom-model-empty-state {
+  height: 100%;
+  min-height: 8rem;
+  box-sizing: border-box;
+}
+
+@media (max-width: 760px) {
+  .settings-workspace-content .settings-model-reset-row,
+  .settings-workspace-content .settings-model-reset-controls {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .settings-workspace-content .settings-reset-card-picker,
+  .settings-workspace-content .settings-reset-card-trigger {
+    width: 100%;
+  }
+
+  .settings-workspace-content .settings-memory-domain-consent {
+    gap: 0.5rem;
+  }
+
+  .settings-workspace-content .settings-memory-domain-consent > span {
+    width: 8rem;
+    flex-basis: 8rem;
+  }
 }
 
 /* August 28: keep the default-model surface compact and visually aligned.
