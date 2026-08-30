@@ -3072,7 +3072,9 @@ function normalizedPlanName(value: string | null | undefined): "Free" | "Plus" |
 }
 
 function AccountPlanLabel({ authenticated }: { authenticated: boolean }) {
-  const [plan, setPlan] = useState<"Free" | "Plus" | "Pro">("Free");
+  const [plan, setPlan] = useState<"Free" | "Plus" | "Pro" | null>(
+    authenticated ? null : "Free",
+  );
 
   useEffect(() => {
     if (!authenticated) {
@@ -3085,14 +3087,14 @@ function AccountPlanLabel({ authenticated }: { authenticated: boolean }) {
         if (active) setPlan(normalizedPlanName(snapshot.plan.name));
       })
       .catch(() => {
-        if (active) setPlan("Free");
+        if (active) setPlan(null);
       });
     return () => {
       active = false;
     };
   }, [authenticated]);
 
-  return <>{plan}</>;
+  return <>{plan ?? "—"}</>;
 }
 
 function AccountMenuPopover({

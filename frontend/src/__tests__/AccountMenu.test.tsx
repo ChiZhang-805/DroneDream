@@ -158,6 +158,17 @@ describe("sidebar account menu", () => {
     window.localStorage.clear();
   });
 
+  it("does not mislabel an authenticated account as Free when usage is unavailable", async () => {
+    usageMock.get.mockRejectedValueOnce(new Error("usage unavailable"));
+    const { router } = renderApp();
+
+    const accountButton = screen.getByRole("button", { name: "Account" });
+    await waitFor(() => expect(accountButton).toHaveTextContent("—"));
+    expect(accountButton).not.toHaveTextContent("Free");
+
+    router.dispose();
+  });
+
   it("shows the authoritative remaining Token percentage and opens the Models workspace", async () => {
     const { router } = renderApp();
     fireEvent.click(screen.getByRole("button", { name: "Workspace count 0" }));
