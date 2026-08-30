@@ -1309,6 +1309,10 @@ export function setAgentCorePlugin(pluginId: string, enabled: boolean): Promise<
   return requestJson(`/v1/plugins/${encodeURIComponent(pluginId)}/${enabled ? "enable" : "disable"}`, { method: "POST" });
 }
 
+export function applyAgentCoreHarnessProfile(pluginId: string): Promise<unknown> {
+  return requestJson(`/v1/plugins/${encodeURIComponent(pluginId)}/apply-profile`, { method: "POST" });
+}
+
 export function healthcheckAgentCorePlugin(pluginId: string): Promise<unknown> {
   return requestJson(`/v1/plugins/${encodeURIComponent(pluginId)}/healthcheck`, { method: "POST" });
 }

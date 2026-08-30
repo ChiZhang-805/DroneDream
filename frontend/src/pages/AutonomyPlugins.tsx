@@ -11,8 +11,9 @@ import { NavLink } from "react-router-dom";
 
 import {
   AgentCoreRequestError, AgentCoreUnavailableError, editAgentCoreHarness,
-  getAgentCoreHarnessCatalog, getAgentCoreHarnessState, importAgentCorePlugin,
-  listAgentCorePlugins, uninstallAgentCorePlugin, type AgentCoreHarnessCatalog,
+  applyAgentCoreHarnessProfile, getAgentCoreHarnessCatalog, getAgentCoreHarnessState,
+  importAgentCorePlugin, listAgentCorePlugins, setAgentCorePlugin,
+  uninstallAgentCorePlugin, type AgentCoreHarnessCatalog,
   type AgentCoreHarnessOperation, type AgentCoreHarnessState, type AgentCorePluginEntry,
 } from "../features/autonomy/agentCore";
 import {
@@ -41,6 +42,11 @@ type PieceDetails = {
 };
 type ContextMenuState = { piece: PieceSelection; x: number; y: number; submenu: boolean; submenuLeft: boolean };
 type PieceOverride = Pick<PieceDetails, "title" | "description" | "category" | "color">;
+type ReplacementCandidate = {
+  key: string; title: string; description: string; category: string; color: string;
+  groupKey: string; groupLabel: string; pluginId?: string;
+  action?: "enable" | "apply-profile"; previewPiece?: PieceDetails;
+};
 
 const GROUP_COLORS = ["#ee466d", "#765ee8", "#18a6cf", "#26b985", "#f19a38"];
 const CONNECTOR_NONE: PuzzleConnector = { profile: "round", sign: 0 };
@@ -94,6 +100,13 @@ function englishIdentifier(value: string): string {
 function pluginName(chinese: boolean, plugin: AgentCorePluginEntry): string {
   if (chinese || !hasCjk(plugin.name)) return plugin.name;
   return englishIdentifier(plugin.plugin_id.replace(/^dronedream\./u, ""));
+}
+function harnessPluginName(
+  chinese: boolean,
+  plugin: AgentCoreHarnessCatalog["plugins"][number],
+): string {
+  if (chinese || !hasCjk(plugin.name)) return plugin.name;
+  return englishIdentifier(plugin.plugin_id.replace(/^harness\./u, ""));
 }
 function errorText(error: unknown, chinese: boolean): string {
   if (error instanceof AgentCoreUnavailableError) return chinese
@@ -244,12 +257,42 @@ export function AutonomyPlugins() {
   }, [interfaceLocale, plugins, query]);
   const replacementCandidates = useMemo(() => {
     if (!selectedPiece) return [];
-    const candidates = selectedPiece.level === 1
-      ? groups.map((group) => findPiece(groups, { level: 1, groupId: group.id }))
-      : groups.flatMap((group) => group.atoms.map((atom) => findPiece(groups, { level: 2, groupId: group.id, atomId: atom.id })));
-    return candidates.filter((candidate): candidate is PieceDetails => Boolean(candidate && candidate.key !== selectedPiece.key))
-      .sort((left, right) => Number(right.category === selectedPiece.category) - Number(left.category === selectedPiece.category) || left.title.localeCompare(right.title, interfaceLocale));
-  }, [groups, interfaceLocale, selectedPiece]);
+    if (!catalog) {
+      const candidates = selectedPiece.level === 1
+        ? groups.map((group) => findPiece(groups, { level: 1, groupId: group.id }))
+        : groups.flatMap((group) => group.atoms.map((atom) => findPiece(groups, { level: 2, groupId: group.id, atomId: atom.id })));
+      return candidates.filter((candidate): candidate is PieceDetails => Boolean(candidate && candidate.key !== selectedPiece.key))
+        .map((candidate): ReplacementCandidate => ({
+          key: candidate.key, title: candidate.title, description: candidate.description,
+          category: candidate.category, color: candidate.color,
+          groupKey: candidate.category, groupLabel: categoryLabel(candidate.category, chinese),
+          previewPiece: candidate,
+        }))
+        .sort((left, right) => Number(right.category === selectedPiece.category) - Number(left.category === selectedPiece.category)
+          || left.title.localeCompare(right.title, interfaceLocale));
+    }
+
+    const ownerItemId = selectedPiece.level === 2 ? selectedPiece.selection.atomId : undefined;
+    return catalog.plugins
+      .filter((plugin) => !plugin.enabled && plugin.activation_mode === "single")
+      .filter((plugin) => selectedPiece.level === 1
+        ? plugin.granularity === "large"
+        : plugin.granularity === "small" && Boolean(ownerItemId && plugin.owner_item_ids.includes(ownerItemId)))
+      .map((plugin): ReplacementCandidate => {
+        const slotItem = catalog.composition_items.find((item) => item.level === 3
+          && item.parent_item_id === ownerItemId && item.plugin_slot_ids.includes(plugin.slot_id));
+        const category = slotItem?.category_id ?? selectedPiece.category;
+        return {
+          key: `plugin:${plugin.plugin_id}`, pluginId: plugin.plugin_id,
+          action: plugin.slot_id === "harness.profile" ? "apply-profile" : "enable",
+          title: harnessPluginName(chinese, plugin), description: plugin.description,
+          category, color: harnessCategoryColors[category] ?? selectedPiece.color,
+          groupKey: plugin.slot_id, groupLabel: plugin.slot_label,
+        };
+      })
+      .sort((left, right) => left.groupLabel.localeCompare(right.groupLabel, interfaceLocale)
+        || left.title.localeCompare(right.title, interfaceLocale));
+  }, [catalog, chinese, groups, interfaceLocale, selectedPiece]);
 
   useEffect(() => {
     if (!contextMenu) return undefined;
@@ -337,21 +380,22 @@ export function AutonomyPlugins() {
     } catch (reason) { setError(errorText(reason, chinese)); await refresh(); }
     finally { setBusy(null); }
   };
-  const replacePiece = async (source: PieceDetails, target: PieceDetails) => {
+  const replacePiece = async (source: PieceDetails, target: ReplacementCandidate) => {
     setContextMenu(null);
-    if (!harness || !catalog || !source.nodeIds.length || source.nodeIds.length !== target.nodeIds.length) {
-      setPieceOverrides((values) => ({ ...values, [source.key]: { title: target.title, description: target.description, category: target.category, color: target.color } }));
+    if (target.previewPiece) {
+      setPieceOverrides((values) => ({ ...values, [source.key]: {
+        title: target.title, description: target.description, category: target.category, color: target.color,
+      } }));
       return;
     }
-    const targetDescriptors = target.nodeIds.map((nodeId) => catalog.node_descriptors.find((descriptor) => descriptor.descriptor_id === nodeId));
-    if (targetDescriptors.some((descriptor) => !descriptor)) { setError(chinese ? "所选同级模块当前没有可用的后端描述符。" : "The selected same-level piece has no available backend descriptor."); return; }
+    if (!target.pluginId || !target.action) {
+      setError(chinese ? "该替换项当前没有可用的后端插件。" : "This replacement has no available backend plug-in.");
+      return;
+    }
     setBusy(source.key); setError(null);
     try {
-      let revision = harness.current.revision;
-      for (let index = 0; index < source.nodeIds.length; index += 1) {
-        const result = await editAgentCoreHarness(operation(revision, "replace_node", { node_id: source.nodeIds[index], descriptor_id: targetDescriptors[index]?.descriptor_id }));
-        revision = result.revision.revision;
-      }
+      if (target.action === "apply-profile") await applyAgentCoreHarnessProfile(target.pluginId);
+      else await setAgentCorePlugin(target.pluginId, true);
       setPieceOverrides({}); setHiddenPieceKeys(new Set()); await refresh();
     } catch (reason) { setError(errorText(reason, chinese)); await refresh(); }
     finally { setBusy(null); }
@@ -433,7 +477,7 @@ export function AutonomyPlugins() {
       onClick={(event) => event.stopPropagation()} onKeyDown={menuKeyDown}>
       <button role="menuitem" type="button" onClick={() => { setDetailsSelection(selectedPiece.selection); setContextMenu(null); }}><Eye aria-hidden="true" /><span>{chinese ? "查看详情…" : "View details…"}</span></button>
       <button role="menuitem" type="button" data-submenu="replace" aria-haspopup="menu" aria-expanded={contextMenu.submenu}
-        disabled={!selectedPiece.replaceable || !replacementCandidates.length}
+        disabled={!replacementCandidates.length || (!catalog && !selectedPiece.replaceable)}
         onPointerEnter={() => setContextMenu((value) => value ? { ...value, submenu: true } : null)}
         onClick={() => setContextMenu((value) => value ? { ...value, submenu: true } : null)}>
         <Blocks aria-hidden="true" /><span>{chinese ? "替换" : "Replace"}</span><ChevronRight className="is-trailing" aria-hidden="true" /></button>
@@ -443,7 +487,7 @@ export function AutonomyPlugins() {
         onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "Escape") { event.preventDefault(); event.stopPropagation(); setContextMenu((value) => value ? { ...value, submenu: false } : null); menuRef.current?.querySelector<HTMLElement>("[data-submenu='replace']")?.focus(); } }}>
         <header>{chinese ? `仅显示 ${selectedPiece.level} 级拼图` : `Level ${selectedPiece.level} pieces only`}</header>
         {replacementCandidates.map((candidate, index) => <div key={candidate.key} className="agent-piece-submenu-row">
-          {(index === 0 || replacementCandidates[index - 1]?.category !== candidate.category) ? <small role="presentation">{categoryLabel(candidate.category, chinese)}</small> : null}
+          {(index === 0 || replacementCandidates[index - 1]?.groupKey !== candidate.groupKey) ? <small role="presentation">{candidate.groupLabel}</small> : null}
           <button role="menuitem" type="button" onClick={() => void replacePiece(selectedPiece, candidate)}>
             <span style={{ "--candidate-color": candidate.color } as CSSProperties} /><strong>{candidate.title}</strong></button>
         </div>)}
