@@ -492,9 +492,7 @@ async function handleGrant(request: Request): Promise<Response> {
   if (error || !isRecord(data)) {
     throw error ?? new Error("MODEL_GRANT_ISSUE_FAILED");
   }
-  const requestUrl = new URL(request.url);
-  requestUrl.pathname = requestUrl.pathname
-    .replace(/\/grants\/?$/u, "/chat/completions");
+  const gatewayBaseUrl = publicModelGatewayBaseUrl(requiredEnv("SUPABASE_URL"));
   return jsonResponse(request, 201, {
     data: {
       access_mode: "platform",
@@ -502,14 +500,21 @@ async function handleGrant(request: Request): Promise<Response> {
       scope,
       expires_at: data.expires_at,
       max_calls: data.max_calls,
-      gateway_base_url: requestUrl.toString().replace(
-        /\/chat\/completions$/u,
-        "",
-      ),
+      gateway_base_url: gatewayBaseUrl,
       managed_model: model,
       usage: await usageSnapshot(user.id),
     },
   });
+}
+
+export function publicModelGatewayBaseUrl(supabaseUrl: string): string {
+  const publicUrl = new URL(supabaseUrl);
+  publicUrl.pathname = `${
+    publicUrl.pathname.replace(/\/+$/u, "")
+  }/functions/v1/model-gateway`;
+  publicUrl.search = "";
+  publicUrl.hash = "";
+  return publicUrl.toString().replace(/\/+$/u, "");
 }
 
 function validateMessages(value: unknown): JsonRecord[] {
