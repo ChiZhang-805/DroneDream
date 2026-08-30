@@ -14,3 +14,12 @@ verify_jwt = false
 
 [functions.billing-checkout]
 verify_jwt = false
+
+[functions.admin-console]
+verify_jwt = false
+
+[functions.organization-console]
+verify_jwt = false
+
+[functions.product-events]
+verify_jwt = false
