@@ -26,14 +26,11 @@ use uuid::Uuid;
 use crate::{browser_auth_audit, browser_auth_vault};
 
 const AUTH_RESULT_TEMPLATE: &str = include_str!("../browser-auth.html");
-const UNIVERSAL_BRAND_LOCKUP: &[u8] =
-    include_bytes!("../../../brand/icons/universal-lockup.png");
+const UNIVERSAL_BRAND_LOCKUP: &[u8] = include_bytes!("../../../brand/icons/universal-lockup.png");
 const SIM_BRAND_LOCKUP: &[u8] = include_bytes!("../../../brand/icons/sim-lockup.png");
 const LAB_BRAND_LOCKUP: &[u8] = include_bytes!("../../../brand/icons/lab-lockup.png");
-const FIELD_BRAND_LOCKUP: &[u8] =
-    include_bytes!("../../../brand/icons/field-lockup.png");
-const AUTONOMY_BRAND_LOCKUP: &[u8] =
-    include_bytes!("../../../brand/icons/agent-lockup.png");
+const FIELD_BRAND_LOCKUP: &[u8] = include_bytes!("../../../brand/icons/field-lockup.png");
+const AUTONOMY_BRAND_LOCKUP: &[u8] = include_bytes!("../../../brand/icons/agent-lockup.png");
 const OAUTH_AUTHORIZE_URL: &str =
     "https://yggabfynndpzymlqvnim.supabase.co/auth/v1/oauth/authorize";
 const OAUTH_TOKEN_URL: &str = "https://yggabfynndpzymlqvnim.supabase.co/auth/v1/oauth/token";

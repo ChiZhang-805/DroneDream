@@ -243,7 +243,7 @@ updates = {
     'PX4_ULOG_PATH': '',
     'PX4_ENABLE_OFFBOARD_EXECUTOR': 'true',
     'PX4_OFFBOARD_EXECUTOR_COMMAND': f'"{px4}/.venv/bin/python {repo}/scripts/simulators/px4_offboard_track_executor.py"',
-    'PX4_OFFBOARD_CONNECTION': 'udp://:14540',
+    'PX4_OFFBOARD_CONNECTION': 'udpin://0.0.0.0:14540',
     'PX4_OFFBOARD_SETPOINT_RATE_HZ': '10',
     'PX4_OFFBOARD_TAKEOFF_TIMEOUT_SECONDS': '30',
     'PX4_OFFBOARD_TRACK_TIMEOUT_SECONDS': '120',

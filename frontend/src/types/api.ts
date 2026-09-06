@@ -1101,7 +1101,6 @@ export interface ExperimentStudyConfig {
     estimated_trials: number;
   };
   compatibility: {
-    legacy_job_api: boolean;
     unmapped_parameters: string[];
   };
 }

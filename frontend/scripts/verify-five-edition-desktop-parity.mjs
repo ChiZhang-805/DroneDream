@@ -30,7 +30,6 @@ const autonomyRoutes = [
   ["autonomy-plugins", "/autonomy/plugins"],
   ["autonomy-harness", "/autonomy/plugins/harness"],
   ["autonomy-live", "/autonomy/live"],
-  ["autonomy-evidence", "/autonomy/evidence"],
 ];
 
 const shellStateRoutes = [

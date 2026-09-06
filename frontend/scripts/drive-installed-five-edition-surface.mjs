@@ -19,7 +19,6 @@ const autonomySurfaces = Object.freeze([
   { id: "autonomy-plugins", route: "/autonomy/plugins" },
   { id: "autonomy-harness", route: "/autonomy/plugins/harness" },
   { id: "autonomy-live", route: "/autonomy/live", settleMilliseconds: 1_400 },
-  { id: "autonomy-evidence", route: "/autonomy/evidence" },
 ]);
 
 const launcherSurface = Object.freeze({

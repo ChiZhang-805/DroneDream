@@ -60,7 +60,7 @@ describe("workspace account entry", () => {
 
     const accountButton = screen.getByRole("button", { name: "Account" });
     expect(accountButton).toHaveTextContent("Local user");
-    expect(accountButton).toHaveTextContent("Free");
+    expect(accountButton).toHaveTextContent("Local");
     fireEvent.click(accountButton);
 
     const dialog = screen.getByRole("dialog", { name: "Local workspace" });

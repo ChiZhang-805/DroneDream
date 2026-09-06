@@ -11,11 +11,29 @@ SCRIPT = ROOT / "frontend" / "scripts" / "verify-edition-build-boundaries.mjs"
 COMMON_CHUNKS = (
     "AutonomyPlatform",
     "Dashboard",
-    "ExperimentAssistant",
     "FixedScenarios",
     "History",
     "NewJobRoute",
 )
+VALID_EDITION_CHUNKS = {
+    "universal": (
+        "ExperimentAssistant",
+        "LabSetup",
+        "LabHardwareWorkspace",
+        "LabValidationWorkspace",
+        "FieldApp",
+        "UniversalFieldApp",
+    ),
+    "sim": ("ExperimentAssistant",),
+    "lab": (
+        "ExperimentAssistant",
+        "LabSetup",
+        "LabHardwareWorkspace",
+        "LabValidationWorkspace",
+    ),
+    "field": ("ExperimentAssistant", "UniversalFieldApp"),
+    "autonomy": (),
+}
 
 
 def _write_dist(root: Path, chunks: tuple[str, ...]) -> None:
@@ -34,63 +52,28 @@ def _verify(edition: str, dist: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
-@pytest.mark.parametrize("edition", ["universal", "autonomy"])
-def test_vehicle_studio_is_required_in_its_two_host_editions(
+@pytest.mark.parametrize("edition", tuple(VALID_EDITION_CHUNKS))
+def test_current_edition_boundaries_accept_only_current_chunks(
     tmp_path: Path,
     edition: str,
 ) -> None:
-    required = (
-        "LabSetup",
-        "LabHardwareWorkspace",
-        "LabValidationWorkspace",
-        "FieldApp",
-        "UniversalFieldApp",
-        "VehicleStudio",
-    ) if edition == "universal" else ("VehicleStudio",)
-    _write_dist(tmp_path, required)
+    _write_dist(tmp_path, VALID_EDITION_CHUNKS[edition])
 
     result = _verify(edition, tmp_path)
 
     assert result.returncode == 0, result.stderr
     receipt = json.loads(result.stdout)
-    assert receipt["vehicleStudioHosts"] == ["universal", "autonomy"]
-    assert receipt["vehicleStudioBoundarySatisfied"] is True
+    assert receipt["edition"] == edition
+    assert receipt["builtInVehicleStudioAbsent"] is True
+    assert receipt["result"] == "pass"
 
 
-@pytest.mark.parametrize("edition", ["universal", "autonomy"])
-def test_vehicle_studio_host_build_fails_when_chunk_is_missing(
+@pytest.mark.parametrize("edition", tuple(VALID_EDITION_CHUNKS))
+def test_retired_vehicle_studio_is_forbidden_in_every_edition(
     tmp_path: Path,
     edition: str,
 ) -> None:
-    required = (
-        "LabSetup",
-        "LabHardwareWorkspace",
-        "LabValidationWorkspace",
-        "FieldApp",
-        "UniversalFieldApp",
-    ) if edition == "universal" else ()
-    _write_dist(tmp_path, required)
-
-    result = _verify(edition, tmp_path)
-
-    assert result.returncode != 0
-    assert f"{edition} is missing its VehicleStudio chunk" in result.stderr
-
-
-@pytest.mark.parametrize(
-    ("edition", "required"),
-    [
-        ("sim", ()),
-        ("lab", ("LabSetup", "LabHardwareWorkspace", "LabValidationWorkspace")),
-        ("field", ("UniversalFieldApp",)),
-    ],
-)
-def test_vehicle_studio_is_forbidden_in_non_host_editions(
-    tmp_path: Path,
-    edition: str,
-    required: tuple[str, ...],
-) -> None:
-    _write_dist(tmp_path, (*required, "VehicleStudio"))
+    _write_dist(tmp_path, (*VALID_EDITION_CHUNKS[edition], "VehicleStudio"))
 
     result = _verify(edition, tmp_path)
 
@@ -98,10 +81,37 @@ def test_vehicle_studio_is_forbidden_in_non_host_editions(
     assert f"{edition} contains foreign VehicleStudio code" in result.stderr
 
 
-def test_autonomy_rejects_uncompiled_universal_field_workspace(tmp_path: Path) -> None:
-    _write_dist(tmp_path, ("UniversalFieldApp", "VehicleStudio"))
+@pytest.mark.parametrize("foreign_chunk", ("ExperimentAssistant", "UniversalFieldApp"))
+def test_autonomy_rejects_routes_folded_into_the_current_agent_workspace(
+    tmp_path: Path,
+    foreign_chunk: str,
+) -> None:
+    _write_dist(tmp_path, (foreign_chunk,))
 
     result = _verify("autonomy", tmp_path)
 
     assert result.returncode != 0
-    assert "autonomy contains foreign UniversalFieldApp code" in result.stderr
+    assert f"autonomy contains foreign {foreign_chunk} code" in result.stderr
+
+
+@pytest.mark.parametrize(
+    ("edition", "missing_chunk"),
+    (
+        ("universal", "LabSetup"),
+        ("lab", "LabHardwareWorkspace"),
+        ("field", "UniversalFieldApp"),
+        ("sim", "ExperimentAssistant"),
+    ),
+)
+def test_edition_specific_required_chunks_fail_closed(
+    tmp_path: Path,
+    edition: str,
+    missing_chunk: str,
+) -> None:
+    chunks = tuple(chunk for chunk in VALID_EDITION_CHUNKS[edition] if chunk != missing_chunk)
+    _write_dist(tmp_path, chunks)
+
+    result = _verify(edition, tmp_path)
+
+    assert result.returncode != 0
+    assert f"{edition} is missing its {missing_chunk} chunk" in result.stderr

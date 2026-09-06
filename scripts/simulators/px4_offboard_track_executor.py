@@ -530,7 +530,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--runtime-control-file", type=Path)
     parser.add_argument(
         "--connection",
-        default=os.environ.get("PX4_OFFBOARD_CONNECTION", "udp://:14540"),
+        default=os.environ.get("PX4_OFFBOARD_CONNECTION", "udpin://0.0.0.0:14540"),
     )
     parser.add_argument(
         "--setpoint-rate-hz",

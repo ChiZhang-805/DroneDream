@@ -6,6 +6,7 @@ param(
     [string]$OutputRoot,
     [string]$CargoRoot,
     [string]$StorageRoot,
+    [string]$AgentCoreRepository,
     [switch]$AllowUnsignedUpdater,
     [switch]$ReuseCargoTarget,
     [switch]$PreserveCargoTarget
@@ -430,6 +431,11 @@ foreach ($name in @("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS")) {
     }
 }
 
+$trackedSourceStatus = (& git -C $repoRoot status --porcelain=v1 --untracked-files=no | Out-String).Trim()
+if ($LASTEXITCODE -ne 0 -or $trackedSourceStatus) {
+    throw "The five-edition build refuses to overwrite tracked source changes."
+}
+
 Remove-GeneratedSourceOutputs
 
 $sourceCommit = (& git -C $repoRoot rev-parse --verify HEAD).Trim()
@@ -587,6 +593,7 @@ try {
             }
 
             & (Join-Path $repoRoot "desktop\scripts\stage-agent-core.ps1") `
+                -AgentCoreRepository $AgentCoreRepository `
                 -TargetTriple $toolchainContract.targetTriple
             if ($LASTEXITCODE -ne 0) {
                 throw "AGENT Core staging failed for $editionId."

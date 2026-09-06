@@ -33,8 +33,12 @@ def test_release_publisher_requires_release_and_tag_set_equality() -> None:
         "Assert-ExactStringSet",
         "GitHub Release inventory",
         "GitHub Tag inventory",
+        "the canonical public set must contain exactly eight entries",
         "git/matching-refs/tags",
         "$channelTags + $keepCombined + $keepRuntime",
+        "GitHub long-lived branch inventory",
+        "repos/$Repository/branches?per_page=100",
+        '"codex/technical-report"',
     ):
         assert fragment in publisher
     assert publisher.index('"release", "delete"') < publisher.index(
@@ -49,6 +53,7 @@ def test_public_policy_defines_the_exact_eight_entry_topology() -> None:
     for statement in (
         "Release names and remote Tag names must be the same set",
         "exactly eight entries",
+        "Exactly eight long-lived branches",
         "two five-edition builds",
         "five updater channels",
         "one Runtime release",

@@ -19,7 +19,7 @@ SMOKE_ROOT = Path("/var/lib/dronedream/runtime-smoke")
 
 async def _round_trip() -> dict[str, float | str]:
     drone = System()
-    await drone.connect(system_address="udp://:14540")
+    await drone.connect(system_address="udpin://0.0.0.0:14540")
 
     async def wait_connected() -> None:
         async for state in drone.core.connection_state():

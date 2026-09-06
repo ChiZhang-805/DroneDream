@@ -32,7 +32,6 @@
     "test:field-installed-launcher": "node scripts/inspect-field-installed-launcher.mjs",
     "test:settings-locales": "node scripts/verify-settings-locales.mjs",
     "test:assistant-orchestration": "node scripts/verify-assistant-orchestration.mjs",
-    "test:autonomy-mission-entry": "node scripts/verify-autonomy-mission-entry.mjs",
     "test:school-map-and-drone": "node scripts/verify-school-map-and-drone.mjs",
     "test:fixed-scenarios-layout": "node scripts/verify-fixed-scenarios-layout.mjs",
     "test:five-edition-desktop-parity": "node scripts/verify-five-edition-desktop-parity.mjs",
@@ -85,6 +84,7 @@
   },
   "overrides": {
     "brace-expansion": "5.0.9",
+    "browserslist": "4.28.9",
     "nanoid": "3.3.18",
     "undici": "^7.29.0"
   }

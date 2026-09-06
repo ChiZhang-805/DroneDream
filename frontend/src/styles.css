@@ -565,8 +565,7 @@ body:has(.autonomy-platform-page),
   white-space: nowrap;
 }
 
-.agent-plugin-name small,
-.agent-plugin-version {
+.agent-plugin-name small {
   color: #8d8490;
   font-size: 0.67rem;
 }
@@ -584,10 +583,6 @@ body:has(.autonomy-platform-page),
 .agent-plugin-health.is-unverified,
 .agent-plugin-health.is-revoked {
   color: #bd3151;
-}
-
-.agent-plugin-version {
-  text-align: right;
 }
 
 .agent-plugin-switch {
@@ -1518,8 +1513,7 @@ body:has(.autonomy-platform-page),
   color: var(--dd-brand-middle);
 }
 
-.autonomy-readiness-strip,
-.autonomy-stage-metrics {
+.autonomy-readiness-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.65rem;
@@ -1920,7 +1914,6 @@ body:has(.autonomy-platform-page),
 
 .autonomy-config-card,
 .autonomy-config-summary,
-.autonomy-mission-stage,
 .autonomy-evidence-bindings,
 .autonomy-evidence-empty {
   border: 1px solid #e1dae5;
@@ -1935,8 +1928,7 @@ body:has(.autonomy-platform-page),
 }
 
 .autonomy-config-card > header,
-.autonomy-config-summary > header,
-.autonomy-mission-stage section > header {
+.autonomy-config-summary > header {
   display: flex;
   min-width: 0;
   align-items: center;
@@ -1945,15 +1937,13 @@ body:has(.autonomy-platform-page),
 }
 
 .autonomy-config-card > header svg,
-.autonomy-config-summary > header svg,
-.autonomy-mission-stage section > header > svg {
+.autonomy-config-summary > header svg {
   width: 1.05rem;
   color: var(--dd-brand-middle);
 }
 
 .autonomy-config-card h2,
-.autonomy-config-summary h2,
-.autonomy-mission-stage h2 {
+.autonomy-config-summary h2 {
   margin: 0;
   font-size: 0.96rem;
 }
@@ -2086,8 +2076,7 @@ fieldset.autonomy-form-grid {
   margin-top: 0.42rem;
 }
 
-.autonomy-choice-grid button,
-.autonomy-planner-choices button {
+.autonomy-choice-grid button {
   display: flex;
   min-width: 0;
   min-height: 2.7rem;
@@ -2104,14 +2093,12 @@ fieldset.autonomy-form-grid {
   cursor: pointer;
 }
 
-.autonomy-choice-grid button svg,
-.autonomy-planner-choices button svg {
+.autonomy-choice-grid button svg {
   width: 0.9rem;
   height: 0.9rem;
 }
 
-.autonomy-choice-grid button.is-selected,
-.autonomy-planner-choices button.is-selected {
+.autonomy-choice-grid button.is-selected {
   border-color: color-mix(in srgb, var(--dd-brand-middle) 62%, white);
   color: var(--dd-brand-middle);
   background: color-mix(in srgb, var(--dd-brand-light-surface) 62%, white);
@@ -2375,172 +2362,6 @@ fieldset.autonomy-form-grid {
   font-weight: 750;
 }
 
-.autonomy-mission-page {
-  display: grid;
-  min-height: 100%;
-  grid-template-rows: auto minmax(360px, 1fr) auto;
-  gap: 0.72rem;
-}
-
-.autonomy-mission-stepper {
-  display: grid;
-  margin: 0;
-  padding: 0;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 0.35rem;
-  list-style: none;
-}
-
-.autonomy-mission-stepper button {
-  display: grid;
-  width: 100%;
-  min-height: 4rem;
-  padding: 0.5rem;
-  grid-template-columns: auto auto minmax(0, 1fr);
-  align-items: center;
-  gap: 0.35rem;
-  border: 1px solid #e1dae5;
-  border-radius: 13px;
-  color: #776b7c;
-  background: rgba(255, 255, 255, 0.9);
-  font: inherit;
-  cursor: pointer;
-}
-
-.autonomy-mission-stepper button > span {
-  display: grid;
-  width: 1.35rem;
-  height: 1.35rem;
-  place-items: center;
-  border-radius: 50%;
-  background: #f0ebf2;
-  font-size: 0.58rem;
-  font-weight: 900;
-}
-
-.autonomy-mission-stepper button > span svg,
-.autonomy-mission-stepper button > svg { width: 0.84rem; height: 0.84rem; }
-.autonomy-mission-stepper button strong { overflow: hidden; font-size: 0.64rem; text-overflow: ellipsis; white-space: nowrap; }
-.autonomy-mission-stepper li.is-active button { border-color: color-mix(in srgb, var(--dd-brand-middle) 52%, white); color: var(--dd-brand-middle); background: color-mix(in srgb, var(--dd-brand-light-surface) 60%, white); }
-.autonomy-mission-stepper li.is-complete button > span { color: #fff; background: #20a77f; }
-
-.autonomy-mission-stage {
-  display: grid;
-  min-height: 0;
-  place-items: stretch;
-  padding: clamp(1rem, 1.5vw, 1.5rem);
-}
-
-.autonomy-mission-stage > section {
-  display: grid;
-  min-height: 0;
-  align-content: center;
-  gap: 1rem;
-}
-
-.autonomy-mission-stage section > header { margin-bottom: 0; }
-.autonomy-mission-stage section > header .btn { margin-left: auto; }
-.autonomy-mission-stage blockquote { width: min(900px, 100%); margin: 0 auto; padding: 1.25rem; border: 0; border-left: 3px solid var(--dd-brand-middle); border-radius: 0 14px 14px 0; color: #382d3d; background: #faf7fb; font-size: clamp(1rem, 1.3vw, 1.3rem); line-height: 1.55; }
-
-.autonomy-contract-points {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.85rem;
-}
-
-.autonomy-mission-model {
-  display: flex;
-  width: fit-content;
-  max-width: 100%;
-  align-items: center;
-  gap: 0.45rem;
-  margin: 0 0 1rem;
-  padding: 0.48rem 0.72rem;
-  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 24%, #ddd7e4);
-  border-radius: 999px;
-  color: #706779;
-  background: color-mix(in srgb, var(--dd-brand-start) 6%, #fff);
-  font-size: 0.78rem;
-}
-
-.autonomy-mission-model svg { width: 1rem; height: 1rem; color: var(--dd-brand-middle); }
-.autonomy-mission-model strong { overflow: hidden; color: #2c2431; text-overflow: ellipsis; white-space: nowrap; }
-
-.autonomy-planning-brief {
-  max-width: 64rem;
-  margin: 0 0 1rem;
-  color: #6f6675;
-  line-height: 1.55;
-}
-
-.autonomy-contract-points span {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: #65596a;
-  font-size: 0.7rem;
-  font-weight: 800;
-}
-
-.autonomy-contract-points i {
-  display: grid;
-  width: 1.65rem;
-  height: 1.65rem;
-  place-items: center;
-  border-radius: 50%;
-  color: #fff;
-  background: var(--dd-brand-middle);
-  font-style: normal;
-}
-
-.autonomy-planner-choices,
-.autonomy-safety-policy-list,
-.autonomy-review-block {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.7rem;
-}
-
-.autonomy-planner-choices button { min-height: 7rem; flex-direction: column; font-size: 0.76rem; }
-.autonomy-planner-choices button svg { width: 1.45rem; height: 1.45rem; }
-
-.autonomy-safety-policy-list > span,
-.autonomy-review-block > div {
-  display: grid;
-  min-height: 7rem;
-  place-items: center;
-  gap: 0.45rem;
-  padding: 0.75rem;
-  border: 1px solid #e1dae5;
-  border-radius: 14px;
-  color: #746879;
-  background: #fbf9fc;
-  font-size: 0.68rem;
-}
-
-.autonomy-safety-policy-list svg,
-.autonomy-review-block svg { width: 1.4rem; color: var(--dd-brand-middle); }
-.autonomy-safety-policy-list strong,
-.autonomy-review-block strong { color: #302536; font-size: 0.7rem; }
-.autonomy-review-block > div.is-ready { border-color: #bde9dc; background: #f0faf7; }
-.autonomy-review-block > div.is-blocked { border-color: #f0c8d0; background: #fff5f6; }
-.autonomy-review-blockers { width: min(700px, 100%); margin: 0 auto; color: #9e4359; font-size: 0.7rem; }
-.autonomy-mission-stage > section > .btn { justify-self: center; }
-
-.autonomy-mission-footer {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 0.7rem;
-  padding: 0.65rem 0.75rem;
-  border: 1px solid #e1dae5;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.95);
-}
-
-.autonomy-mission-footer span { color: #85798a; font-size: 0.66rem; font-weight: 800; text-align: center; }
-
 .autonomy-evidence-bindings {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2647,8 +2468,6 @@ fieldset.autonomy-form-grid {
   .autonomy-choice-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .autonomy-choice-grid.is-semantic { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .autonomy-config-page { grid-template-columns: minmax(0, 1fr) 240px; }
-  .autonomy-mission-stepper button { grid-template-columns: auto minmax(0, 1fr); }
-  .autonomy-mission-stepper button > svg { display: none; }
   .autonomy-platform-content:has(.autonomy-lab-page.is-embedded) { overflow: auto; scrollbar-gutter: stable; }
   .autonomy-lab-page.is-embedded { height: auto; }
   .autonomy-lab-page.is-embedded .autonomy-workspace { height: auto; grid-template-columns: minmax(0, 1fr); }
@@ -2702,12 +2521,7 @@ fieldset.autonomy-form-grid {
   .autonomy-config-page { grid-template-columns: 1fr; }
   .autonomy-config-summary { position: static; height: auto; }
   .autonomy-config-summary-metrics { grid-template-rows: none; }
-  .autonomy-mission-stepper { overflow-x: auto; grid-template-columns: repeat(6, minmax(120px, 1fr)); }
-  .autonomy-planner-choices,
-  .autonomy-safety-policy-list,
-  .autonomy-review-block,
-  .autonomy-readiness-strip,
-  .autonomy-stage-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .autonomy-readiness-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .autonomy-inline-plan-bindings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .autonomy-lab-page.is-embedded,
   .autonomy-lab-page.is-embedded .autonomy-workspace { min-height: 680px; }
@@ -2727,11 +2541,7 @@ fieldset.autonomy-form-grid {
   .autonomy-overview-grid,
   .autonomy-form-grid.is-three,
   .autonomy-form-grid.is-four,
-  .autonomy-planner-choices,
-  .autonomy-safety-policy-list,
-  .autonomy-review-block,
   .autonomy-readiness-strip,
-  .autonomy-stage-metrics,
   .autonomy-evidence-bindings { grid-template-columns: 1fr; }
   .autonomy-evidence-runs { grid-template-columns: 1fr; }
   .autonomy-choice-grid,
@@ -2745,8 +2555,6 @@ fieldset.autonomy-form-grid {
   .autonomy-check-control { grid-column: auto; }
   .autonomy-map-upload { align-items: flex-start; flex-direction: column; }
   .autonomy-map-upload > span { margin-left: 0; }
-  .autonomy-contract-points { align-items: flex-start; flex-direction: column; }
-  .autonomy-contract-points > svg { transform: rotate(90deg); }
   .autonomy-evidence-empty > div { align-items: stretch; flex-direction: column; }
   .autonomy-evidence-empty > div svg { align-self: center; transform: rotate(90deg); }
   .autonomy-sensor-mounts > article { grid-template-columns: 1fr; }
@@ -5863,17 +5671,6 @@ a {
   margin: 0;
 }
 
-.starter-experience-version {
-  flex: 0 0 auto;
-  padding: 0.2rem 0.5rem;
-  border: 1px solid rgba(125, 231, 255, 0.28);
-  border-radius: 999px;
-  color: #a7efff;
-  background: rgba(38, 120, 153, 0.14);
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-
 .starter-experience-heading-actions {
   display: flex;
   align-items: center;
@@ -5919,12 +5716,6 @@ a {
 
 .starter-experience-card strong {
   font-size: 0.82rem;
-}
-
-.starter-experience-card > div span {
-  color: #a7efff;
-  font-size: 0.68rem;
-  font-weight: 700;
 }
 
 .starter-experience-card .btn {
@@ -9044,10 +8835,6 @@ a {
   .starter-experience-heading {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .starter-experience-version {
-    align-self: flex-start;
   }
 
   .starter-experience-heading-actions {
@@ -12717,23 +12504,6 @@ a {
   flex: 0 0 auto;
 }
 
-.distribution-version-badge {
-  flex: 0 0 auto;
-  padding: 0.28rem 0.52rem;
-  color: #8443ab;
-  border: 1px solid rgba(168, 85, 247, 0.24);
-  border-radius: 999px;
-  background: rgba(168, 85, 247, 0.07);
-  font-size: 0.68rem;
-  font-weight: 800;
-}
-
-.distribution-setup-panel-settings .distribution-version-badge {
-  color: #8443ab;
-  border-color: rgba(168, 85, 247, 0.24);
-  background: rgba(168, 85, 247, 0.07);
-}
-
 .distribution-edition-options,
 .distribution-optional-modules {
   display: grid;
@@ -13019,10 +12789,6 @@ a {
 
   .distribution-setup-heading h3 {
     font-size: 0.98rem;
-  }
-
-  .distribution-version-badge {
-    padding-inline: 0.42rem;
   }
 
   .distribution-preview-grid,
@@ -22898,7 +22664,7 @@ body {
 .agent-plugin-simple-list article {
   min-height: 3.9rem;
   display: grid;
-  grid-template-columns: 1.3rem minmax(0, 1fr) auto 2rem;
+  grid-template-columns: 1.3rem minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.85rem;
   padding: 0.65rem 0.2rem;
@@ -22909,11 +22675,6 @@ body {
   width: 1.2rem;
   height: 1.2rem;
   color: var(--dd-brand-middle);
-}
-
-.agent-plugin-simple-list article > span {
-  color: #948898;
-  font-size: 0.76rem;
 }
 
 .agent-plugin-simple-list article > button {

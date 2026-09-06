@@ -69,8 +69,8 @@ version bump prevents a Prompt/Evidence upgrade from overwriting prior bytes.
 
 `harness-fallback-contract-campaign-v3.*` is the current deterministic
 multi-tool fallback integration freeze. It preserves the 15 matched arms and
-474 persisted Trials from v2 while making the declared normalization contract
-literal: opaque nested `evidence_id` values are excluded from the campaign
+474 persisted Trials while making the declared normalization contract literal:
+opaque nested `evidence_id` values are excluded from the campaign
 projection. Those IDs hash higher-precision intermediate floats and can differ
 between supported Python runtimes even when every normalized outcome field is
 identical. The v3 artifact canonical SHA-256 is
@@ -79,9 +79,10 @@ the JSON and CSV file SHA-256 values are
 `1c7b7a15662ae519c4f1b1c17db018a3cc7536f5ec5c87bf4f7b2f50e36bd458`
 and
 `d4a002789924297973c19d4b0213b381ce30c437e441346732a52b64f9bde4c2`.
-The v2 files remain immutable and strictly verifiable as historical evidence.
-Neither version establishes LLM superiority, causal Harness benefit, physical
-fidelity, or PX4/Gazebo performance.
+Superseded compatibility freezes are intentionally not shipped or accepted by
+the current verifier, which prevents an older contract from re-entering active
+qualification. This evidence does not establish LLM superiority, causal Harness
+benefit, physical fidelity, or PX4/Gazebo performance.
 
 `harness-reflection-trigger-ablation-v1.*` freezes six direct input
 interventions against the production receding-plan compiler, eligibility gate,

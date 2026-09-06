@@ -199,9 +199,6 @@ export function DistributionSetupPanel({
           <h3 id={`${id}-title`}>{copy.title}</h3>
           <p>{copy.description}</p>
         </div>
-        <span className="distribution-version-badge">
-          v{DISTRIBUTION_CATALOG.catalogVersion}
-        </span>
       </header>
 
       <fieldset className="distribution-edition-options">

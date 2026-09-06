@@ -79,7 +79,7 @@ slowdown can increase it by at most `10x`. The base/effective values are
 recorded in `launch_config.json` and `simulator_runtime_manifest.json`.
 
 `instance_id` is an advanced, operator-managed override, not an automatic port
-allocator. The bundled wrapper still defaults MAVSDK to `udp://:14540`. Until a
+allocator. The bundled wrapper defaults MAVSDK to `udpin://0.0.0.0:14540`. Until a
 host-level instance/port lease allocator is configured, run at most **one
 `real_cli` trial per host**. Setting a unique `instance_id` alone is not enough;
 the operator must also configure matching PX4/Gazebo/MAVSDK ports.
@@ -414,7 +414,7 @@ Wrapper env vars (with defaults):
 - `PX4_ENABLE_OFFBOARD_EXECUTOR` (default `true`; run offboard track executor)
 - `PX4_OFFBOARD_EXECUTOR_COMMAND` (optional command override; default is
   `python3 scripts/simulators/px4_offboard_track_executor.py`)
-- `PX4_OFFBOARD_CONNECTION` (default `udp://:14540`)
+- `PX4_OFFBOARD_CONNECTION` (default `udpin://0.0.0.0:14540`)
 - `PX4_OFFBOARD_SETPOINT_RATE_HZ` (default `10`)
 - `PX4_OFFBOARD_TAKEOFF_TIMEOUT_SECONDS` (default `30`)
 - `PX4_OFFBOARD_TRACK_TIMEOUT_SECONDS` (default `120`)
@@ -424,7 +424,7 @@ Wrapper env vars (with defaults):
 - `PX4_OFFBOARD_DRY_RUN` (default `false`)
 - `PX4_PARAMETER_TRANSPORT` (`environment` or `mavsdk`; default
   `environment`)
-- `PX4_PARAMETER_CONNECTION` (default `udp://:14540`)
+- `PX4_PARAMETER_CONNECTION` (default `udpin://0.0.0.0:14540`)
 - `PX4_PARAMETER_TIMEOUT_SECONDS` (default `15`)
 - `PX4_PARAMETER_ENFORCE_SAFE_BOUNDS` (default `true`)
 - `PX4_GAZEBO_ENTITY_FACTORY_TIMEOUT_MS` (default `5000`; per-obstacle Gazebo

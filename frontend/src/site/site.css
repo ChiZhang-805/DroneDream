@@ -3653,6 +3653,19 @@ html[lang="zh-CN"] .site-hero h1 {
   .community-modal-backdrop { padding: 12px; }
 }
 
+@media (max-width: 480px) {
+  .dd-site .site-brand .brand-lockup { height: 24px; }
+  .site-header-actions { gap: .2rem; }
+  .site-account-button,
+  .site-language {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+  }
+  .site-account-button > span,
+  .site-language-label { display: none; }
+}
+
 @media (max-width: 520px) {
   .site-brand .brand-lockup { height: 30px; }
   .site-language { font-size: .7rem; }

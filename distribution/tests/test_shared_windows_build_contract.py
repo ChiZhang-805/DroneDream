@@ -72,7 +72,9 @@ def test_five_edition_wrapper_freezes_one_source_and_cleans_only_owned_outputs()
         "Remove-Item Env:\\RUSTFLAGS -ErrorAction SilentlyContinue",
         "Remove-Item Env:\\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue",
         '"DRONEDREAM_RELEASE_SOURCE_COMMIT"',
-        "& git -C $repoRoot clean -fdx -- @paths",
+        "& git -C $repoRoot clean -fdx -- @generatedPaths",
+        "& git -C $repoRoot checkout-index --force -- @trackedPaths",
+        "The five-edition build refuses to overwrite tracked source changes.",
         "Refusing to delete a reparse-point root",
         "Refusing to delete a tree containing reparse points",
         "The source tree changed after the $editionId build.",
@@ -110,6 +112,9 @@ def test_five_edition_wrapper_freezes_one_source_and_cleans_only_owned_outputs()
         assert fragment in script
     assert "[IO.Path]::IsPathFullyQualified" not in script
     assert 'Join-Path $editionOutput "$($contract.product)-${version}.exe"' not in script
+    assert script.index("$trackedSourceStatus =") < script.index(
+        "Remove-GeneratedSourceOutputs\n\n$sourceCommit"
+    )
     assert script.index("Remove-GeneratedSourceOutputs\n\n$sourceCommit") < script.index(
         "$sourceCommit = (& git -C $repoRoot rev-parse --verify HEAD).Trim()"
     )

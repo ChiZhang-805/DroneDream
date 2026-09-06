@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reject internal experiment sequence labels from public repository text."""
+"""Reject internal experiment labels and UI-only component versions."""
 
 from __future__ import annotations
 
@@ -32,6 +32,18 @@ EXPERIMENT_SEQUENCE_LABEL = re.compile(
     r"(?i)(?<![a-z0-9])r[0-9]{1,3}(?![a-z0-9])"
 )
 VISIBLE_REVISION_LABEL = re.compile(r"R\{[^}\n]*revision")
+VISIBLE_INTERNAL_VERSION_EXPRESSION = re.compile(
+    r"(?i)(?:>\s*|·\s*)v\{[^}\n]*(?:plugin|template|aircraft|mapPack|generated_files|catalog)"
+    r"[^}\n]*version[^}\n]*\}"
+)
+VISIBLE_INTERNAL_VERSION_ROW = re.compile(
+    r'(?i)(?:"Version"|"版本")[^\n]*`v\$\{'
+    r"(?:aircraft|mapPack|plugin|template|catalog)[^}\n]*version\}"
+)
+VISIBLE_INTERNAL_VERSION_COPY = re.compile(
+    r"(?i)(?:template|scenario|plugin|map|aircraft|vehicle|harness|artifact|catalog)"
+    r"[^\n]{0,60}\bv\{\{?version"
+)
 
 # These files bind literal names owned by third parties or installer-language
 # register syntax. Their numeric tokens are not DroneDream experiment labels.
@@ -73,7 +85,22 @@ def find_public_experiment_labels(repository: Path) -> list[str]:
         except UnicodeDecodeError:
             continue
         for line_number, line in enumerate(lines, start=1):
-            if EXPERIMENT_SEQUENCE_LABEL.search(line) or VISIBLE_REVISION_LABEL.search(line):
+            frontend_source = relative.startswith("frontend/src/") and path.suffix.lower() in {
+                ".ts",
+                ".tsx",
+            }
+            if (
+                EXPERIMENT_SEQUENCE_LABEL.search(line)
+                or VISIBLE_REVISION_LABEL.search(line)
+                or (
+                    frontend_source
+                    and (
+                        VISIBLE_INTERNAL_VERSION_EXPRESSION.search(line)
+                        or VISIBLE_INTERNAL_VERSION_ROW.search(line)
+                        or VISIBLE_INTERNAL_VERSION_COPY.search(line)
+                    )
+                )
+            ):
                 violations.append(f"{relative}:{line_number}")
     return violations
 

@@ -19,6 +19,12 @@ if (-not (Test-Path -LiteralPath $handoffRootFull -PathType Container)) {
 if ($Repository -cnotmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') {
     throw "Repository must use owner/name syntax."
 }
+if ($RollbackBuildsToKeep -ne 1) {
+    throw "Public retention requires exactly one rollback five-edition build."
+}
+if (-not $PruneObsoleteReleases) {
+    throw "Publishing requires -PruneObsoleteReleases so Releases and Tags remain exact."
+}
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
     throw "GitHub CLI is required."
 }
@@ -291,6 +297,9 @@ try {
 
         if (-not $WhatIfPreference) {
             $expectedPublicTags = @($channelTags + $keepCombined + $keepRuntime | Sort-Object -Unique)
+            if ($expectedPublicTags.Count -ne 8) {
+                throw "Release retention failed: the canonical public set must contain exactly eight entries."
+            }
             $finalReleaseList = Invoke-GitHubCli -Arguments @(
                 "release", "list", "--repo", $Repository,
                 "--limit", "100", "--json", "tagName"
@@ -307,6 +316,22 @@ try {
             )
             Assert-ExactStringSet -Label "GitHub Release inventory" -Actual $finalReleaseTags -Expected $expectedPublicTags
             Assert-ExactStringSet -Label "GitHub Tag inventory" -Actual $remoteTags -Expected $expectedPublicTags
+            $expectedBranches = @(
+                "main",
+                "codex/software",
+                "codex/software-agent",
+                "codex/software-field",
+                "codex/software-lab",
+                "codex/software-sim",
+                "codex/technical-report",
+                "codex/website"
+            )
+            $remoteBranchOutput = Invoke-GitHubCli -Arguments @(
+                "api", "--paginate", "repos/$Repository/branches?per_page=100",
+                "--jq", ".[].name"
+            )
+            $remoteBranches = @($remoteBranchOutput -split "`r?`n" | Where-Object { $_ })
+            Assert-ExactStringSet -Label "GitHub long-lived branch inventory" -Actual $remoteBranches -Expected $expectedBranches
         }
     }
 

@@ -15,7 +15,6 @@ import { localeSafeError } from "../i18n/I18nProvider";
 import {
   completeManagedModelChat,
   completeManagedModelCatalog,
-  DEFAULT_MANAGED_MODEL_CATALOG,
   getManagedModelCatalog,
   issueManagedModelGrant,
   managedModelAvailableForAssistant,
@@ -277,8 +276,10 @@ export function FieldAssistantWorkspace({
 }) {
   const copy = COPY[locale];
   const modelAccess = useModelAccess();
-  const [models, setModels] = useState<ManagedModelCatalogEntry[]>(DEFAULT_MANAGED_MODEL_CATALOG);
-  const [catalogReady, setCatalogReady] = useState(true);
+  const [models, setModels] = useState<ManagedModelCatalogEntry[]>(
+    completeManagedModelCatalog([]),
+  );
+  const [catalogReady, setCatalogReady] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [composer, setComposer] = useState("");
   const [plan, setPlan] = useState<FieldAssistantPlan | null>(null);
@@ -302,7 +303,7 @@ export function FieldAssistantWorkspace({
         setModels(completeManagedModelCatalog(catalog.models));
       })
       .catch(() => {
-        if (active) setModels(DEFAULT_MANAGED_MODEL_CATALOG);
+        if (active) setModels(completeManagedModelCatalog([]));
       })
       .finally(() => {
         if (active) setCatalogReady(true);

@@ -47,13 +47,7 @@ pub(crate) struct AppUpdateSnapshot {
 }
 
 impl AppUpdateCoordinator {
-    fn publish(
-        &self,
-        app: &tauri::AppHandle,
-        phase: &'static str,
-        progress: u8,
-        attempt: u32,
-    ) {
+    fn publish(&self, app: &tauri::AppHandle, phase: &'static str, progress: u8, attempt: u32) {
         let progress = AppUpdateProgress {
             phase,
             progress,
@@ -68,7 +62,11 @@ impl AppUpdateCoordinator {
     fn snapshot(&self) -> AppUpdateSnapshot {
         AppUpdateSnapshot {
             running: self.running.load(Ordering::Acquire),
-            progress: self.progress.lock().ok().and_then(|progress| progress.clone()),
+            progress: self
+                .progress
+                .lock()
+                .ok()
+                .and_then(|progress| progress.clone()),
         }
     }
 }

@@ -23,9 +23,6 @@ Space Grotesk input. The public website favicon is intentionally independent
 from the Universal application mark: the exact user-approved mainland-preview
 PNG lives at `source/approved/website-favicon-64.png` and is copied byte-for-byte
 to the public site so brand regeneration cannot replace it.
-`generated/brand-assets.v1.json` binds every canonical output to exact source,
-generator, locked requirements, font, bytes, dimensions, and SHA-256.
-
 Windows PNG/ICO files and the browser favicon are deterministic build
 derivatives. They are generated into ignored temporary paths and removed after
 the build; they must never be checked in as additional brand designs.

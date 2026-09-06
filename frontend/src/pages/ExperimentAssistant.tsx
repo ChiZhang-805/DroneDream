@@ -618,9 +618,13 @@ export function ExperimentAssistant() {
   const docsPreview = import.meta.env.DEV
     && new URLSearchParams(window.location.search).has("docsPreview");
   const [managedModels, setManagedModels] = useState<ManagedModelCatalogEntry[]>(
-    DEFAULT_MANAGED_MODEL_CATALOG,
+    docsPreview || !auth?.account
+      ? DEFAULT_MANAGED_MODEL_CATALOG
+      : completeManagedModelCatalog([]),
   );
-  const [managedModelsReady, setManagedModelsReady] = useState(true);
+  const [managedModelsReady, setManagedModelsReady] = useState(
+    docsPreview || !auth?.account,
+  );
   const assistantManagedModels = managedModels;
   const configuredModelProfiles = modelProfiles.filter((profile) =>
     profile.apiKey.trim(),
@@ -685,7 +689,7 @@ export function ExperimentAssistant() {
       })
       .catch(() => {
         if (!active) return;
-        setManagedModels(DEFAULT_MANAGED_MODEL_CATALOG);
+        setManagedModels(completeManagedModelCatalog([]));
         setManagedModelsReady(true);
       });
     return () => {
@@ -1298,7 +1302,7 @@ export function ExperimentAssistant() {
                 {latest.orchestration?.generated_files?.length ? (
                   <div className="assistant-generated-file">
                     <strong>{locale === "zh-CN" ? "已保存产物" : "Saved artifact"}</strong>
-                    <span>{latest.orchestration.generated_files[0].display_name} · v{latest.orchestration.generated_files[0].version}</span>
+                    <span>{latest.orchestration.generated_files[0].display_name}</span>
                   </div>
                 ) : null}
                 <button

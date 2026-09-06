@@ -466,7 +466,7 @@ export function AutonomyPlugins() {
       {loading && !plugins.length ? <p className="agent-plugin-empty">{chinese ? "正在读取插件" : "Loading plug-ins"}</p> : null}
       {!loading && !visiblePlugins.length ? <p className="agent-plugin-empty">{chinese ? "没有已安装的独立插件" : "No standalone plug-ins installed"}</p> : null}
       <div className="agent-plugin-simple-list">{visiblePlugins.map((plugin) => <article key={plugin.plugin_id}>
-        <Blocks aria-hidden="true" /><strong>{pluginName(chinese, plugin)}</strong><span>v{plugin.version}</span>
+        <Blocks aria-hidden="true" /><strong>{pluginName(chinese, plugin)}</strong>
         {plugin.removable ? <button type="button" aria-label={chinese ? `删除 ${pluginName(chinese, plugin)}` : `Delete ${pluginName(chinese, plugin)}`}
           disabled={busy === plugin.plugin_id} onClick={() => void removePlugin(plugin)}><Trash2 aria-hidden="true" /></button> : null}
       </article>)}</div>

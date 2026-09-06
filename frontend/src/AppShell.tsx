@@ -1022,7 +1022,9 @@ function SettingsDialog({
     );
   const [managedUsageError, setManagedUsageError] = useState<string | null>(null);
   const [managedModels, setManagedModels] = useState<ManagedModelCatalogEntry[]>(
-    docsPreview ? DOCS_PREVIEW_MANAGED_MODELS : DEFAULT_MANAGED_MODEL_CATALOG,
+    docsPreview
+      ? DOCS_PREVIEW_MANAGED_MODELS
+      : completeManagedModelCatalog([]),
   );
   const [selectedAllowanceResetCardId, setSelectedAllowanceResetCardId] =
     useState("");
@@ -1168,7 +1170,7 @@ function SettingsDialog({
       })
       .catch(() => {
         if (!active) return;
-        setManagedModels(DEFAULT_MANAGED_MODEL_CATALOG);
+        setManagedModels(completeManagedModelCatalog([]));
       });
     return () => {
       active = false;
@@ -2419,7 +2421,7 @@ function SettingsDialog({
               <div className="settings-model-plan-row">
                 <div className="settings-model-plan-title" id="settings-current-plan-title">
                   <span>{t("settings.model.currentPlan")}:</span>
-                  <strong>{managedUsage?.plan.name ?? "Free / Plus / Pro"}</strong>
+                  <strong>{managedUsage?.plan.name ?? "—"}</strong>
                 </div>
                 <a
                   href="https://getdronedream.com/pricing/"
@@ -2920,7 +2922,6 @@ const ACCOUNT_COPY = {
     account: "Account",
     localUser: "Local user",
     localWorkspace: "Local workspace",
-    cloudWorkspace: "Free",
     editProfile: "Edit profile",
     remainingAllowance: "Token",
     allowanceUnavailable: "Unavailable",
@@ -2997,7 +2998,6 @@ const ACCOUNT_COPY = {
     account: "账号",
     localUser: "本地用户",
     localWorkspace: "本地工作区",
-    cloudWorkspace: "Free",
     editProfile: "编辑账户",
     remainingAllowance: "Token",
     allowanceUnavailable: "暂不可用",
@@ -3074,20 +3074,21 @@ function normalizedPlanName(
   return null;
 }
 
-function AccountPlanLabel({ authenticated }: { authenticated: boolean }) {
-  const [plan, setPlan] = useState<"Free" | "Plus" | "Pro" | null>(
-    authenticated ? null : "Free",
+function AccountPlanLabel({ accountId }: { accountId: string | null }) {
+  const [plan, setPlan] = useState<"Free" | "Plus" | "Pro" | "Local" | null>(
+    accountId ? null : "Local",
   );
 
   useEffect(() => {
-    if (!authenticated) {
-      setPlan("Free");
+    if (!accountId) {
+      setPlan("Local");
       return undefined;
     }
     let active = true;
+    setPlan(null);
     void getManagedModelUsage()
       .then((snapshot) => {
-        if (active) setPlan(normalizedPlanName(snapshot.plan.name));
+        if (active) setPlan(normalizedPlanName(snapshot.plan.id));
       })
       .catch(() => {
         if (active) setPlan(null);
@@ -3095,7 +3096,7 @@ function AccountPlanLabel({ authenticated }: { authenticated: boolean }) {
     return () => {
       active = false;
     };
-  }, [authenticated]);
+  }, [accountId]);
 
   return <>{plan ?? "—"}</>;
 }
@@ -4839,7 +4840,7 @@ function AppShellContent() {
                   {auth.account?.displayName ?? accountCopy.localUser}
                 </strong>
                 <small>
-                  <AccountPlanLabel authenticated={Boolean(auth.account)} />
+                  <AccountPlanLabel accountId={auth.account?.id ?? null} />
                 </small>
               </span>
             </button>

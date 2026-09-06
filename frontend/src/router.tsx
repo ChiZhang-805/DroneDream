@@ -142,30 +142,13 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
               },
             },
             {
-              path: "mission",
-              lazy: async () => {
-                const { AutonomyMissionRedirect } = await import("./pages/AutonomyPlatform");
-                return { Component: AutonomyMissionRedirect };
-              },
-            },
-            {
               path: "live",
               lazy: async () => {
                 const { AutonomyLive } = await import("./pages/AutonomyPlatform");
                 return { Component: AutonomyLive };
               },
             },
-            {
-              path: "evidence",
-              element: <Navigate to="/autonomy" replace />,
-            },
           ],
-        },
-        {
-          path: "vehicle-studio",
-          // Preserve old bookmarks without loading the retired modeler. Legacy
-          // drafts remain readable through the qualified aircraft repository.
-          element: <Navigate to="/autonomy/aircraft?source=legacy-vehicle-studio" replace />,
         },
         {
           path: "admin",
@@ -230,7 +213,7 @@ export function createAppRouter(desktopRuntime = isDesktopRuntime()) {
   const routes = appRoutes(desktopRuntime);
   // A packaged Tauri app has no HTTP server to resolve a console route after a
   // WebView reload. Hash history keeps every asset request on index.html while
-  // the hosted web app retains clean browser URLs and normal deep links. The
+  // the hosted web app retains clean browser URLs and normal deep links.
   // Every packaged-desktop cold start enters the launcher first. The launcher
   // owns Runtime install/repair, the 0-100 readiness proof, and browser sign-in;
   // the hosted web app continues to enter the edition landing surface directly.

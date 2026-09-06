@@ -1481,7 +1481,7 @@ export function SiteApp() {
             onClick={() => setLocale(locale === "en" ? "zh-CN" : "en")}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.7 2.4 4 5.4 4 9s-1.3 6.6-4 9c-2.7-2.4-4-5.4-4-9s1.3-6.6 4-9Z" /></svg>
-            {copy.language}
+            <span className="site-language-label">{copy.language}</span>
           </button>
           <div
             ref={downloadMenuRef}

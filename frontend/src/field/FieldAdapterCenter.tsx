@@ -404,7 +404,7 @@ export function FieldAdapterCenter({
       </header>
 
       <div className="field-adapter-summary">
-        <span><ShieldCheck aria-hidden="true" />{copy.verified} {catalog.catalogVersion}</span>
+        <span><ShieldCheck aria-hidden="true" />{copy.verified}</span>
         <strong>{installedCount} / {catalog.entries.length}</strong>
         <button
           type="button"

@@ -203,6 +203,17 @@ describe("sidebar account menu", () => {
     router.dispose();
   });
 
+  it("never presents a cloud read failure as a Free subscription", async () => {
+    usageMock.get.mockRejectedValueOnce(new Error("cloud unavailable"));
+    const { router } = renderApp();
+
+    const accountButton = screen.getByRole("button", { name: "Account" });
+    await waitFor(() => expect(accountButton).toHaveTextContent("—"));
+    expect(accountButton).not.toHaveTextContent("Free");
+
+    router.dispose();
+  });
+
   it("keeps the header gear concise and routes All settings into the workspace", async () => {
     const { router } = renderApp();
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
@@ -212,7 +223,9 @@ describe("sidebar account menu", () => {
     expect(within(quickSettings).getByText("Appearance")).toBeVisible();
     expect(within(quickSettings).getByText("Account memory")).toBeVisible();
     expect(within(quickSettings).getByText("This edition's memory")).toBeVisible();
-    expect(within(quickSettings).getByText("Default platform model")).toBeVisible();
+    expect(within(quickSettings).getByRole("combobox", {
+      name: "Default platform model",
+    })).toBeVisible();
     expect(within(quickSettings).queryByText("Chat preferences")).not.toBeInTheDocument();
     expect(within(quickSettings).queryByText("Default vehicle")).not.toBeInTheDocument();
 

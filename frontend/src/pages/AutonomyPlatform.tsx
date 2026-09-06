@@ -1,21 +1,13 @@
 import {
-  Activity,
   Airplay,
   ArrowUp,
   Blocks,
   Cable,
   Camera,
-  Check,
-  ChevronRight,
-  CircleCheck,
   CircleUserRound,
   Cpu,
-  Database,
-  FileClock,
-  Gauge,
   GitBranch,
   Globe2,
-  HardDrive,
   Layers3,
   MapPin,
   Mic,
@@ -24,9 +16,7 @@ import {
   Orbit,
   Plus,
   Radar,
-  Radio,
   Route,
-  ScanLine,
   ShieldCheck,
   Sparkles,
   Trash2,
@@ -35,7 +25,6 @@ import {
   Square,
   VideoOff,
   Waypoints,
-  Weight,
   X,
 } from "lucide-react";
 import {
@@ -46,12 +35,10 @@ import {
   useState,
   type Dispatch,
   type FormEvent,
-  type ReactNode,
   type SetStateAction,
 } from "react";
 import {
   Link,
-  Navigate,
   NavLink,
   Outlet,
   useLocation,
@@ -274,16 +261,6 @@ function normalizedAutonomyPath(pathname: string): string {
       ? pathname.slice("/console".length)
       : pathname;
   return withoutBasename.replace(/\/+$/u, "") || "/";
-}
-
-function Metric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
-  return <div className="autonomy-asset-metric"><span>{icon}{label}</span><strong>{value}</strong></div>;
-}
-
-function readinessLabel(ready: boolean, chinese: boolean): string {
-  return ready
-    ? chinese ? "已就绪" : "Ready"
-    : chinese ? "未就绪" : "Blocked";
 }
 
 const AUTONOMY_ISSUE_COPY: Readonly<Record<string, { zh: string; en: string }>> = {
@@ -1077,7 +1054,7 @@ function AutonomyMissionPlanCard({
         </em>
       </header>
       <div className="autonomy-inline-plan-bindings">
-        <span><Navigation2 aria-hidden="true" /><small>{chinese ? "无人机" : "Aircraft"}</small><strong>{workspace.aircraft.name} · v{workspace.aircraft.version}</strong></span>
+        <span><Navigation2 aria-hidden="true" /><small>{chinese ? "无人机" : "Aircraft"}</small><strong>{workspace.aircraft.name}</strong></span>
         <span><Layers3 aria-hidden="true" /><small>{chinese ? "地图" : "Map"}</small><strong>{workspace.mapPack.name}</strong></span>
           <span><Radar aria-hidden="true" /><small>{chinese ? "感知" : "Perception"}</small><strong>{chinese ? ({ map: "地图", vision: "视觉", fusion: "融合" } as const)[plan.perceptionMode] : plan.perceptionMode}</strong></span>
         <span><Route aria-hidden="true" /><small>{chinese ? "路线" : "Route"}</small><strong>{plan.metrics.routeLengthM.toFixed(1)} m · {Math.ceil(plan.metrics.estimatedDurationS)} s</strong></span>
@@ -1622,8 +1599,12 @@ export function AutonomyOverview() {
   const [voiceConsentPending, setVoiceConsentPending] = useState(false);
   const [voiceConsentGranted, setVoiceConsentGranted] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [managedModels, setManagedModels] = useState(DEFAULT_MANAGED_MODEL_CATALOG);
-  const [managedModelsReady, setManagedModelsReady] = useState(true);
+  const [managedModels, setManagedModels] = useState(
+    auth?.account
+      ? completeManagedModelCatalog([])
+      : DEFAULT_MANAGED_MODEL_CATALOG,
+  );
+  const [managedModelsReady, setManagedModelsReady] = useState(!auth?.account);
   const [generating, setGenerating] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
   const [inputProvenance, setInputProvenance] = useState<"text" | "web-speech" | "audio-attachment">("text");
@@ -1810,7 +1791,7 @@ export function AutonomyOverview() {
       })
       .catch(() => {
         if (!active) return;
-        setManagedModels(DEFAULT_MANAGED_MODEL_CATALOG);
+        setManagedModels(completeManagedModelCatalog([]));
         setManagedModelsReady(true);
       });
     return () => {
@@ -2286,7 +2267,6 @@ export function AutonomyAircraft() {
       [chinese ? "制造商" : "Manufacturer", aircraft.manufacturer || "—"],
       [chinese ? "机架" : "Airframe", aircraft.airframe || "—"],
       [chinese ? "飞控" : "Flight controller", aircraft.flightController || "—"],
-      [chinese ? "版本" : "Version", `v${aircraft.version}`],
       [chinese ? "传感器" : "Sensors", aircraft.sensors.join(" · ") || "—"],
     ],
   });
@@ -2332,7 +2312,6 @@ export function AutonomyAircraft() {
                 rows: [
                   [chinese ? "来源" : "Source", asset.sourceApplication || "—"],
                   [chinese ? "格式" : "Format", asset.sourceFormat.toUpperCase()],
-                  [chinese ? "版本" : "Version", asset.version || "—"],
                   [chinese ? "状态" : "Status", asset.maturity.replaceAll("_", " ")],
                 ],
               })}
@@ -2361,7 +2340,6 @@ export function AutonomyMaps() {
       [chinese ? "坐标系" : "Coordinate frame", mapPack.coordinateFrame],
       [chinese ? "分辨率" : "Resolution", `${mapPack.resolutionM} m`],
       [chinese ? "楼层" : "Floors", String(mapPack.floorCount)],
-      [chinese ? "版本" : "Version", `v${mapPack.version}`],
     ],
   });
 
@@ -2376,14 +2354,14 @@ export function AutonomyMaps() {
           <article key={mapPack.id} data-selected={workspace.mapPack.id === mapPack.id}>
             <button type="button" className="autonomy-repository-card-surface" onClick={() => selectMap(mapPack.id)} onDoubleClick={() => openMapDetails(mapPack)}>
               <span className="autonomy-repository-preview is-map"><Layers3 aria-hidden="true" /></span>
-              <span className="autonomy-repository-copy"><strong>{mapPack.name}</strong><small>{mapRepresentationLabel(mapPack.representation, chinese)} · v{mapPack.version}</small></span>
+              <span className="autonomy-repository-copy"><strong>{mapPack.name}</strong><small>{mapRepresentationLabel(mapPack.representation, chinese)}</small></span>
             </button>
             {mapPack.id !== defaultMapId ? <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${mapPack.name}` : `Delete ${mapPack.name}`} onClick={() => removeAsset("map", mapPack.id)}><Trash2 aria-hidden="true" /></button> : null}
           </article>
         ))}
         {externalMaps.map((asset) => (
           <article key={`${asset.id}:${asset.contentSha256}`}>
-            <button type="button" className="autonomy-repository-card-surface" onDoubleClick={() => setDetails({ title: asset.name, rows: [[chinese ? "来源" : "Source", asset.sourceApplication || "—"], [chinese ? "格式" : "Format", asset.sourceFormat.toUpperCase()], [chinese ? "版本" : "Version", asset.version || "—"], [chinese ? "状态" : "Status", asset.maturity.replaceAll("_", " ")]] })}>
+            <button type="button" className="autonomy-repository-card-surface" onDoubleClick={() => setDetails({ title: asset.name, rows: [[chinese ? "来源" : "Source", asset.sourceApplication || "—"], [chinese ? "格式" : "Format", asset.sourceFormat.toUpperCase()], [chinese ? "状态" : "Status", asset.maturity.replaceAll("_", " ")]] })}>
               <span className="autonomy-repository-preview is-map is-imported"><Layers3 aria-hidden="true" /></span>
               <span className="autonomy-repository-copy"><strong>{asset.name}</strong><small>{asset.sourceApplication || asset.sourceFormat}</small></span>
             </button>
@@ -2414,72 +2392,6 @@ function RepositoryDetailsDialog({
         <dl>{details.rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
       </section>
     </div>
-  );
-}
-
-const MISSION_STEPS = [
-  { id: "contract", icon: Waypoints, en: "Task contract", zh: "任务合同" },
-  { id: "aircraft", icon: Navigation2, en: "Aircraft", zh: "无人机" },
-  { id: "world", icon: Layers3, en: "World", zh: "环境" },
-  { id: "trajectory", icon: Route, en: "Trajectory", zh: "航迹规划" },
-  { id: "safety", icon: ShieldCheck, en: "Safety", zh: "安全策略" },
-  { id: "review", icon: CircleCheck, en: "Review", zh: "检查验证" },
-] as const;
-
-export function AutonomyMissionRedirect() {
-  return <Navigate replace to="/autonomy" />;
-}
-
-export function AutonomyMission() {
-  const { chinese, workspace, persist } = useAutonomyWorkspace();
-  const step = workspace.mission.currentStep;
-  const handoffConsumed = useRef(false);
-  useEffect(() => {
-    if (handoffConsumed.current) return;
-    handoffConsumed.current = true;
-    const handoff = consumeAutonomyHandoff();
-    if (!handoff) return;
-    const updatedAt = new Date().toISOString();
-    persist(updatedWorkspace(workspace, { mission: { ...workspace.mission, intent: handoff, currentStep: 0, updatedAt } }));
-  }, [persist, workspace]);
-  const selectStep = (currentStep: number) => {
-    const updatedAt = new Date().toISOString();
-    persist(updatedWorkspace(workspace, { mission: { ...workspace.mission, currentStep, updatedAt } }));
-  };
-  const mapReady = autonomyMapPackQualified(workspace.mapPack);
-  const aircraftReady = isAutonomyAircraftAssetQualified(workspace.aircraft);
-  const assetPairReady = autonomyAssetPairQualified(workspace);
-  const blockers = [
-    ...(!aircraftReady ? [chinese ? "机型质量包络无效" : "Aircraft mass envelope is invalid"] : []),
-    ...(!mapReady ? [chinese ? "地图资料尚未完成运行场景绑定与认证" : "The map profile requires a qualified runtime binding"] : []),
-    ...(aircraftReady && mapReady && !assetPairReady
-      ? [chinese ? "地图与无人机必须来自同一次成对真实仿真认证" : "Map and aircraft must share one paired real-simulation qualification"]
-      : []),
-  ];
-  return (
-    <section className="autonomy-mission-page">
-      <ol className="autonomy-mission-stepper">
-        {MISSION_STEPS.map((item, index) => {
-          const Icon = item.icon;
-          return <li key={item.id} className={index === step ? "is-active" : index < step ? "is-complete" : ""}><button type="button" onClick={() => selectStep(index)}><span>{index < step ? <Check aria-hidden="true" /> : index + 1}</span><Icon aria-hidden="true" /><strong>{chinese ? item.zh : item.en}</strong></button></li>;
-        })}
-      </ol>
-
-      <div className="autonomy-mission-stage">
-        {step === 0 ? <section><header><Waypoints aria-hidden="true" /><h2>{chinese ? "任务合同" : "Task contract"}</h2><Link className="btn" to="/autonomy"><Sparkles aria-hidden="true" />{chinese ? "任务对话" : "Mission chat"}</Link></header><blockquote>{workspace.mission.intent}</blockquote><div className="autonomy-mission-model"><Cpu aria-hidden="true" /><span>{chinese ? "规划模型" : "Planning model"}</span><strong>{workspace.mission.planningModel.provider} · {workspace.mission.planningModel.model}</strong></div>{workspace.mission.planningBrief ? <p className="autonomy-planning-brief">{localizedAutonomyError(workspace.mission.planningBrief, chinese, { zh: "任务规划已完成，请继续检查结构化合同。", en: "Mission planning is complete. Continue reviewing the structured contract." })}</p> : null}<div className="autonomy-contract-points"><span><i>S</i>{chinese ? "起点" : "Start"}</span><ChevronRight /><span><i>1</i>{chinese ? "工作点" : "Work point"}</span><ChevronRight /><span><i>H</i>{chinese ? "返航" : "Return"}</span></div></section> : null}
-        {step === 1 ? <section><header><Navigation2 aria-hidden="true" /><h2>{workspace.aircraft.name}</h2><Link className="btn" to="/autonomy/aircraft">{chinese ? "无人机仓库" : "Aircraft repository"}</Link></header><div className="autonomy-stage-metrics"><Metric icon={<Database />} label={chinese ? "资产标识" : "Asset ID"} value={workspace.aircraft.agentCoreAssetId ?? "—"} /><Metric icon={<ShieldCheck />} label={chinese ? "资格" : "Qualification"} value={readinessLabel(aircraftReady, chinese)} /><Metric icon={<FileClock />} label={chinese ? "内容哈希" : "Content hash"} value={workspace.aircraft.agentCoreContentSha256?.slice(0, 16) ?? "—"} /><Metric icon={<CircleCheck />} label={chinese ? "认证凭据" : "Receipt"} value={workspace.aircraft.qualificationReceiptId ?? "—"} /></div></section> : null}
-        {step === 2 ? <section><header><Layers3 aria-hidden="true" /><h2>{workspace.mapPack.name}</h2><Link className="btn" to="/autonomy/maps">{chinese ? "地图仓库" : "Map repository"}</Link></header><div className="autonomy-stage-metrics"><Metric icon={<Database />} label={chinese ? "表示" : "Representation"} value={mapRepresentationLabel(workspace.mapPack.representation, chinese)} /><Metric icon={<ScanLine />} label={chinese ? "分辨率" : "Resolution"} value={`${workspace.mapPack.resolutionM.toFixed(3)} m`} /><Metric icon={<HardDrive />} label={chinese ? "资产" : "Assets"} value={String(workspace.mapPack.sourceFiles.length)} /><Metric icon={<ShieldCheck />} label={chinese ? "资格" : "Qualification"} value={readinessLabel(mapReady, chinese)} /></div></section> : null}
-        {step === 3 ? <section><header><Route aria-hidden="true" /><h2>{chinese ? "航迹目标" : "Trajectory objectives"}</h2></header><div className="autonomy-planner-choices"><button className="is-selected"><ShieldCheck />{chinese ? "安全优先" : "Safety first"}</button><button><Activity />{chinese ? "平滑飞行" : "Smooth flight"}</button><button><Gauge />{chinese ? "时间效率" : "Time efficient"}</button><button><Cpu />{chinese ? "能量效率" : "Energy efficient"}</button></div></section> : null}
-        {step === 4 ? <section><header><ShieldCheck aria-hidden="true" /><h2>{chinese ? "安全策略" : "Safety policy"}</h2></header><div className="autonomy-safety-policy-list"><span><Radio />{chinese ? "失联" : "Link loss"}<strong>{chinese ? "悬停 → 降落" : "HOLD → LAND"}</strong></span><span><MapPin />{chinese ? "越界" : "Geofence"}<strong>{chinese ? "降落" : "LAND"}</strong></span><span><Camera />{chinese ? "感知过期" : "Stale perception"}<strong>{chinese ? "悬停" : "HOLD"}</strong></span><span><Weight />{chinese ? "载荷超限" : "Payload overrun"}<strong>{chinese ? "降落" : "LAND"}</strong></span></div></section> : null}
-        {step === 5 ? <section><header><CircleCheck aria-hidden="true" /><h2>{chinese ? "检查并验证" : "Review & qualify"}</h2></header><div className="autonomy-review-block"><div className={aircraftReady ? "is-ready" : "is-blocked"}><Navigation2 /><span>{chinese ? "无人机" : "Aircraft"}</span><strong>{readinessLabel(aircraftReady, chinese)}</strong></div><div className={mapReady ? "is-ready" : "is-blocked"}><Layers3 /><span>{chinese ? "地图资料" : "Map profile"}</span><strong>{readinessLabel(mapReady, chinese)}</strong></div><div className="is-ready"><ShieldCheck /><span>{chinese ? "安全策略" : "Safety policy"}</span><strong>{chinese ? "已绑定" : "Bound"}</strong></div></div>{blockers.length ? <ul className="autonomy-review-blockers">{blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul> : <Link className="btn btn-primary" to="/autonomy/live"><Airplay />{chinese ? "进入仿真验证" : "Open simulation validation"}</Link>}</section> : null}
-      </div>
-
-      <footer className="autonomy-mission-footer">
-        <button className="btn" type="button" disabled={step === 0} onClick={() => selectStep(step - 1)}>{chinese ? "上一步" : "Back"}</button>
-        <span>{step + 1} / {MISSION_STEPS.length}</span>
-        <button className="btn btn-primary" type="button" disabled={step === MISSION_STEPS.length - 1} onClick={() => selectStep(step + 1)}>{chinese ? "下一步" : "Next"}<ChevronRight aria-hidden="true" /></button>
-      </footer>
-    </section>
   );
 }
 

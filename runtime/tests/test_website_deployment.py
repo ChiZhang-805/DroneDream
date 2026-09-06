@@ -91,17 +91,15 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
 
     def test_readme_routes_baota_deployments_through_the_wrapper(self) -> None:
         readme = self.read("website/README.md")
-        legacy_script = self.read("website/scripts/deploy-static.sh")
 
         self.assertIn("deploy-static-baota.ps1", readme)
         self.assertIn('-SshKeyPath "$HOME\\.ssh\\DroneDream-deploy.pem"', readme)
         self.assertIn("StrictHostKeyChecking=yes", readme)
-        self.assertRegex(readme, r"(?i)legacy generic-nginx workflow")
-        self.assertRegex(readme, r"(?i)not the supported path")
         self.assertIn("bare-IP", readme)
         self.assertIn("HTTPS", readme)
-        self.assertIn("LEGACY", legacy_script)
-        self.assertIn("deploy-static-baota.ps1", legacy_script)
+        self.assertFalse((ROOT / "website/scripts/deploy-static.sh").exists())
+        self.assertFalse((ROOT / "website/nginx/dronedream.conf").exists())
+        self.assertFalse((ROOT / "website/nginx/dronedream-bootstrap.conf").exists())
 
     def test_wrapper_accepts_only_a_key_path_and_keeps_release_gates(self) -> None:
         wrapper = self.read("website/scripts/deploy-static-baota.ps1")
@@ -174,9 +172,8 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         release_builder = self.read("website/scripts/build-release-site.ps1")
         wrapper = self.read("website/scripts/deploy-static-baota.ps1")
         remote_deploy = self.read("website/scripts/deploy-static-baota.sh")
-        legacy_deploy = self.read("website/scripts/deploy-static.sh")
 
-        for script in (pages_builder, wrapper, remote_deploy, legacy_deploy):
+        for script in (pages_builder, wrapper, remote_deploy):
             for product in (
                 "DroneDream-Universal",
                 "DroneDream-Sim",

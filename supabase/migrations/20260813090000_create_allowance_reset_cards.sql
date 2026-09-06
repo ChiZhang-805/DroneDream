@@ -154,20 +154,3 @@ revoke insert, update, delete on table public.model_allowance_reset_events from 
 revoke all on function public.model_allowance_reset_redeem(uuid, uuid) from public;
 grant execute on function public.model_allowance_reset_redeem(uuid, uuid)
   to service_role;
-
--- Product-owner support grant requested for the CZ91 account. The migration is
--- idempotent at deployment level and does not embed credentials.
-insert into public.model_allowance_reset_cards (
-  user_id,
-  credits,
-  expires_at,
-  issued_reason
-)
-select
-  users.id,
-  15000000,
-  now() + interval '1 year',
-  'product-owner-preview'
-from auth.users as users
-cross join generate_series(1, 3)
-where lower(users.email) = 'cz91@illinois.edu';

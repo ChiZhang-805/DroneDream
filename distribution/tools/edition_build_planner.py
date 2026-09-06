@@ -22,9 +22,12 @@ from typing import Any
 import distribution_contract as contract
 
 EDITION_IDS = ("autonomy", "field", "lab", "sim")
-EDITION_BRANCHES = {
-    edition_id: contract.EDITION_BRANCHES[edition_id]
-    for edition_id in EDITION_IDS
+EDITION_BRANCHES = {edition_id: contract.EDITION_BRANCHES[edition_id] for edition_id in EDITION_IDS}
+EDITION_LABELS = {
+    "autonomy": "Agent",
+    "field": "Field",
+    "lab": "Lab",
+    "sim": "Sim",
 }
 CORE_PATHS = ("backend", "desktop", "engine-pack", "frontend", "runtime", "worker")
 COMPONENT_IDS = {
@@ -216,8 +219,7 @@ def observe_release_heads(repo_root: Path, remote: str = "origin") -> dict[str, 
             raise BuildPlanError("remote release-head observation is malformed")
         branch = fields[1].removeprefix("refs/heads/")
         branch_to_edition = {
-            edition_branch: edition_id
-            for edition_id, edition_branch in EDITION_BRANCHES.items()
+            edition_branch: edition_id for edition_id, edition_branch in EDITION_BRANCHES.items()
         }
         if branch not in branch_to_edition:
             raise BuildPlanError("remote release-head observation returned an unexpected ref")

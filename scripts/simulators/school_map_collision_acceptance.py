@@ -22,7 +22,6 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_ROOT = REPOSITORY_ROOT / "backend"
 if str(BACKEND_ROOT) not in sys.path:
@@ -36,7 +35,6 @@ from app.autonomy.school_map_mission_validation import (  # noqa: E402
     sample_polyline,
     validate_route_clearance,
 )
-
 
 WORLD_NAME = "school_map_world"
 VEHICLE_PROBE_RADIUS_M = 0.38
@@ -94,7 +92,7 @@ def _prepare_empty_directory(path: Path) -> None:
 
 
 def _inject_collision_plugins(source: Path, destination: Path) -> None:
-    tree = ElementTree.parse(source)
+    tree = ElementTree.parse(source)  # noqa: S314 - exact qualified School Map SDF input.
     world = tree.getroot().find("world")
     if world is None:
         raise ValueError("School Map physics SDF has no world")
@@ -155,7 +153,7 @@ def _run(
     timeout: float = 10.0,
     check: bool = True,
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    return subprocess.run(  # noqa: S603 - resolved Gazebo executable with fixed argv.
         args,
         env=env,
         check=check,
@@ -231,10 +229,7 @@ def _publish_wrench(
     force: tuple[float, float, float],
 ) -> None:
     x, y, z = force
-    message = (
-        f'entity: {{name: "{name}" type: MODEL}} '
-        f'wrench: {{force: {{x: {x} y: {y} z: {z}}}}}'
-    )
+    message = f'entity: {{name: "{name}" type: MODEL}} wrench: {{force: {{x: {x} y: {y} z: {z}}}}}'
     _run(
         [
             gz,
@@ -335,7 +330,7 @@ def main() -> int:
     gazebo_log_path = run_dir / "gazebo.log"
     results: list[dict[str, Any]] = []
     with gazebo_log_path.open("w", encoding="utf-8") as gazebo_log:
-        gazebo = subprocess.Popen(
+        gazebo = subprocess.Popen(  # noqa: S603 - resolved Gazebo executable with fixed argv.
             [gz, "sim", "-r", "-s", "-v", "2", str(collision_world)],
             env=env,
             stdout=gazebo_log,
@@ -350,11 +345,9 @@ def main() -> int:
                 name = f"collision_probe_{scenario_id.replace('-', '_')}"
                 topic = f"/dronedream/collision/{scenario_id}"
                 probe_path = run_dir / f"{name}.sdf"
-                probe_path.write_text(
-                    _probe_sdf(name, topic, scenario["start"]), encoding="utf-8"
-                )
+                probe_path.write_text(_probe_sdf(name, topic, scenario["start"]), encoding="utf-8")
                 _create_entity(gz, env, name=name, sdf_filename=probe_path)
-                listener = subprocess.Popen(
+                listener = subprocess.Popen(  # noqa: S603 - resolved Gazebo executable with fixed argv.
                     [gz, "topic", "-e", "-n", "1", "-t", topic],
                     env=env,
                     stdout=subprocess.PIPE,

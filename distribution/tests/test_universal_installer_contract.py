@@ -13,9 +13,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[2]
 PROFILE = ROOT / "distribution/build-profiles/universal-1.0.0.v1.json"
 INTEGRATED_WORKSPACES = ROOT / "distribution/universal/integrated-workspaces.v2.json"
-EXTERNAL_ASSET_QUALIFICATION = (
-    ROOT / "distribution/shared/external-asset-qualification.v1.json"
-)
+EXTERNAL_ASSET_QUALIFICATION = ROOT / "distribution/shared/external-asset-qualification.v1.json"
 OVERLAY = ROOT / "desktop/src-tauri/tauri.universal.conf.json"
 SCRIPT = ROOT / "desktop/scripts/build-universal-installer.ps1"
 FINALIZER = ROOT / "desktop/scripts/finalize-existing-universal-candidate.ps1"
@@ -133,8 +131,8 @@ def test_visible_installer_receipt_is_exact_source_bound_and_never_commits() -> 
         "Refusing to overwrite an existing visible installer receipt",
         'foreach ($language in @("English", "SimpChinese"))',
         '"-SimulateFreshInstall", "-ValidatePathGuard"',
-        'installationCommits = 0',
-        'visibleInstallerUiReady = $true',
+        "installationCommits = 0",
+        "visibleInstallerUiReady = $true",
     ):
         assert fragment in text
     assert "-RedirectStandardOutput" in text
@@ -221,11 +219,16 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
     assert integrated_manifest["createsCrossEditionHarnessOrchestrator"] is False
     assert integrated_manifest["validatedVehiclePackCount"] == 0
     assert integrated_manifest["hardwareActionDecision"] == "deny"
-    integrated_vehicle_studio = integrated_manifest["productScopedCapability"]
-    assert integrated_vehicle_studio["id"] == "vehicle-studio"
-    assert integrated_vehicle_studio["hostEditions"] == ["universal", "autonomy"]
-    assert integrated_vehicle_studio["editionBoundStorage"] is True
-    assert integrated_vehicle_studio["theme"] == "edition-bound"
+    integrated_capability = integrated_manifest["sharedCapability"]
+    assert integrated_capability["id"] == "external-asset-qualification"
+    assert integrated_capability["ownerEdition"] == "autonomy"
+    assert integrated_capability["routes"] == [
+        "/autonomy/maps",
+        "/autonomy/aircraft",
+    ]
+    assert integrated_capability["builtInModeling"] is False
+    assert integrated_capability["unqualifiedAssetCanExecute"] is False
+    assert integrated_capability["grantsHardwareAuthority"] is False
     assert "universalExclusiveCapability" not in integrated_manifest
     assert integrated_manifest["donors"]["lab"]["productSource"] == (  # type: ignore[index]
         "b3c5f90948f206472e3e12504d8205cb563ac9dc"
@@ -256,20 +259,32 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
                 check=True,
             ).stdout.strip()
             assert actual_blob == source_file["donorBlob"]
-    vehicle_studio = profile["productScopedCapabilities"]["vehicleStudio"]
-    assert vehicle_studio["hostEditions"] == ["universal", "autonomy"]
-    assert vehicle_studio["editionBoundStorage"] is True
-    assert vehicle_studio["shareTargets"] == ["sim", "lab", "field", "autonomy"]
-    assert vehicle_studio["automaticReceiverInstallation"] is False
-    assert vehicle_studio["modelHarnessStartsOnExchange"] is False
-    assert vehicle_studio["grantsSimulationExecution"] is False
-    assert vehicle_studio["grantsHardwareAuthority"] is False
-    assert vehicle_studio["productSourceCommit"] == (
-        "b2fdade2afcfa20e1f117eafabb537aafa6f067f"
+    qualification = profile["sharedCapabilities"]["externalAssetQualification"]
+    assert qualification["ownerEdition"] == "autonomy"
+    assert qualification["routes"] == ["/autonomy/maps", "/autonomy/aircraft"]
+    assert qualification["shareTargets"] == [
+        "universal",
+        "sim",
+        "lab",
+        "field",
+        "autonomy",
+    ]
+    assert qualification["sourceKinds"] == ["file", "directory", "direct_url", "git"]
+    assert qualification["qualificationTargets"] == [
+        "ROS 2 Jazzy",
+        "Gazebo Harmonic",
+        "PX4 SITL",
+    ]
+    assert qualification["builtInModeling"] is False
+    assert qualification["automaticReceiverInstallation"] is False
+    assert qualification["modelHarnessStartsOnImport"] is False
+    assert qualification["unqualifiedAssetCanExecute"] is False
+    assert qualification["grantsSimulationExecution"] is False
+    assert qualification["grantsHardwareAuthority"] is False
+    assert qualification["productSourceCommit"] == ("7cf37d728211a92bbcbb411c3ce8cca904d4c38a")
+    assert qualification["contract"] == str(EXTERNAL_ASSET_QUALIFICATION.relative_to(ROOT)).replace(
+        "\\", "/"
     )
-    assert qualification["contract"] == str(
-        EXTERNAL_ASSET_QUALIFICATION.relative_to(ROOT)
-    ).replace("\\", "/")
     assert len(qualification["sourceFiles"]) == 10
     for source_file in qualification["sourceFiles"]:
         path = ROOT / source_file["path"]
@@ -298,9 +313,10 @@ def test_universal_overlay_uses_mother_brand_and_canonical_windows_icon() -> Non
     assert resources["../../distribution/desktop/edition-browser-auth.v1.json"] == (  # type: ignore[index]
         "distribution/desktop/edition-browser-auth.v1.json"
     )
-    assert resources[
-        "../../distribution/desktop/edition-runtime-update-families.v1.json"
-    ] == "distribution/desktop/edition-runtime-update-families.v1.json"  # type: ignore[index]
+    assert (
+        resources["../../distribution/desktop/edition-runtime-update-families.v1.json"]
+        == "distribution/desktop/edition-runtime-update-families.v1.json"
+    )  # type: ignore[index]
 
 
 def test_universal_engine_payload_contains_all_editions_without_build_plans() -> None:
@@ -334,66 +350,64 @@ def test_universal_engine_payload_contains_all_editions_without_build_plans() ->
 def test_universal_build_is_single_source_bound_signed_attempt_with_external_target() -> None:
     script = SCRIPT.read_text(encoding="utf-8-sig")
     for fragment in (
-        '[string]$ExpectedSourceCommit',
-        'Universal builds require an explicit -ExpectedSourceCommit pin.',
-        'Universal HEAD does not match ExpectedSourceCommit.',
-        'explicitSourcePinRequiredForBuild = $true',
+        "[string]$ExpectedSourceCommit",
+        "Universal builds require an explicit -ExpectedSourceCommit pin.",
+        "Universal HEAD does not match ExpectedSourceCommit.",
+        "explicitSourcePinRequiredForBuild = $true",
         '$branch -cne "codex/software"',
-        'Universal builds require an exact clean source tree.',
-        'DroneDream-Universal-1.0.0.exe',
-        'universal-cargo-target',
+        "Universal builds require an exact clean source tree.",
+        "DroneDream-Universal-1.0.0.exe",
+        "universal-cargo-target",
         '$env:DRONEDREAM_EDITION_PROFILE = "unified-sim-lab"',
         '$env:DRONEDREAM_DESKTOP_EDITION_ID = "universal"',
         '$env:VITE_DRONEDREAM_EDITION = "universal"',
-        '$browserAuth.identityBinding.contractSha256 -cne $coexistenceSha256',
-        '$browserAuthIdentity.authClientId -cne $coexistenceIdentity.authClientId',
-        'Universal browser sign-in requires its registered public DRONEDREAM_OAUTH_CLIENT_ID.',
-        'providerOAuthClientIdSha256 = $providerOAuthClientIdSha256',
+        "$browserAuth.identityBinding.contractSha256 -cne $coexistenceSha256",
+        "$browserAuthIdentity.authClientId -cne $coexistenceIdentity.authClientId",
+        "Universal browser sign-in requires its registered public DRONEDREAM_OAUTH_CLIENT_ID.",
+        "providerOAuthClientIdSha256 = $providerOAuthClientIdSha256",
         'browserAuthStatus = "pending-exact-headed-roundtrip-validation"',
-        'Universal updater signing requires TAURI_SIGNING_PRIVATE_KEY_PATH.',
-        'buildCount = 1',
+        "Universal updater signing requires TAURI_SIGNING_PRIVATE_KEY_PATH.",
+        "buildCount = 1",
         '$buildReceiptPath = "${artifactPath}.receipt.json"',
         '$updaterMetadataPath = Join-Path $releaseMetadataDirectory "latest-universal.json"',
-        'desktop-universal-v1\\.0\\.0-build-',
-        'publishedWithWebsiteFiles = $false',
+        "desktop-universal-v1\\.0\\.0-build-",
+        "publishedWithWebsiteFiles = $false",
         'payloadContractId = "dronedream-universal-engine-payload/v1"',
-        'dronedream-shared-edition-ui/v1',
+        "dronedream-shared-edition-ui/v1",
         'Invoke-GitText @("merge-base", "--is-ancestor"',
-        'visualEvidenceSubjectCommit = [string]$sharedUi.visualEvidence.subjectCommit',
-        'Universal shared UI source binding drifted:',
-        'Universal shared UI visual evidence hash drifted.',
-        'dronedream-universal-integrated-workspaces/v2',
-        '$integratedUi.sourceFileCount -ne 12',
-        'Universal integrated workspace manifest hash drifted.',
-        'Universal integrated workspace source binding drifted:',
-        'Universal integrated workspace byte-exact donor drifted:',
-        'createsCrossEditionHarnessOrchestrator = $false',
-        'integratedWorkspaceUi = [ordered]@{',
-        'Product-scoped Vehicle Studio identity or safety policy drifted.',
-        'Product-scoped Vehicle Studio source binding drifted:',
-        'Product-scoped Vehicle Studio contract must bind exactly ten source files.',
-        '$vehicleStudioHosts -join ","',
-        'editionBoundStorage = $true',
-        'vehicleStudio = [ordered]@{',
-        'dialogScrollHeight -gt $measurement.dialogClientHeight',
-        'panelScrollHeight -gt $measurement.panelClientHeight',
-        'runtimePanelHeadedValidationStatus',
-        'fieldLightweightEntryIntegrationStatus',
-        'Multiple incompatible Universal Engine Pack manifests were produced.',
-            "AdditionalConfigPath = $overlayPath",
-            "CargoTargetDir = $cargoTargetFull",
-            "ExpectedProductName = [string]$overlay.productName",
-            'EditionId = "universal"',
-            "@builderArguments",
-        'releaseReady = $false',
-        'pending-isolated-red-validation',
+        "visualEvidenceSubjectCommit = [string]$sharedUi.visualEvidence.subjectCommit",
+        "Universal shared UI source binding drifted:",
+        "Universal shared UI visual evidence hash drifted.",
+        "dronedream-universal-integrated-workspaces/v2",
+        "$integratedUi.sourceFileCount -ne 12",
+        "Universal integrated workspace manifest hash drifted.",
+        "Universal integrated workspace source binding drifted:",
+        "Universal integrated workspace byte-exact donor drifted:",
+        "createsCrossEditionHarnessOrchestrator = $false",
+        "integratedWorkspaceUi = [ordered]@{",
+        "Shared external asset qualification identity or safety policy drifted.",
+        "Shared external asset qualification source binding drifted:",
+        "Shared external asset qualification contract must bind exactly ten source files.",
+        "externalAssetQualification = [ordered]@{",
+        "dialogScrollHeight -gt $measurement.dialogClientHeight",
+        "panelScrollHeight -gt $measurement.panelClientHeight",
+        "runtimePanelHeadedValidationStatus",
+        "fieldLightweightEntryIntegrationStatus",
+        "Multiple incompatible Universal Engine Pack manifests were produced.",
+        "AdditionalConfigPath = $overlayPath",
+        "CargoTargetDir = $cargoTargetFull",
+        "ExpectedProductName = [string]$overlay.productName",
+        'EditionId = "universal"',
+        "@builderArguments",
+        "releaseReady = $false",
+        "pending-isolated-red-validation",
     ):
         assert fragment in script
     assert "-AllowUnsignedUpdater" not in script
     assert "$sharedArguments" not in script
-    assert '$env:DRONEDREAM_OAUTH_CLIENT_ID =' not in script
-    assert script.index('Universal builds require an explicit -ExpectedSourceCommit pin.') < (
-        script.index('Universal updater signing requires TAURI_SIGNING_PRIVATE_KEY_PATH.')
+    assert "$env:DRONEDREAM_OAUTH_CLIENT_ID =" not in script
+    assert script.index("Universal builds require an explicit -ExpectedSourceCommit pin.") < (
+        script.index("Universal updater signing requires TAURI_SIGNING_PRIVATE_KEY_PATH.")
     )
 
 
@@ -417,14 +431,14 @@ def test_existing_candidate_finalizer_preserves_product_source_and_never_rebuild
     finalizer = FINALIZER.read_text(encoding="utf-8-sig")
     for fragment in (
         'ValidatePattern("^[0-9a-f]{40}$")',
-        'DroneDream-Universal_1.0.0_x64-setup.exe',
-        'DroneDream-Universal-1.0.0.exe',
-        'finalizerToolHeadIsProductSource = $false',
-        'candidate-awaiting-isolated-red-lifecycle-validation',
-        'rebuildProhibited -ne $true',
-        'exactCleanProductSourceCommit = $ProductSourceCommit',
-        'buildCount = 1',
-        'releaseReady = $false',
+        "DroneDream-Universal_1.0.0_x64-setup.exe",
+        "DroneDream-Universal-1.0.0.exe",
+        "finalizerToolHeadIsProductSource = $false",
+        "candidate-awaiting-isolated-red-lifecycle-validation",
+        "rebuildProhibited -ne $true",
+        "exactCleanProductSourceCommit = $ProductSourceCommit",
+        "buildCount = 1",
+        "releaseReady = $false",
     ):
         assert fragment in finalizer
     assert "tauri build" not in finalizer
@@ -437,29 +451,29 @@ def test_universal_lifecycle_verifier_is_exact_byte_bound_and_isolated() -> None
     for fragment in (
         'ValidatePattern("^[0-9a-f]{40}$")',
         'ValidatePattern("^[0-9a-f]{64}$")',
-        'DroneDream-Universal-1.0.0.exe',
-        'DroneDream-Universal',
-        'io.dronedream.desktop.universal',
-        'install-app-only',
+        "DroneDream-Universal-1.0.0.exe",
+        "DroneDream-Universal",
+        "io.dronedream.desktop.universal",
+        "install-app-only",
         'hardwareActionDecision -cne "deny"',
-        'distribution\\desktop\\edition-coexistence.v1.json',
-        'distribution\\desktop\\edition-browser-auth.v1.json',
-        'distribution\\desktop\\edition-runtime-update-families.v1.json',
+        "distribution\\desktop\\edition-coexistence.v1.json",
+        "distribution\\desktop\\edition-browser-auth.v1.json",
+        "distribution\\desktop\\edition-runtime-update-families.v1.json",
         'browserAuthIdentity[0].authClientId -cne "dronedream-desktop-universal"',
-        'dronedream-vehicle-pack-registry',
-        '$registry.packs',
-        '$_.currentValidationTier',
-        'validatedVehiclePackCount = 0',
+        "dronedream-vehicle-pack-registry",
+        "$registry.packs",
+        "$_.currentValidationTier",
+        "validatedVehiclePackCount = 0",
         '@("/S", "/NS", "/L=1033")',
         '@("/S", "/NS", "/UPDATE", "/L=1033")',
-        'Close it before isolated lifecycle validation; the verifier will never terminate it.',
-        'Universal lifecycle preflight found pre-existing product state',
-        'Protected existing DroneDream, Runtime, shortcut, registry, or WebView2 state changed',
-        'releaseReady = $false',
-        'installerLifecycleReady = $true',
+        "Close it before isolated lifecycle validation; the verifier will never terminate it.",
+        "Universal lifecycle preflight found pre-existing product state",
+        "Protected existing DroneDream, Runtime, shortcut, registry, or WebView2 state changed",
+        "releaseReady = $false",
+        "installerLifecycleReady = $true",
         'browserAuth = "not-run-separate-headed-gate"',
-        'if ($Execute)',
-        'edition-installer-lifecycle-contract.ps1',
+        "if ($Execute)",
+        "edition-installer-lifecycle-contract.ps1",
         'productRegistrationAfterStandardUninstall = "retained-unless-delete-app-data-selected"',
     ):
         assert fragment in lifecycle
@@ -471,11 +485,7 @@ def test_universal_lifecycle_verifier_is_exact_byte_bound_and_isolated() -> None
 
 
 def _run_lifecycle_contract(expression: str) -> subprocess.CompletedProcess[str]:
-    command = (
-        f". '{LIFECYCLE_CONTRACT}'; "
-        "$ErrorActionPreference='Stop'; "
-        f"{expression}"
-    )
+    command = f". '{LIFECYCLE_CONTRACT}'; $ErrorActionPreference='Stop'; {expression}"
     return subprocess.run(
         ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
         cwd=ROOT,
@@ -593,17 +603,17 @@ def test_visible_locale_verifier_handles_language_selector_in_edition_namespace(
         "Test-Path -LiteralPath $entry.ProviderPath",
         "& reg.exe export $key $backup /y *> $null",
         "& reg.exe delete $key /f *> $null",
-        'throw "Could not back up installer registration \'$key\'"',
-        'throw "Could not suspend installer registration \'$key\'"',
-        '[DroneDreamInstallerUi]::GetDlgItem($handle, 1002)',
+        "throw \"Could not back up installer registration '$key'\"",
+        "throw \"Could not suspend installer registration '$key'\"",
+        "[DroneDreamInstallerUi]::GetDlgItem($handle, 1002)",
         '$languageIndex = if ($Language -eq "English") { 0 } else { 1 }',
-        'SendMessage($languageCombo, $CB_SETCURSEL',
-        'Invoke-DialogButton -Dialog $entryPage.Handle -ControlId 1',
-        '[switch]$StopAfterLocationPage',
-        'StopAfterLocationPage and ValidatePathGuard are mutually exclusive.',
-        'Interactive installer application page verified:',
+        "SendMessage($languageCombo, $CB_SETCURSEL",
+        "Invoke-DialogButton -Dialog $entryPage.Handle -ControlId 1",
+        "[switch]$StopAfterLocationPage",
+        "StopAfterLocationPage and ValidatePathGuard are mutually exclusive.",
+        "Interactive installer application page verified:",
         '$installerArguments += "/DRONEDREAMVALIDATEPATHONLY"',
-        'The installer path-only validation did not exit',
+        "The installer path-only validation did not exit",
     ):
         assert fragment in verifier
     assert 'HKCU:\\Software\\DroneDream\\DroneDream"' not in verifier
@@ -625,8 +635,7 @@ def _run_installer_ui_registration_guard(body: str) -> subprocess.CompletedProce
         "if($functions.Count -ne 2){exit 8};"
         "$functions | ForEach-Object { Invoke-Expression $_.Extent.Text };"
         "$InstallerProductName=('DroneDream-UiGuard-' + [Guid]::NewGuid().ToString('N'));"
-        "$script:registryBackups=@();"
-        + body
+        "$script:registryBackups=@();" + body
     )
     return subprocess.run(
         ["powershell", "-NoProfile", "-NonInteractive", "-Command", command],
@@ -639,8 +648,7 @@ def _run_installer_ui_registration_guard(body: str) -> subprocess.CompletedProce
 
 def test_visible_locale_registration_guard_accepts_absent_fresh_state() -> None:
     result = _run_installer_ui_registration_guard(
-        "Suspend-DroneDreamRegistration;"
-        "if($script:registryBackups.Count -ne 0){exit 9}"
+        "Suspend-DroneDreamRegistration;if($script:registryBackups.Count -ne 0){exit 9}"
     )
     assert result.returncode == 0, result.stderr
 

@@ -1156,7 +1156,7 @@ describe("NewJob experiment wizard", () => {
       .mockResolvedValue({ id: "unused" } as Job);
     renderPage();
 
-    expect(screen.getByText("Template catalog v1")).toBeVisible();
+    expect(screen.queryByText("Template catalog v1")).not.toBeInTheDocument();
     expect(screen.queryByTestId("route-preview")).not.toBeInTheDocument();
     fireEvent.click(
       screen.getByRole("button", { name: "Apply to draft: Hover basics" }),
@@ -1217,13 +1217,12 @@ describe("NewJob experiment wizard", () => {
     expect(createSpy).not.toHaveBeenCalled();
   });
 
-  it("falls back to the legacy contract only when an old backend rejects advanced fields", async () => {
+  it("fails closed instead of downgrading a current experiment for an old backend", async () => {
     const createSpy = vi
       .spyOn(apiClient, "createJob")
-      .mockRejectedValueOnce(
+      .mockRejectedValue(
         new ApiClientError("INVALID_INPUT", "Unknown advanced fields", null, 422),
-      )
-      .mockResolvedValueOnce({ id: "job_legacy" } as Job);
+      );
     renderPage();
     openStep(/Constraints & budget/i);
     fireEvent.change(screen.getByLabelText(/Optimizer Strategy/i), {
@@ -1231,11 +1230,11 @@ describe("NewJob experiment wizard", () => {
     });
     createExperiment();
 
-    await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText(/experiment could not be created.*BACKEND_UPGRADE_REQUIRED/i)).toBeVisible();
+    expect(createSpy).toHaveBeenCalledTimes(1);
     expect(createSpy.mock.calls[0][0].parameter_space).toBeDefined();
-    expect(createSpy.mock.calls[1][0].parameter_space).toBeUndefined();
-    expect(createSpy.mock.calls[1][0].vehicle_profile).toBeUndefined();
-    expect(navigateMock).toHaveBeenCalledWith("/jobs/job_legacy", { replace: false });
+    expect(createSpy.mock.calls[0][0].vehicle_profile).toBeDefined();
+    expect(navigateMock).not.toHaveBeenCalled();
   });
 
   it("does not silently downgrade an experimental optimizer for an old backend", async () => {

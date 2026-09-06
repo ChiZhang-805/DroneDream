@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -51,6 +52,9 @@ def main() -> int:
     from gz.transport13 import Node
 
     partition = f"dronedream_live_smoke_{os.getpid()}"
+    gz_executable = shutil.which("gz")
+    if gz_executable is None:
+        raise RuntimeError("Gazebo CLI executable 'gz' was not found on PATH")
     os.environ["GZ_PARTITION"] = partition
     os.environ["GZ_IP"] = "127.0.0.1"
     with tempfile.TemporaryDirectory(prefix="dronedream-live-smoke-") as temporary:
@@ -58,8 +62,8 @@ def main() -> int:
         world = root / "world.sdf"
         world.write_text(WORLD, encoding="utf-8")
         log = (root / "gazebo.log").open("w", encoding="utf-8")
-        process = subprocess.Popen(
-            ["gz", "sim", "-r", "-s", "--headless-rendering", str(world)],
+        process = subprocess.Popen(  # noqa: S603 - resolved Gazebo executable, fixed argv.
+            [gz_executable, "sim", "-r", "-s", "--headless-rendering", str(world)],
             stdout=log,
             stderr=subprocess.STDOUT,
             text=True,

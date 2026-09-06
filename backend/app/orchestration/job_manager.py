@@ -1781,7 +1781,7 @@ def _harness_budget_context(
         tool_id for tool_id in selectable_harness_tools(snapshot) if tool_id != "cma_es"
     )
     if not selectable:
-        raise RuntimeError("multi-tool Harness requires an experimental fallback")
+        raise RuntimeError("multi-tool Harness requires a configured deterministic fallback")
     full_capacity = remaining_trials // full_trials_per_candidate
     has_full_optimizer_evidence = _has_successful_full_fidelity_optimizer_evidence(job)
     candidate_capacity = min(4, full_capacity)

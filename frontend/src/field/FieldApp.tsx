@@ -209,11 +209,12 @@ function savedLocale(): FieldLocale {
   }
 }
 
-function fieldPlanName(value: string | undefined): "Free" | "Plus" | "Pro" {
+function fieldPlanName(value: string | undefined): "Free" | "Plus" | "Pro" | null {
   const normalized = value?.trim().toLocaleLowerCase();
   if (normalized === "plus") return "Plus";
   if (normalized === "pro") return "Pro";
-  return "Free";
+  if (normalized === "free") return "Free";
+  return null;
 }
 
 export interface FieldAppProps {
@@ -297,7 +298,9 @@ function FieldWorkspace({
         managedUsage.plan.included_ai_credits,
       ))
     : null;
-  const accountPlan = fieldPlanName(managedUsage?.plan.name);
+  const accountPlan = auth?.account
+    ? fieldPlanName(managedUsage?.plan.id)
+    : "Local";
   const updateVisible = isDesktopRuntime() && [
     "available",
     "downloading",
@@ -564,7 +567,7 @@ function FieldWorkspace({
                     )}
                     <span className="field-sidebar-account-copy">
                       <strong>{auth?.account?.displayName || copy.settings}</strong>
-                      <small>{accountPlan}</small>
+                      <small>{accountPlan ?? "—"}</small>
                     </span>
                     <ChevronUp aria-hidden="true" />
                   </button>

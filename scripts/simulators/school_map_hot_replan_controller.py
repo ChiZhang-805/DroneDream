@@ -184,9 +184,7 @@ def run(run_dir: Path, *, timeout_seconds: float) -> dict[str, Any]:
     _write_json_atomic(control_path, replace_request)
     replace_ack = _wait_for(
         ack_path,
-        lambda value: (
-            value.get("revision") == 2 and value.get("state") == "route_replaced"
-        ),
+        lambda value: value.get("revision") == 2 and value.get("state") == "route_replaced",
         timeout_seconds=30.0,
         label="PX4 replacement-route acknowledgement",
     )
@@ -210,18 +208,13 @@ def run(run_dir: Path, *, timeout_seconds: float) -> dict[str, Any]:
     gates = mission.get("gates")
     if not isinstance(gates, dict):
         raise ValueError("HOT_REPLAN_MISSION_GATES_INVALID")
-    destination_distance = _minimum_destination_distance(
-        run_dir / "gazebo_pose_samples.csv"
-    )
+    destination_distance = _minimum_destination_distance(run_dir / "gazebo_pose_samples.csv")
     assertions = {
         "interrupted_before_original_pickup": trigger.get("payload_attached") is False,
         "hold_acknowledged": hold_ack.get("state") == "holding",
-        "safe_hold_stabilized": max(
-            float(sample["vehicle_speed_m_s"]) for sample in stable_samples
-        )
+        "safe_hold_stabilized": max(float(sample["vehicle_speed_m_s"]) for sample in stable_samples)
         <= 0.12,
-        "route_replacement_acknowledged": replace_ack.get("state")
-        == "route_replaced",
+        "route_replacement_acknowledged": replace_ack.get("state") == "route_replaced",
         "hold_and_replace_recorded": runtime_actions == ["hold", "replace_route"],
         "changed_destination_reached": destination_distance <= 0.5,
         "executor_completed": gates.get("executor_completed") is True,
@@ -229,10 +222,7 @@ def run(run_dir: Path, *, timeout_seconds: float) -> dict[str, Any]:
         "office_return_reached": gates.get("office_return_reached") is True,
         "landed_on_office_pad": gates.get("landed_on_office_pad") is True,
         "px4_landing_confirmed": gates.get("px4_landing_confirmed") is True,
-        "zero_unsafe_dynamic_penetrations": gates.get(
-            "zero_unsafe_dynamic_penetrations"
-        )
-        is True,
+        "zero_unsafe_dynamic_penetrations": gates.get("zero_unsafe_dynamic_penetrations") is True,
     }
     evidence = {
         "schema_version": "dronedream.school-map-hot-replan-evidence.v1",

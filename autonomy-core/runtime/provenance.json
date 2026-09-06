@@ -1,9 +1,0 @@
-{
-  "schema_version": "1.0.0",
-  "px4_offboard_track_executor": {
-    "source_repository": "ChiZhang-805/DroneDream",
-    "source_commit": "5d6eae80f550df1edf29569c61c629abe73ee9b4",
-    "source_path": "scripts/simulators/px4_offboard_track_executor.py",
-    "sha256": "72545a95503589188f46fc508f94aad67e9753e8c131a6e579574e1055cc3da8"
-  }
-}

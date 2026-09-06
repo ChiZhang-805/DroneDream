@@ -1107,7 +1107,7 @@ function ExecutionBackendCard({ job }: { job: Job }) {
               ? t("jobDetail.completionPolicy.explorationBudget")
               : job.completion_policy === "first_qualified_stop"
                 ? t("jobDetail.completionPolicy.firstQualified")
-                : t("jobDetail.completionPolicy.legacy")}
+                : t("jobDetail.completionPolicy.basic")}
           </span>
         </li>
         {job.provider_turn_cap !== undefined ? (

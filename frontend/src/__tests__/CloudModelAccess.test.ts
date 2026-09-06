@@ -243,6 +243,17 @@ describe("cloud model access client", () => {
     expect(JSON.stringify(fetchMock.mock.calls)).not.toMatch(/api[_-]?key/iu);
   });
 
+  it("keeps an unavailable cloud catalog visibly fail-closed", async () => {
+    const { cloud } = await loadCloudAccess();
+
+    const models = cloud.completeManagedModelCatalog([]);
+
+    expect(models).toHaveLength(cloud.DEFAULT_MANAGED_MODEL_CATALOG.length);
+    expect(models.every((model) => (
+      !model.enabled && !model.assistant_enabled && !model.job_enabled
+    ))).toBe(true);
+  });
+
   it("maps an exhausted managed allowance to the typed BYOK boundary", async () => {
     const { cloud, auth } = await loadCloudAccess();
     auth.setAuthAccessToken("signed-user-token");

@@ -46,7 +46,7 @@ class _System:
         self.param = _Parameters(reads)
 
     async def connect(self, *, system_address: str) -> None:
-        if system_address != "udp://:14540":
+        if system_address != "udpin://0.0.0.0:14540":
             raise AssertionError(system_address)
 
 

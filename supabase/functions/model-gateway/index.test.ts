@@ -1,6 +1,8 @@
 import {
   buildModelCatalog,
   MANAGED_MODELS,
+  managedProviderReasoningPolicy,
+  publicModelGatewayBaseUrl,
   reconcileManagedUsage,
   type ModelPolicyRow,
 } from "./index.ts";
@@ -51,6 +53,38 @@ Deno.test("managed catalog exposes the two current Kimi choices", () => {
   assert(kimi.length === 2, "Kimi model count changed unexpectedly");
   assert(kimi[0].model === "kimi-k2.6", "Kimi K2.6 is missing");
   assert(kimi[1].model === "kimi-k3", "Kimi K3 is missing");
+});
+
+Deno.test("managed Kimi K2.6 calls reserve output for the final JSON artifact", () => {
+  assert(
+    JSON.stringify(managedProviderReasoningPolicy("kimi", "kimi-k2.6")) ===
+      JSON.stringify({ thinking: { type: "disabled" } }),
+    "Kimi K2.6 must not spend the bounded response budget on hidden thinking",
+  );
+  assert(
+    Object.keys(managedProviderReasoningPolicy("kimi", "kimi-k3")).length === 0,
+    "the K2.6 policy must not leak into another model",
+  );
+  assert(
+    Object.keys(managedProviderReasoningPolicy("openai", "gpt-5.4")).length ===
+      0,
+    "the Kimi policy must not leak into another provider",
+  );
+});
+
+Deno.test("model grants expose the public HTTPS Functions endpoint", () => {
+  assert(
+    publicModelGatewayBaseUrl("https://project-ref.supabase.co") ===
+      "https://project-ref.supabase.co/functions/v1/model-gateway",
+    "grant URLs must not inherit an Edge Runtime internal request path",
+  );
+  let rejected = false;
+  try {
+    publicModelGatewayBaseUrl("http://project-ref.supabase.co/model-gateway");
+  } catch {
+    rejected = true;
+  }
+  assert(rejected, "an internal or insecure gateway origin must be rejected");
 });
 
 Deno.test("model catalog rejects malformed provider policy", () => {

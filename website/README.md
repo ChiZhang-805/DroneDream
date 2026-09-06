@@ -151,14 +151,6 @@ bash website/scripts/prune-static-baota.sh --apply 0.3.18-20260716T183330Z
 The active release is always retained. Additional release IDs supplied on the
 command line are also retained.
 
-## Legacy generic-Nginx workflow
-
-`website/scripts/deploy-static.sh` and the templates under `website/nginx/`
-target the older `/var/www/dronedream-*` layout for a generic Ubuntu/Nginx host.
-They are retained as **legacy reference tooling** and are not the supported path
-for the current BaoTa server. Do not mix that layout with the BaoTa scripts or
-vhosts.
-
 If an existing host was created from a WordPress image, take a snapshot before
 changing Nginx or document roots. Reinstalling or replacing its system disk can
 destroy WordPress and its database and therefore requires explicit owner

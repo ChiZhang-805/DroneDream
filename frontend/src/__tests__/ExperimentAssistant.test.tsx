@@ -475,7 +475,7 @@ describe("conversational experiment drafting", () => {
       .not.toContain('{"track_type":"circle","altitude_m":3}');
   });
 
-  it("keeps a legacy server-side modeling result in chat without creating an AGENT artifact", async () => {
+  it("keeps an unsupported server-side modeling result in chat without creating an AGENT artifact", async () => {
     const blocked = assistantResponse();
     blocked.experiment_summary = "Vehicle modeling is not available in DroneDream · AGENT.";
     blocked.assistant_message = blocked.experiment_summary;
@@ -488,7 +488,7 @@ describe("conversational experiment drafting", () => {
       edition: "autonomy",
       artifact_id: "artifact-blocked-agent-vehicle",
       artifact_version: 1,
-      product_link: "/vehicle-studio",
+      product_link: "/autonomy/aircraft",
       artifact_kind: "universal_vehicle_model",
       artifact_payload: {
         status: "blocked",

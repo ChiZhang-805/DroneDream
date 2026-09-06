@@ -1631,12 +1631,9 @@ def main(argv: list[str] | None = None) -> int:
                 if loop_observed_at >= executor_deadline:
                     live_abort_reason = "executor_wall_timeout"
                 latest = recorder.latest_sample
-                sample_is_new = (
-                    latest is not None
-                    and (
-                        last_pose_sample_elapsed is None
-                        or latest.elapsed_s > last_pose_sample_elapsed + 1e-9
-                    )
+                sample_is_new = latest is not None and (
+                    last_pose_sample_elapsed is None
+                    or latest.elapsed_s > last_pose_sample_elapsed + 1e-9
                 )
                 if sample_is_new and latest is not None:
                     last_pose_sample_elapsed = latest.elapsed_s

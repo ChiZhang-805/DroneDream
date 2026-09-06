@@ -1,4 +1,0 @@
-openai==2.54.0
-pydantic==2.13.4
-mavsdk==3.15.3
-jsonschema==4.26.0

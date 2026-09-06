@@ -12,7 +12,6 @@ import pytest
 from app.orchestration.harness_fallback_contract_campaign import (
     HARNESS_FALLBACK_CONTRACT_ARMS,
     HARNESS_FALLBACK_CONTRACT_CLAIM_BOUNDARY,
-    HARNESS_FALLBACK_CONTRACT_LEGACY_SCHEMA_VERSION,
     HARNESS_FALLBACK_CONTRACT_REFERENCE_ARM,
     build_harness_fallback_contract_campaign,
     verify_harness_fallback_contract_campaign,
@@ -39,7 +38,6 @@ ARTIFACT_ROOT = Path(__file__).resolve().parents[1] / "evaluation_artifacts"
 JSON_ARTIFACT = ARTIFACT_ROOT / "harness-fallback-outcome-campaign-v1.json"
 CSV_ARTIFACT = ARTIFACT_ROOT / "harness-fallback-outcome-campaign-v1.csv"
 SHA256_ARTIFACT = ARTIFACT_ROOT / "harness-fallback-outcome-campaign-v1.sha256"
-LEGACY_JSON_ARTIFACT = ARTIFACT_ROOT / "harness-fallback-contract-campaign-v2.json"
 CURRENT_JSON_ARTIFACT = ARTIFACT_ROOT / "harness-fallback-contract-campaign-v3.json"
 CURRENT_CSV_ARTIFACT = ARTIFACT_ROOT / "harness-fallback-contract-campaign-v3.csv"
 CURRENT_SHA256_ARTIFACT = ARTIFACT_ROOT / "harness-fallback-contract-campaign-v3.sha256"
@@ -141,16 +139,6 @@ def test_current_fallback_verifier_rejects_missing_tool_execution_trace() -> Non
 
     with pytest.raises(ValueError, match="declared current fallback contract"):
         verify_harness_fallback_contract_campaign(artifact)
-
-
-def test_legacy_fallback_campaign_remains_strictly_verifiable() -> None:
-    legacy = verify_harness_fallback_contract_campaign(
-        json.loads(LEGACY_JSON_ARTIFACT.read_text(encoding="utf-8"))
-    )
-    assert legacy["schema_version"] == HARNESS_FALLBACK_CONTRACT_LEGACY_SCHEMA_VERSION
-    assert legacy["artifact_sha256"] == (
-        "6a6cd147a79ce2583192304802f263b9902850120701934ba58329832b103ff9"
-    )
 
 
 def test_campaign_guard_blocks_and_counts_network_connects() -> None:

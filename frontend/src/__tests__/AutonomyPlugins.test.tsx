@@ -65,6 +65,23 @@ describe("two-level plug-in studio", () => {
     expect(screen.getByText("No standalone plug-ins installed")).toBeInTheDocument();
   });
 
+  it("keeps component versions internal in the standalone plug-in library", async () => {
+    pluginMocks.plugins.mockResolvedValue([{
+      plugin_id: "dronedream.dynamic-obstacle-planner",
+      name: "Dynamic obstacle planner",
+      version: "1.0.0",
+      publisher: "DroneDream",
+      removable: false,
+    }]);
+    render(<MemoryRouter><AutonomyPlugins /></MemoryRouter>);
+    await screen.findByText("Balanced closed loop");
+
+    fireEvent.click(screen.getByRole("button", { name: "Library" }));
+
+    expect(screen.getByText("Dynamic obstacle planner")).toBeInTheDocument();
+    expect(screen.queryByText(/1\.0\.0/)).not.toBeInTheDocument();
+  });
+
   it("opens a desktop context menu on right-click and shows a details card", async () => {
     render(<MemoryRouter><AutonomyPlugins /></MemoryRouter>);
     await screen.findByText("Balanced closed loop");

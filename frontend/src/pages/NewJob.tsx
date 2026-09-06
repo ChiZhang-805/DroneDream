@@ -84,7 +84,6 @@ import { ExperienceTrackPreview } from "../features/experiment/ExperienceTrackPr
 import {
   applyStarterExperienceTemplate,
   findStarterExperienceTemplate,
-  STARTER_EXPERIENCE_CATALOG_VERSION,
   STARTER_EXPERIENCE_TEMPLATES,
   type StarterExperienceId,
   type StarterExperienceTemplate,
@@ -1214,35 +1213,10 @@ function formToRequest(
   return request;
 }
 
-function legacyRequest(request: JobCreateRequest): JobCreateRequest {
-  const legacy: JobCreateRequest = { ...request };
-  const llm = legacy.llm;
-  delete legacy.vehicle_profile;
-  delete legacy.parameter_catalog_version;
-  delete legacy.parameter_space;
-  delete legacy.objective_config;
-  delete legacy.scenario_suite;
-  delete legacy.max_total_trials;
-  delete legacy.completion_policy;
-  delete legacy.provider_turn_cap;
-  delete legacy.continue_exploration_after_qualified;
-  delete legacy.exploration_budget;
-  delete legacy.llm;
-  if (llm) {
-    if (llm.access_mode === "platform" || !llm.api_key) return legacy;
-    return {
-      ...legacy,
-      openai: { api_key: llm.api_key, model: llm.model ?? null },
-    };
-  }
-  return legacy;
-}
-
 function buildStudyMetadata(
   form: FormState,
   selections: ParameterSelectionMap,
   estimatedTrials: number,
-  usedLegacyApi: boolean,
 ): ExperimentStudyConfig {
   return {
     schema_version: 1,
@@ -1279,23 +1253,21 @@ function buildStudyMetadata(
       estimated_trials: estimatedTrials,
     },
     compatibility: {
-      legacy_job_api: usedLegacyApi,
-      unmapped_parameters: usedLegacyApi
-        ? selectedParameters(selections).map((parameter) => parameter.name)
-        : [],
+      unmapped_parameters: [],
     },
   };
 }
 
-function isLegacyContractRejection(
+function isUnsupportedCurrentContractRejection(
   error: unknown,
   request: JobCreateRequest,
 ): error is ApiClientError {
   if (!(error instanceof ApiClientError) || ![400, 422].includes(error.httpStatus)) {
     return false;
   }
-  // An old backend cannot enforce an immutable first-qualified receipt or a
-  // separately bounded continuation child. Never silently erase that choice.
+  // A backend without the current contract cannot enforce an immutable
+  // first-qualified receipt or a separately bounded continuation child. Never
+  // silently erase that choice.
   if (request.continue_exploration_after_qualified) return false;
   if (request.llm && request.llm.provider !== "openai") return false;
   const evidence = `${error.message} ${JSON.stringify(error.details ?? "")}`.toLowerCase();
@@ -1986,7 +1958,6 @@ export function NewJob() {
     }
     submittingRef.current = true;
     setSubmitting(true);
-    let usedLegacyApi = false;
     try {
       if (publicDemoConsole) {
         persistDraft(4);
@@ -2019,31 +1990,17 @@ export function NewJob() {
       try {
         created = await apiClient.createJob(advancedRequest);
       } catch (error) {
-        if (!isLegacyContractRejection(error, advancedRequest)) throw error;
-        if (advancedRequest.llm?.access_mode === "platform") {
-          throw new ApiClientError(
-            "BACKEND_UPGRADE_REQUIRED",
-            t("wizard.experimentalBackendRequired"),
-            null,
-            422,
-          );
-        }
-        if (EXPERIMENTAL_OPTIMIZER_STRATEGIES.some(
-          (strategy) => strategy === advancedRequest.optimizer_strategy,
-        )) {
-          throw new ApiClientError(
-            "BACKEND_UPGRADE_REQUIRED",
-            t("wizard.experimentalBackendRequired"),
-            null,
-            422,
-          );
-        }
-        usedLegacyApi = true;
-        created = await apiClient.createJob(legacyRequest(advancedRequest));
+        if (!isUnsupportedCurrentContractRejection(error, advancedRequest)) throw error;
+        throw new ApiClientError(
+          "BACKEND_UPGRADE_REQUIRED",
+          t("wizard.experimentalBackendRequired"),
+          null,
+          422,
+        );
       }
       persistStudyForJob(
         created.id,
-        buildStudyMetadata(form, selections, estimatedTrials, usedLegacyApi),
+        buildStudyMetadata(form, selections, estimatedTrials),
       );
       if (workspaceId) {
         updateExperimentWorkspace(ownerId, workspaceId, {
@@ -2057,7 +2014,7 @@ export function NewJob() {
       void recordProductEvent("job_created", {
         source: lastAppliedTemplateKey ? "fixed_scenario" : "manual_or_assistant",
         template_key: lastAppliedTemplateKey,
-        used_legacy_api: usedLegacyApi,
+        used_legacy_api: false,
       });
       navigate(`/jobs/${created.id}`, { replace: false });
     } catch (error) {
@@ -2239,11 +2196,6 @@ export function NewJob() {
                   <h3 id="starter-experience-title">{t("wizard.starter.title")}</h3>
                 </div>
                 <div className="starter-experience-heading-actions">
-                  <span className="starter-experience-version">
-                    {t("wizard.starter.catalogVersion", {
-                      version: STARTER_EXPERIENCE_CATALOG_VERSION,
-                    })}
-                  </span>
                   <button
                     type="button"
                     className="btn btn-ghost btn-small"
@@ -2263,10 +2215,7 @@ export function NewJob() {
                     const title = t(copy.title);
                     return (
                       <article className="starter-experience-card" key={template.key}>
-                        <div>
-                          <strong>{title}</strong>
-                          <span>v{template.version}</span>
-                        </div>
+                        <div><strong>{title}</strong></div>
                         <button
                           type="button"
                           className="btn btn-ghost btn-small"
@@ -2725,7 +2674,7 @@ export function NewJob() {
                           </option>
                         ))}
                       </optgroup>
-                      <optgroup label={t("wizard.optimizerLegacyGroup")}>
+                      <optgroup label={t("wizard.optimizerBaselineGroup")}>
                         {LEGACY_OPTIMIZER_STRATEGIES.map((strategy) => (
                           <option key={strategy} value={strategy}>
                             {optimizerStrategyLabel(strategy, t)}

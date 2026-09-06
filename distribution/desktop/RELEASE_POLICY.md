@@ -6,6 +6,11 @@ Git commit count is the update build number.
 
 ## Permanent public layout
 
+- Exactly eight long-lived branches: `main`, the five edition branches
+  (`codex/software`, `codex/software-sim`, `codex/software-lab`,
+  `codex/software-field`, `codex/software-agent`), `codex/website`, and
+  `codex/technical-report`. Feature branches are temporary and must not become
+  additional permanent channels.
 - An immutable build release for each retained desktop build:
   `five-edition-v<version>-build-<buildNumber>`.
 - Exactly twenty immutable build assets: installer, updater signature, SHA-256
@@ -17,6 +22,17 @@ Git commit count is the update build number.
   That manifest points to the matching installer inside the shared immutable
   five-edition release.
 - The website download menu points to those same five immutable installer assets.
+- Exactly eight public Releases and eight matching Tags after retention: the
+  current and rollback five-edition builds, five updater-channel releases, and
+  the current Runtime release.
+- Exactly one GitHub Pages Deployment record is retained after a successful
+  publish. Superseded inactive Deployment records are deleted only after the
+  newest record is verified successful.
+
+The `Retain latest Pages deployment` job runs only after the Pages deployment
+completes successfully. It verifies the newest `github-pages`
+deployment state, marks every older record inactive, deletes those records, and
+then verifies that exactly the newest deployment remains.
 
 An installed older build checks only its permanent edition channel. It may update
 directly to the newest build without the intermediate build releases remaining
@@ -43,6 +59,12 @@ current five-product topology that set contains exactly eight entries: two
 five-edition builds, five updater channels, and one Runtime release. A release
 publisher must fail closed if any standalone remote Tag, orphaned Release, extra
 Runtime release, or third desktop rollback remains after approved pruning.
+
+Push validated work promptly to its existing long-lived branch. A fast update
+does not relax source-integrity, secret scanning, build, test, or signed-release
+gates, and it must not create an extra permanent branch, Release, Tag, or
+Deployment record. Shared product changes still return through the repository's
+normal integration policy.
 
 Remote `archive/*`, unsigned internal-build, website-deployment, experiment, and
 recovery-only Tags are forbidden. A recovery snapshot that is not a public

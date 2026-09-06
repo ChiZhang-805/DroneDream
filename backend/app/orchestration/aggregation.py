@@ -354,7 +354,7 @@ def candidate_is_publishable(candidate: models.CandidateParameterSet) -> bool:
     no known hard-constraint failure, exact coverage of the configured scenario
     matrix, and a passed holdout whenever the suite requires one. Legacy
     aggregates did not persist ``feasible``; absence remains compatible for
-    legacy optimizers, while experimental optimizers require an explicit result.
+    baseline optimizers, while experimental optimizers require an explicit result.
     """
 
     job = getattr(candidate, "job", None)

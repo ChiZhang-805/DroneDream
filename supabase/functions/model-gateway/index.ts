@@ -45,6 +45,35 @@ export const MANAGED_MODELS: readonly ManagedModelDefinition[] = [
   { provider: "kimi", display_name: "Kimi K3", model: "kimi-k3" },
 ] as const;
 
+export function managedProviderReasoningPolicy(
+  provider: ManagedProvider,
+  model: string,
+): JsonRecord {
+  if (provider === "kimi" && model === "kimi-k2.6") {
+    // K2.6 thinks by default. DroneDream's managed gateway reserves a bounded
+    // output allowance for a machine-readable control-plane artifact, so the
+    // service owns this setting and guarantees room for the final JSON body.
+    return { thinking: { type: "disabled" } };
+  }
+  return {};
+}
+
+export function publicModelGatewayBaseUrl(supabaseUrl: string): string {
+  const parsed = new URL(supabaseUrl);
+  if (
+    parsed.protocol !== "https:" || parsed.username || parsed.password ||
+    (parsed.pathname !== "/" && parsed.pathname !== "") || parsed.search ||
+    parsed.hash
+  ) {
+    throw new GatewayError(
+      "SERVICE_NOT_CONFIGURED",
+      "SUPABASE_URL must be a credential-free HTTPS origin.",
+      503,
+    );
+  }
+  return `${parsed.origin}/functions/v1/model-gateway`;
+}
+
 class GatewayError extends Error {
   readonly code: string;
   readonly status: number;
@@ -513,16 +542,6 @@ async function handleGrant(request: Request): Promise<Response> {
   });
 }
 
-export function publicModelGatewayBaseUrl(supabaseUrl: string): string {
-  const publicUrl = new URL(supabaseUrl);
-  publicUrl.pathname = `${
-    publicUrl.pathname.replace(/\/+$/u, "")
-  }/functions/v1/model-gateway`;
-  publicUrl.search = "";
-  publicUrl.hash = "";
-  return publicUrl.toString().replace(/\/+$/u, "");
-}
-
 function validateMessages(value: unknown): JsonRecord[] {
   if (
     !Array.isArray(value) || value.length < 1 || value.length > MAX_MESSAGES
@@ -771,6 +790,7 @@ async function handleChatCompletions(request: Request): Promise<Response> {
     model: config.model,
     messages,
     stream: false,
+    ...managedProviderReasoningPolicy(provider, config.model),
   };
   if (provider === "openai") {
     providerBody.max_completion_tokens = config.maxOutputTokens;
