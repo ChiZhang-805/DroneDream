@@ -113,6 +113,11 @@ but this is not a trained ten-expert package or autonomous flight acceptance.
 The final publication-contract suite passed 419 tests and 15 subtests with the
 public Core reference pinned to `e4496d73230ce5593ea44e42e8e9bb146462bc07`.
 The closed native-output/configuration tests are included in that result.
+The later source pin includes camera-training validation, JSON-safe camera
+readback, bounded preflight timing diagnostics and a strict ensemble CLI.
+Focused regressions passed; they do not relabel the earlier full-suite result
+as having run against this newer revision. Actual camera readback now succeeds,
+but stable preflight sensing and complete current-model training remain unqualified.
 These source checks do not claim a completed Windows installer build. Model
 training/admission, third-party weight redistribution rights, current UI
 acceptance, and approved production signing remain release prerequisites.
