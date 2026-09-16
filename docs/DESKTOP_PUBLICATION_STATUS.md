@@ -135,3 +135,28 @@ These source checks do not claim a completed Windows installer build. Model
 training/admission, third-party weight redistribution rights, current UI
 acceptance, and approved production signing remain release prerequisites.
 No installer assets or update-channel manifests were promoted by this repair.
+
+## Desktop cancellation and model computation checks (2026-09-17)
+
+The current Core pin unifies desktop cancellation, tracking-failure and shutdown
+requests with the executor's stop contract. The previous requests omitted the
+mandatory `world_paused` flag and contained fields the evidence reader rejected.
+The repaired path retains the first safety stop, including a paused-world state,
+and does not describe sending a stop request as proof of landing.
+
+Package assembly and installer preflight now actually execute every expert's
+required outputs using bounded, synthetic interface inputs. They check current
+tensor dimensions, float32 values, finiteness, risk/scale bounds and four-axis
+control bounds using the same output validators as live inference. Probe inputs
+never enter control history or a training dataset and grant no flight authority.
+440 focused Core regressions passed; lint, 68 exported schemas and seven shared
+Runtime files also passed. All 419 distribution regressions passed with this
+Core pin. These results do not attest trained model quality.
+
+The maintainer requested manual flight acceptance rather than further automatic
+flight runs. The last started collection was stopped before arming and all of its
+resources were closed. No new collection, model promotion or installed desktop
+replacement has been performed since that request. A compatible trained model
+bundle is still absent, and the read-only signing check still reports missing
+SignPath configuration. Source fixes are not advertised as a completed installer
+update; further data collection requires the maintainer's direction.
