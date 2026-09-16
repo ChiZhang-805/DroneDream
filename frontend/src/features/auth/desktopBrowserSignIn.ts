@@ -22,16 +22,24 @@ export interface DesktopBrowserRestoreOptions {
 }
 
 function cancelledError(): Error {
+  // A consistent user-facing cancellation message contains no credential details.
   return new Error("Desktop browser sign-in cancelled.");
 }
 
 function throwIfCancelled(signal?: AbortSignal): void {
+  // Check between native calls as well as before publishing an adopted account.
   if (signal?.aborted) throw cancelledError();
 }
 
 function abortable<T>(operation: Promise<T>, signal?: AbortSignal): Promise<T> {
+  // Cancel the caller's wait; this cannot roll back the already-started native RPC.
   if (!signal) return operation;
-  throwIfCancelled(signal);
+  if (signal.aborted) {
+    // Argument evaluation may already have started the operation. Observe even
+    // this branch's late rejection while returning cancellation to the caller.
+    void operation.catch(() => undefined);
+    return Promise.reject(cancelledError());
+  }
   return new Promise<T>((resolve, reject) => {
     let settled = false;
     const finish = (complete: () => void) => {
@@ -55,6 +63,7 @@ async function rethrowAdoptionError(
   error: unknown,
   signal?: AbortSignal,
 ): Promise<never> {
+  // Clear only conclusively unusable credentials, preserving the original failure.
   if (signal?.aborted) throw cancelledError();
   if (shouldClearBrowserAuthVaultAfterAdoptionError(error)) {
     // Native vault entries are edition-scoped. Remove this one only when the
@@ -70,6 +79,7 @@ export async function completeDesktopBrowserSignIn(
   locale: "en" | "zh-CN",
   options: DesktopBrowserSignInOptions = {},
 ): Promise<void> {
+  // Explicit sign-in owns launcher activation, browser consent, then remote adoption.
   const { signal, restoreFromVault = false, onAdopting } = options;
   throwIfCancelled(signal);
   activateDesktopAuthSession();
@@ -97,6 +107,7 @@ export async function completeDesktopBrowserSignIn(
 export async function restoreDesktopBrowserSession(
   options: DesktopBrowserRestoreOptions = {},
 ): Promise<boolean> {
+  // Restore only when explicitly requested; absence is distinct from invalid adoption.
   const { signal, onAdopting } = options;
   throwIfCancelled(signal);
   activateDesktopAuthSession();
@@ -116,6 +127,7 @@ export async function restoreDesktopBrowserSession(
 export async function cancelDesktopBrowserSignIn(
   controller: AbortController,
 ): Promise<boolean> {
+  // Stop local publication immediately, even if cancelling the native UI later fails.
   controller.abort();
   return cancelBrowserAuth().catch(() => false);
 }

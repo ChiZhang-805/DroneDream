@@ -42,6 +42,7 @@ export class BrowserAuthAdoptionError extends Error {
 export function shouldClearBrowserAuthVaultAfterAdoptionError(
   error: unknown,
 ): boolean {
+  // Transport/configuration failures do not prove the saved credential is revoked.
   return error instanceof BrowserAuthAdoptionError
     && (
       error.failure === "session-binding"
@@ -50,32 +51,46 @@ export function shouldClearBrowserAuthVaultAfterAdoptionError(
 }
 
 let refreshTimer: number | null = null;
+let refreshGeneration = 0;
+let refreshController: AbortController | null = null;
 const REFRESH_RETRY_DELAYS_MS = [15_000, 30_000, 60_000, 120_000, 300_000] as const;
 
 function tokenExpiryMs(accessToken: string): number | null {
+  // This unverified JWT field schedules refresh only; getUser authenticates tokens.
   try {
     const payload = accessToken.split(".")[1];
     if (!payload) return null;
     const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
     const decoded = JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "="))) as { exp?: unknown };
-    return typeof decoded.exp === "number" && Number.isFinite(decoded.exp)
-      ? decoded.exp * 1000
-      : null;
+    if (typeof decoded.exp !== "number") return null;
+    const expiry = decoded.exp * 1000;
+    return Number.isFinite(expiry) ? expiry : null;
   } catch {
     return null;
   }
 }
 
 function armNativeRefresh(accessToken: string, delay: number, retryAttempt: number): void {
+  // Native RPC cancellation cannot undo its work, so both late success and late
+  // failure are generation-bound before they may change the active account.
   if (refreshTimer !== null) window.clearTimeout(refreshTimer);
+  const generation = refreshGeneration;
   refreshTimer = window.setTimeout(() => {
+    if (generation !== refreshGeneration) return;
     refreshTimer = null;
-    void restoreBrowserAuthVault()
+    const controller = new AbortController();
+    refreshController = controller;
+    void Promise.resolve().then(() => {
+      if (controller.signal.aborted) return null;
+      return restoreBrowserAuthVault();
+    })
       .then((session) => {
+        if (generation !== refreshGeneration || controller.signal.aborted) return;
         if (!session) throw new Error("The desktop credential vault returned no session.");
-        return adoptBrowserAuthSession(session);
+        return adoptBrowserAuthSession(session, { signal: controller.signal });
       })
       .catch(() => {
+        if (generation !== refreshGeneration || controller.signal.aborted) return;
         const retryDelay = REFRESH_RETRY_DELAYS_MS[retryAttempt];
         const expiry = tokenExpiryMs(accessToken);
         if (
@@ -88,13 +103,16 @@ function armNativeRefresh(accessToken: string, delay: number, retryAttempt: numb
         }
         setAuthAccessToken(null);
         window.dispatchEvent(new Event(DESKTOP_AUTH_REFRESH_FAILED_EVENT));
+      })
+      .finally(() => {
+        if (refreshController === controller) refreshController = null;
       });
   }, delay);
 }
 
 function scheduleNativeRefresh(accessToken: string): void {
-  if (refreshTimer !== null) window.clearTimeout(refreshTimer);
-  refreshTimer = null;
+  // A newly adopted session supersedes pending refreshes of the previous session.
+  clearBrowserAuthSessionRefresh();
   const expiry = tokenExpiryMs(accessToken);
   if (expiry === null) return;
   const delay = Math.max(15_000, Math.min(expiry - Date.now() - 60_000, 24 * 60 * 60 * 1000));
@@ -102,11 +120,16 @@ function scheduleNativeRefresh(accessToken: string): void {
 }
 
 export function clearBrowserAuthSessionRefresh(): void {
+  // Sign-out must invalidate work already awaiting a reply, not only its timer.
+  refreshGeneration += 1;
+  refreshController?.abort();
+  refreshController = null;
   if (refreshTimer !== null) window.clearTimeout(refreshTimer);
   refreshTimer = null;
 }
 
 function expectedDesktopEdition(): keyof typeof CLIENT_BY_EDITION {
+  // Reject unknown configured editions instead of inheriting Universal privileges.
   const configured = (import.meta.env.VITE_DRONEDREAM_EDITION as string | undefined)
     ?.trim()
     .toLowerCase();
@@ -126,6 +149,7 @@ function errorDetails(error: unknown): {
   status: number | null;
   code: string | null;
 } {
+  // Inspect only known scalar fields; the original object stays an internal cause.
   if (typeof error !== "object" || error === null) {
     return {
       message: typeof error === "string" && error.trim() ? error : null,
@@ -153,6 +177,7 @@ function errorDetails(error: unknown): {
 }
 
 function classifyRemoteAdoptionError(error: unknown): BrowserAuthAdoptionError {
+  // Permanent rejection permits clearing this edition's vault; transient errors do not.
   const { message, name, status, code } = errorDetails(error);
   const normalizedMessage = message?.toLowerCase() ?? "";
   if (
@@ -200,6 +225,8 @@ export async function adoptBrowserAuthSession(
   session: BrowserAuthSession,
   options: { signal?: AbortSignal } = {},
 ): Promise<void> {
+  // Match protocol and edition before sending the token to the configured account
+  // service; native refresh grants never enter the WebView's token cache.
   const throwIfCancelled = () => {
     if (options.signal?.aborted) {
       throw new Error("Desktop browser sign-in cancelled.");
@@ -252,8 +279,9 @@ export async function adoptBrowserAuthSession(
     throw classifyRemoteAdoptionError(error);
   }
   setAuthAccessToken(session.accessToken);
+  // Arm first so an adoption listener can synchronously sign out and cancel it.
+  scheduleNativeRefresh(session.accessToken);
   window.dispatchEvent(new CustomEvent(ADOPT_DESKTOP_AUTH_EVENT, {
     detail: { user: data.user, accessToken: session.accessToken },
   }));
-  scheduleNativeRefresh(session.accessToken);
 }

@@ -13,6 +13,7 @@ from app.model_harness.domains import (
     MEMORY_PRECEDENCE,
     MODEL_HARNESS_DOMAIN_VALUES,
     PLUGIN_SEAMS,
+    MemoryLifecycle,
     consolidated_verified_outcome_lifecycle,
     resolve_task_domains,
     validate_long_term_memory_payload,
@@ -196,3 +197,31 @@ def test_verified_outcome_lifecycle_is_consolidated_and_bounded() -> None:
             recency_at=timestamp,
             ttl_days=90,
         )
+
+
+@pytest.mark.parametrize("key", ("apiKey", "provider.accessToken", "password", "rawChatHistory"))
+def test_memory_secret_and_conversation_gates_cover_key_spellings(key: str) -> None:
+    with pytest.raises(ValueError, match="conversation data or execution authority"):
+        validate_long_term_memory_payload({key: "fixture-sensitive-value"})
+
+
+@pytest.mark.parametrize("value", (float("nan"), float("inf"), float("-inf")))
+def test_memory_never_persists_nonfinite_observations(value: float) -> None:
+    with pytest.raises(ValueError, match="finite"):
+        validate_long_term_memory_payload({"metric": value})
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (("evidence_count", True), ("ttl_days", 1.5), ("confidence", True),
+     ("source", "invented"), ("status", "invented"), ("recency_at", datetime(2026, 9, 1))),
+)
+def test_lifecycle_rejects_invalid_metadata_before_persistence(field: str, value: object) -> None:
+    data = {
+        "source": "verified_job_outcome", "evidence_count": 1, "confidence": 1.0,
+        "recency_at": datetime(2026, 9, 1, tzinfo=timezone.utc), "ttl_days": 90,
+        "status": "consolidated",
+    }
+    data[field] = value
+    with pytest.raises(ValueError):
+        MemoryLifecycle(**data)

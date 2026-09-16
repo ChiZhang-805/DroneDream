@@ -481,6 +481,43 @@ afterEach(() => {
     router.dispose();
   });
 
+  it("does not turn pending environment checks green before native evidence returns", async () => {
+    let finishProbe!: (report: typeof missingRuntime) => void;
+    const probe = new Promise<typeof missingRuntime>((resolve) => { finishProbe = resolve; });
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return probe;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    const router = createMemoryRouter([{
+      path: "/",
+      element: <AppShell />,
+      children: [{ path: "dashboard", element: <div>Dashboard placeholder</div> }],
+    }], { initialEntries: ["/dashboard"] });
+    render(<I18nProvider><RouterProvider router={router} /></I18nProvider>);
+    try {
+      const workspace = await openSettingsWorkspace();
+      fireEvent.click(within(workspace).getByRole("tab", { name: "Runtime" }));
+      const check = within(workspace).getByRole("button", { name: "Check environment" });
+      fireEvent.click(check);
+      await waitFor(() => expect(invoke.mock.calls.some(([command]) => command === "probe_runtime_status")).toBe(true));
+      expect(check).toBeDisabled();
+      const rows = workspace.querySelectorAll(".settings-runtime-check-steps li");
+      expect(rows.length).toBeGreaterThan(0);
+      rows.forEach((row) => expect(row).toHaveAttribute("data-state", "checking"));
+      fireEvent.click(check);
+      expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status")).toHaveLength(1);
+      await act(async () => { finishProbe(missingRuntime); });
+      await waitFor(() => expect(check).not.toBeDisabled());
+      expect(workspace.querySelectorAll('.settings-runtime-check-steps li[data-state="error"]').length).toBeGreaterThan(0);
+      expect(within(workspace).getByText("Environment unavailable")).toBeInTheDocument();
+    } finally {
+      finishProbe(missingRuntime);
+      router.dispose();
+    }
+  });
+
   it("keeps a ready launcher frozen on focus and changes it only after a manual check", async () => {
     let currentRuntime: typeof readyRuntime | typeof missingRuntime = readyRuntime;
     const invoke = vi.fn(async (command: string) => {

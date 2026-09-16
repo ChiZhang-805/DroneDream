@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -21,13 +21,14 @@ import {
 } from "../desktop/bridge";
 import {
   analyzeLabCalibration,
+  MAX_LAB_CALIBRATION_INPUT_BYTES,
   parseLabCalibrationInput,
   serializeLabCalibrationDraftReceipt,
   type LabCalibrationAnalysis,
-  type LabCalibrationInput,
   type LabObjective,
 } from "./calibrationWorkflow";
 import { LabEvidenceBridgePanel } from "./LabEvidenceBridgePanel";
+import { useEvidenceImport } from "./useEvidenceImport";
 
 const COPY = {
   en: {
@@ -166,18 +167,27 @@ const COPY = {
   },
 } as const;
 
+/** Render already-validated metrics, not a second source of physical measurements. */
 function formatMetric(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(3);
 }
 
+/** Local sim/real comparison and draft export; no automatic model training or actuation. */
 export function LabCalibrationWorkspace() {
   const { locale } = useI18n();
   const copy = COPY[locale];
   const [objective, setObjective] = useState<LabObjective>("tracking");
   const [tolerance, setTolerance] = useState(15);
   const [cycleBudget, setCycleBudget] = useState(4);
-  const [input, setInput] = useState<LabCalibrationInput | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const evidenceImport = useEvidenceImport(MAX_LAB_CALIBRATION_INPUT_BYTES,
+                                          parseLabCalibrationInput);
+  const input = evidenceImport.value;
+  const [exportError, setExportError] = useState<string | null>(null);
+  const exportGeneration = useRef(0);
+  useEffect(() => () => { exportGeneration.current += 1; }, []);
+  const error = evidenceImport.error ? localeSafeError(evidenceImport.error, locale, {
+    zh: COPY["zh-CN"].inspectFailed, en: COPY.en.inspectFailed,
+  }) : exportError;
   const analysis = useMemo<LabCalibrationAnalysis | null>(
     () => input
       ? analyzeLabCalibration(input, objective, tolerance, cycleBudget)
@@ -189,25 +199,24 @@ export function LabCalibrationWorkspace() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    try {
-      setInput(parseLabCalibrationInput(file.name, await file.text()));
-      setError(null);
-    } catch (caught) {
-      setInput(null);
-      setError(localeSafeError(caught, locale, {
-        zh: COPY["zh-CN"].inspectFailed,
-        en: COPY.en.inspectFailed,
-      }));
-    }
+    invalidateExport();
+    await evidenceImport.importFile(file);
+  }
+
+  /** Any changed input invalidates a pending native export; late results cannot download. */
+  function invalidateExport() {
+    exportGeneration.current += 1;
+    setExportError(null);
   }
 
   function reset() {
-    setInput(null);
-    setError(null);
+    invalidateExport();
+    evidenceImport.reset();
   }
 
   async function exportDraft() {
     if (!input || !analysis) return;
+    const ticket = ++exportGeneration.current;
     let source: string;
     if (isDesktopRuntime()) {
       try {
@@ -236,7 +245,8 @@ export function LabCalibrationWorkspace() {
         });
         source = `${JSON.stringify(receipt, null, 2)}\n`;
       } catch (caught) {
-        setError(localeSafeError(caught, locale, {
+        if (ticket !== exportGeneration.current) return;
+        setExportError(localeSafeError(caught, locale, {
           zh: COPY["zh-CN"].exportFailed,
           en: COPY.en.exportFailed,
         }));
@@ -245,6 +255,7 @@ export function LabCalibrationWorkspace() {
     } else {
       source = serializeLabCalibrationDraftReceipt(input, analysis);
     }
+    if (ticket !== exportGeneration.current) return;
     const blob = new Blob(
       [source],
       { type: "application/json" },
@@ -280,7 +291,9 @@ export function LabCalibrationWorkspace() {
       <div className="lab-calibration-controls">
         <label>
           <span>{copy.objective}</span>
-          <select value={objective} onChange={(event) => setObjective(event.target.value as LabObjective)}>
+          <select value={objective} onChange={(event) => {
+            invalidateExport(); setObjective(event.target.value as LabObjective);
+          }}>
             {(Object.keys(copy.objectives) as LabObjective[]).map((value) => (
               <option key={value} value={value}>{copy.objectives[value]}</option>
             ))}
@@ -293,12 +306,14 @@ export function LabCalibrationWorkspace() {
             min="1"
             max="50"
             value={tolerance}
-            onChange={(event) => setTolerance(Number(event.target.value))}
+            onChange={(event) => { invalidateExport(); setTolerance(Number(event.target.value)); }}
           />
         </label>
         <label>
           <span>{copy.cycleBudget}</span>
-          <select value={cycleBudget} onChange={(event) => setCycleBudget(Number(event.target.value))}>
+          <select value={cycleBudget} onChange={(event) => {
+            invalidateExport(); setCycleBudget(Number(event.target.value));
+          }}>
             {[2, 4, 6, 8, 10, 12].map((value) => (
               <option key={value} value={value}>{value} {copy.cycles}</option>
             ))}
@@ -309,7 +324,8 @@ export function LabCalibrationWorkspace() {
             <Upload aria-hidden="true" /> {copy.import}
             <input type="file" accept="application/json,.json" onChange={importEvidence} />
           </label>
-          <button type="button" className="btn btn-ghost" disabled={!input && !error} onClick={reset}>
+          <button type="button" className="btn btn-ghost"
+            disabled={!input && !error && !evidenceImport.loading} onClick={reset}>
             <RefreshCw aria-hidden="true" /> {copy.reset}
           </button>
         </div>

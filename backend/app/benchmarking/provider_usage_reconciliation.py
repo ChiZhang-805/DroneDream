@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 from datetime import datetime, timezone
 from typing import Any, Literal, NoReturn
 
@@ -36,21 +35,27 @@ from app.benchmarking.provider_execution_contract import (
 
 
 class BenchmarkProviderUsageBlocked(RuntimeError):
+    """Reject inconsistent reconciliation evidence without mutating the reservation ledger."""
+
     def __init__(self, code: str, message: str) -> None:
+        """Carry a stable application error code separately from the operator explanation."""
         super().__init__(message)
         self.code = code
 
 
 def _blocked(code: str, message: str) -> NoReturn:
+    """Stop accounting before an invalid receipt can be presented as observed usage."""
     raise BenchmarkProviderUsageBlocked(code, message)
 
 
 def _iso8601(value: datetime) -> str:
+    """Normalize stored UTC timestamps; SQLite may return UTC columns without tzinfo."""
     aware = value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
     return aware.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _resource_vector(record: models.BenchmarkBudgetReservation) -> BenchmarkResourceVectorV1:
+    """Project reserved capacity, not actual consumption, into the shared budget schema."""
     return BenchmarkResourceVectorV1(
         jobs=record.jobs,
         trials=record.trials,
@@ -71,6 +76,7 @@ def validate_provider_run_reservation(
     campaign_id: str,
     run_binding_id: str,
 ) -> BenchmarkResourceVectorV1:
+    """Bind capacity to one campaign/run and recompute its immutable request digest."""
     if (
         reservation.campaign_id != campaign_id
         or reservation.reservation_key != f"provider-run/{run_binding_id}"
@@ -113,6 +119,7 @@ def _validate_run_graph(
     str,
     dict[str, Any],
 ]:
+    """Verify the relational run graph and frozen campaign/arm/source provenance together."""
     campaign = run.campaign
     arm = run.arm
     if (
@@ -215,6 +222,7 @@ def _validate_run_graph(
 
 
 def _turn_ledger_item(turn: models.HarnessCognitiveTurnReceipt) -> dict[str, Any]:
+    """Hash one logical turn including an explicit missing outcome, never fabricated success."""
     outcome = turn.outcome
     return {
         "generation_index": turn.generation_index,
@@ -241,6 +249,7 @@ def _turn_ledger_item(turn: models.HarnessCognitiveTurnReceipt) -> dict[str, Any
 
 
 def _request_ledger_item(request: models.ProviderNetworkRequestReceipt) -> dict[str, Any]:
+    """Describe one physical request's evidence without retaining plaintext prompts or keys."""
     turn = request.turn_receipt
     outcome = request.outcome
     return {
@@ -282,6 +291,7 @@ def _request_ledger_item(request: models.ProviderNetworkRequestReceipt) -> dict[
 
 
 def _attempt_counts(statuses: list[str | None]) -> BenchmarkProviderAttemptCountsV1:
+    """Partition attempted work; absent outcomes remain indeterminate rather than failed or free."""
     return BenchmarkProviderAttemptCountsV1(
         attempted=len(statuses),
         succeeded=sum(status == "succeeded" for status in statuses),
@@ -290,11 +300,47 @@ def _attempt_counts(statuses: list[str | None]) -> BenchmarkProviderAttemptCount
     )
 
 
+def _validate_observed_outcome(outcome: models.ProviderNetworkRequestOutcome) -> None:
+    """Check each row before summing; aggregate bounds cannot detect offsetting bad counts."""
+    for name in (
+        "output_utf8_bytes",
+        "latency_ms",
+        "input_tokens",
+        "output_tokens",
+        "total_tokens",
+        "provider_cost_microusd",
+    ):
+        value = getattr(outcome, name)
+        nullable = name not in {"output_utf8_bytes", "latency_ms"}
+        if value is None and nullable:
+            continue
+        if type(value) is not int or value < 0:
+            _blocked(
+                "benchmark_provider_outcome_usage_invalid",
+                "A provider outcome contains an invalid usage quantity.",
+            )
+    counts = (outcome.input_tokens, outcome.output_tokens)
+    known_sum = sum(value for value in counts if value is not None)
+    if outcome.total_tokens is not None and (
+        known_sum > outcome.total_tokens
+        or (all(value is not None for value in counts) and known_sum != outcome.total_tokens)
+    ):
+        _blocked(
+            "benchmark_provider_outcome_usage_inconsistent",
+            "Provider total tokens disagree with the reported components.",
+        )
+
+
 def reconcile_provider_run_usage(
     db: Session,
     run_binding_id: str,
 ) -> BenchmarkProviderRunUsageReconciliationV1:
-    """Recompute one run's actual work from immutable attempt/outcome ledgers."""
+    """Recompute observed usage without debiting or releasing reserved capacity.
+
+    Unknown token/cost components contribute no *observed* quantity but force an
+    incomplete status. This is a bounded accounting view, not proof of free use
+    or a supplier invoice. Run/arm checks forbid unregistered retries/fallbacks.
+    """
 
     run = db.get(models.BenchmarkCampaignRunBinding, run_binding_id)
     if run is None:
@@ -349,6 +395,7 @@ def reconcile_provider_run_usage(
     def _adaptive_review_reasons(
         turn: models.HarnessCognitiveTurnReceipt,
     ) -> list[str] | None:
+        """Recover optional review triggers only from a hash-matching revision checkpoint."""
         if turn.turn_index == 1:
             return ["adaptive-plan-turn"]
         if turn.turn_index == 2:
@@ -384,6 +431,7 @@ def reconcile_provider_run_usage(
         return list(trigger.diagnosis_reasons if turn.turn_index == 3 else trigger.critic_reasons)
 
     def _turn_contract_matches(turn: models.HarnessCognitiveTurnReceipt) -> bool:
+        """Bind role, ordinal, trigger reasons and model/source to the preregistered arm."""
         turn_expected_role: str | None
         turn_expected_reason: list[str] | None
         if arm.proposal_adapter_id == "dronedream_fixed_two_turn/v1":
@@ -476,6 +524,7 @@ def reconcile_provider_run_usage(
         if outcome is None:
             incomplete_usage += 1
             continue
+        _validate_observed_outcome(outcome)
         output_bytes += outcome.output_utf8_bytes
         latency_ms += outcome.latency_ms
         if (
@@ -486,6 +535,8 @@ def reconcile_provider_run_usage(
             or outcome.provider_cost_microusd is None
         ):
             incomplete_usage += 1
+        # Missing totals are deliberately lower-bound observations, and the
+        # incomplete counter prevents interpreting that lower bound as final.
         provider_tokens += outcome.total_tokens or 0
         provider_cost += outcome.provider_cost_microusd or 0
     observed = BenchmarkResourceVectorV1(
@@ -495,7 +546,8 @@ def reconcile_provider_run_usage(
         output_utf8_bytes=output_bytes,
         provider_tokens=provider_tokens,
         provider_cost_microusd=provider_cost,
-        wall_time_seconds=math.ceil(latency_ms / 1000),
+        # Preserve exact integer milliseconds even above float's exact range.
+        wall_time_seconds=(latency_ms + 999) // 1000,
     )
     status: Literal["complete", "usage_incomplete", "indeterminate"] = (
         "indeterminate"
@@ -536,7 +588,7 @@ def reconcile_direct_provider_run_usage(
     db: Session,
     run_binding_id: str,
 ) -> BenchmarkProviderRunUsageReconciliationV1:
-    """Backward-compatible direct-arm entry point."""
+    """Keep the direct-arm API as a checked alias of the single current reconciliation path."""
 
     run = db.get(models.BenchmarkCampaignRunBinding, run_binding_id)
     if run is None or run.arm.proposal_adapter_id != "llm_direct/v1":

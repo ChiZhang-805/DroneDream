@@ -106,6 +106,7 @@ function AccountProbe() {
   const [avatarError, setAvatarError] = useState("");
   const [registrationError, setRegistrationError] = useState("");
   const [recoveryError, setRecoveryError] = useState("");
+  const [profileError, setProfileError] = useState("");
   return (
     <>
       <output aria-label="username">{auth.account?.displayName ?? ""}</output>
@@ -114,10 +115,13 @@ function AccountProbe() {
       <output aria-label="avatar-error">{avatarError}</output>
       <output aria-label="registration-error">{registrationError}</output>
       <output aria-label="recovery-error">{recoveryError}</output>
+      <output aria-label="profile-error">{profileError}</output>
       <output aria-label="password-recovery">{String(auth.passwordRecovery)}</output>
       <button
         type="button"
-        onClick={() => void auth.updateDisplayName("Flight Pilot")}
+        onClick={() => void auth.updateDisplayName("Flight Pilot").catch((error: Error) => {
+          setProfileError(error.message);
+        })}
       >
         Rename
       </button>
@@ -238,6 +242,60 @@ function LoadingHistoryProbe({ history }: { history: boolean[] }) {
 }
 
 describe("AuthContext account profile", () => {
+  it("does not overwrite a newer auth event with a late hydration snapshot", async () => {
+    let resolve!: (value: Awaited<ReturnType<typeof authMock.getSession>>) => void;
+    const oldUser = { ...authMock.state.user };
+    authMock.getSession.mockReturnValueOnce(new Promise((accept) => { resolve = accept; }));
+    render(<AuthProvider><AccountProbe /></AuthProvider>);
+    act(() => authMock.emitAuthStateChange("SIGNED_IN", {
+      user: { ...oldUser, id: "user-2", email: "new@example.com" }, access_token: "new-token",
+    }));
+    await act(async () => resolve({
+      data: { session: { user: oldUser, access_token: "old-token" } }, error: null,
+    }));
+    expect(screen.getByLabelText("email")).toHaveTextContent("new@example.com");
+  });
+
+  it("settles loading when hydration rejects instead of returning an error object", async () => {
+    authMock.getSession.mockRejectedValueOnce(new Error("offline"));
+    render(<AuthProvider><LoadingHistoryProbe history={[]} /></AuthProvider>);
+    await waitFor(() => expect(screen.getByLabelText("auth-loading")).toHaveTextContent("false"));
+  });
+
+  it("does not rename the new desktop account with a late old-account response", async () => {
+    let resolve!: (value: Response) => void;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((accept) => { resolve = accept; })));
+    window.__TAURI__ = { core: { invoke: vi.fn(async () => undefined) } };
+    render(<AuthProvider><AccountProbe /></AuthProvider>);
+    act(() => { activateDesktopAuthSession(); adoptDesktopAccount(); });
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    act(() => window.dispatchEvent(new CustomEvent(ADOPT_DESKTOP_AUTH_EVENT, {
+      detail: {
+        user: { ...authMock.state.user, id: "user-2", email: "new@example.com" },
+        accessToken: "new-token",
+      },
+    })));
+    await act(async () => resolve(new Response("{}", { status: 200 })));
+    expect(screen.getByLabelText("username")).toHaveTextContent("new");
+    expect(screen.getByLabelText("profile-error")).toHaveTextContent("account changed");
+  });
+
+  it("does not write old avatar metadata into a newly signed-in web account", async () => {
+    let resolve!: (value: Awaited<ReturnType<typeof authMock.uploadAvatar>>) => void;
+    authMock.uploadAvatar.mockReturnValueOnce(new Promise((accept) => { resolve = accept; }));
+    render(<AuthProvider><AccountProbe /></AuthProvider>);
+    await waitFor(() => expect(screen.getByLabelText("email")).toHaveTextContent("pilot.name"));
+    fireEvent.click(screen.getByRole("button", { name: "Change avatar" }));
+    act(() => authMock.emitAuthStateChange("SIGNED_IN", {
+      user: { ...authMock.state.user, id: "user-2", email: "new@example.com" },
+      access_token: "new-token",
+    }));
+    await act(async () => resolve({ data: { path: "user-1/avatar.jpg" }, error: null }));
+    expect(authMock.updateUser).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("email")).toHaveTextContent("new@example.com");
+    expect(screen.getByLabelText("avatar-error")).toHaveTextContent("account changed");
+  });
+
   afterEach(() => {
     authMock.state.user = {
       id: "user-1",

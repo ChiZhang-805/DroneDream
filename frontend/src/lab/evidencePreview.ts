@@ -1,3 +1,5 @@
+import { validateEvidenceTree } from "./evidenceInput";
+
 export const MAX_LAB_EVIDENCE_BYTES = 256 * 1024;
 
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -31,6 +33,7 @@ export class LabEvidencePreviewError extends Error {
   }
 }
 
+/** Require a JSON object before selecting presentation fields. */
 function objectValue(value: unknown, label: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new LabEvidencePreviewError(`${label} must be an object.`);
@@ -45,6 +48,7 @@ function stringValue(value: unknown, label: string): string {
   return value.trim();
 }
 
+/** Validate the declared digest's syntax only; this preview does not authenticate it. */
 function sha256Value(value: unknown, label: string): string {
   const normalized = stringValue(value, label).toLowerCase();
   if (!SHA256.test(normalized)) {
@@ -53,6 +57,7 @@ function sha256Value(value: unknown, label: string): string {
   return normalized;
 }
 
+/** Show bounded SIM claims and parameters; never execute, consume or promote the receipt. */
 export function parseLabEvidencePreview(
   fileName: string,
   source: string,
@@ -72,6 +77,7 @@ export function parseLabEvidencePreview(
     throw new LabEvidencePreviewError("The evidence file is not valid JSON.");
   }
 
+  validateEvidenceTree(decoded, LabEvidencePreviewError);
   const receipt = objectValue(decoded, "Evidence receipt");
   const kind = stringValue(receipt.kind, "Evidence kind");
   if (kind !== "dronedream-simulation-qualification-receipt") {
@@ -130,6 +136,9 @@ export function parseLabEvidencePreview(
     };
   });
 
+  if (new Set(parameters.map((parameter) => parameter.name)).size !== parameters.length) {
+    throw new LabEvidencePreviewError("Parameter names must be unique.");
+  }
   return {
     fileName,
     kind,

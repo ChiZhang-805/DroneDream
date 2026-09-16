@@ -42,12 +42,17 @@ import {
   NavLink,
   Outlet,
   useLocation,
+  useNavigate,
   useOutletContext,
 } from "react-router-dom";
 
 import type { BrandEditionId } from "../brand/edition-brand.generated";
 import { apiClient } from "../api/client";
 import { openAppSettings } from "../appSettings";
+import { AssetInterpretButton } from "../features/autonomy/AssetInterpretButton";
+import { AUTONOMY_CONVERSATIONS_CHANGED, autonomyConversationId, autonomyConversationPath, loadAutonomyConversation, newAutonomyConversation, preserveLegacyAutonomyConversation, saveAutonomyConversation } from "../features/autonomy/conversationStore";
+import { acquireAutonomyPlanning, useAutonomyPlanning } from "../features/autonomy/conversationActivity";
+import { bindVerifiedAssetPair, externalAssetReferenceFromVersion, reconcileAgentCoreWorkspace } from "../features/autonomy/assetPairBinding";
 import { AssistantModelPicker } from "../components/AssistantModelPicker";
 import {
   defaultAutonomyWorkspace,
@@ -68,7 +73,6 @@ import {
   type AutonomyExternalAssetReference,
 } from "../features/autonomy/assetLibraryStore";
 import {
-  autonomyAssetPairQualified,
   autonomyMapPackQualified,
   planAutonomyMission,
   type AutonomyPlanningModel,
@@ -230,29 +234,6 @@ function qualificationIdForAssetVersion(
   return match?.qualification_id ?? null;
 }
 
-function externalAssetReferenceFromVersion(
-  version: AgentCoreAssetVersion,
-  qualificationId: string | null = null,
-): AutonomyExternalAssetReference {
-  const ir = version.asset_ir;
-  const source = ir && typeof ir.source === "object" && ir.source
-    ? ir.source as Record<string, unknown>
-    : {};
-  const name = typeof ir?.name === "string" ? ir.name.trim() : version.asset_id;
-  return {
-    schemaVersion: 1,
-    id: version.asset_id,
-    kind: version.kind,
-    name: name || version.asset_id,
-    sourceApplication: typeof source.application === "string" ? source.application : "External source",
-    sourceFormat: typeof source.source_format === "string" ? source.source_format : "ddpkg",
-    version: typeof ir?.version === "string" ? ir.version : "1",
-    maturity: version.maturity,
-    contentSha256: version.content_sha256,
-    qualificationId,
-    importedAt: version.imported_at,
-  };
-}
 
 function normalizedAutonomyPath(pathname: string): string {
   const withoutBasename = pathname === "/console"
@@ -296,6 +277,12 @@ function localizedAutonomyError(
   chinese: boolean,
   fallback: { zh: string; en: string },
 ): string {
+  const code = value instanceof Error ? value.message.split(":", 1)[0] : "";
+  if (["AGENT_CORE_ASSET_PAIR_BINDING_REQUIRED", "AGENT_CORE_ASSET_PAIR_QUALIFICATION_ID_MISMATCH",
+    "AGENT_CORE_ASSET_PAIR_QUALIFICATION_JOB_NOT_FOUND"].includes(code)) {
+    return chinese ? "所选地图与无人机尚未绑定到同一份有效认证。请在地图页检查组合认证后重试。"
+      : "The selected map and aircraft do not share a verified qualification. Check pair qualification on the Maps page, then retry.";
+  }
   return localeSafeError(value, chinese ? "zh-CN" : "en", fallback);
 }
 
@@ -1102,6 +1089,13 @@ export function AutonomyPlatform() {
   const ownerId = auth?.account?.id ?? "local";
   const edition = theme.id;
   const [workspace, setWorkspace] = useState(() => loadAutonomyWorkspace(ownerId, edition));
+  const activeView = useRef({ ownerId, edition, pathname: location.pathname });
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  activeView.current = { ownerId, edition, pathname: location.pathname };
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const viewKey = JSON.stringify([ownerId, edition, location.pathname]);
+  const [loadedViewKey, setLoadedViewKey] = useState<string | null>(null);
   const [assetLibrary, setAssetLibrary] = useState(() => {
     const current = loadAutonomyWorkspace(ownerId, edition);
     return loadAutonomyAssetLibrary(ownerId, edition, current);
@@ -1113,11 +1107,32 @@ export function AutonomyPlatform() {
   );
   const [agentCoreRestarting, setAgentCoreRestarting] = useState(false);
   useEffect(() => {
-    const next = loadAutonomyWorkspace(ownerId, edition);
-    setWorkspace(next);
-    setAssetLibrary(loadAutonomyAssetLibrary(ownerId, edition, next));
+    const id = autonomyConversationId(location.pathname);
+    const loadView = () => {
+      try {
+        preserveLegacyAutonomyConversation(ownerId, edition);
+        const previous = loadAutonomyWorkspace(ownerId, edition);
+        const next = id ? loadAutonomyConversation(ownerId, edition, id)
+          : /^\/autonomy\/?$/u.test(location.pathname) ? newAutonomyConversation(previous) : previous;
+        if (!next) throw new Error("AUTONOMY_CONVERSATION_NOT_FOUND");
+        if (id) saveAutonomyWorkspace(ownerId, edition, next);
+        setWorkspace(next);
+        setAssetLibrary(loadAutonomyAssetLibrary(ownerId, edition, next));
+        setWorkspaceError(null);
+        setLoadedViewKey(JSON.stringify([ownerId, edition, location.pathname]));
+      } catch {
+        setWorkspaceError(chinese ? "无法读取或保存此会话，请检查本机存储后重试。" : "This conversation could not be read or saved. Check local storage and retry.");
+      }
+    };
+    loadView();
     setMissionComposerDraft("");
-  }, [edition, ownerId]);
+    const onChange = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (id && detail?.ownerId === ownerId && detail?.edition === edition && detail?.id === id) loadView();
+    };
+    window.addEventListener(AUTONOMY_CONVERSATIONS_CHANGED, onChange);
+    return () => window.removeEventListener(AUTONOMY_CONVERSATIONS_CHANGED, onChange);
+  }, [edition, ownerId, location.pathname, chinese]);
 
   useEffect(() => {
     if (publicDemoConsole) {
@@ -1165,6 +1180,16 @@ export function AutonomyPlatform() {
   }, []);
 
   const persist = useCallback((next: AutonomyWorkspaceState) => {
+    const id = next.mission.conversationId;
+    if (id && (next.mission.messages.length || next.mission.compiledPlan)) {
+      saveAutonomyConversation(ownerId, edition, next);
+    }
+    const currentView = activeView.current;
+    if (!mounted.current || currentView.ownerId !== ownerId || currentView.edition !== edition) return;
+    const visibleId = autonomyConversationId(currentView.pathname);
+    // 后台完成的旧会话仅写入自己的记录；不把新对话或其他会话切回去。
+    if (visibleId ? visibleId !== id : id && (/^\/autonomy\/?$/u.test(currentView.pathname)
+      || loadAutonomyWorkspace(ownerId, edition).mission.conversationId !== id)) return;
     const saved = saveAutonomyWorkspace(ownerId, edition, next);
     setWorkspace(saved);
     setAssetLibrary((current) => saveAutonomyAssetLibrary(
@@ -1193,197 +1218,12 @@ export function AutonomyPlatform() {
     vehicleVersion: AgentCoreAssetVersion,
     runtimeContracts: AgentCoreAssetPairRuntimeContracts,
   ) => {
-    const qualificationId = job.qualification_id;
-    const valid = job.state === "qualified"
-      && Boolean(qualificationId)
-      && (mapVersion.kind === "map" || mapVersion.kind === "world")
-      && vehicleVersion.kind === "vehicle"
-      && mapVersion.maturity === "qualified"
-      && vehicleVersion.maturity === "qualified"
-      && job.map_asset_id === mapVersion.asset_id
-      && job.vehicle_asset_id === vehicleVersion.asset_id
-      && job.result_map_content_sha256 === mapVersion.content_sha256
-      && job.result_vehicle_content_sha256 === vehicleVersion.content_sha256
-      && runtimeContracts.schema_version === "dronedream.asset-pair-runtime-contracts.v1"
-      && runtimeContracts.map.asset_id === mapVersion.asset_id
-      && runtimeContracts.map.content_sha256 === mapVersion.content_sha256
-      && runtimeContracts.map.coordinate_frame === "ENU"
-      && runtimeContracts.vehicle.asset_id === vehicleVersion.asset_id
-      && runtimeContracts.vehicle.content_sha256 === vehicleVersion.content_sha256
-      && runtimeContracts.vehicle.coordinate_frame === "base_link_frd";
-    if (!valid || !qualificationId) return false;
-
-    const mapAsset = externalAssetReferenceFromVersion(mapVersion, qualificationId);
-    const vehicleAsset = externalAssetReferenceFromVersion(vehicleVersion, qualificationId);
-    const runtimeVehicle = runtimeContracts.vehicle;
-    const runtimeMap = runtimeContracts.map;
-    const knownSensor = (sensor: string): AutonomyWorkspaceState["aircraft"]["sensors"][number] | null => {
-      const normalized = sensor.trim().toLowerCase().replaceAll("-", "_");
-      if (["rgb", "camera", "rgb_camera", "color_camera"].includes(normalized)) return "rgb";
-      if (["depth", "depth_camera", "rgbd"].includes(normalized)) return "depth";
-      if (normalized.includes("stereo")) return "stereo";
-      if (normalized.includes("thermal")) return "thermal";
-      if (normalized.includes("lidar")) return "lidar";
-      if (["gps", "gnss"].includes(normalized)) return "gps";
-      if (["vio", "visual_inertial_odometry"].includes(normalized)) return "vio";
-      return null;
-    };
-    const runtimeSensors = [...new Set(runtimeVehicle.sensors.map(knownSensor).filter((sensor): sensor is NonNullable<typeof sensor> => Boolean(sensor)))];
-    const vehicleRuntimeContract: NonNullable<AutonomyWorkspaceState["aircraft"]["agentCoreRuntimeContract"]> = {
-      schemaVersion: 1,
-      assetId: runtimeVehicle.asset_id,
-      contentSha256: runtimeVehicle.content_sha256,
-      coordinateFrame: runtimeVehicle.coordinate_frame,
-      dryMassKg: runtimeVehicle.dry_mass_kg,
-      maximumTakeoffMassKg: runtimeVehicle.max_takeoff_mass_kg,
-      bodyRadiusM: runtimeVehicle.body_radius_m,
-      bodyHeightM: runtimeVehicle.body_height_m,
-      maximumSpeedMps: runtimeVehicle.max_speed_mps,
-      maximumAccelerationMps2: runtimeVehicle.max_acceleration_mps2,
-      qualifiedRangeM: runtimeVehicle.qualified_range_m,
-      reserveBatteryPercent: runtimeVehicle.reserve_battery_percent,
-      maximumPickupPayloadKg: runtimeVehicle.max_pickup_payload_kg,
-      sensors: runtimeVehicle.sensors,
-      vehicleClass: runtimeVehicle.vehicle_class,
-      simulationTargets: runtimeVehicle.simulation_targets.map((target) => ({
-        targetId: target.target_id,
-        simulator: target.simulator,
-        simulatorVersion: target.simulator_version,
-        rosDistribution: target.ros_distribution,
-        autopilot: target.autopilot,
-        entrypoint: target.entrypoint,
-      })),
-    };
-    const mapRuntimeContract: NonNullable<AutonomyWorkspaceState["mapPack"]["agentCoreRuntimeContract"]> = {
-      schemaVersion: 1,
-      assetId: runtimeMap.asset_id,
-      contentSha256: runtimeMap.content_sha256,
-      coordinateFrame: runtimeMap.coordinate_frame,
-      nodeCount: runtimeMap.node_count,
-      edgeCount: runtimeMap.edge_count,
-      namedEntityCount: runtimeMap.named_entity_count,
-      navigationBoundsM: {
-        minimum: runtimeMap.navigation_bounds_m.minimum,
-        maximum: runtimeMap.navigation_bounds_m.maximum,
-        span: runtimeMap.navigation_bounds_m.span,
-      },
-      semanticLayers: runtimeMap.semantic_layers,
-      simulationTargets: runtimeMap.simulation_targets.map((target) => ({
-        targetId: target.target_id,
-        simulator: target.simulator,
-        simulatorVersion: target.simulator_version,
-        rosDistribution: target.ros_distribution,
-        autopilot: target.autopilot,
-        entrypoint: target.entrypoint,
-      })),
-    };
-    const updatedAt = new Date().toISOString();
-    const existingAircraft = assetLibrary.aircraft.find((candidate) => (
-      candidate.agentCoreAssetId === vehicleAsset.id
-      && candidate.agentCoreContentSha256 === vehicleAsset.contentSha256
-    ));
-    const aircraft = existingAircraft ? {
-      ...existingAircraft,
-      status: "validated-unsigned" as const,
-      qualificationReceiptId: qualificationId,
-      qualificationContentHash: vehicleAsset.contentSha256,
-      agentCoreAssetId: vehicleAsset.id,
-      agentCoreContentSha256: vehicleAsset.contentSha256,
-      agentCoreRuntimeContract: vehicleRuntimeContract,
-      dryMassKg: runtimeVehicle.dry_mass_kg,
-      maximumTakeoffMassKg: runtimeVehicle.max_takeoff_mass_kg,
-      bodyHeightM: runtimeVehicle.body_height_m,
-      reserveBatteryPercent: runtimeVehicle.reserve_battery_percent,
-      maximumPickupPayloadKg: runtimeVehicle.max_pickup_payload_kg,
-      maximumSpeedMps: runtimeVehicle.max_speed_mps,
-      maximumAccelerationMps2: runtimeVehicle.max_acceleration_mps2,
-      sensors: runtimeSensors,
-      sensorMounts: [],
-      updatedAt,
-    } : {
-      ...defaultAutonomyWorkspace().aircraft,
-      id: `imported-${vehicleAsset.id}-${vehicleAsset.contentSha256.slice(0, 10)}`,
-      version: 1,
-      name: vehicleAsset.name,
-      manufacturer: vehicleAsset.sourceApplication,
-      status: "validated-unsigned" as const,
-      qualificationReceiptId: qualificationId,
-      qualificationContentHash: vehicleAsset.contentSha256,
-      agentCoreAssetId: vehicleAsset.id,
-      agentCoreContentSha256: vehicleAsset.contentSha256,
-      agentCoreRuntimeContract: vehicleRuntimeContract,
-      airframe: runtimeVehicle.vehicle_class.replaceAll("_", " "),
-      dryMassKg: runtimeVehicle.dry_mass_kg,
-      maximumTakeoffMassKg: runtimeVehicle.max_takeoff_mass_kg,
-      bodyHeightM: runtimeVehicle.body_height_m,
-      reserveBatteryPercent: runtimeVehicle.reserve_battery_percent,
-      maximumPickupPayloadKg: runtimeVehicle.max_pickup_payload_kg,
-      maximumSpeedMps: runtimeVehicle.max_speed_mps,
-      maximumAccelerationMps2: runtimeVehicle.max_acceleration_mps2,
-      sensors: runtimeSensors,
-      sensorMounts: [],
-      updatedAt,
-    };
-    const sourceFile: AutonomyMapPack["sourceFiles"][number] = {
-      name: mapAsset.name,
-      bytes: 0,
-      format: mapAsset.sourceFormat,
-      importedAt: mapAsset.importedAt,
-      sha256: mapAsset.contentSha256,
-      receiptId: qualificationId,
-      admission: "admitted",
-      parser: mapAsset.sourceApplication,
-      layers: ["mesh", "semantic"],
-    };
-    const existingMap = assetLibrary.maps.find((candidate) => (
-      candidate.agentCoreAssetId === mapAsset.id
-      && candidate.agentCoreContentSha256 === mapAsset.contentSha256
-    ));
-    const mapPack = existingMap ? {
-      ...existingMap,
-      status: "qualified" as const,
-      contentHash: mapAsset.contentSha256,
-      qualificationReceiptId: qualificationId,
-      calibrated: true,
-      compilerSceneId: null,
-      agentCoreAssetId: mapAsset.id,
-      agentCoreContentSha256: mapAsset.contentSha256,
-      agentCoreRuntimeContract: mapRuntimeContract,
-      coordinateFrame: runtimeMap.coordinate_frame,
-      sourceFiles: [
-        sourceFile,
-        ...existingMap.sourceFiles.filter((file) => file.sha256 !== mapAsset.contentSha256),
-      ],
-      updatedAt,
-    } : {
-      ...defaultAutonomyWorkspace().mapPack,
-      id: `imported-${mapAsset.id}-${mapAsset.contentSha256.slice(0, 10)}`,
-      version: 1,
-      name: mapAsset.name,
-      status: "qualified" as const,
-      contentHash: mapAsset.contentSha256,
-      qualificationReceiptId: qualificationId,
-      agentCoreAssetId: mapAsset.id,
-      agentCoreContentSha256: mapAsset.contentSha256,
-      agentCoreRuntimeContract: mapRuntimeContract,
-      coordinateFrame: runtimeMap.coordinate_frame,
-      calibrated: true,
-      compilerSceneId: null,
-      sourceFiles: [sourceFile],
-      updatedAt,
-    };
-    const nextWorkspace = normalizeAutonomyWorkspace(updatedWorkspace(workspace, {
-      aircraft,
-      mapPack,
-      mission: {
-        ...workspace.mission,
-        aircraftProfileId: aircraft.id,
-        mapPackId: mapPack.id,
-        compiledPlan: null,
-        updatedAt,
-      },
-    }));
-    if (!autonomyAssetPairQualified(nextWorkspace)) return false;
+    const binding = bindVerifiedAssetPair(workspace, assetLibrary, job, mapVersion, vehicleVersion, runtimeContracts);
+    if (!binding) return false;
+    const { workspace: nextWorkspace, mapAsset, vehicleAsset } = binding;
+    if (nextWorkspace.mission.conversationId && nextWorkspace.mission.messages.length) {
+      saveAutonomyConversation(ownerId, edition, nextWorkspace);
+    }
     const savedWorkspace = saveAutonomyWorkspace(ownerId, edition, nextWorkspace);
     setWorkspace(savedWorkspace);
     setAssetLibrary((current) => {
@@ -1482,6 +1322,9 @@ export function AutonomyPlatform() {
     const savedWorkspace = removingCurrent
       ? saveAutonomyWorkspace(ownerId, edition, nextWorkspace)
       : workspace;
+    if (removingCurrent && savedWorkspace.mission.conversationId && savedWorkspace.mission.messages.length) {
+      saveAutonomyConversation(ownerId, edition, savedWorkspace);
+    }
     if (removingCurrent) setWorkspace(savedWorkspace);
     setAssetLibrary((current) => saveAutonomyAssetLibrary(
       ownerId,
@@ -1553,7 +1396,7 @@ export function AutonomyPlatform() {
 
       <main className="autonomy-platform-content">
         {usesSidebarNavigation ? healthAlert : null}
-        <Outlet context={{
+        {workspaceError ? <div role="alert">{workspaceError}</div> : loadedViewKey !== viewKey ? null : <Outlet context={{
           edition,
           chinese,
           workspace,
@@ -1567,7 +1410,7 @@ export function AutonomyPlatform() {
           missionComposerDraft,
           setMissionComposerDraft,
           removeAsset,
-        } satisfies WorkspaceContext} />
+        } satisfies WorkspaceContext} />}
       </main>
     </div>
   );
@@ -1587,6 +1430,10 @@ export function AutonomyOverview() {
     setMissionComposerDraft: setComposer,
   } = useAutonomyWorkspace();
   const auth = useOptionalAuth();
+  const navigate = useNavigate();
+  const ownerId = auth?.account?.id ?? "local";
+  const generating = useAutonomyPlanning(ownerId, edition, workspace.mission.conversationId);
+  const submitting = useRef(false);
   const {
     settings: modelAccess,
     profiles: modelProfiles,
@@ -1605,9 +1452,14 @@ export function AutonomyOverview() {
       : DEFAULT_MANAGED_MODEL_CATALOG,
   );
   const [managedModelsReady, setManagedModelsReady] = useState(!auth?.account);
-  const [generating, setGenerating] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
   const [inputProvenance, setInputProvenance] = useState<"text" | "web-speech" | "audio-attachment">("text");
+  useEffect(() => {
+    setError(null);
+    setPendingAttachments([]);
+    setInputProvenance("text");
+    setContextMenuOpen(false);
+  }, [ownerId, edition, workspace.mission.conversationId]);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const audioInputRef = useRef<HTMLInputElement>(null);
@@ -1833,6 +1685,7 @@ export function AutonomyOverview() {
 
   const submitMission = async (event: FormEvent) => {
     event.preventDefault();
+    if (submitting.current) return;
     const intent = composer.trim();
     if (!intent) return;
     if (intent.length > 2_000) {
@@ -1845,16 +1698,19 @@ export function AutonomyOverview() {
     }
     voice.cancel();
     consumeAutonomyHandoff();
-    setGenerating(true);
+    const assistantWorkspaceId = workspace.mission.conversationId ?? createExperimentWorkspaceId();
+    const releasePlanning = acquireAutonomyPlanning(ownerId, edition, assistantWorkspaceId);
+    if (!releasePlanning) return;
+    submitting.current = true;
     setError(null);
+    let submittedWorkspace: AutonomyWorkspaceState | null = null;
     try {
       const submittedAttachments = pendingAttachments.slice(0, 8);
-      const missionWorkspace = resolveMissionAssets(workspace, assetLibrary, intent);
-      const assistantWorkspaceId = missionWorkspace.mission.conversationId ?? createExperimentWorkspaceId();
+      const selectedWorkspace = resolveMissionAssets(workspace, assetLibrary, intent);
       const turnId = crypto.randomUUID();
       const followUpPrefix = chinese ? "\n补充指令：" : "\nFollow-up instruction: ";
-      const revisedIntent = missionWorkspace.mission.messages.length || missionWorkspace.mission.compiledPlan
-        ? `${missionWorkspace.mission.intent.slice(0, Math.max(0, 2_000 - followUpPrefix.length - intent.length))}${followUpPrefix}${intent}`
+      const revisedIntent = selectedWorkspace.mission.messages.length || selectedWorkspace.mission.compiledPlan
+        ? `${selectedWorkspace.mission.intent.slice(0, Math.max(0, 2_000 - followUpPrefix.length - intent.length))}${followUpPrefix}${intent}`
         : intent;
       const submittedAt = new Date().toISOString();
       const userMessage: AutonomyConversationMessage = {
@@ -1869,19 +1725,32 @@ export function AutonomyOverview() {
           byteSize: file.size,
         })),
       };
-      const priorMessages = missionWorkspace.mission.messages;
-      persist(updatedWorkspace(missionWorkspace, {
+      const priorMessages = selectedWorkspace.mission.messages;
+      const submitted = updatedWorkspace(selectedWorkspace, {
         mission: {
-          ...missionWorkspace.mission,
+          ...selectedWorkspace.mission,
           intent: revisedIntent,
           conversationId: assistantWorkspaceId,
           messages: [...priorMessages, userMessage].slice(-100),
-          aircraftProfileId: missionWorkspace.aircraft.id,
-          mapPackId: missionWorkspace.mapPack.id,
+          aircraftProfileId: selectedWorkspace.aircraft.id,
+          mapPackId: selectedWorkspace.mapPack.id,
+          compiledPlan: null,
+          planningRunId: null,
+          planningError: null,
           updatedAt: submittedAt,
         },
-      }));
+      });
+      // 首条消息先持久化并进入独立页面，资产或云端失败也不会吞掉会话。
+      persist(submitted);
+      submittedWorkspace = submitted;
       setComposer("");
+      navigate(autonomyConversationPath(assistantWorkspaceId), { replace: !workspace.mission.conversationId });
+      setPendingAttachments([]);
+      setInputProvenance("text");
+      const missionWorkspace = publicDemoConsole
+        ? submitted
+        : await reconcileAgentCoreWorkspace(submitted, assetLibrary);
+      submittedWorkspace = missionWorkspace;
       const planning = await planAutonomyMission({
         edition,
         workspace: missionWorkspace,
@@ -1898,8 +1767,6 @@ export function AutonomyOverview() {
         inputChannel: inputProvenance === "text" ? "text" : "voice",
         transcriptSource: inputProvenance === "text" ? null : inputProvenance,
       });
-      setPendingAttachments([]);
-      setInputProvenance("text");
       if (!planning.compiledPlan) {
         const updatedAt = new Date().toISOString();
         const assistantMessage: AutonomyConversationMessage = {
@@ -1952,12 +1819,18 @@ export function AutonomyOverview() {
         },
       }));
     } catch (reason) {
-      setError(localizedAutonomyError(reason, chinese, {
+      const message = localizedAutonomyError(reason, chinese, {
         zh: "请检查规划模型、任务资产与运行环境后重试。",
         en: "Check the planning model, mission assets, and runtime before trying again.",
-      }));
+      });
+      if (submittedWorkspace) {
+        try {
+          persist(updatedWorkspace(submittedWorkspace, { mission: { ...submittedWorkspace.mission, planningError: message, compiledPlan: null, updatedAt: new Date().toISOString() } }));
+        } catch { setError(chinese ? "会话保存失败，请检查本机存储。" : "Conversation could not be saved. Check local storage."); }
+      } else setError(message);
     } finally {
-      setGenerating(false);
+      submitting.current = false;
+      releasePlanning();
     }
   };
 
@@ -1981,12 +1854,8 @@ export function AutonomyOverview() {
                     <span className="autonomy-conversation-avatar" aria-hidden="true"><Sparkles /></span>
                   ) : null}
                   <div className="autonomy-conversation-body">
-                    <p>{message.role === "assistant"
-                      ? localizedAutonomyError(message.content, chinese, {
-                          zh: "任务计划已更新，请查看下方的结构化计划。",
-                          en: "The mission plan has been updated. Review the structured plan below.",
-                        })
-                      : message.content}</p>
+                    {/* 模型回复是会话内容，不是错误文案；跨语言澄清问题必须原样保留。 */}
+                    <p>{message.content}</p>
                     {message.attachments?.length ? (
                       <div className="autonomy-message-attachments">
                         {message.attachments.map((attachment) => (
@@ -2237,7 +2106,7 @@ export function AutonomyOverview() {
             </div>
           ) : null}
           {voiceStatus ? <p className="assistant-composer-status">{voiceStatus}</p> : null}
-          {error ? <p className="assistant-composer-error" role="alert">{error}</p> : null}
+          {error || workspace.mission.planningError ? <p className="assistant-composer-error" role="alert">{error || workspace.mission.planningError}</p> : null}
         </form>
       </div>
     </section>
@@ -2257,7 +2126,7 @@ function mapRepresentationLabel(value: AutonomyMapPack["representation"], chines
 }
 
 export function AutonomyAircraft() {
-  const { chinese, workspace, assetLibrary, selectAircraft, removeAsset } = useAutonomyWorkspace();
+  const { edition, chinese, workspace, assetLibrary, selectAircraft, removeAsset } = useAutonomyWorkspace();
   const [details, setDetails] = useState<{ title: string; rows: Array<[string, string]> } | null>(null);
   const defaultAircraftId = defaultAutonomyWorkspace().aircraft.id;
   const externalAircraft = assetLibrary.externalAssets.filter((asset) => asset.kind === "vehicle");
@@ -2292,6 +2161,7 @@ export function AutonomyAircraft() {
                 <small>{[aircraft.manufacturer, aircraft.airframe].filter(Boolean).join(" · ")}</small>
               </span>
             </button>
+            <AssetInterpretButton edition={edition} chinese={chinese} kind="vehicle" assetId={aircraft.agentCoreAssetId ?? null} contentSha256={aircraft.agentCoreContentSha256 ?? null} name={aircraft.name} />
             {aircraft.id !== defaultAircraftId ? (
               <button
                 type="button"
@@ -2319,6 +2189,7 @@ export function AutonomyAircraft() {
               <span className="autonomy-repository-preview is-aircraft is-imported"><Navigation2 aria-hidden="true" /></span>
               <span className="autonomy-repository-copy"><strong>{asset.name}</strong><small>{asset.sourceApplication || asset.sourceFormat}</small></span>
             </button>
+            <AssetInterpretButton edition={edition} chinese={chinese} kind="vehicle" assetId={asset.id} contentSha256={asset.contentSha256} name={asset.name} />
             <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${asset.name}` : `Delete ${asset.name}`} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
           </article>
         ))}
@@ -2329,7 +2200,7 @@ export function AutonomyAircraft() {
 }
 
 export function AutonomyMaps() {
-  const { chinese, workspace, assetLibrary, selectMap, removeAsset } = useAutonomyWorkspace();
+  const { edition, chinese, workspace, assetLibrary, selectMap, removeAsset } = useAutonomyWorkspace();
   const [details, setDetails] = useState<{ title: string; rows: Array<[string, string]> } | null>(null);
   const defaultMapId = defaultAutonomyWorkspace().mapPack.id;
   const externalMaps = assetLibrary.externalAssets.filter((asset) => asset.kind === "map" || asset.kind === "world");
@@ -2356,6 +2227,7 @@ export function AutonomyMaps() {
               <span className="autonomy-repository-preview is-map"><Layers3 aria-hidden="true" /></span>
               <span className="autonomy-repository-copy"><strong>{mapPack.name}</strong><small>{mapRepresentationLabel(mapPack.representation, chinese)}</small></span>
             </button>
+            <AssetInterpretButton edition={edition} chinese={chinese} kind="map" assetId={mapPack.agentCoreAssetId ?? null} contentSha256={mapPack.agentCoreContentSha256 ?? null} name={mapPack.name} />
             {mapPack.id !== defaultMapId ? <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${mapPack.name}` : `Delete ${mapPack.name}`} onClick={() => removeAsset("map", mapPack.id)}><Trash2 aria-hidden="true" /></button> : null}
           </article>
         ))}
@@ -2365,6 +2237,7 @@ export function AutonomyMaps() {
               <span className="autonomy-repository-preview is-map is-imported"><Layers3 aria-hidden="true" /></span>
               <span className="autonomy-repository-copy"><strong>{asset.name}</strong><small>{asset.sourceApplication || asset.sourceFormat}</small></span>
             </button>
+            <AssetInterpretButton edition={edition} chinese={chinese} kind="map" assetId={asset.id} contentSha256={asset.contentSha256} name={asset.name} />
             <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${asset.name}` : `Delete ${asset.name}`} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
           </article>
         ))}
@@ -2460,6 +2333,7 @@ export function AgentCoreLiveMission({
 
   const executionInput = {
     ...binding,
+    planRevisionId: workspace.mission.planningRunId ?? "",
     accessMode: planningModel.accessMode,
     provider: planningModel.provider,
     model: planningModel.model,

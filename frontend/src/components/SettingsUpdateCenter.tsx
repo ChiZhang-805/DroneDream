@@ -26,7 +26,12 @@ export function SettingsUpdateCenter({
   const progress = updater.progress === null
     ? null
     : Math.max(0, Math.min(100, updater.progress));
-  const localizedError = updater.error
+  const ambiguousEngine = updater.error?.includes("Different Engine Packs share the same source timestamp") ?? false;
+  const localizedError = ambiguousEngine
+    ? (locale === "zh-CN"
+      ? "软件内置组件与已安装组件内容不同，但版本时间相同，无法安全判断更新顺序。已保留现有 Runtime，需要提供版本一致的构建。"
+      : "The bundled and installed Engine Packs have different contents but the same version timestamp. The existing Runtime was preserved; a consistently versioned build is required.")
+    : updater.error
     ? localeSafeError(updater.error, locale, {
         zh: "更新暂时无法完成。",
         en: "The update could not be completed.",
@@ -43,6 +48,8 @@ export function SettingsUpdateCenter({
         reconciling: "正在同步组件",
         deferred: "等待重试",
         failed: "检查失败",
+        engineFailed: "运行组件检查失败",
+        componentFailed: "组件更新检查失败",
         runtimeRequired: "Runtime Base 需要更新",
       }
     : {
@@ -55,6 +62,8 @@ export function SettingsUpdateCenter({
         reconciling: "reconciling components",
         deferred: "retry required",
         failed: "check failed",
+        engineFailed: "Engine Pack check failed",
+        componentFailed: "component update check failed",
         runtimeRequired: "Runtime Base update required",
       };
 
@@ -107,7 +116,7 @@ export function SettingsUpdateCenter({
     actionLabel = t("settings.updates.retry");
     action = () => { void updater.reconcileEnginePack(); };
   } else if (updater.status === "engineError") {
-    stateValue = copy.failed;
+    stateValue = copy.engineFailed;
     tone = "error";
     StatusIcon = CircleAlert;
     actionLabel = t("settings.updates.retry");
@@ -133,7 +142,7 @@ export function SettingsUpdateCenter({
     actionLabel = t("settings.updates.retry");
     action = () => { void updater.checkForUpdates(); };
   } else if (updater.status === "componentError") {
-    stateValue = copy.failed;
+    stateValue = copy.componentFailed;
     tone = "error";
     StatusIcon = CircleAlert;
     actionLabel = t("settings.updates.retry");
@@ -196,8 +205,8 @@ export function SettingsUpdateCenter({
             aria-label={t("settings.updates.progressLabel")}
           />
         ) : null}
-        {localizedError ? <span className="sr-only">{localizedError}</span> : null}
       </div>
+      {localizedError ? <p className="settings-update-error" role="alert">{localizedError}</p> : null}
     </section>
   );
 }

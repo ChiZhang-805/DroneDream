@@ -1,7 +1,8 @@
 """Database engine, session, and Base for the DroneDream backend.
 
-SQLite is the default for local development. The code avoids SQLite-specific
-features so Postgres can be swapped in later by changing ``DATABASE_URL``.
+SQLite is the default for local development, with explicit lightweight SQLite
+migrations below. PostgreSQL deployments use their Alembic migration path;
+changing DATABASE_URL alone does not migrate existing data or schema.
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ class Base(DeclarativeBase):
 
 
 def _build_engine(database_url: str) -> Engine:
+    """Configure one engine and per-connection SQLite integrity; do not share Session objects."""
     connect_args: dict[str, object] = {}
     if database_url.startswith("sqlite"):
         # SQLite in a multi-threaded test/dev server needs this.
@@ -40,6 +42,7 @@ def _build_engine(database_url: str) -> Engine:
         # referential-integrity guarantees as PostgreSQL.
         @event.listens_for(built_engine, "connect")
         def _enable_sqlite_foreign_keys(dbapi_connection: object, _record: object) -> None:
+            """Enable foreign keys for every pooled SQLite connection, not just startup."""
             cursor = dbapi_connection.cursor()  # type: ignore[attr-defined]
             try:
                 cursor.execute("PRAGMA foreign_keys=ON")
@@ -101,6 +104,12 @@ def init_db() -> None:
 
 
 def _apply_sqlite_lightweight_migrations() -> None:
+    """Upgrade local SQLite tables in a transaction, preserving explicit historical evidence.
+
+    This runs only after create_all in the auto-create path. Identifiers below
+    come from source-owned constants, never user input. Receipt immutability
+    needs database triggers too: ORM checks alone do not cover direct SQL.
+    """
     settings = get_settings()
     if not settings.database_url.startswith("sqlite"):
         return
@@ -159,6 +168,8 @@ def _apply_sqlite_lightweight_migrations() -> None:
         from app.model_harness.control_plane import compile_control_plane_receipt
         from app.model_harness.domains import OPTIMIZATION_CONTROL_TUNING_DOMAIN
 
+        # Supply missing legacy configuration, not proof that historical jobs
+        # actually used this harness. Synthetic events below mark their provenance.
         canonical_control_plane_receipt = compile_control_plane_receipt(
             OPTIMIZATION_CONTROL_TUNING_DOMAIN
         )
@@ -364,6 +375,8 @@ def _apply_sqlite_lightweight_migrations() -> None:
                 "WHERE llm_access_mode IS NULL"
             )
         )
+        # Leases fence concurrent finalizers; adding columns does not grant a
+        # running worker a new lease or renew an expired claim.
         finalization_claim_columns = {
             "finalization_claim_token": "VARCHAR(64)",
             "finalization_claim_generation": "INTEGER",
@@ -571,6 +584,8 @@ def _apply_sqlite_lightweight_migrations() -> None:
                 conn.execute(
                     text("ALTER TABLE job_reports ADD COLUMN winner_freeze_receipt_id VARCHAR(64)")
                 )
+        # Sealed evidence stays append-only. Lifecycle deletion requires a
+        # matching authorization row; it is not a general update/delete bypass.
         if "winner_freeze_receipts" in table_names:
             conn.execute(
                 text(
@@ -1107,6 +1122,8 @@ def _apply_sqlite_lightweight_migrations() -> None:
                     """
                 )
             )
+        # Preregistration fixes methodology/budgets before results are collected;
+        # runtime usage and lease state belong in separate mutable state tables.
         if "benchmark_campaigns" in table_names:
             conn.execute(
                 text(
@@ -1307,7 +1324,7 @@ def _apply_sqlite_lightweight_migrations() -> None:
 
 
 def get_db() -> Iterator[Session]:
-    """FastAPI dependency that yields a scoped session."""
+    """Yield one request-owned Session; explicit commits precede rollback-on-close."""
 
     db = SessionLocal()
     try:

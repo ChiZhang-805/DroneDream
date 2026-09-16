@@ -49,6 +49,7 @@ def _canonical_uuid(raw: str | None) -> str | None:
 
 
 def _bridge_key() -> bytes:
+    """Derive a bridge-only HMAC key from validated local deployment secret material."""
     app_secret = os.environ.get("APP_SECRET_KEY") or os.environ.get(
         "DRONEDREAM_SECRET_KEY"
     )
@@ -77,6 +78,7 @@ def _canonical_request(
     authorization_sha256: str,
     idempotency_key: str,
 ) -> bytes:
+    """Match the desktop sender's exact field order, encoding and trailing newline."""
     return (
         "\n".join(
             (
@@ -105,6 +107,7 @@ def _consume_nonce(
     now: datetime,
     retention_seconds: int,
 ) -> bool:
+    """Atomically consume proof uniqueness before any route can mutate account data."""
     expires_at = now + timedelta(seconds=retention_seconds)
     with SessionLocal() as db:
         # Bounded opportunistic cleanup keeps the local table finite without
@@ -129,12 +132,36 @@ def _consume_nonce(
     return True
 
 
+async def _bounded_request_body(request: Request) -> bytes | None:
+    """Stop accumulating at the byte limit; cache accepted bytes for route replay.
+
+    Content-Length is not trusted. Starlette's Request body cache is also used
+    by BaseHTTPMiddleware to forward a consumed body to downstream handlers;
+    integration tests must preserve this behavior when upgrading Starlette.
+    """
+    parts: list[bytes] = []
+    received = 0
+    async for chunk in request.stream():
+        received += len(chunk)
+        if received > _MAX_BODY_BYTES:
+            return None
+        if chunk:
+            parts.append(chunk)
+    body = b"".join(parts)
+    request._body = body
+    return body
+
+
 async def enforce_desktop_bridge(
     request: Request,
     call_next: Callable[[Request], Awaitable[Response]],
     settings: Settings,
 ) -> Response:
-    """Verify and consume a packaged-desktop request proof."""
+    """Bind body, account token, target, time and nonce before forwarding once.
+
+    This proves the desktop-to-Runtime channel, not cloud user permissions;
+    the normal route authentication/ownership checks still run downstream.
+    """
 
     if not settings.desktop_bridge_required or not request.url.path.startswith(
         "/api/v1/"
@@ -175,8 +202,8 @@ async def enforce_desktop_bridge(
             "The desktop request proof has expired.",
         )
 
-    body = await request.body()
-    if len(body) > _MAX_BODY_BYTES:
+    body = await _bounded_request_body(request)
+    if body is None:
         return _rejection(
             "DESKTOP_BRIDGE_BODY_TOO_LARGE",
             "The desktop request body exceeds the bridge limit.",

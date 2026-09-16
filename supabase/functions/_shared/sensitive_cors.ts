@@ -22,6 +22,9 @@ function localDevelopmentHost(hostname: string): boolean {
     normalized.endsWith(".localhost");
 }
 
+/** Accept canonical HTTPS origins and explicitly local development/desktop origins.
+ * This checks syntax and transport policy, not membership in an endpoint's allowlist.
+ */
 export function isSafeSensitiveOrigin(origin: string): boolean {
   if (origin === "tauri://localhost") return true;
   let parsed: URL;
@@ -45,6 +48,7 @@ export function isSafeSensitiveOrigin(origin: string): boolean {
     parsed.origin === origin;
 }
 
+/** Build the exact allowlist; invalid explicit configuration never falls back open. */
 export function sensitiveAllowedOrigins(
   configured: string | undefined,
   defaults: readonly string[],
@@ -65,6 +69,9 @@ export function sensitiveAllowedOrigins(
   return new Set(candidates);
 }
 
+/** Apply browser-origin policy, not user authorization.
+ * Requests without Origin still require the endpoint's normal token/role checks.
+ */
 export function sensitiveCorsHeaders(
   request: Request,
   allowedOrigins: ReadonlySet<string>,

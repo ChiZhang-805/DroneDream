@@ -8,6 +8,7 @@ export const SETTINGS_LOCALES = [
   { id: "zh-CN", label: "简体中文", region: "east" },
 ] as const;
 
+/** Decorative region indicator; the adjacent locale name supplies its accessible text. */
 export function SettingsLanguageRegionIcon({
   region,
 }: {
@@ -32,6 +33,7 @@ export function SettingsLanguageRegionIcon({
   );
 }
 
+/** Controlled native checkbox: persistence and authorization stay with the owning settings page. */
 export function SettingsToggle({
   checked,
   className,

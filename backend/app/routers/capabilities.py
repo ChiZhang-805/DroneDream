@@ -63,6 +63,7 @@ def _experimental_optimizer_capabilities() -> dict[str, dict[str, object]]:
 
 
 def _global_simulator_override() -> str | None:
+    """Read this API process's override, not a promise about a remote worker's environment."""
     raw = os.environ.get("SIMULATOR_BACKEND", "").strip().lower()
     return raw or None
 
@@ -89,6 +90,7 @@ def _real_cli_configuration() -> tuple[bool, str, str | None]:
 
 
 def _simulator_capabilities() -> dict[str, object]:
+    """Describe configuration and explicit test-only adapters without probing or starting flight."""
     override = _global_simulator_override()
     test_mode = get_settings().app_env.strip().lower() in {"test", "testing"}
     supported_backends = {"real_cli"}
@@ -100,6 +102,7 @@ def _simulator_capabilities() -> dict[str, object]:
     real_configured, real_status, real_reason = _real_cli_configuration()
 
     def selectable(backend: str) -> bool:
+        """Respect the global override; an invalid value disables every per-job selection."""
         return override_supported and override in {None, backend}
 
     mock_selectable = test_mode and selectable("mock")

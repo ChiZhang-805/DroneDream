@@ -10,10 +10,12 @@ canonical Runtime layer decision receipt.
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import importlib.util
 import json
 import re
 import sys
+import threading
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
@@ -64,28 +66,77 @@ RUNTIME_DISTRIBUTION_BASE_PATHS = (
     "distribution/vehicle-packs/registry.v1.json",
 )
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_CONTRACT_SOURCE_LIMIT_BYTES = 2 * 1024 * 1024
+_CONTRACT_CACHE: dict[str, tuple[Path, str, ModuleType]] = {}
+_CONTRACT_LOAD_LOCK = threading.RLock()
 
 
 class RuntimeEditionSafetyError(RuntimeError):
     """Raised when no trustworthy Runtime decision can be produced."""
 
 
+def _load_active_contract(active_engine_root: Path, filename: str, name: str) -> ModuleType:
+    """Load the selected installed contract, never a different/older payload.
+
+    The installer owns payload trust; this loader does not verify a signature.
+    Cache at most one module per contract kind, bound to resolved path AND exact
+    source bytes. Read source before consulting the cache so removal or damage
+    cannot silently resurrect a formerly valid module.
+    """
+    with _CONTRACT_LOAD_LOCK:
+        path = active_engine_root / "distribution/tools" / filename
+        try:
+            root = active_engine_root.resolve(strict=True)
+            if path.is_symlink() or not path.is_file():
+                raise ValueError("contract must be an ordinary file")
+            path = path.resolve(strict=True)
+            if not path.is_relative_to(root):
+                raise ValueError("contract escaped active payload")
+            with path.open("rb") as stream:
+                source = stream.read(_CONTRACT_SOURCE_LIMIT_BYTES + 1)
+            if not source or len(source) > _CONTRACT_SOURCE_LIMIT_BYTES:
+                raise ValueError("contract source size is invalid")
+        except (OSError, ValueError) as error:
+            raise RuntimeEditionSafetyError("Runtime contract source is unavailable") from error
+        digest = hashlib.sha256(source).hexdigest()
+        cached = _CONTRACT_CACHE.get(name)
+        if (cached is not None and cached[:2] == (path, digest)
+                and sys.modules.get(name) is cached[2]):
+            return cached[2]
+        spec = importlib.util.spec_from_file_location(name, path)
+        if spec is None or spec.loader is None:
+            raise RuntimeEditionSafetyError("Runtime contract loader is unavailable")
+        module = importlib.util.module_from_spec(spec)
+        previous = sys.modules.get(name)
+        # Dataclasses need their module during execution. Publish under a lock
+        # and restore on error so a partially initialized replacement cannot
+        # become the next successful load. Avoid timestamp-based .pyc reuse.
+        sys.modules[name] = module
+        try:
+            exec(compile(source, str(path), "exec"), module.__dict__)
+        except BaseException as error:
+            if previous is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = previous
+            if isinstance(error, Exception):
+                raise RuntimeEditionSafetyError("Runtime contract failed to load") from error
+            raise
+        _CONTRACT_CACHE[name] = (path, digest, module)
+        return module
+
+
 def _load_profile_contract(active_engine_root: Path) -> ModuleType:
-    path = active_engine_root / "distribution/tools/engine_pack_profile_contract.py"
-    name = "dronedream_runtime_engine_pack_profile_contract"
-    spec = importlib.util.spec_from_file_location(name, path)
-    if spec is None or spec.loader is None:
-        raise RuntimeEditionSafetyError("Runtime Engine Pack profile contract is unavailable")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
+    """Use the active profile's own validator, not a previously selected edition."""
+    return _load_active_contract(active_engine_root, "engine_pack_profile_contract.py",
+                                 "dronedream_runtime_engine_pack_profile_contract")
 
 
 def _sim_profile_from_manifest(
     active_engine_root: Path,
     engine_manifest: Mapping[str, Any],
 ) -> tuple[ModuleType, dict[str, Any]] | None:
+    """Resolve only the declared Sim profile and verify its exact payload binding."""
     edition_profile = engine_manifest.get("editionProfile")
     if not isinstance(edition_profile, dict):
         return None
@@ -112,6 +163,7 @@ def _validate_engine_profile_identity(
     active_engine_root: Path,
     engine_manifest: Mapping[str, Any],
 ) -> None:
+    """Reject unknown/mixed edition fields rather than inferring capabilities."""
     profile = engine_manifest.get("editionProfile")
     if not isinstance(profile, dict):
         raise RuntimeEditionSafetyError("Engine Pack edition profile is unavailable")
@@ -148,6 +200,7 @@ def _validate_sim_payload_paths(
     profile: Mapping[str, Any],
     paths: list[str],
 ) -> None:
+    """Apply the selected profile's allowlist; a Sim bundle cannot carry hardware extras."""
     try:
         contract.validate_payload_paths(profile, paths)
     except contract.EnginePackProfileError as error:
@@ -159,6 +212,11 @@ def runtime_distribution_paths(
     *,
     engine_manifest: Mapping[str, Any] | None = None,
 ) -> tuple[str, ...]:
+    """Resolve the active profile's closed, ordinary-file contract inventory.
+
+    A valid path list is not signature or hardware qualification; the caller
+    must still bind each file's bytes to the installed manifest and request.
+    """
     registry_path = active_engine_root / RUNTIME_CONTRACT_REGISTRY_PATH
     if registry_path.is_symlink() or not registry_path.is_file():
         raise RuntimeEditionSafetyError("Runtime contract registry must be an ordinary file")
@@ -172,7 +230,8 @@ def runtime_distribution_paths(
         "contractPaths",
     }:
         raise RuntimeEditionSafetyError("Runtime contract registry fields are invalid")
-    if registry["schemaVersion"] != 1 or registry["kind"] != "dronedream-runtime-contract-registry":
+    if (type(registry["schemaVersion"]) is not int or registry["schemaVersion"] != 1
+            or registry["kind"] != "dronedream-runtime-contract-registry"):
         raise RuntimeEditionSafetyError("Runtime contract registry identity is unsupported")
     paths = registry["contractPaths"]
     if (
@@ -220,36 +279,19 @@ def runtime_distribution_paths(
 
 
 def _load_contract(active_engine_root: Path) -> ModuleType:
-    path = active_engine_root / "distribution" / "tools" / "edition_safety_contract.py"
-    name = "dronedream_runtime_edition_safety_contract"
-    existing = sys.modules.get(name)
-    if existing is not None:
-        return existing
-    spec = importlib.util.spec_from_file_location(name, path)
-    if spec is None or spec.loader is None:
-        raise RuntimeEditionSafetyError("Runtime edition safety contract is unavailable")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
+    """Select the authorization validator from this exact active Engine Pack."""
+    return _load_active_contract(active_engine_root, "edition_safety_contract.py",
+                                 "dronedream_runtime_edition_safety_contract")
 
 
 def _load_distribution_contract(active_engine_root: Path) -> ModuleType:
-    path = active_engine_root / "distribution" / "tools" / "distribution_contract.py"
-    name = "dronedream_runtime_distribution_contract"
-    existing = sys.modules.get(name)
-    if existing is not None:
-        return existing
-    spec = importlib.util.spec_from_file_location(name, path)
-    if spec is None or spec.loader is None:
-        raise RuntimeEditionSafetyError("Runtime distribution contract is unavailable")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[name] = module
-    spec.loader.exec_module(module)
-    return module
+    """Select distribution validation with the same source-bound loading rule."""
+    return _load_active_contract(active_engine_root, "distribution_contract.py",
+                                 "dronedream_runtime_distribution_contract")
 
 
 def _load_object(path: Path, label: str) -> dict[str, Any]:
+    """Read a JSON object or stop verification; missing state is never an empty policy."""
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
@@ -260,12 +302,14 @@ def _load_object(path: Path, label: str) -> dict[str, Any]:
 
 
 def _isoformat(value: dt.datetime) -> str:
+    """Emit UTC seconds only from an explicit timezone, avoiding local-clock ambiguity."""
     if value.tzinfo is None:
         raise RuntimeEditionSafetyError("Runtime observation time must be timezone-aware")
     return value.astimezone(dt.UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
 def _normalize_controller(value: str) -> str:
+    """Normalize catalog spelling, not the measured hardware identity hash."""
     return value.replace(" ", "").lower()
 
 
@@ -302,12 +346,14 @@ class RuntimeTrustedObservation:
 
 @dataclass(frozen=True)
 class RuntimeLayerDecision:
+    """Decision-only receipt; the caller still owns one-time action consumption."""
     decision: str
     reason_codes: tuple[str, ...]
     receipt: Mapping[str, Any]
 
 
 def _manifest_records(document: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    """Reject the whole inventory on malformed paths, sizes, hashes or duplicates."""
     raw = document.get("files")
     if not isinstance(raw, list):
         return {}
@@ -321,9 +367,12 @@ def _manifest_records(document: Mapping[str, Any]) -> dict[str, Mapping[str, Any
         if not isinstance(path, str) or path in records:
             return {}
         inner = PurePosixPath(path)
-        if inner.is_absolute() or not inner.parts or ".." in inner.parts:
+        # A manifest crosses Linux and Windows. Do not let normalization merge
+        # aliases, reinterpret a drive/alternate stream, or change separators.
+        if (inner.is_absolute() or not inner.parts or ".." in inner.parts
+                or inner.as_posix() != path or any(char in path for char in "\\:\x00")):
             return {}
-        if not isinstance(size, int) or size < 0:
+        if type(size) is not int or size < 0:
             return {}
         if not isinstance(digest, str) or not SHA256_RE.fullmatch(digest):
             return {}
@@ -336,6 +385,7 @@ def _active_inventory_reasons(
     request: Mapping[str, Any],
     observed: RuntimeTrustedObservation,
 ) -> list[str]:
+    """Compare installed source, signature state and per-file bytes with the request."""
     reasons: list[str] = []
     try:
         engine_manifest = _load_object(
@@ -426,6 +476,7 @@ def _active_inventory_reasons(
 
 
 def _evidence_hashes(request: Mapping[str, Any]) -> dict[str, str]:
+    """Project receipt bindings only after the request schema validates their uniqueness."""
     return {
         str(receipt["receiptType"]): str(receipt["evidenceHash"])
         for receipt in request["evidenceReceipts"]
@@ -437,6 +488,7 @@ def _validate_active_catalog(
     active_root: Path,
     request: Mapping[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Validate the complete active catalog before resolving one requested vehicle."""
     distribution_contract = _load_distribution_contract(active_root)
     try:
         upstream = distribution_contract.validate_upstream_source_inventory(
@@ -490,6 +542,7 @@ def _validate_active_catalog(
 def _local_target_reasons(
     request: Mapping[str, Any], observed: RuntimeTrustedObservation
 ) -> list[str]:
+    """Require measured target identity and unconsumed, non-stale request evidence."""
     reasons: list[str] = []
     comparisons = (
         (
@@ -555,6 +608,7 @@ def _catalog_reasons(
     capability_policy: Mapping[str, Any],
     pack: Mapping[str, Any],
 ) -> list[str]:
+    """Enforce edition/vehicle/firmware eligibility without test overrides leaking live."""
     root = observed.active_engine_root
     reasons: list[str] = []
     paths = {
@@ -634,6 +688,7 @@ def _build_receipt(
     decision: str,
     reason_codes: tuple[str, ...],
 ) -> dict[str, Any]:
+    """Bind a canonical decision whose expiry cannot exceed the original request."""
     request_expires = dt.datetime.fromisoformat(
         str(request["expiresAt"]).removesuffix("Z") + "+00:00"
     )
@@ -702,6 +757,8 @@ def evaluate_runtime_authorization(
             pack=pack,
         )
     )
+    # Any independent layer mismatch vetoes the request. This receipt neither
+    # operates the device nor consumes the nonce; execution must do that atomically.
     reason_codes = tuple(sorted(set(reasons))) or ("runtime.contract.allow",)
     decision = "deny" if reasons else "allow"
     receipt = _build_receipt(

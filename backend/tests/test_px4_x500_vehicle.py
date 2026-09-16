@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 from xml.etree import ElementTree
@@ -14,6 +15,7 @@ from app.autonomy.px4_x500_vehicle import (
     TAKEOUT_PAYLOAD_MASS_KG,
     TAKEOUT_PAYLOAD_MAXIMUM_ATTACHMENT_ERROR_M,
     TAKEOUT_PAYLOAD_SIZE_M,
+    export_my_drone_gazebo_artifact,
     get_my_drone_gazebo_artifact,
     px4_x500_loaded_thrust_to_weight,
     px4_x500_maximum_qualified_payload_kg,
@@ -66,3 +68,21 @@ def test_my_drone_artifact_binds_x500_and_dynamic_payload_joint() -> None:
         "model.sdf",
         "takeout-payload.sdf",
     }
+
+
+def test_export_preserves_declared_utf8_payload_hashes(tmp_path) -> None:
+    """Windows text-mode newlines must not invalidate the package's own receipt."""
+    reported = export_my_drone_gazebo_artifact(tmp_path)
+    expected = get_my_drone_gazebo_artifact()
+    for name, content in expected.files.items():
+        raw = (tmp_path / name).read_bytes()
+        assert raw == content.encode("utf-8")
+        assert reported[name] == hashlib.sha256(raw).hexdigest()
+    for name, digest in expected.summary["payload_files_sha256"].items():
+        assert reported[name] == digest
+
+
+@pytest.mark.parametrize("mass", [True, "0.04", 10**1000, float("nan"), -0.01])
+def test_invalid_payload_mass_has_a_stable_validation_error(mass) -> None:
+    with pytest.raises(ValueError):
+        px4_x500_loaded_thrust_to_weight(mass)

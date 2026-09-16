@@ -12,10 +12,12 @@ import {
   issueAgentCoreCustomModelGrant,
   patchAgentCoreThread,
   prepareAgentCoreMission,
+  requestAgentCoreAssetInterpretation,
   submitAgentCoreRuntimeMessage,
   uploadAgentCoreAttachment,
   type AgentCoreAssetKind,
   type AgentCoreAssetQualificationEvidence,
+  type AgentCoreAssetQualificationJob,
   type AgentCoreAssetVersion,
   type AgentCoreMissionPrepareSummary,
   type AgentCoreThread,
@@ -49,6 +51,7 @@ export interface AgentCorePlanningInput {
   transcriptSource?: "web-speech" | "audio-attachment" | null;
 }
 
+/** BYOK selects a Core-owned credential profile, never a key copied into the draft. */
 function selectedModelId(input: Pick<AgentCorePlanningInput,
   "accessMode" | "model" | "agentCoreProfileId" | "agentCoreSelectionId"
 >): string {
@@ -63,6 +66,7 @@ function selectedModelId(input: Pick<AgentCorePlanningInput,
   return input.agentCoreSelectionId;
 }
 
+/** Extract optional grant routing; the receiving Core still validates the endpoint. */
 function modelGatewayBaseUrl(grant: unknown): string | null {
   if (typeof grant !== "object" || grant === null || !("gateway_base_url" in grant)) {
     return null;
@@ -73,6 +77,7 @@ function modelGatewayBaseUrl(grant: unknown): string | null {
     : null;
 }
 
+/** Namespace UI-to-Core thread hints by account, edition and public conversation. */
 function bindingKey(input: Pick<AgentCorePlanningInput, "edition" | "accountId" | "conversationId">): string {
   return [
     THREAD_BINDING_PREFIX,
@@ -82,6 +87,7 @@ function bindingKey(input: Pick<AgentCorePlanningInput, "edition" | "accountId" 
   ].join(":");
 }
 
+/** Storage is a lookup hint only; Core must still authorize the referenced thread. */
 function readThreadBinding(input: Pick<AgentCorePlanningInput, "edition" | "accountId" | "conversationId">): string | null {
   try {
     return window.localStorage.getItem(bindingKey(input));
@@ -90,6 +96,7 @@ function readThreadBinding(input: Pick<AgentCorePlanningInput, "edition" | "acco
   }
 }
 
+/** Persist only a thread identifier; failing to save must not invalidate this turn. */
 function saveThreadBinding(
   input: Pick<AgentCorePlanningInput, "edition" | "accountId" | "conversationId">,
   threadId: string,
@@ -101,6 +108,10 @@ function saveThreadBinding(
   }
 }
 
+/**
+ * An explicit content hash is a pin: never substitute a newer/different asset.
+ * Without a pin, choose only a qualified version, not merely the newest import.
+ */
 function latestAssetVersion(
   versions: AgentCoreAssetVersion[],
   assetId: string | null | undefined,
@@ -126,6 +137,44 @@ function sha256(value: unknown): value is string {
   return typeof value === "string" && /^[0-9a-f]{64}$/u.test(value);
 }
 
+// 功能：
+//   使用当前模型解析单个精确资产版本，模型授权只在调用前申请。
+// 输入：
+//   input：当前账户、版本、模型及卡片对应的资产。
+// 输出：
+//   result：实际模型解析或同版本缓存结果。
+export async function interpretAgentCoreAsset(input: Pick<AgentCorePlanningInput, "edition" | "accountId" | "locale" | "accessMode" | "provider" | "model" | "agentCoreProfileId" | "agentCoreSelectionId"> & {
+  kind: "map" | "vehicle"; assetId: string | null; contentSha256: string | null;
+}) {
+  if (!input.accountId) throw new Error("AGENT_CORE_ACCOUNT_REQUIRED");
+  const modelId = selectedModelId(input);
+  const bootstrap = await getAgentCoreBootstrap();
+  const entry = bootstrap.models.find((item) => item.id === modelId);
+  if (!entry || (input.accessMode === "platform" && (entry.source !== "default" || entry.provider !== input.provider))
+    || (input.accessMode === "byok" && (entry.source !== "custom" || entry.profile_id !== input.agentCoreProfileId))) {
+    throw new Error("AGENT_CORE_MODEL_NOT_AVAILABLE");
+  }
+  const version = latestAssetVersion(bootstrap.asset_versions, input.assetId, input.contentSha256, input.kind);
+  const thread = await createAgentCoreThread({ title: input.locale === "zh-CN" ? "资产解析" : "Asset interpretation", selected_model: modelId });
+  const grant = input.accessMode === "platform"
+    ? await issueManagedModelGrant("assistant", thread.thread_id, input.provider as "openai" | "deepseek" | "qwen" | "kimi", input.model)
+    : await issueAgentCoreCustomModelGrant(input.agentCoreProfileId!, thread.thread_id);
+  const result = await requestAgentCoreAssetInterpretation(thread.thread_id, {
+    expected_owner_account_id: input.accountId, source_edition: input.edition,
+    kind: input.kind, asset_id: version.asset_id, content_sha256: version.content_sha256,
+    model_id: modelId, model_grant: grant.grant, gateway_base_url: modelGatewayBaseUrl(grant),
+    locale: input.locale, force: false,
+  });
+  if (result.source.asset_id !== version.asset_id || result.source.content_sha256 !== version.content_sha256
+    || result.source.kind !== input.kind) throw new Error("AGENT_CORE_ASSET_INTERPRETATION_BINDING_INVALID");
+  return result;
+}
+
+/**
+ * Cross-check the map/vehicle pair, runtime contracts and successful receipt.
+ * This client check complements Core's byte/hash verification; UI "100%" alone
+ * is not qualification, nor does asset qualification authorize mission execution.
+ */
 function assertVerifiedPairEvidence(
   evidence: AgentCoreAssetQualificationEvidence,
   expected: {
@@ -133,8 +182,10 @@ function assertVerifiedPairEvidence(
     qualificationId: string;
     mapAssetId: string;
     mapContentSha256: string;
+    sourceMapContentSha256: string;
     vehicleAssetId: string;
     vehicleContentSha256: string;
+    sourceVehicleContentSha256: string;
   },
 ): void {
   const receipt = evidence.receipt;
@@ -166,7 +217,6 @@ function assertVerifiedPairEvidence(
       target.simulator,
       target.simulator_version,
       target.ros_distribution ?? "none",
-      target.autopilot,
     ].join(":");
     const unsafeTarget = (target: (typeof mapTargets)[number]) => (
       !target.target_id
@@ -177,8 +227,11 @@ function assertVerifiedPairEvidence(
       || target.entrypoint.includes("\\")
       || target.entrypoint.split("/").some((segment) => segment === ".." || segment === "")
     );
-    const vehicleTargetIdentities = new Set(vehicleTargets.map(targetIdentity));
-    const compatibleRuntimeTarget = mapTargets.some((target) => vehicleTargetIdentities.has(targetIdentity(target)));
+    // 场景可以不含飞控；只有声明了飞控约束的地图才要求与飞机一致。
+    const compatibleRuntimeTarget = mapTargets.some((mapTarget) => vehicleTargets.some((vehicleTarget) => (
+      targetIdentity(mapTarget) === targetIdentity(vehicleTarget)
+      && (mapTarget.autopilot === "none" || mapTarget.autopilot === vehicleTarget.autopilot)
+    )));
     if (
       runtimeContracts.map.coordinate_frame !== "ENU"
       || runtimeContracts.vehicle.coordinate_frame !== "base_link_frd"
@@ -206,9 +259,10 @@ function assertVerifiedPairEvidence(
   if (receipt.status !== "verified") failures.push("receipt.status.invalid");
   exact(receipt.qualification_id, expected.qualificationId, "receipt.qualification-id");
   exact(receipt.map_asset_id, expected.mapAssetId, "receipt.map-id");
-  exact(receipt.map_content_sha256, expected.mapContentSha256, "receipt.map-hash");
+  // 原始回执绑定认证输入；外层证据及运行契约绑定加入回执后的输出包。
+  exact(receipt.map_content_sha256, expected.sourceMapContentSha256, "receipt.map-hash");
   exact(receipt.vehicle_asset_id, expected.vehicleAssetId, "receipt.vehicle-id");
-  exact(receipt.vehicle_content_sha256, expected.vehicleContentSha256, "receipt.vehicle-hash");
+  exact(receipt.vehicle_content_sha256, expected.sourceVehicleContentSha256, "receipt.vehicle-hash");
   if (!sha256(receipt.runtime_evidence_sha256)) failures.push("receipt.runtime-evidence-hash.invalid");
   if (!receipt.environment_versions || Object.keys(receipt.environment_versions).length === 0) {
     failures.push("receipt.environment-versions.missing");
@@ -241,20 +295,13 @@ function assertVerifiedPairEvidence(
   }
 }
 
-export async function inspectAgentCoreAssetBindings(
-  request: AutonomyHarnessInspectRequest,
-  workspace: AutonomyWorkspaceState,
-): Promise<AutonomyHarnessInspectResponse> {
-  const qualificationId = workspace.mapPack.qualificationReceiptId;
-  if (
-    !qualificationId
-    || qualificationId !== workspace.aircraft.qualificationReceiptId
-    || qualificationId !== request.map_pack.qualification_receipt_id
-    || qualificationId !== request.aircraft.qualification_receipt_id
-    || !/^asset-qualification-[0-9a-f]{24}$/u.test(qualificationId)
-  ) {
-    throw new Error("AGENT_CORE_ASSET_PAIR_QUALIFICATION_ID_MISMATCH");
-  }
+// 功能：
+//   为当前所选资产解析同一份后端认证；已有内容摘要固定版本，未固定时才选最新合格版本。
+// 输入：
+//   workspace：当前地图与飞机选择；页面缓存的回执标识不作为认证依据。
+// 输出：
+//   pair：通过输入包、输出包、运行契约及回执交叉校验的资产组合。
+export async function resolveAgentCoreAssetPair(workspace: AutonomyWorkspaceState) {
   const bootstrap = await getAgentCoreBootstrap();
   const mapVersion = latestAssetVersion(
     bootstrap.asset_versions,
@@ -268,27 +315,62 @@ export async function inspectAgentCoreAssetBindings(
     workspace.aircraft.agentCoreContentSha256,
     "vehicle",
   );
-  const job = bootstrap.asset_qualification_jobs.find((candidate) => (
+  const jobs = bootstrap.asset_qualification_jobs.filter((candidate) => (
     candidate.state === "qualified"
     && candidate.progress_percent === 100
-    && candidate.qualification_id === qualificationId
+    && /^asset-qualification-[0-9a-f]{24}$/u.test(candidate.qualification_id ?? "")
     && candidate.map_asset_id === mapVersion.asset_id
-    && candidate.map_content_sha256 === mapVersion.content_sha256
     && candidate.result_map_content_sha256 === mapVersion.content_sha256
     && candidate.vehicle_asset_id === vehicleVersion.asset_id
-    && candidate.vehicle_content_sha256 === vehicleVersion.content_sha256
     && candidate.result_vehicle_content_sha256 === vehicleVersion.content_sha256
-  ));
+  )).sort((left, right) => right.updated_at.localeCompare(left.updated_at));
+  const job = jobs.find((candidate) => (
+    candidate.qualification_id === workspace.mapPack.qualificationReceiptId
+    && candidate.qualification_id === workspace.aircraft.qualificationReceiptId
+  )) ?? jobs[0];
   if (!job) throw new Error("AGENT_CORE_ASSET_PAIR_QUALIFICATION_JOB_NOT_FOUND");
+  const qualificationId = job.qualification_id!;
+  if (!sha256(job.map_content_sha256) || !sha256(job.vehicle_content_sha256)) {
+    throw new Error("AGENT_CORE_ASSET_PAIR_EVIDENCE_INVALID:job.source-hash.invalid");
+  }
   const evidence = await getAgentCoreAssetQualificationEvidence(job.job_id);
   assertVerifiedPairEvidence(evidence, {
     jobId: job.job_id,
     qualificationId,
     mapAssetId: mapVersion.asset_id,
     mapContentSha256: mapVersion.content_sha256,
+    sourceMapContentSha256: job.map_content_sha256,
     vehicleAssetId: vehicleVersion.asset_id,
     vehicleContentSha256: vehicleVersion.content_sha256,
+    sourceVehicleContentSha256: job.vehicle_content_sha256,
   });
+  return { job: job as AgentCoreAssetQualificationJob, mapVersion, vehicleVersion, evidence };
+}
+
+// 功能：
+//   检查请求与工作区的同一认证绑定，再把后端验证的证据加入 Harness。
+// 输入：
+//   request：由当前工作区生成的规划请求。
+//   workspace：已同步认证的地图和飞机。
+// 输出：
+//   inspection：规划检查结果；不授予飞行权限。
+export async function inspectAgentCoreAssetBindings(request: AutonomyHarnessInspectRequest, workspace: AutonomyWorkspaceState): Promise<AutonomyHarnessInspectResponse> {
+  const qualificationId = workspace.mapPack.qualificationReceiptId;
+  if (!qualificationId || !workspace.aircraft.qualificationReceiptId) {
+    throw new Error("AGENT_CORE_ASSET_PAIR_BINDING_REQUIRED");
+  }
+  if (qualificationId !== workspace.aircraft.qualificationReceiptId
+    || qualificationId !== request.map_pack.qualification_receipt_id
+    || qualificationId !== request.aircraft.qualification_receipt_id
+    || !/^asset-qualification-[0-9a-f]{24}$/u.test(qualificationId)
+    || request.map_pack.content_hash !== workspace.mapPack.agentCoreContentSha256
+    || request.aircraft.content_hash !== workspace.aircraft.agentCoreContentSha256) {
+    throw new Error("AGENT_CORE_ASSET_PAIR_QUALIFICATION_ID_MISMATCH");
+  }
+  const { job, mapVersion, vehicleVersion, evidence } = await resolveAgentCoreAssetPair(workspace);
+  if (job.qualification_id !== qualificationId) {
+    throw new Error("AGENT_CORE_ASSET_PAIR_QUALIFICATION_ID_MISMATCH");
+  }
   // The loopback Core verifies the receipt bytes and evidence SHA-256 before
   // returning this response. The public shell binds that server-verified digest
   // into its own Harness context rather than reserializing Python JSON in JS.
@@ -305,6 +387,7 @@ export async function inspectAgentCoreAssetBindings(
   });
 }
 
+/** Reconcile saved UI hints with Core's current model catalog and asset hashes. */
 async function ensureThread(input: AgentCorePlanningInput): Promise<{
   thread: AgentCoreThread;
   mapVersion: AgentCoreAssetVersion;
@@ -356,9 +439,15 @@ async function ensureThread(input: AgentCorePlanningInput): Promise<{
   return { thread, mapVersion, vehicleVersion };
 }
 
+/**
+ * Prepare, but do not execute, a mission using a scoped platform/BYOK grant.
+ * Attachments and asset hashes accompany the request; returned bindings must
+ * match exactly before the plan can be shown for confirmation.
+ */
 export async function planWithAgentCore(
   input: AgentCorePlanningInput,
 ): Promise<AgentCoreMissionPrepareSummary> {
+  if (!input.accountId) throw new Error("AGENT_CORE_ACCOUNT_REQUIRED");
   const { thread, mapVersion, vehicleVersion } = await ensureThread(input);
   const modelSelectionId = selectedModelId(input);
   const attachmentIds: string[] = [];
@@ -375,6 +464,8 @@ export async function planWithAgentCore(
       )
     : await issueAgentCoreCustomModelGrant(input.agentCoreProfileId!, thread.thread_id);
   const summary = await prepareAgentCoreMission(thread.thread_id, {
+    expected_owner_account_id: input.accountId,
+    source_edition: input.edition,
     message: input.instruction,
     map_id: mapVersion.asset_id,
     map_content_sha256: mapVersion.content_sha256,
@@ -419,6 +510,7 @@ export function isAgentCoreUnavailable(reason: unknown): boolean {
   return reason instanceof AgentCoreUnavailableError;
 }
 
+/** Forward a user amendment to Core; the UI does not apply it directly to flight. */
 export async function submitRuntimeMessageToBoundAgentCore(input: {
   edition: BrandEditionId;
   accountId: string | null;
@@ -439,12 +531,14 @@ export interface AgentCoreExecutionInput {
   model: string;
   agentCoreProfileId: string | null;
   agentCoreSelectionId: string | null;
+  planRevisionId: string;
 }
 
 function executionModelId(input: AgentCoreExecutionInput): string {
   return selectedModelId(input);
 }
 
+/** Read the authoritative Core state, not a cached plan or local success flag. */
 export async function getBoundAgentCoreThread(
   input: Pick<AgentCoreExecutionInput, "edition" | "accountId" | "conversationId">,
 ) {
@@ -453,13 +547,29 @@ export async function getBoundAgentCoreThread(
   return getAgentCoreThread(threadId);
 }
 
+// 功能：
+//   复读后端任务，确认页面所展示的精确计划仍为当前计划，再申请授权并启动仿真。
+// 输入：
+//   input：当前账户、版本、任务、模型及用户已确认的计划修订标识。
+// 输出：
+//   receipt：后端启动回执，不代表已经起飞或任务成功。
 export async function executeBoundAgentCoreMission(input: AgentCoreExecutionInput) {
+  if (!input.accountId) throw new Error("AGENT_CORE_ACCOUNT_REQUIRED");
+  if (!/^plan-[0-9a-f]{32}$/u.test(input.planRevisionId)) {
+    throw new Error("AGENT_CORE_EXPLICIT_PLAN_CONFIRMATION_REQUIRED");
+  }
   const threadId = readThreadBinding(input);
   if (!threadId) throw new Error("AGENT_CORE_THREAD_NOT_BOUND");
   const modelId = executionModelId(input);
   const thread = await getAgentCoreThread(threadId);
   if (thread.selected_model !== modelId || thread.state !== "awaiting_confirmation") {
     throw new Error(`AGENT_CORE_TASK_NOT_CONFIRMABLE:${thread.state}`);
+  }
+  const currentPlan = (thread.messages ?? []).filter(
+    (message) => message.role === "assistant" && message.kind === "plan",
+  ).at(-1);
+  if (currentPlan?.metadata?.plan_revision_id !== input.planRevisionId) {
+    throw new Error("AGENT_CORE_PLAN_CHANGED_REVIEW_AGAIN");
   }
   const grant = input.accessMode === "platform"
     ? await issueManagedModelGrant(
@@ -469,9 +579,13 @@ export async function executeBoundAgentCoreMission(input: AgentCoreExecutionInpu
         input.model,
       )
     : await issueAgentCoreCustomModelGrant(input.agentCoreProfileId!, threadId);
-  return executeAgentCoreMission(threadId, {
+  const receipt = await executeAgentCoreMission(threadId, {
+    expected_owner_account_id: input.accountId,
+    source_edition: input.edition,
+    plan_revision_id: input.planRevisionId,
     model_id: modelId,
     model_grant: grant.grant,
     gateway_base_url: modelGatewayBaseUrl(grant),
   });
+  return receipt;
 }

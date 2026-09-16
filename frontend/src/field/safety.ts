@@ -65,6 +65,7 @@ export const FIELD_VALIDATED_PACK_COUNT = FIELD_CATALOG.vehiclePacks.filter(
 ).length;
 
 function observationBlocker(state: FieldObservationState): FieldSafetyBlocker {
+  // Unknown runtime input stays a blocker even if TypeScript was bypassed.
   const blockers: Record<FieldObservationState, FieldSafetyBlocker> = {
     offline: "field.device.offline",
     "device-missing": "field.device.missing",
@@ -72,32 +73,41 @@ function observationBlocker(state: FieldObservationState): FieldSafetyBlocker {
     "firmware-drift": "field.device.firmware-drift",
     "recognized-unvalidated": "field.device.pack-unvalidated",
   };
-  return blockers[state];
+  return Object.prototype.hasOwnProperty.call(blockers, state)
+    ? blockers[state] : "field.device.unknown";
 }
 
 export function evaluateFieldSafety(
   observation: FieldDeviceObservation,
 ): FieldSafetyDecision {
+  // This is a read-only UI explanation, never the backend's grant decision.
+  // Malformed/foreign payloads must not crash the denied state or fake quorum.
+  const usable = observation !== null && typeof observation === "object"
+    && observation.schemaVersion === 1 && observation.source === "fake-readonly"
+    && ["offline", "device-missing", "unknown-device", "firmware-drift", "recognized-unvalidated"]
+      .includes(observation.state);
+  const quorum = usable && observation.quorum && typeof observation.quorum === "object"
+    ? observation.quorum : null;
   const blockers = new Set<FieldSafetyBlocker>([
-    observationBlocker(observation.state),
+    observationBlocker(usable ? observation.state : "unknown-device"),
   ]);
 
   if (FIELD_VALIDATED_PACK_COUNT === 0) {
     blockers.add("field.registry.zero-validated-packs");
   }
-  if (observation.quorum.vehiclePackReceipt !== "verified") {
+  if (quorum?.vehiclePackReceipt !== "verified") {
     blockers.add("field.quorum.vehicle-pack-receipt-missing");
   }
-  if (observation.quorum.controllerMatch !== "verified") {
+  if (quorum?.controllerMatch !== "verified") {
     blockers.add("field.quorum.controller-match-missing");
   }
-  if (observation.quorum.firmwareMatch !== "verified") {
+  if (quorum?.firmwareMatch !== "verified") {
     blockers.add("field.quorum.firmware-match-missing");
   }
 
-  const threeLayerQuorum = observation.quorum.vehiclePackReceipt === "verified"
-    && observation.quorum.controllerMatch === "verified"
-    && observation.quorum.firmwareMatch === "verified"
+  const threeLayerQuorum = quorum?.vehiclePackReceipt === "verified"
+    && quorum?.controllerMatch === "verified"
+    && quorum?.firmwareMatch === "verified"
     ? "verified"
     : "missing";
 
@@ -118,6 +128,7 @@ export const FIELD_OBSERVATION_FIXTURES: Record<
   FieldObservationState,
   FieldDeviceObservation
 > = {
+  // Fixed read-only examples; observedAt is not refreshed to impersonate live data.
   offline: {
     schemaVersion: 1,
     source: "fake-readonly",

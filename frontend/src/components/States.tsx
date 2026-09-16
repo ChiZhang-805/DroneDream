@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useI18n } from "../i18n/I18nProvider";
 
+/** Announce asynchronous work politely; this component does not start or poll a task. */
 export function Loading({ label }: { label?: string }) {
   const { t } = useI18n();
   return (
@@ -17,6 +18,7 @@ interface EmptyProps {
   action?: ReactNode;
 }
 
+/** Render a genuinely empty result separately from loading and failed requests. */
 export function Empty({ title, description, action }: EmptyProps) {
   const { t } = useI18n();
   return (
@@ -34,6 +36,7 @@ interface ErrorStateProps {
   action?: ReactNode;
 }
 
+/** Announce a failure; callers provide a safe message and decide whether retry is appropriate. */
 export function ErrorState({
   title,
   description,

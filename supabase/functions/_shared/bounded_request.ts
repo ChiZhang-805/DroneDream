@@ -25,6 +25,7 @@ export class BoundedRequestError extends Error {
   }
 }
 
+// An absent/invalid header is not proof of a small body; always count stream bytes.
 function validContentLength(value: string | null): number | null {
   const normalized = value?.trim() ?? "";
   if (!/^(0|[1-9][0-9]*)$/u.test(normalized)) return null;
@@ -55,6 +56,10 @@ async function rejectUnreadBody(
   }
 }
 
+/** Read at most limitBytes of valid UTF-8, including split multi-byte characters.
+ * The bound is bytes, not JavaScript string length; the caller owns authentication
+ * and the request lifetime. Content-Length is only an early rejection hint.
+ */
 export async function readBoundedRequestText(
   request: Request,
   limitBytes: number,
@@ -160,6 +165,7 @@ export async function readBoundedRequestText(
   }
 }
 
+/** Parse a bounded object envelope; endpoint-specific fields still need validation. */
 export async function readBoundedJsonObject(
   request: Request,
   limitBytes: number,

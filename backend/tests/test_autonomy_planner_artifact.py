@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import io
+from types import SimpleNamespace
+from urllib.error import HTTPError
 
 import pytest
 
@@ -191,3 +194,35 @@ def test_rejects_fabricated_or_cross_owner_planner_receipts(
 
     assert rejected.value.code == "AUTONOMY_PLANNER_ARTIFACT_MISMATCH"
     assert rejected.value.status_code == 403
+
+
+def test_deep_receipt_json_fails_with_stable_planner_error() -> None:
+    """Bounded byte length does not by itself bound the JSON parser's call stack."""
+    payload = b'{"nested":' + b"[" * 1500 + b"0" + b"]" * 1500 + b"}"
+    response = SimpleNamespace(headers={}, read=io.BytesIO(payload).read)
+    with pytest.raises(PlannerArtifactVerificationError) as rejected:
+        planner_artifact_module._read_bounded_response(response, len(payload))
+    assert rejected.value.code == "AUTONOMY_PLANNER_RECEIPT_INVALID"
+
+
+def test_rejected_http_receipt_closes_its_error_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    """HTTPError owns its response body even when the successful opener never yields."""
+    body = io.BytesIO(b"not authorized")
+    error = HTTPError("https://example.invalid", 403, "Forbidden", {}, body)
+
+    def fail_open(*_args: object, **_kwargs: object) -> None:
+        raise error
+
+    monkeypatch.setattr(
+        planner_artifact_module, "_orchestrator_url", lambda _settings: "https://example.invalid"
+    )
+    monkeypatch.setattr(
+        planner_artifact_module.url_request,
+        "build_opener",
+        lambda _handler: SimpleNamespace(open=fail_open),
+    )
+    with pytest.raises(PlannerArtifactVerificationError):
+        planner_artifact_module._fetch_run(
+            "run", "Bearer fixture-only", SimpleNamespace(assistant_orchestrator_timeout_seconds=1)
+        )
+    assert body.closed

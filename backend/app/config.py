@@ -22,6 +22,7 @@ _PLACEHOLDER_MARKERS = (
 
 
 def _is_obvious_placeholder(value: str) -> bool:
+    """Detect common template secrets; this supplements rather than proves entropy."""
     normalized = value.strip().lower().replace("_", "-")
     return any(marker in normalized for marker in _PLACEHOLDER_MARKERS)
 
@@ -52,7 +53,7 @@ class Settings(BaseSettings):
         )
     )
 
-    # Phase 9: artifact roots for generated job/trial outputs and safe downloads.
+    # Artifact roots for generated job/trial outputs and bounded downloads.
     # Keep this default aligned with app.simulator.real_cli._DEFAULT_ARTIFACT_ROOT
     # so generated real-simulator artifacts are always downloadable by default.
     real_simulator_artifact_root: str = Field(default="./artifacts")
@@ -154,7 +155,12 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_safety(self) -> Settings:
-        """Reject the development-only anonymous identity in production."""
+        """Validate cross-field launch invariants before any service starts.
+
+        Lease renewal must precede expiry; finalization outlives bounded model
+        retries. Desktop requires both OIDC identity and process-bound bridge
+        proof. Artifact cleanup owns only designated subtrees, not broad roots.
+        """
 
         protected_environment = self.app_env.strip().lower() in {
             "desktop",
@@ -367,6 +373,7 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> list[str]:
+        """Normalize exact origins once without widening hosts or introducing wildcards."""
         origins: list[str] = []
         for raw_origin in self.cors_origins.split(","):
             origin = raw_origin.strip()
@@ -376,14 +383,17 @@ class Settings(BaseSettings):
 
     @property
     def real_artifact_root_path(self) -> Path:
+        """Resolve simulator output relative to the configured process working directory."""
         return Path(self.real_simulator_artifact_root).resolve()
 
     @property
     def default_artifact_root_path(self) -> Path:
+        """Resolve general artifact storage; read access still validates each child path."""
         return Path(self.artifact_root).resolve()
 
     @property
     def allowed_artifact_roots(self) -> list[Path]:
+        """Deduplicate trusted storage roots; this list alone does not authorize deletion."""
         roots = [self.real_artifact_root_path, self.default_artifact_root_path]
         dedup: list[Path] = []
         for root in roots:
@@ -411,6 +421,7 @@ class Settings(BaseSettings):
 
     @property
     def demo_auth_token_map(self) -> dict[str, str]:
+        """Index validated demo tokens by identity; never serialize or log this map."""
         pairs = [p.strip() for p in self.demo_auth_tokens.split(",") if p.strip()]
         mapping: dict[str, str] = {}
         for pair in pairs:
@@ -425,15 +436,17 @@ class Settings(BaseSettings):
 
     @property
     def oidc_audience_list(self) -> list[str]:
+        """Parse configured JWT audiences, not audiences claimed by an incoming token."""
         return [item.strip() for item in (self.oidc_audience or "").split(",") if item.strip()]
 
     @property
     def oidc_algorithm_list(self) -> list[str]:
+        """Use the validated asymmetric allowlist independently of JWT header choices."""
         return [item.strip() for item in self.oidc_algorithms.split(",") if item.strip()]
 
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    """Return a cached Settings instance."""
+    """Cache one validated process configuration; env changes require an explicit reload."""
 
     return Settings()

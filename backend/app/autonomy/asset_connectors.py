@@ -44,6 +44,7 @@ class AutonomyAssetConnector(StrictModel):
 
     @model_validator(mode="after")
     def validate_trust_boundary(self) -> AutonomyAssetConnector:
+        """Keep native authoring tools outside the declarative parser's trust boundary."""
         if self.execution_boundary == "declarative_parser" and self.availability != "builtin":
             raise ValueError("only built-in connectors may parse inside the core process")
         if self.enabled and self.availability != "builtin":
@@ -175,6 +176,7 @@ _CONNECTORS = (
 
 
 def get_asset_connector_catalog() -> AutonomyAssetConnectorCatalog:
+    """Return isolated descriptors; caller edits must not enable a global optional connector."""
     return AutonomyAssetConnectorCatalog(items=[item.model_copy(deep=True) for item in _CONNECTORS])
 
 

@@ -81,11 +81,13 @@ export interface ConsoleMemoryConsentRecord {
   memory_scopes: Record<ConsoleMemoryScope, boolean>;
 }
 
+/** Missing cloud configuration is an error, not a successful local-only save. */
 function client() {
   if (!supabaseClient) throw new Error("CLOUD_PREFERENCES_NOT_CONFIGURED");
   return supabaseClient;
 }
 
+/** Match database composite keys; RLS still owns authentication and authorization. */
 function boundaryColumns(boundary: ConsolePreferenceBoundary) {
   return {
     user_id: boundary.userId,
@@ -96,6 +98,7 @@ function boundaryColumns(boundary: ConsolePreferenceBoundary) {
   };
 }
 
+/** Read one account/workspace/edition row; absence is null, network failure still throws. */
 export async function loadConsolePreferences(
   boundary: ConsolePreferenceBoundary,
 ): Promise<ConsolePreferenceRecord | null> {
@@ -113,6 +116,7 @@ export async function loadConsolePreferences(
   return data as ConsolePreferenceRecord | null;
 }
 
+/** Replace that boundary's complete preference row, not a partial nested-field patch. */
 export async function saveConsolePreferences(
   boundary: ConsolePreferenceBoundary,
   preference: ConsolePreferenceRecord,
@@ -125,6 +129,7 @@ export async function saveConsolePreferences(
   if (error) throw error;
 }
 
+/** Consent is account/tenant/organization-wide, deliberately independent of edition. */
 export async function loadConsoleMemoryConsent(
   boundary: ConsolePreferenceBoundary,
 ): Promise<ConsoleMemoryConsentRecord | null> {
@@ -139,6 +144,7 @@ export async function loadConsoleMemoryConsent(
   return data as ConsoleMemoryConsentRecord | null;
 }
 
+/** Persist account consent separately from edition-specific memory participation. */
 export async function saveConsoleMemoryConsent(
   boundary: ConsolePreferenceBoundary,
   consent: ConsoleMemoryConsentRecord,
@@ -154,6 +160,7 @@ export async function saveConsoleMemoryConsent(
   if (error) throw error;
 }
 
+/** Explicit destructive reset: account-domain memories/consent plus this edition's preferences. */
 export async function deleteConsolePreferencesAndMemory(
   boundary: ConsolePreferenceBoundary,
 ): Promise<number> {
@@ -166,6 +173,8 @@ export async function deleteConsolePreferencesAndMemory(
     },
   );
   if (deleteError) throw deleteError;
+  // These are separate server operations, not one transaction. Propagate any
+  // failure so the caller cannot announce that every part of the reset succeeded.
   const consentDelete = await client().from("console_memory_consents")
     .delete()
     .eq("user_id", columns.user_id)
@@ -184,6 +193,7 @@ export async function deleteConsolePreferencesAndMemory(
   return Number.isSafeInteger(count) && count >= 0 ? count : 0;
 }
 
+/** Retrieve only active, unexpired selected scopes; caller and RLS must enforce consent. */
 export async function loadConsoleMemory(
   boundary: ConsolePreferenceBoundary,
   scopes: ConsoleMemoryScope[],
@@ -205,11 +215,12 @@ export async function loadConsoleMemory(
     .gt("expires_at", new Date().toISOString())
     .order("confidence", { ascending: false })
     .order("last_seen", { ascending: false })
-    .limit(64);
+    .limit(64); // Bound model context; this is retrieval, not a complete export.
   if (error) throw error;
   return (data ?? []) as ConsoleMemoryRecord[];
 }
 
+/** Return review candidates, never silently promote them into active model context. */
 export async function loadConsoleMemoryCandidates(
   boundary: ConsolePreferenceBoundary,
   responsibilityNamespaces: readonly ModelHarnessMemoryNamespace[] =
@@ -233,6 +244,7 @@ export async function loadConsoleMemoryCandidates(
   return (data ?? []) as ConsoleMemoryCandidate[];
 }
 
+/** Soft-forget through an authenticated RPC; null scope/key intentionally means the whole domain. */
 export async function forgetConsoleMemory(
   boundary: ConsolePreferenceBoundary,
   target: ConsoleMemoryForgetTarget,
@@ -256,6 +268,7 @@ export async function forgetConsoleMemory(
   return Number.isSafeInteger(count) && count >= 0 ? count : 0;
 }
 
+/** Permanently erase an explicit target using server-derived user identity, unlike soft forget. */
 export async function permanentlyDeleteConsoleMemory(
   boundary: ConsolePreferenceBoundary,
   target: ConsoleMemoryForgetTarget,
@@ -279,6 +292,7 @@ export async function permanentlyDeleteConsoleMemory(
   return Number.isSafeInteger(count) && count >= 0 ? count : 0;
 }
 
+/** Deliberately forget every scope/key within this responsibility namespace. */
 export async function forgetConsoleMemoryDomain(
   boundary: ConsolePreferenceBoundary,
   responsibilityNamespace: ModelHarnessMemoryNamespace,
@@ -286,6 +300,7 @@ export async function forgetConsoleMemoryDomain(
   return forgetConsoleMemory(boundary, { responsibilityNamespace });
 }
 
+/** Preserve all three identity components so a single-record action cannot become domain-wide. */
 export async function forgetConsoleMemoryRecord(
   boundary: ConsolePreferenceBoundary,
   record: Pick<
@@ -300,6 +315,7 @@ export async function forgetConsoleMemoryRecord(
   });
 }
 
+/** Ask the server to promote/reject a candidate; the browser never supplies an acting user ID. */
 export async function resolveConsoleMemoryCandidate(
   boundary: ConsolePreferenceBoundary,
   candidateId: string,

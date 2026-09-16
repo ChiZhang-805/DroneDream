@@ -56,6 +56,10 @@ afterEach(() => {
 });
 
 describe("desktop Runtime account-session contract", () => {
+  it("rejects a contradictory success envelope returned with an unauthorized status", async () => {
+    installResponse(401, { success: true, error: { code: "UNAUTHORIZED" }, data: null });
+    expect((await verifyRuntimeSessionContract(readyRuntime)).ready).toBe(false);
+  });
   it("accepts a structured anonymous 401 as proof that the protected route exists", async () => {
     const invoke = installResponse(401, {
       success: false,

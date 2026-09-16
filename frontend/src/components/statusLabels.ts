@@ -15,6 +15,7 @@ const STATUS_LABELS: Record<AnyStatus, TranslationKey> = {
   CANCELLED: "status.cancelled",
 };
 
+/** Exhaustive job/trial status mapping; adding a backend status must update this typed table. */
 export function statusTranslationKey(status: AnyStatus): TranslationKey {
   return STATUS_LABELS[status];
 }

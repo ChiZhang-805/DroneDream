@@ -47,6 +47,7 @@ async def _secret_housekeeping_loop(interval_seconds: int) -> None:
         await asyncio.sleep(interval_seconds)
 
         def purge_once() -> int:
+            """Own a short DB session on the worker thread, never across an await."""
             with SessionLocal() as db:
                 return purge_expired_job_secrets(db)
 
@@ -67,6 +68,7 @@ async def _artifact_housekeeping_loop(interval_seconds: int) -> None:
         await asyncio.sleep(interval_seconds)
 
         def cleanup_once() -> dict[str, object]:
+            """Execute the configured opt-in retention policy in an isolated session."""
             with SessionLocal() as db:
                 return cleanup_local_artifacts(db).to_dict()
 
@@ -81,7 +83,11 @@ async def _artifact_housekeeping_loop(interval_seconds: int) -> None:
 
 
 def create_app() -> FastAPI:
-    """Build and configure the FastAPI application."""
+    """Build API routes and middleware after validated configuration/DB initialization.
+
+    Importing this module also creates ``app`` below. Tests and launchers must
+    set their intended environment and database URL before importing it.
+    """
 
     settings = get_settings()
     logging.basicConfig(level=settings.log_level.upper())
@@ -91,6 +97,7 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        """Own housekeeping tasks for this process lifetime and await cancellation."""
         tasks = [
             asyncio.create_task(
                 _secret_housekeeping_loop(settings.job_secret_cleanup_interval_seconds)
@@ -135,6 +142,7 @@ def create_app() -> FastAPI:
 
     @app.middleware("http")
     async def desktop_bridge_middleware(request: Request, call_next: object) -> Response:
+        """Require desktop process proof before routing; route auth still checks the user."""
         return await enforce_desktop_bridge(
             request,
             call_next,  # type: ignore[arg-type]
@@ -168,10 +176,12 @@ def create_app() -> FastAPI:
 
 
 def _register_exception_handlers(target: FastAPI) -> None:
+    """Install the same error envelope on both mounted and outer FastAPI apps."""
     @target.exception_handler(StarletteHTTPException)
     async def http_exception_handler(
         _request: Request, exc: StarletteHTTPException
     ) -> JSONResponse:
+        """Preserve intentional HTTP status/headers without bypassing the API envelope."""
         detail = exc.detail
         if isinstance(detail, dict) and "code" in detail and "message" in detail:
             return JSONResponse(
@@ -193,6 +203,7 @@ def _register_exception_handlers(target: FastAPI) -> None:
     async def validation_exception_handler(
         _request: Request, exc: RequestValidationError
     ) -> JSONResponse:
+        """Return validation locations/types without reflecting rejected secret values."""
         # Pydantic includes the rejected raw value by default. Requests can
         # contain API keys, so never echo ``input``/``ctx`` into a response or
         # an upstream access log merely because another field was invalid.
@@ -213,6 +224,7 @@ def _register_exception_handlers(target: FastAPI) -> None:
     async def unhandled_exception_handler(
         request: Request, exc: Exception
     ) -> JSONResponse:
+        """Expose a generic failure; logs retain only bounded stack locations and type."""
         # Preserve the response envelope while keeping internal exception
         # details out of the public API. Operator logs retain a compact stack
         # location, but not the exception message: database drivers and custom
@@ -237,6 +249,7 @@ def _register_exception_handlers(target: FastAPI) -> None:
 
 
 def _http_code_label(status_code: int) -> str:
+    """Provide stable client error categories when a route supplied only HTTP detail."""
     mapping = {
         400: "BAD_REQUEST",
         401: "UNAUTHORIZED",

@@ -8,6 +8,10 @@ import {
 import { EDITION_THEMES } from "../theme/editionTheme";
 
 describe("canonical Edition theme contract", () => {
+  it("freezes nested returned colors instead of sharing a mutable generated token array", () => {
+    expect(Object.isFrozen(EDITION_THEMES.sim.gradientStops)).toBe(true);
+    expect(EDITION_THEMES.sim.gradientStops).not.toBe(EDITION_BRAND_TOKENS.sim.gradientStops);
+  });
   it("derives every CSS and 3D palette from the generated canonical manifest", () => {
     for (const [edition, expected] of Object.entries(EDITION_BRAND_TOKENS)) {
       const theme = EDITION_THEMES[edition as keyof typeof EDITION_THEMES];

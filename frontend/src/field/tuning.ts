@@ -5,19 +5,24 @@ import type {
   FieldTuningStatus,
 } from "../desktop/bridge";
 import { hardwareDomainEdition, hardwareDomainRuntimeProfile } from "./hardwareDomain";
+import { isFieldTuningDemoRequest } from "../desktop/fieldTuningRequest";
 
+// Explicit browser-only placeholders, not hashes of trained models or devices.
 const FIXTURE_COMMIT = "0000000000000000000000000000000000000000";
 const FIXTURE_PACK = `sha256:${"0".repeat(64)}`;
 
 function round(value: number): number {
+  // Inputs below are bounded fixture arithmetic, never hardware observations.
   return Math.round(value * 10_000) / 10_000;
 }
 
 function fixtureDigest(index: number): string {
+  // A stable row key shaped like a digest, not a content-authenticating hash.
   return index.toString(16).padStart(64, "0");
 }
 
 export function fieldBrowserStatus(): FieldTuningStatus {
+  // Browser availability means the inert fixture can run, not that a device is ready.
   return {
     schemaVersion: 1,
     kind: "dronedream-field-tuning-status",
@@ -44,6 +49,11 @@ export function fieldBrowserStatus(): FieldTuningStatus {
 export function runFieldBrowserFixture(
   request: FieldTuningDemoRequest,
 ): FieldTuningDemoReceipt {
+  // Keep synthetic demo data visibly separate from the recorded-device workflow.
+  // This function performs no inference, sensor acquisition or parameter writes.
+  if (!isFieldTuningDemoRequest(request)) {
+    throw new Error("Field tuning demo request is outside its bounded contract.");
+  }
   const candidates = Array.from({ length: request.maxIterations }, (_, index) => {
     const progress = index;
     const trackingError = round(Math.max(0.22, 0.78 - 0.085 * progress));
@@ -72,6 +82,7 @@ export function runFieldBrowserFixture(
   const selected = [...candidates].sort((left, right) => left.score - right.score)[0];
   if (!selected) throw new Error("Field fixture produced no candidate");
   const holdoutScore = round(Math.min(1, selected.score + 0.035));
+  // The fixture's holdout label is a UI contract only, not independent measured evidence.
   const holdoutPassed = holdoutScore <= request.targetScore;
   return {
     schemaVersion: 1,
@@ -109,6 +120,7 @@ export function runFieldBrowserFixture(
 }
 
 export function fieldBrowserHardwareDenial(): FieldHardwareTuningPlan {
+  // Never synthesize a successful native hardware gate in browser-only mode.
   return {
     schemaVersion: 1,
     kind: "dronedream-field-hardware-tuning-plan",

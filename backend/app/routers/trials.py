@@ -23,12 +23,14 @@ def get_trial(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
+    """Read trial data only through its owning job; unknown and foreign IDs look identical."""
     trial = db.get(models.Trial, trial_id)
     if trial is None:
         raise HTTPException(
             status_code=404,
             detail={"code": "TRIAL_NOT_FOUND", "message": f"Trial {trial_id} was not found."},
         )
+    # Null ownership is a deliberately restricted auth-disabled development case.
     auth_disabled_owned_null = (
         get_settings().auth_mode == "disabled"
         and trial.job is not None

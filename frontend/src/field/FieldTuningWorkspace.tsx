@@ -10,7 +10,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   getFieldTuningStatus,
@@ -62,11 +62,11 @@ const COPY = {
     verdict: "Verdict",
     selected: "Selected",
     observed: "Observed",
-    holdout: "Independent holdout",
+    holdout: "Fixture holdout",
     passed: "Passed",
     rejected: "Rejected",
     demoOnly: "Demo-qualified only",
-    notHardwareEvidence: "The receipt is content-bound demonstration evidence and is never valid for hardware.",
+    notHardwareEvidence: "This synthetic demonstration receipt is never valid as measured hardware evidence.",
     hardwareGate: "Real-hardware execution gate",
     evaluate: "Evaluate current hardware gate",
     blockers: "Current blockers",
@@ -121,11 +121,11 @@ const COPY = {
     verdict: "结果",
     selected: "已选择",
     observed: "已观测",
-    holdout: "独立留出验证",
+    holdout: "测试数据留出示例",
     passed: "通过",
     rejected: "未通过",
     demoOnly: "仅演示通过",
-    notHardwareEvidence: "该回执仅为内容绑定的演示证据，永远不能作为真机资格证据。",
+    notHardwareEvidence: "该回执是人工构造的演示数据，永远不能作为实际测量或真机资格证据。",
     hardwareGate: "真机执行安全门",
     evaluate: "评估当前真机安全门",
     blockers: "当前阻断",
@@ -158,21 +158,36 @@ const COPY = {
 } as const;
 
 function compactHash(value: string): string {
+  // Display shortening must never be used for identity comparison or verification.
   const hash = value.startsWith("sha256:") ? value.slice(7) : value;
   return `${hash.slice(0, 8)}...${hash.slice(-6)}`;
 }
 
-export function FieldTuningWorkspace({
-  locale,
-  selectedPackId,
-  selectedControllerId,
-  snapshot,
-}: {
+interface FieldTuningWorkspaceProps {
   locale: FieldLocale;
   selectedPackId: string;
   selectedControllerId: string;
   snapshot?: FieldParameterSnapshot;
-}) {
+}
+
+/** A changed vehicle/snapshot starts a new UI owner; old native jobs may still finish. */
+export function FieldTuningWorkspace(props: FieldTuningWorkspaceProps) {
+  const snapshot = props.snapshot?.vehiclePackId === props.selectedPackId
+    && props.snapshot?.controllerId === props.selectedControllerId ? props.snapshot : undefined;
+  const binding = JSON.stringify([
+    props.locale, props.selectedPackId, props.selectedControllerId,
+    snapshot?.snapshotSha256, snapshot?.observationSha256, snapshot?.firmwareVersion,
+  ]);
+  return <FieldTuningSession key={binding} {...props} snapshot={snapshot} />;
+}
+
+/** Keep fixture results, recorded evidence and hardware denials explicitly separate. */
+function FieldTuningSession({
+  locale,
+  selectedPackId,
+  selectedControllerId,
+  snapshot,
+}: FieldTuningWorkspaceProps) {
   const copy = COPY[locale];
   const [objective, setObjective] = useState<string>(copy.objectiveValue);
   const [iterations, setIterations] = useState(5);
@@ -187,48 +202,79 @@ export function FieldTuningWorkspace({
   const [jobHistory, setJobHistory] = useState<FieldHarnessJobSummary[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const requestEpoch = useRef(0);
+  const historyEpoch = useRef(0);
 
+  // Invalidating ownership is not cancellation of an already persisted native job.
   useEffect(() => {
-    setObjective(copy.objectiveValue);
-    setJobName(copy.jobNameValue);
-  }, [copy.jobNameValue, copy.objectiveValue]);
+    return () => { requestEpoch.current += 1; };
+  }, []);
+
+  const invalidateResults = () => {
+    requestEpoch.current += 1;
+    setReceipt(null);
+    setHarnessReceipt(null);
+    setHardwarePlan(null);
+    setBusy(false);
+    setError(null);
+  };
 
   useEffect(() => {
     if (!isDesktopRuntime()) return;
+    let active = true;
+    const errorOwner = requestEpoch.current;
+    const historyTicket = ++historyEpoch.current;
     void getFieldTuningStatus()
       .then((next) => {
+        if (!active) return;
         setStatus(next);
         setStatusSource("native");
       })
-      .catch((reason: unknown) => setError(localeSafeError(reason, locale, {
+      .catch((reason: unknown) => active && requestEpoch.current === errorOwner && setError(localeSafeError(reason, locale, {
         zh: COPY["zh-CN"].statusLoadFailed,
         en: COPY.en.statusLoadFailed,
       })));
     void listFieldHarnessJobs()
-      .then(setJobHistory)
-      .catch((reason: unknown) => setError(localeSafeError(reason, locale, {
+      // Initial history can finish after a job refresh. Only the latest history
+      // reader owns this list; input edits alone do not invalidate persisted jobs.
+      .then((jobs) => { if (active && historyEpoch.current === historyTicket) setJobHistory(jobs); })
+      .catch((reason: unknown) => active && historyEpoch.current === historyTicket
+        && requestEpoch.current === errorOwner && setError(localeSafeError(reason, locale, {
         zh: COPY["zh-CN"].historyLoadFailed,
         en: COPY.en.historyLoadFailed,
       })));
+    return () => { active = false; };
   }, [locale]);
 
   const createEvidenceTemplate = () => {
+    // Templates contain bounds only, never fabricated measurements or training trials.
+    invalidateResults();
     if (!snapshot) {
       setError(copy.evidenceNeedsSnapshot);
       return;
     }
-    const parameterBounds = Object.fromEntries(
-      Object.entries(snapshot.parameters).map(([name, value]) => {
-        const span = Math.max(Math.abs(value) * 0.25, 0.1);
-        return [name, {
-          min: Number((value - span).toFixed(6)),
-          max: Number((value + span).toFixed(6)),
-          maxStep: Number(Math.max(span * 0.1, 0.001).toFixed(6)),
-        }];
-      }),
-    );
-    setEvidenceJson(JSON.stringify({ parameterBounds, trials: [] }, null, 2));
-    setError(null);
+    try {
+      const parameterBounds = Object.fromEntries(
+        Object.entries(snapshot.parameters).map(([name, value]) => {
+          if (typeof value !== "number" || !Number.isFinite(value)) {
+            throw new Error(copy.evidenceInvalid);
+          }
+          const span = Math.max(Math.abs(value) * 0.25, 0.1);
+          if (!Number.isFinite(value - span) || !Number.isFinite(value + span)) {
+            throw new Error(copy.evidenceInvalid);
+          }
+          return [name, {
+            min: Number((value - span).toFixed(6)),
+            max: Number((value + span).toFixed(6)),
+            maxStep: Number(Math.max(span * 0.1, 0.001).toFixed(6)),
+          }];
+        }),
+      );
+      setEvidenceJson(JSON.stringify({ parameterBounds, trials: [] }, null, 2));
+      setError(null);
+    } catch {
+      setError(copy.evidenceInvalid);
+    }
   };
 
   const runRecordedHarness = async () => {
@@ -236,14 +282,17 @@ export function FieldTuningWorkspace({
       setError(copy.evidenceNeedsSnapshot);
       return;
     }
+    const ticket = ++requestEpoch.current;
     setBusy(true);
     setError(null);
     try {
+      if (evidenceJson.length > 2 * 1024 * 1024) throw new Error(copy.evidenceInvalid);
       const parsed = JSON.parse(evidenceJson) as {
         parameterBounds?: Record<string, FieldHarnessParameterBound>;
         trials?: FieldHarnessTrialInput[];
       };
-      if (!parsed.parameterBounds || !Array.isArray(parsed.trials) || parsed.trials.length < 3) {
+      if (!parsed || typeof parsed !== "object" || !parsed.parameterBounds
+        || !Array.isArray(parsed.trials) || parsed.trials.length < 3 || parsed.trials.length > 32) {
         throw new Error(copy.evidenceInvalid);
       }
       const next = await runFieldHarnessJob({
@@ -261,15 +310,19 @@ export function FieldTuningWorkspace({
         parameterBounds: parsed.parameterBounds,
         trials: parsed.trials,
       });
+      if (requestEpoch.current !== ticket) return;
       setHarnessReceipt(next);
-      setJobHistory(await listFieldHarnessJobs());
+      const historyTicket = ++historyEpoch.current;
+      const jobs = await listFieldHarnessJobs();
+      if (requestEpoch.current === ticket && historyEpoch.current === historyTicket) setJobHistory(jobs);
     } catch (reason) {
+      if (requestEpoch.current !== ticket) return;
       setError(localeSafeError(reason, locale, {
         zh: COPY["zh-CN"].evidenceFailed,
         en: COPY.en.evidenceFailed,
       }));
     } finally {
-      setBusy(false);
+      if (requestEpoch.current === ticket) setBusy(false);
     }
   };
 
@@ -281,30 +334,33 @@ export function FieldTuningWorkspace({
   );
 
   const runDemo = async () => {
+    const ticket = ++requestEpoch.current;
     setBusy(true);
     setError(null);
     try {
       const request = { objective, maxIterations: iterations, targetScore };
-      setReceipt(
-        isDesktopRuntime()
+      const next = isDesktopRuntime()
           ? await runFieldTuningDemo(request)
-          : runFieldBrowserFixture(request),
-      );
+          : runFieldBrowserFixture(request);
+      if (requestEpoch.current === ticket) setReceipt(next);
     } catch (reason) {
+      if (requestEpoch.current !== ticket) return;
       setError(localeSafeError(reason, locale, {
         zh: COPY["zh-CN"].demoFailed,
         en: COPY.en.demoFailed,
       }));
     } finally {
-      setBusy(false);
+      if (requestEpoch.current === ticket) setBusy(false);
     }
   };
 
   const evaluateHardwareGate = async () => {
+    const ticket = ++requestEpoch.current;
+    setBusy(true);
+    setHardwarePlan(null);
     setError(null);
     try {
-      setHardwarePlan(
-        isDesktopRuntime()
+      const next = isDesktopRuntime()
           ? await prepareFieldHardwareTuning({
             deviceObservationId: snapshot?.deviceObservationId ?? null,
             vehiclePackId: selectedPackId,
@@ -316,13 +372,16 @@ export function FieldTuningWorkspace({
             objective,
             maxIterations: iterations,
           })
-          : fieldBrowserHardwareDenial(),
-      );
+          : fieldBrowserHardwareDenial();
+      if (requestEpoch.current === ticket) setHardwarePlan(next);
     } catch (reason) {
+      if (requestEpoch.current !== ticket) return;
       setError(localeSafeError(reason, locale, {
         zh: COPY["zh-CN"].gateFailed,
         en: COPY.en.gateFailed,
       }));
+    } finally {
+      if (requestEpoch.current === ticket) setBusy(false);
     }
   };
 
@@ -347,7 +406,7 @@ export function FieldTuningWorkspace({
         <div className="field-recorded-harness-grid">
           <label>
             <span>{copy.jobName}</span>
-            <input value={jobName} maxLength={80} onChange={(event) => setJobName(event.target.value)} />
+            <input value={jobName} maxLength={80} onChange={(event) => { invalidateResults(); setJobName(event.target.value); }} />
           </label>
           <label className="field-recorded-json">
             <span>{copy.evidenceJson}</span>
@@ -355,8 +414,9 @@ export function FieldTuningWorkspace({
               value={evidenceJson}
               spellCheck={false}
               rows={10}
+              maxLength={2 * 1024 * 1024}
               placeholder={'{\n  "parameterBounds": {},\n  "trials": []\n}'}
-              onChange={(event) => setEvidenceJson(event.target.value)}
+              onChange={(event) => { invalidateResults(); setEvidenceJson(event.target.value); }}
             />
           </label>
           <div className="field-recorded-actions">
@@ -406,7 +466,7 @@ export function FieldTuningWorkspace({
       <div className="field-tuning-controls">
         <label>
           <span>{copy.objective}</span>
-          <input value={objective} maxLength={120} onChange={(event) => setObjective(event.target.value)} />
+          <input value={objective} maxLength={120} onChange={(event) => { invalidateResults(); setObjective(event.target.value); }} />
         </label>
         <label>
           <span>{copy.iterations}</span>
@@ -415,7 +475,7 @@ export function FieldTuningWorkspace({
             min={2}
             max={8}
             value={iterations}
-            onChange={(event) => setIterations(Math.max(2, Math.min(8, Number(event.target.value))))}
+            onChange={(event) => { invalidateResults(); setIterations(Math.max(2, Math.min(8, Number(event.target.value)))); }}
           />
         </label>
         <label>
@@ -426,7 +486,7 @@ export function FieldTuningWorkspace({
             max={0.9}
             step={0.01}
             value={targetScore}
-            onChange={(event) => setTargetScore(Number(event.target.value))}
+            onChange={(event) => { invalidateResults(); setTargetScore(Number(event.target.value)); }}
           />
         </label>
         <button type="button" className="field-primary-command" disabled={busy || objective.trim() === ""} onClick={() => void runDemo()}>
@@ -482,7 +542,7 @@ export function FieldTuningWorkspace({
 
       <section className="field-hardware-gate" aria-labelledby="field-hardware-gate-title">
         <header><h3 id="field-hardware-gate-title">{copy.hardwareGate}</h3><ShieldCheck aria-hidden="true" /></header>
-        <button type="button" onClick={() => void evaluateHardwareGate()}><ShieldCheck aria-hidden="true" />{copy.evaluate}</button>
+        <button type="button" disabled={busy} onClick={() => void evaluateHardwareGate()}><ShieldCheck aria-hidden="true" />{copy.evaluate}</button>
         {hardwarePlan ? (
           <div className="field-gate-evidence" role="status">
             <div><h4>{copy.job}</h4><code>{hardwarePlan.jobId}</code></div>
@@ -498,5 +558,6 @@ export function FieldTuningWorkspace({
 }
 
 function RadioStatus() {
+  // Decorative domain indicator only; this does not attest to a live radio connection.
   return <span className="field-live-indicator" aria-hidden="true" />;
 }

@@ -41,6 +41,7 @@ _TASK_LABELS_ZH = {
 
 
 def _localized_workflow_blocker(code: str, *, chinese: bool) -> str:
+    """Explain a blocker without changing the machine-readable workflow decision."""
     if not chinese:
         return code
     if code.endswith(".denied") and code.startswith("edition."):
@@ -68,6 +69,8 @@ async def compile_turn(
     simulator, or mutate persisted experiment state.
     """
 
+    # Read only consented account defaults on this request's DB session. Pass an
+    # owned context value, not the live SQL session, into the model worker thread.
     account_context = account_shared_model_context(
         get_user_experience_preferences(db, user_id=current_user.id)
     )
@@ -111,6 +114,8 @@ async def compile_turn(
         requested_tool_ids=[],
     )
     workflow = compile_task_workflow(current_user.id, workflow_request)
+    # Other domains expose a compiled proposal, not a model-controlled flight or
+    # a completed job. Lifecycle flags let clients avoid overstating this stage.
     if workflow.task_type != "control_tuning":
         step_summary = " → ".join(step.title for step in workflow.steps)
         if request.locale == "zh-CN":

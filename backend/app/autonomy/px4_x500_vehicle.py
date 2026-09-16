@@ -59,7 +59,17 @@ def px4_x500_maximum_qualified_payload_kg() -> float:
 
 
 def px4_x500_loaded_thrust_to_weight(payload_mass_kg: float) -> float:
-    if not math.isfinite(payload_mass_kg) or payload_mass_kg < 0:
+    """Compute a static thrust reserve, not an in-flight payload qualification."""
+    try:
+        valid = (
+            isinstance(payload_mass_kg, (int, float))
+            and not isinstance(payload_mass_kg, bool)
+            and math.isfinite(payload_mass_kg)
+            and payload_mass_kg >= 0
+        )
+    except OverflowError:
+        valid = False
+    if not valid:
         raise ValueError("payload mass must be finite and non-negative")
     return PX4_X500_MAXIMUM_THRUST_N / (
         (PX4_X500_DRY_MASS_KG + payload_mass_kg) * STANDARD_GRAVITY_M_S2
@@ -73,6 +83,7 @@ class MyDroneGazeboArtifact:
 
 
 def _model_config() -> str:
+    """Describe the product-owned wrapper while retaining the pinned PX4 base."""
     root = ElementTree.Element("model")
     ElementTree.SubElement(root, "name").text = "DroneDream My Drone"
     ElementTree.SubElement(root, "version").text = "1.0.0"
@@ -88,6 +99,7 @@ def _model_config() -> str:
 
 
 def _my_drone_model_sdf() -> str:
+    """Attach a dynamic parcel through Gazebo's joint system, not a visual shortcut."""
     sdf = ElementTree.Element("sdf", {"version": "1.9"})
     model = ElementTree.SubElement(sdf, "model", {"name": MY_DRONE_MODEL_NAME})
     include = ElementTree.SubElement(model, "include", {"merge": "true"})
@@ -155,6 +167,7 @@ def takeout_payload_sdf() -> str:
 
 
 def get_my_drone_gazebo_artifact() -> MyDroneGazeboArtifact:
+    """Build fresh model files and a receipt of the exact UTF-8 payload bytes."""
     loaded_mass = PX4_X500_DRY_MASS_KG + TAKEOUT_PAYLOAD_MASS_KG
     summary: dict[str, Any] = {
         "schema_version": "dronedream.my-drone-gazebo-artifact.v1",
@@ -201,18 +214,19 @@ def get_my_drone_gazebo_artifact() -> MyDroneGazeboArtifact:
     summary["payload_files_sha256"] = {
         name: hashlib.sha256(content.encode("utf-8")).hexdigest()
         for name, content in sorted(files.items())
-        if name != "summary.json"
+        if name != "summary.json"  # A summary cannot contain a digest of itself.
     }
     files["summary.json"] = json.dumps(summary, indent=2, sort_keys=True) + "\n"
     return MyDroneGazeboArtifact(files=files, summary=summary)
 
 
 def export_my_drone_gazebo_artifact(output_directory: Path) -> dict[str, str]:
+    """Export the generated package without platform-specific newline translation."""
     artifact = get_my_drone_gazebo_artifact()
     output_directory.mkdir(parents=True, exist_ok=True)
     result: dict[str, str] = {}
     for name, content in artifact.files.items():
         target = output_directory / name
-        target.write_text(content, encoding="utf-8")
+        target.write_text(content, encoding="utf-8", newline="\n")
         result[name] = hashlib.sha256(target.read_bytes()).hexdigest()
     return result

@@ -1,4 +1,4 @@
-import { fireEvent, render, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AuthCaptcha } from "../features/auth/AuthCaptcha";
@@ -6,11 +6,26 @@ import { AuthCaptcha } from "../features/auth/AuthCaptcha";
 const SCRIPT_ID = "drone-dream-turnstile-script";
 
 afterEach(() => {
+  vi.useRealTimers();
   delete window.turnstile;
   document.getElementById(SCRIPT_ID)?.remove();
 });
 
 describe("AuthCaptcha", () => {
+  it("times out a stalled script so a later mount can retry", async () => {
+    vi.useFakeTimers();
+    const page = render(<AuthCaptcha siteKey="site-key" onTokenChange={vi.fn()} />);
+    const stalled = document.getElementById(SCRIPT_ID);
+    expect(stalled).toBeInstanceOf(HTMLScriptElement);
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+    expect(document.getElementById(SCRIPT_ID)).toBeNull();
+    page.unmount();
+    const retry = render(<AuthCaptcha siteKey="site-key" onTokenChange={vi.fn()} />);
+    expect(document.getElementById(SCRIPT_ID)).not.toBe(stalled);
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+    retry.unmount();
+  });
+
   it("replaces a failed script and preserves the widget lifecycle", async () => {
     const failedTokenChange = vi.fn();
     const failedRender = render(

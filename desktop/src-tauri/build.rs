@@ -1,6 +1,34 @@
 use std::path::PathBuf;
 use std::process::Command;
 
+#[path = "build_support/frontend_assets.rs"]
+mod frontend_assets;
+
+// 功能：
+//   在发布模式编译前验证真正生效的前端入口，阻止生成打开本机目录的空壳 EXE。
+// 输入：
+//   manifest_dir：桌面 crate 及规范 Tauri 配置所在目录。
+// 输出：
+//   无；缺失、非字符串或不适合嵌入的入口会直接中止构建。
+fn require_embedded_frontend(manifest_dir: &std::path::Path) {
+    if std::env::var("PROFILE").as_deref() != Ok("release") {
+        return;
+    }
+    println!("cargo:rerun-if-env-changed=TAURI_CONFIG");
+    let base: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(manifest_dir.join("tauri.conf.json")).expect("Tauri base config is missing"),
+    ).expect("Tauri base config is invalid");
+    let overlay: serde_json::Value = std::env::var("TAURI_CONFIG").ok()
+        .map(|value| serde_json::from_str(&value).expect("Tauri build overlay is invalid"))
+        .unwrap_or(serde_json::Value::Null);
+    let frontend = overlay.pointer("/build/frontendDist")
+        .or_else(|| base.pointer("/build/frontendDist"))
+        .and_then(serde_json::Value::as_str)
+        .expect("frontendDist must name an embedded directory");
+    frontend_assets::validate_embedded_frontend(frontend, manifest_dir)
+        .unwrap_or_else(|error| panic!("{error}"));
+}
+
 fn emit_rerun_tree(path: &std::path::Path) {
     println!("cargo:rerun-if-changed={}", path.display());
     if !path.is_dir() {
@@ -220,6 +248,49 @@ fn prepare_generated_directory(path: &std::path::Path) {
     });
 }
 
+// 功能：
+//   为明确指定的本机界面补丁复用已安装且通过完整性校验的 Engine Pack，禁止伪造更新顺序。
+// 输入：
+//   output：隔离构建目录；tool：组件校验程序；python：解释器；profile：版本配置；commit：源码提交。
+// 输出：
+//   reused：是否使用显式指定的本机组件包。
+fn reuse_local_engine_pack(output: &std::path::Path, tool: &std::path::Path, python: &str, profile: &str, commit: &str) -> bool {
+    println!("cargo:rerun-if-env-changed=DRONEDREAM_LOCAL_ENGINE_PACK_DIRECTORY");
+    println!("cargo:rerun-if-env-changed=DRONEDREAM_LOCAL_ENGINE_PACK_ID");
+    let Some(directory) = std::env::var_os("DRONEDREAM_LOCAL_ENGINE_PACK_DIRECTORY") else { return false; };
+    assert!(std::env::var_os("DRONEDREAM_RELEASE_SOURCE_COMMIT").is_none()
+        && std::env::var_os("DRONEDREAM_RELEASE_BUILD_NUMBER").is_none(),
+        "Official releases cannot reuse a local component override");
+    let directory = PathBuf::from(directory).canonicalize().expect("Local Engine Pack directory is missing");
+    emit_rerun_tree(&directory);
+    let descriptor_path = directory.join("engine-pack-bundle.json");
+    let manifest_path = directory.join("engine-pack-manifest.json");
+    let descriptor: serde_json::Value = serde_json::from_slice(&std::fs::read(&descriptor_path).expect("Local Engine Pack descriptor is missing")).expect("Invalid local descriptor");
+    let manifest: serde_json::Value = serde_json::from_slice(&std::fs::read(&manifest_path).expect("Local Engine Pack manifest is missing")).expect("Invalid local manifest");
+    let expected_id = std::env::var("DRONEDREAM_LOCAL_ENGINE_PACK_ID").expect("Local Engine Pack reuse requires an explicit content identity");
+    assert_eq!(descriptor["packId"].as_str(), Some(expected_id.as_str()), "Local Engine Pack pin mismatch");
+    assert_eq!(descriptor["sourceCommit"].as_str(), Some(commit), "Local Engine Pack belongs to a different source commit");
+    assert_eq!(manifest["editionProfile"]["profileId"].as_str(), Some(profile), "Local Engine Pack belongs to a different edition");
+    // 校验工具检查归档内每个文件及外部清单的大小和摘要，而非只相信版本字符串。
+    let verified = Command::new(python).arg(tool).arg("verify")
+        .arg("--descriptor").arg(&descriptor_path)
+        .arg("--archive").arg(directory.join("DroneDreamEnginePack.tar.gz"))
+        .status().expect("Unable to verify local Engine Pack");
+    assert!(verified.success(), "Local Engine Pack failed content verification");
+    for name in ["engine-pack-bundle.json", "engine-pack-manifest.json", "DroneDreamEnginePack.tar.gz"] {
+        std::fs::copy(directory.join(name), output.join(name)).expect("Unable to stage verified local Engine Pack");
+    }
+    let staged: serde_json::Value = serde_json::from_slice(&std::fs::read(output.join("engine-pack-bundle.json")).expect("Staged descriptor is missing")).expect("Staged descriptor is invalid");
+    assert_eq!(staged, descriptor, "Local Engine Pack changed during staging");
+    let staged_verified = Command::new(python).arg(tool).arg("verify")
+        .arg("--descriptor").arg(output.join("engine-pack-bundle.json"))
+        .arg("--archive").arg(output.join("DroneDreamEnginePack.tar.gz"))
+        .status().expect("Unable to verify staged Engine Pack");
+    assert!(staged_verified.success(), "Staged Engine Pack failed content verification");
+    println!("cargo:warning=Local UI build preserves explicitly pinned Engine Pack {expected_id}; this is not an official release");
+    true
+}
+
 fn build_engine_pack(manifest_dir: &std::path::Path, edition_profile: &str) {
     let repository_root = manifest_dir
         .join("../..")
@@ -281,7 +352,8 @@ fn build_engine_pack(manifest_dir: &std::path::Path, edition_profile: &str) {
             "python3".to_string()
         }
     });
-    let status = Command::new(&python)
+    if !reuse_local_engine_pack(&output_directory, &tool, &python, edition_profile, &source_commit) {
+      let status = Command::new(&python)
         .arg(&tool)
         .arg("build")
         .arg("--repository-root")
@@ -298,6 +370,7 @@ fn build_engine_pack(manifest_dir: &std::path::Path, edition_profile: &str) {
             panic!("unable to build the embedded Engine Pack with {python}: {error}")
         });
     assert!(status.success(), "embedded Engine Pack generation failed");
+    }
     let descriptor_path = output_directory.join("engine-pack-bundle.json");
     let descriptor: serde_json::Value = serde_json::from_slice(
         &std::fs::read(&descriptor_path).expect("embedded Engine Pack descriptor is missing"),
@@ -317,6 +390,7 @@ fn main() {
     let manifest_dir = PathBuf::from(
         std::env::var("CARGO_MANIFEST_DIR").expect("Cargo must set CARGO_MANIFEST_DIR"),
     );
+    require_embedded_frontend(&manifest_dir);
     let edition_profile = configure_desktop_auth_identity(&manifest_dir);
     build_engine_pack(&manifest_dir, &edition_profile);
     let frontend_environment = manifest_dir.join("../../frontend/.env.production");

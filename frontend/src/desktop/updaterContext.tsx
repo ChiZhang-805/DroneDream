@@ -5,6 +5,8 @@ import { useAuth } from "../features/auth/AuthContext";
 
 type AppUpdaterState = ReturnType<typeof useAppUpdater>;
 
+// Non-desktop/provider-free views expose inert actions; "current" here is not
+// evidence that an installed product or its Runtime has passed update checks.
 const FALLBACK: AppUpdaterState = {
   status: "current",
   availableVersion: null,
@@ -25,6 +27,7 @@ const FALLBACK: AppUpdaterState = {
 
 const AppUpdaterContext = createContext<AppUpdaterState>(FALLBACK);
 
+/** Share one updater lifecycle and defer account-bound calls until auth hydration settles. */
 export function AppUpdaterProvider({ children }: { children: ReactNode }) {
   const auth = useAuth();
   const updater = useAppUpdater({
@@ -37,6 +40,7 @@ export function AppUpdaterProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/** Consume the provider-owned state; reading it never starts a second update loop. */
 // eslint-disable-next-line react-refresh/only-export-components
 export function useAppUpdaterState(): AppUpdaterState {
   return useContext(AppUpdaterContext);

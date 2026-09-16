@@ -29,6 +29,7 @@ def urlopen(request: Request, *, timeout: float) -> Any:
 
 
 def _verified_plan_id(payload: object) -> ReportExportTier | None:
+    """Accept only known plans from the gateway envelope, not profile metadata or query params."""
     if not isinstance(payload, dict):
         return None
     data = payload.get("data")
@@ -98,6 +99,8 @@ def resolve_report_export_tier(
     except Exception:
         return "free"
 
+    # This conservative fallback affects this export's watermark only; it must
+    # never overwrite the account's subscription or be persisted as its plan.
     return _verified_plan_id(payload) or "free"
 
 

@@ -19274,6 +19274,17 @@ html[data-dd-reduced-motion="true"] .assistant-voice-button.requesting svg {
   );
 }
 
+.app-conversations .app-workspace-row > a {
+  padding-right: 0.72rem;
+}
+
+.settings-update-error {
+  margin: 0.25rem 0 0.75rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
 .app-workspace-label {
   min-width: 0;
   overflow: hidden;
@@ -22599,6 +22610,31 @@ body {
 }
 
 .autonomy-repository-delete:hover { color: #c62f55; }
+.autonomy-repository-interpret {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+.autonomy-repository-interpret svg { width: 1.15rem; height: 1.15rem; }
+.autonomy-repository-interpret:disabled { opacity: 0.6; cursor: default; }
+.autonomy-repository-interpret:hover,
+.autonomy-repository-interpret:active { background: transparent; box-shadow: none; }
+.autonomy-repository-interpret[data-state="done"] { color: #a3f1d3; }
+.autonomy-repository-interpret[data-state="error"] { color: #ffbecb; }
+.autonomy-repository-interpret[data-state="busy"] svg { animation: autonomy-interpret-spin 1s linear infinite; }
+.autonomy-repository-interpret:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+@keyframes autonomy-interpret-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .autonomy-repository-interpret[data-state="busy"] svg { animation: none; } }
 .autonomy-repository-delete svg { width: 1rem; height: 1rem; }
 
 .autonomy-repository-dialog-backdrop {

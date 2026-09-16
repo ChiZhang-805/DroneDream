@@ -1,9 +1,9 @@
 //! Safe lifecycle primitives for the signed runtime-image installer.
 
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, OpenOptions};
-use std::io::{ErrorKind, Write};
+use std::io::{ErrorKind, Read, Write};
 use std::path::{Component, Path, PathBuf};
 
 // Keep downloads beside the WSL import target, never inside it. `wsl --import`
@@ -49,6 +49,7 @@ pub(crate) struct DownloadArtifact {
 
 #[allow(dead_code)]
 impl DownloadArtifact {
+    /// A downloaded path is not eligible for cleanup until its digest is verified.
     pub(crate) fn partial(relative_path: impl Into<PathBuf>) -> Self {
         Self {
             relative_path: relative_path.into(),
@@ -78,10 +79,12 @@ enum ArtifactLocation {
     Missing,
 }
 
+/// Compute a candidate sibling cache; this alone neither creates nor authorizes it.
 pub(crate) fn runtime_download_cache_root(target_root: &str) -> PathBuf {
     runtime_download_cache_root_path(Path::new(target_root))
 }
 
+/// Keep resumable downloads out of the WSL import directory, which must stay clean.
 fn runtime_download_cache_root_path(target_root: &Path) -> PathBuf {
     target_root
         .parent()
@@ -163,11 +166,16 @@ pub(crate) fn apply_runtime_import_outcome(
         .map_err(|error| format!("Unable to resolve the managed artifact cache: {error}"))?;
 
     let mut unique = BTreeMap::<PathBuf, DownloadArtifactState>::new();
+    let mut spellings = BTreeSet::new();
     for artifact in artifacts {
         validate_artifact_relative_path(&artifact.relative_path)?;
-        if unique
-            .insert(artifact.relative_path.clone(), artifact.state)
-            .is_some()
+        // Windows ignores case for normal installer paths. A partial and a verified
+        // entry must not refer to the same file under different spellings.
+        let spelling = artifact.relative_path.to_string_lossy().to_lowercase();
+        if !spellings.insert(spelling)
+            || unique
+                .insert(artifact.relative_path.clone(), artifact.state)
+                .is_some()
         {
             return Err(format!(
                 "The download manifest contains the duplicate artifact {}.",
@@ -219,6 +227,8 @@ pub(crate) fn apply_runtime_import_outcome(
     Ok(report)
 }
 
+/// Require marker ownership, plain directories and a canonical same-parent cache.
+/// The marker identifies managed data; it is not a cryptographic release signature.
 pub(crate) fn validate_managed_cache(runtime_target_root: &Path) -> Result<PathBuf, String> {
     require_absolute_runtime_root(runtime_target_root)?;
     reject_existing_link_like(runtime_target_root)?;
@@ -248,6 +258,8 @@ pub(crate) fn validate_managed_cache(runtime_target_root: &Path) -> Result<PathB
     Ok(cache_root)
 }
 
+/// Walk every existing component without following links, then bind its canonical root.
+/// The installer must serialize lifecycle changes; path checks are not a hostile-user sandbox.
 fn inspect_artifact_location(
     cache_root: &Path,
     canonical_artifact_root: &Path,
@@ -310,6 +322,7 @@ fn inspect_artifact_location(
     Ok(ArtifactLocation::ExistingFile(path))
 }
 
+/// Restrict manifests to ordinary Windows-compatible files below artifacts/.
 fn validate_artifact_relative_path(relative_path: &Path) -> Result<(), String> {
     if relative_path.as_os_str().is_empty() || relative_path.is_absolute() {
         return Err("Download artifact paths must be non-empty relative paths.".to_string());
@@ -324,6 +337,10 @@ fn validate_artifact_relative_path(relative_path: &Path) -> Result<(), String> {
         || components
             .iter()
             .any(|component| !matches!(component, Component::Normal(_)))
+        || components.iter().any(|component| match component {
+            Component::Normal(segment) => !ordinary_segment(segment),
+            _ => true,
+        })
     {
         return Err(format!(
             "Artifact {} must be a relative ordinary-file path below {ARTIFACT_DIRECTORY}/.",
@@ -333,6 +350,38 @@ fn validate_artifact_relative_path(relative_path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Reject alternate streams, Win32 device aliases and lossy/trailing path spellings.
+fn ordinary_segment(segment: &std::ffi::OsStr) -> bool {
+    let Some(name) = segment.to_str() else {
+        return false;
+    };
+    if name.ends_with(['.', ' '])
+        || name
+            .chars()
+            .any(|ch| ch.is_control() || "<>:\"|?*".contains(ch))
+    {
+        return false;
+    }
+    let stem = name
+        .split('.')
+        .next()
+        .unwrap_or("")
+        .trim_end()
+        .to_uppercase();
+    !matches!(
+        stem.as_str(),
+        "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$"
+    ) && !["COM", "LPT"].iter().any(|prefix| {
+        stem.strip_prefix(prefix).is_some_and(|suffix| {
+            matches!(
+                suffix,
+                "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³"
+            )
+        })
+    })
+}
+
+/// Only the dedicated absolute import directory may determine a sibling cleanup root.
 fn require_absolute_runtime_root(runtime_target_root: &Path) -> Result<(), String> {
     if !runtime_target_root.is_absolute() {
         return Err("The managed runtime target must be an absolute path.".to_string());
@@ -345,6 +394,7 @@ fn require_absolute_runtime_root(runtime_target_root: &Path) -> Result<(), Strin
     Ok(())
 }
 
+/// Permit a not-yet-created path, but never reinterpret a link as owned storage.
 fn reject_existing_link_like(path: &Path) -> Result<(), String> {
     match fs::symlink_metadata(path) {
         Ok(metadata) if is_link_like(&metadata) => Err(format!(
@@ -357,6 +407,7 @@ fn reject_existing_link_like(path: &Path) -> Result<(), String> {
     }
 }
 
+/// Existing cache directories must be ordinary filesystem directories.
 fn ensure_real_directory(path: &Path, label: &str) -> Result<(), String> {
     let metadata = fs::symlink_metadata(path)
         .map_err(|error| format!("Unable to inspect {label} {}: {error}", path.display()))?;
@@ -370,6 +421,7 @@ fn ensure_real_directory(path: &Path, label: &str) -> Result<(), String> {
 }
 
 #[cfg(target_os = "windows")]
+/// Junctions and other reparse points need the Windows attribute check as well.
 pub(crate) fn is_link_like(metadata: &fs::Metadata) -> bool {
     use std::os::windows::fs::MetadataExt;
     const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x0400;
@@ -378,10 +430,12 @@ pub(crate) fn is_link_like(metadata: &fs::Metadata) -> bool {
 }
 
 #[cfg(not(target_os = "windows"))]
+/// Non-Windows fixtures have no Win32 reparse-point attribute.
 pub(crate) fn is_link_like(metadata: &fs::Metadata) -> bool {
     metadata.file_type().is_symlink()
 }
 
+/// Claim only a new empty cache; create_new must not overwrite somebody else's marker.
 fn write_cache_marker(marker_path: &Path) -> Result<(), String> {
     let marker = CacheMarker {
         schema_version: 1,
@@ -405,6 +459,7 @@ fn write_cache_marker(marker_path: &Path) -> Result<(), String> {
         .map_err(|error| format!("Unable to persist the download-cache marker: {error}"))
 }
 
+/// Bound the actual read, not only an earlier stat, before interpreting ownership.
 fn validate_cache_marker(marker_path: &Path) -> Result<(), String> {
     let metadata = fs::symlink_metadata(marker_path).map_err(|error| {
         format!(
@@ -415,8 +470,29 @@ fn validate_cache_marker(marker_path: &Path) -> Result<(), String> {
     if !metadata.is_file() || is_link_like(&metadata) || metadata.len() > MAX_MARKER_BYTES {
         return Err("The runtime download-cache marker is not a safe ordinary file.".to_string());
     }
-    let raw = fs::read(marker_path)
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        options.custom_flags(windows_sys::Win32::Storage::FileSystem::FILE_FLAG_OPEN_REPARSE_POINT);
+    }
+    let file = options
+        .open(marker_path)
         .map_err(|error| format!("Unable to read the download-cache marker: {error}"))?;
+    let opened = file
+        .metadata()
+        .map_err(|_| "Unable to inspect the opened download-cache marker.".to_string())?;
+    if !opened.is_file() || is_link_like(&opened) || opened.len() > MAX_MARKER_BYTES {
+        return Err("The runtime download-cache marker is not a safe ordinary file.".to_string());
+    }
+    let mut raw = Vec::new();
+    file.take(MAX_MARKER_BYTES + 1)
+        .read_to_end(&mut raw)
+        .map_err(|_| "Unable to read the download-cache marker.".to_string())?;
+    if raw.len() as u64 > MAX_MARKER_BYTES {
+        return Err("The runtime download-cache marker is too large.".to_string());
+    }
     let marker: CacheMarker = serde_json::from_slice(&raw)
         .map_err(|error| format!("The download-cache marker is invalid JSON: {error}"))?;
     if marker.schema_version != 1
@@ -438,6 +514,7 @@ mod tests {
     struct Sandbox(PathBuf);
 
     impl Sandbox {
+        /// Each test owns one unique root, never an installed runtime/cache location.
         fn new() -> Self {
             let root = std::env::temp_dir().join(format!(
                 "dronedream-runtime-cache-{}-{}",
@@ -462,6 +539,7 @@ mod tests {
         }
     }
 
+    /// Synthetic cache bytes exercise cleanup without downloading or importing WSL.
     fn write_artifact(runtime_root: &Path, relative: &Path, body: &[u8]) -> PathBuf {
         let cache_root = runtime_download_cache_root_path(runtime_root);
         let path = cache_root.join(relative);
@@ -595,5 +673,44 @@ mod tests {
         assert!(runtime_download_cache_root_path(&runtime_root)
             .join(&artifact)
             .exists());
+    }
+
+    #[test]
+    fn rejects_windows_stream_and_alias_names() {
+        for path in [
+            "artifacts/runtime.tar:secret",
+            "artifacts/runtime.tar.",
+            "artifacts/runtime.tar ",
+            "artifacts/CON",
+            "artifacts/NUL.zip",
+        ] {
+            assert!(
+                validate_artifact_relative_path(Path::new(path)).is_err(),
+                "unsafe cache path accepted: {path}"
+            );
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn case_aliases_cannot_delete_a_partial_artifact() {
+        let sandbox = Sandbox::new();
+        let runtime_root = sandbox.runtime_root();
+        initialize_runtime_download_cache(&runtime_root).unwrap();
+        let relative = Path::new("artifacts/runtime.tar.zst");
+        let file = write_artifact(&runtime_root, relative, b"resumable");
+        let result = apply_runtime_import_outcome(
+            &runtime_root,
+            ImportOutcome::Succeeded,
+            &[
+                DownloadArtifact::verified(relative),
+                DownloadArtifact::partial("artifacts/RUNTIME.TAR.ZST"),
+            ],
+        );
+        assert!(
+            result.is_err(),
+            "two spellings must not assign conflicting states to one file"
+        );
+        assert!(file.exists(), "reject aliases before deleting anything");
     }
 }

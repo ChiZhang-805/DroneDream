@@ -30,6 +30,7 @@ MOCK_METADATA_ARTIFACT_EVIDENCE = "mock-metadata-only"
 
 
 def _sha256_text(value: str) -> str:
+    """Bind a storage locator without exposing its potentially private path in the projection."""
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
@@ -50,6 +51,8 @@ def candidate_trial_artifact_evidence(
     session = object_session(candidate)
     if session is None:
         return None
+    # Validate the entire ownership set before querying artifacts. Trial IDs
+    # supplied by an aggregator must not pull another candidate's evidence in.
     trial_ids: list[str] = []
     for trial in trials:
         trial_id = getattr(trial, "id", None)
@@ -93,6 +96,8 @@ def candidate_trial_artifact_evidence(
             raise ArtifactIntegrityError(
                 "artifact query returned a row outside the Candidate Trial set"
             )
+        # Missing real bytes cannot be reclassified as mock evidence. A mock
+        # locator is the only explicit metadata-only exception in this contract.
         receipt = require_artifact_integrity(artifact)
         if receipt is None:
             if not artifact.storage_path.startswith("mock://"):
@@ -116,6 +121,8 @@ def candidate_trial_artifact_evidence(
             }
         else:
             if storage is not None:
+                # Compilation verifies storage bytes; later metadata projections
+                # may skip that I/O but still require the immutable receipt above.
                 require_artifact_integrity(
                     artifact,
                     content_digest=storage.content_digest(

@@ -20,6 +20,7 @@ interface ArtifactsPanelProps {
   emptyDescription?: string;
 }
 
+/** Preserve individual artifact identity within the caller's already-filtered section. */
 function ArtifactSectionGrid({ heading, artifacts, emptyNote }: ArtifactSection) {
   return (
     <div className="stack-sm">
@@ -37,6 +38,7 @@ function ArtifactSectionGrid({ heading, artifacts, emptyNote }: ArtifactSection)
   );
 }
 
+/** Distinguish pending, failed and empty fetches; an error must not be presented as no artifacts. */
 export function ArtifactsPanel({
   title,
   description,

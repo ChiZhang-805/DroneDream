@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getAuthAccessToken, setAuthAccessToken } from "../features/auth/authTokenStore";
 
 const authMock = vi.hoisted(() => ({
   getUser: vi.fn(),
@@ -38,13 +39,92 @@ const validSession = {
   completedAt: "2026-08-05T08:00:01Z",
 };
 
+/** Control response order explicitly; no test contacts the credential vault. */
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((accept, refuse) => { resolve = accept; reject = refuse; });
+  return { promise, resolve, reject };
+}
+
+function expiringSession(seconds = 120) {
+  const payload = btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + seconds }));
+  return { ...validSession, accessToken: `header.${payload}.signature` };
+}
+
 describe("browser auth session adoption", () => {
   beforeEach(() => {
     authMock.getUser.mockReset();
     bridgeMock.restoreBrowserAuthVault.mockReset();
     clearBrowserAuthSessionRefresh();
+    setAuthAccessToken(null);
     vi.unstubAllEnvs();
     vi.useRealTimers();
+  });
+
+  afterEach(() => {
+    clearBrowserAuthSessionRefresh();
+    vi.useRealTimers();
+  });
+
+  it("does not restore a signed-out account from a late vault response", async () => {
+    vi.useFakeTimers();
+    const pending = deferred<typeof validSession>();
+    const session = expiringSession();
+    authMock.getUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
+    bridgeMock.restoreBrowserAuthVault.mockReturnValue(pending.promise);
+    await adoptBrowserAuthSession(session);
+    await vi.advanceTimersByTimeAsync(60_000);
+    clearBrowserAuthSessionRefresh();
+    setAuthAccessToken(null);
+    pending.resolve(session);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(getAuthAccessToken()).toBeNull();
+    expect(authMock.getUser).toHaveBeenCalledTimes(1);
+  });
+
+  it("cancels a refresh already awaiting remote token validation", async () => {
+    vi.useFakeTimers();
+    const session = expiringSession();
+    const response = { data: { user: { id: "user-1" } }, error: null };
+    const pending = deferred<typeof response>();
+    authMock.getUser.mockResolvedValueOnce(response).mockReturnValueOnce(pending.promise);
+    bridgeMock.restoreBrowserAuthVault.mockResolvedValue(session);
+    await adoptBrowserAuthSession(session);
+    await vi.advanceTimersByTimeAsync(60_000);
+    clearBrowserAuthSessionRefresh();
+    setAuthAccessToken(null);
+    pending.resolve(response);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(getAuthAccessToken()).toBeNull();
+  });
+
+  it("does not clear a new account when an older refresh eventually fails", async () => {
+    vi.useFakeTimers();
+    const pending = deferred<typeof validSession>();
+    authMock.getUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
+    bridgeMock.restoreBrowserAuthVault.mockReturnValue(pending.promise);
+    await adoptBrowserAuthSession(expiringSession());
+    await vi.advanceTimersByTimeAsync(60_000);
+    const newer = expiringSession(600);
+    await adoptBrowserAuthSession(newer);
+    await vi.advanceTimersByTimeAsync(70_000);
+    pending.reject(new Error("old refresh failed"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(getAuthAccessToken()).toBe(newer.accessToken);
+  });
+
+  it("lets an adoption listener immediately cancel the next refresh", async () => {
+    vi.useFakeTimers();
+    authMock.getUser.mockResolvedValue({ data: { user: { id: "user-1" } }, error: null });
+    window.addEventListener("drone-dream:adopt-desktop-auth", clearBrowserAuthSessionRefresh);
+    try {
+      await adoptBrowserAuthSession(expiringSession());
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(bridgeMock.restoreBrowserAuthVault).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener("drone-dream:adopt-desktop-auth", clearBrowserAuthSessionRefresh);
+    }
   });
 
   it("validates the access token without exposing the native refresh grant", async () => {

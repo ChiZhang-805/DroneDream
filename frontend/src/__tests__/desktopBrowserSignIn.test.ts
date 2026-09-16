@@ -44,6 +44,7 @@ const SESSION = {
 };
 
 function deferred<T>() {
+  // Expose completion ordering without contacting a native or cloud service.
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((next) => {
     resolve = next;
@@ -52,6 +53,18 @@ function deferred<T>() {
 }
 
 describe("desktop browser sign-in transaction", () => {
+  it("observes a native rejection when the call itself triggers cancellation", async () => {
+    const controller = new AbortController();
+    vi.mocked(restoreBrowserAuthVault).mockImplementationOnce(() => {
+      controller.abort();
+      return Promise.reject(new Error("native call rejected after cancellation"));
+    });
+    await expect(restoreDesktopBrowserSession({ signal: controller.signal }))
+      .rejects.toThrow("cancelled");
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+    expect(adoptBrowserAuthSession).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     vi.mocked(beginBrowserAuth).mockReset();
     vi.mocked(cancelBrowserAuth).mockReset();

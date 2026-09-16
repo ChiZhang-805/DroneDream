@@ -16,7 +16,8 @@ function fieldSource(value: unknown = fieldFixture): string {
   return JSON.stringify(value);
 }
 
-async function rehashReceipt(value: typeof fieldFixture): Promise<typeof fieldFixture> {
+/** Rehash deliberately malformed fixtures so semantic checks cannot rely on hash mismatch. */
+async function rehashReceipt<T extends { receiptSha256: string }>(value: T): Promise<T> {
   const receipt = structuredClone(value);
   receipt.receiptSha256 = "";
   receipt.receiptSha256 = await sha256Text(canonicalizeJson(receipt));
@@ -24,6 +25,40 @@ async function rehashReceipt(value: typeof fieldFixture): Promise<typeof fieldFi
 }
 
 describe("Lab Field evidence bridge", () => {
+  it("does not call reused training telemetry an independent holdout", async () => {
+    const reused = structuredClone(fieldFixture);
+    reused.trials[2].telemetrySha256 = reused.trials[0].telemetrySha256;
+    await expect(parseFieldHarnessReceipt("reused.json", fieldSource(await rehashReceipt(reused))))
+      .rejects.toThrow(/holdout telemetry/);
+  });
+
+  it("does not propose a different parameter domain after hashing", async () => {
+    const changed = { ...structuredClone(fieldFixture), proposedParameters: { UNKNOWN_PARAMETER: 1 } };
+    changed.proposedCandidateSha256 = await sha256Text(canonicalizeJson(changed.proposedParameters));
+    await expect(parseFieldHarnessReceipt("changed.json", fieldSource(await rehashReceipt(changed))))
+      .rejects.toThrow(/parameter set/);
+  });
+
+  it("rejects excessive nesting as a typed import error", async () => {
+    const source = "[".repeat(10000) + "0" + "]".repeat(10000);
+    await expect(parseFieldHarnessReceipt("deep.json", source))
+      .rejects.toBeInstanceOf(FieldEvidenceBridgeError);
+  });
+
+  it("rejects a hash-consistent but impossible calendar date", async () => {
+    const invalid = { ...structuredClone(fieldFixture), createdAt: "2026-02-30T10:00:00Z" };
+    await expect(parseFieldHarnessReceipt("date.json", fieldSource(await rehashReceipt(invalid))))
+      .rejects.toThrow(/timestamp/);
+  });
+
+  it("rejects sparse, cyclic and non-JSON canonicalization inputs", () => {
+    const cyclic: unknown[] = [];
+    cyclic.push(cyclic);
+    for (const value of [Array(2), cyclic, new Date()]) {
+      expect(() => canonicalizeJson(value)).toThrow(FieldEvidenceBridgeError);
+    }
+  });
+
   afterEach(() => {
     vi.unstubAllEnvs();
   });

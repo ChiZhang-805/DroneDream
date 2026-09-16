@@ -116,14 +116,17 @@ function shouldDeferDesktopAuth(): boolean {
 }
 
 function avatarStorageKey(userId: string): string {
+  // Scope optional local presentation data to the authenticated account.
   return `${AVATAR_STORAGE_PREFIX}${userId}`;
 }
 
 function avatarObjectPath(userId: string): string {
+  // Cloud object ownership is enforced separately by storage policies.
   return `${userId}/${PROFILE_AVATAR_FILE}`;
 }
 
 function avatarPublicUrl(supabaseUrl: string, userId: string): string {
+  // Derive the project URL; never let a cached URL redirect an authenticated write.
   const url = new URL(
     `/storage/v1/object/public/${PROFILE_AVATAR_BUCKET}/${encodeURIComponent(userId)}/${PROFILE_AVATAR_FILE}`,
     supabaseUrl,
@@ -133,6 +136,7 @@ function avatarPublicUrl(supabaseUrl: string, userId: string): string {
 }
 
 function avatarJpegBlob(avatarDataUrl: string): Blob {
+  // The photo editor produces JPEG; reject other encodings instead of mislabelling them.
   const prefix = "data:image/jpeg;base64,";
   if (!avatarDataUrl.startsWith(prefix)) {
     throw new Error("The selected profile photo must be a JPEG image.");
@@ -151,6 +155,7 @@ function avatarJpegBlob(avatarDataUrl: string): Blob {
 }
 
 function cacheAvatarForUser(userId: string, avatarUrl: string | null): void {
+  // Cache only after cloud success; localStorage is optional, not the source of truth.
   try {
     if (avatarUrl) {
       window.localStorage.setItem(avatarStorageKey(userId), avatarUrl);
@@ -164,6 +169,7 @@ function cacheAvatarForUser(userId: string, avatarUrl: string | null): void {
 }
 
 function localAvatarForUser(userId: string): string | null {
+  // Read an account-scoped presentation fallback without granting authentication.
   if (typeof window === "undefined") return null;
   try {
     const stored = window.localStorage.getItem(avatarStorageKey(userId));
@@ -179,6 +185,7 @@ function localAvatarForUser(userId: string): string | null {
 }
 
 function metadataAvatar(user: User): string | null {
+  // Limit display schemes while preserving provider-supplied profile pictures.
   const candidate = user.user_metadata.avatar_url ?? user.user_metadata.picture;
   return typeof candidate === "string" &&
     (candidate.startsWith("https://") || candidate.startsWith("data:image/"))
@@ -187,6 +194,7 @@ function metadataAvatar(user: User): string | null {
 }
 
 function resolvedAvatarForUser(user: User): string | null {
+  // Prefer current cloud metadata over a possibly stale WebView cache.
   const metadata = metadataAvatar(user);
   const cached = localAvatarForUser(user.id);
   const configuration = browserAuthConfiguration();
@@ -213,6 +221,7 @@ function resolvedAvatarForUser(user: User): string | null {
 }
 
 function accountFromUser(user: User | null): DroneDreamAccount | null {
+  // Project verified identity to UI fields; this does not infer subscription tier.
   if (!user) return null;
   const rawName =
     user.user_metadata.display_name ??
@@ -232,6 +241,7 @@ function accountFromUser(user: User | null): DroneDreamAccount | null {
 }
 
 function requireClient() {
+  // Missing build configuration is an error, not an offline authenticated account.
   if (!supabaseClient) {
     throw new Error("Cloud account access is not configured for this build.");
   }
@@ -239,6 +249,7 @@ function requireClient() {
 }
 
 function providerRedirectUrl(): string {
+  // Retain origin but remove old query/fragment secrets from the OAuth destination.
   const redirect = new URL(window.location.href);
   redirect.pathname = redirect.pathname === "/console"
     || redirect.pathname.startsWith("/console/")
@@ -250,6 +261,8 @@ function providerRedirectUrl(): string {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // Own account transitions centrally so caches, drafts and async profile writes
+  // cannot silently migrate from one account to the next.
   const desktopVisualQa = isDesktopRuntime()
     && import.meta.env.VITE_DESKTOP_VISUAL_QA === "true";
   const docsPreview = desktopVisualQa || (import.meta.env.DEV &&
@@ -270,11 +283,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       : null,
   );
-  const previousAccountId = useRef<string | null>(null);
+  const previousAccountId = useRef<string | null>(account?.id ?? null);
+  const accountGeneration = useRef(0);
+
+  useEffect(() => () => { accountGeneration.current += 1; }, []);
+
+  const assertProfileOwner = useCallback((ownerId: string, generation: number) => {
+    if (previousAccountId.current !== ownerId || accountGeneration.current !== generation) {
+      throw new Error("The account changed while the profile was being saved. Try again.");
+    }
+  }, []);
 
   const adoptUser = useCallback((user: User | null, accessToken: string | null) => {
     const next = accountFromUser(user);
     const previousId = previousAccountId.current;
+    if (previousId !== (next?.id ?? null)) accountGeneration.current += 1;
     if (previousId && previousId !== next?.id) {
       clearAllExperimentDrafts();
     }
@@ -328,18 +351,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return undefined;
     }
     let active = true;
+    let authEventReceived = false;
     void supabaseClient.auth.getSession().then(({ data, error }) => {
-      if (!active) return;
+      // An auth event is newer than the startup snapshot, even if its request
+      // completes first. A late snapshot must not resurrect a signed-out account.
+      if (!active || authEventReceived) return;
       if (error) {
-        setAuthAccessToken(null);
-        setAccount(null);
+        adoptUser(null, null);
       } else {
         adoptUser(data.session?.user ?? null, data.session?.access_token ?? null);
       }
       setLoading(false);
+    }).catch(() => {
+      if (!active || authEventReceived) return;
+      adoptUser(null, null);
+      setLoading(false);
     });
     const { data } = supabaseClient.auth.onAuthStateChange((event, session) => {
       if (!active) return;
+      authEventReceived = true;
       if (event === "PASSWORD_RECOVERY") {
         setPasswordRecovery(true);
       } else if (event === "SIGNED_OUT") {
@@ -359,6 +389,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     captchaToken?: string,
   ) => {
+    // Send credentials only through the configured SDK; auth events adopt the result.
     const { error } = await requireClient().auth.signInWithPassword({
       email: email.trim(),
       password,
@@ -371,6 +402,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     captchaToken?: string,
   ) => {
+    // Registration may create an identity; recovery below deliberately may not.
     const { error } = await requireClient().auth.signInWithOtp({
       email: email.trim(),
       options: {
@@ -386,6 +418,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     token: string,
     password: string,
   ) => {
+    // Verification must succeed before setting a password; roll back local login
+    // if the second step fails so a partial registration is not presented as done.
     const client = requireClient();
     const { error } = await client.auth.verifyOtp({
       email: email.trim(),
@@ -407,6 +441,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     captchaToken?: string,
   ) => {
+    // Never create a new account as a side effect of recovering an existing one.
     const { error } = await requireClient().auth.signInWithOtp({
       email: email.trim(),
       options: {
@@ -422,6 +457,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     token: string,
     newPassword?: string,
   ) => {
+    // A code-only login and a requested password reset share verification, not intent.
     const client = requireClient();
     const { error } = await client.auth.verifyOtp({
       email: email.trim(),
@@ -446,6 +482,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     captchaToken?: string,
   ) => {
+    // A recovery email returns to this origin, not a URL supplied by account metadata.
     const redirectTo = new URL("/", window.location.origin).toString();
     const { error } = await requireClient().auth.resetPasswordForEmail(
       email.trim(),
@@ -458,6 +495,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updatePassword = useCallback(async (password: string) => {
+    // Leave recovery mode only after the account service confirms the write.
     const { error } = await requireClient().auth.updateUser({ password });
     if (error) throw error;
     setPasswordRecovery(false);
@@ -465,6 +503,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithProvider = useCallback(
     async (provider: "google" | "apple") => {
+      // Desktop uses the native browser ceremony; do not start a WebView OAuth flow.
       if (isDesktopRuntime()) {
         throw new Error(
           "Social sign-in needs the signed desktop deep-link callback before it can be enabled.",
@@ -480,6 +519,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const updateDisplayName = useCallback(async (displayName: string) => {
+    // Bind every asynchronous step to the initiating account, including UI adoption.
+    const currentAccount = account;
+    if (!currentAccount) throw new Error("Sign in before changing the username.");
+    const generation = accountGeneration.current;
+    assertProfileOwner(currentAccount.id, generation);
     const normalized = displayName.trim().replace(/\s+/g, " ");
     if (!normalized) {
       throw new Error("Username cannot be empty.");
@@ -492,6 +536,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return code < 32 || code === 127;
     })) {
       throw new Error("Username contains unsupported characters.");
+    }
+
+    if (docsPreview) {
+      setAccount((current) => current?.id === currentAccount.id
+        ? { ...current, displayName: normalized } : current);
+      return;
     }
 
     if (isDesktopRuntime()) {
@@ -512,8 +562,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!response.ok) {
         throw new Error("The username could not be saved.");
       }
+      assertProfileOwner(currentAccount.id, generation);
       setAccount((current) =>
-        current ? { ...current, displayName: normalized } : current,
+        current?.id === currentAccount.id ? { ...current, displayName: normalized } : current,
       );
       return;
     }
@@ -523,18 +574,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: { display_name: normalized },
     });
     if (error) throw error;
+    assertProfileOwner(currentAccount.id, generation);
 
     const { data: sessionData, error: sessionError } =
       await client.auth.getSession();
     if (sessionError) throw sessionError;
+    assertProfileOwner(currentAccount.id, generation);
+    if (data.user.id !== currentAccount.id || sessionData.session?.user.id !== currentAccount.id) {
+      throw new Error("The account changed while the username was being saved. Try again.");
+    }
     adoptUser(data.user, sessionData.session?.access_token ?? null);
-  }, [adoptUser]);
+  }, [account, adoptUser, assertProfileOwner, docsPreview]);
 
   const updateAvatar = useCallback(async (avatarDataUrl: string | null) => {
+    // Storage then metadata is a two-step cloud operation, not an atomic transaction.
+    // If the account changes after upload, do not write metadata into the new account.
     const currentAccount = account;
     if (!currentAccount) {
       throw new Error("Sign in before changing the profile photo.");
     }
+    const generation = accountGeneration.current;
+    assertProfileOwner(currentAccount.id, generation);
     if (
       avatarDataUrl !== null &&
       (
@@ -592,6 +652,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!objectResponse.ok && !(avatarDataUrl === null && objectResponse.status === 404)) {
         throw new Error("The profile photo could not be uploaded.");
       }
+      assertProfileOwner(currentAccount.id, generation);
       let metadataResponse: Response;
       try {
         metadataResponse = await fetch(
@@ -614,6 +675,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!metadataResponse.ok) {
         throw new Error("The profile photo metadata could not be saved.");
       }
+      assertProfileOwner(currentAccount.id, generation);
     } else {
       const client = requireClient();
       if (avatarDataUrl) {
@@ -631,13 +693,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .remove([objectPath]);
         if (removeError) throw removeError;
       }
+      assertProfileOwner(currentAccount.id, generation);
       const { data, error } = await client.auth.updateUser({
         data: { avatar_url: nextAvatarUrl },
       });
       if (error) throw error;
+      assertProfileOwner(currentAccount.id, generation);
       const { data: sessionData, error: sessionError } =
         await client.auth.getSession();
       if (sessionError) throw sessionError;
+      assertProfileOwner(currentAccount.id, generation);
+      if (data.user.id !== currentAccount.id || sessionData.session?.user.id !== currentAccount.id) {
+        throw new Error("The account changed while the profile photo was being saved. Try again.");
+      }
       cacheAvatarForUser(currentAccount.id, nextAvatarUrl);
       adoptUser(data.user, sessionData.session?.access_token ?? null);
       return;
@@ -645,11 +713,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     cacheAvatarForUser(currentAccount.id, nextAvatarUrl);
     setAccount((current) =>
-      current ? { ...current, avatarUrl: nextAvatarUrl } : current,
+      current?.id === currentAccount.id ? { ...current, avatarUrl: nextAvatarUrl } : current,
     );
-  }, [account, adoptUser, docsPreview]);
+  }, [account, adoptUser, assertProfileOwner, docsPreview]);
 
   const signOut = useCallback(async () => {
+    // Stop native refresh first; preserve drafts if the actual local sign-out fails.
     let vaultClearFailed = false;
     if (isDesktopRuntime()) {
       clearBrowserAuthSessionRefresh();
@@ -713,6 +782,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function useAuth(): AuthContextValue {
+  // Production consumers require the provider rather than a fabricated account.
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error("useAuth must be used inside AuthProvider.");
@@ -722,6 +792,7 @@ export function useAuth(): AuthContextValue {
 
 // eslint-disable-next-line react-refresh/only-export-components
 export function useOptionalAuth(): AuthContextValue | null {
+  // Optional consumers can distinguish absent context from a signed-out provider.
   return useContext(AuthContext);
 }
 

@@ -41,12 +41,15 @@ class ArtifactDownloadTooLarge(ValueError):
 
 
 class _BoundedWriter:
+    """Bound streamed download bytes before writing, even if remote size metadata lies."""
     def __init__(self, destination: BinaryIO, maximum_bytes: int) -> None:
+        """Wrap a caller-owned binary sink; this wrapper does not close it."""
         self._destination = destination
         self._maximum_bytes = maximum_bytes
         self.written = 0
 
     def write(self, content: bytes) -> int:
+        """Reject an over-budget chunk before disk allocation; preserve short-write reporting."""
         if len(content) > self._maximum_bytes - self.written:
             raise ArtifactDownloadTooLarge(
                 "artifact exceeds the configured application download limit"
@@ -57,6 +60,7 @@ class _BoundedWriter:
 
 
 def _delete_temporary_download(path: Path) -> None:
+    """Best-effort cleanup of exactly one route-created snapshot, never the source artifact."""
     with contextlib.suppress(OSError):
         path.unlink()
 
@@ -68,6 +72,11 @@ def _temporary_download(
     maximum_bytes: int,
     verify_integrity: bool,
 ) -> Path:
+    """Copy into private temporary bytes, verify the receipt, and remove partial failures.
+
+    Success transfers cleanup responsibility to the response's background task
+    (or the caller if it chooses to regenerate a Free-tier report).
+    """
     descriptor, raw_path = tempfile.mkstemp(prefix="dronedream-artifact-", suffix=".download")
     path = Path(raw_path)
     try:
@@ -97,6 +106,7 @@ def _temporary_download(
 
 
 def _is_under_allowed_root(path: Path, allowed_roots: list[Path]) -> bool:
+    """Resolve filesystem aliases before namespace checks; ownership is verified separately."""
     resolved = path.resolve()
     return any(resolved.is_relative_to(root) for root in allowed_roots)
 
@@ -112,6 +122,7 @@ def _safe_download_name(display_name: str | None, storage_path: str) -> str:
 
 
 def _attachment_header(filename: str) -> str:
+    """Encode a sanitized download name without injecting quotes or non-ASCII headers."""
     try:
         filename.encode("ascii")
     except UnicodeEncodeError:
@@ -125,6 +136,7 @@ def _report_headers(
     artifact: models.Artifact,
     tier: ReportExportTier,
 ) -> dict[str, str]:
+    """Bind export presentation to the trusted tier and forbid shared report caching."""
     return {
         "Cache-Control": "private, no-store",
         "Content-Disposition": _attachment_header(
@@ -142,6 +154,11 @@ def download_artifact(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
 ) -> Response:
+    """Authorize the artifact owner, validate sealed bytes, then apply the current export tier.
+
+    Stored PDF metadata cannot grant paid access. Trial/job ownership and local
+    path or S3 namespace checks are independent gates, neither substitutes for the other.
+    """
     artifact = db.get(models.Artifact, artifact_id)
     if artifact is None:
         raise HTTPException(
@@ -293,13 +310,17 @@ def download_artifact(
             if report_tier == "free":
                 if job is None:
                     raise RuntimeError("report export tier resolved without an owning job")
-                content = render_job_pdf_report(
-                    job,
-                    free_tier_watermark=True,
-                )
-                if temporary_download is not None:
-                    _delete_temporary_download(temporary_download)
-                temporary_download = None
+                # A render failure must not strand the verified, unwatermarked
+                # source on disk. No response task exists yet to clean it up.
+                try:
+                    content = render_job_pdf_report(
+                        job,
+                        free_tier_watermark=True,
+                    )
+                finally:
+                    if temporary_download is not None:
+                        _delete_temporary_download(temporary_download)
+                    temporary_download = None
             elif temporary_download is not None:
                 return FileResponse(
                     path=temporary_download,

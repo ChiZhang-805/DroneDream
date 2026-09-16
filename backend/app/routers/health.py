@@ -17,6 +17,7 @@ router = APIRouter(tags=["health"])
 
 
 def _runtime_id() -> str | None:
+    """Read the active process runtime identity rather than a stale imported setting."""
     # Some test and worker bootstrap paths reload app.config after changing the
     # environment. Import lazily so readiness never retains a stale cached
     # get_settings function from the previous module state.
@@ -86,6 +87,7 @@ def live() -> dict[str, object]:
 
 
 def _database_health() -> dict[str, object]:
+    """Probe configured connectivity without exposing connection strings or driver text."""
     try:
         # Import dynamically so isolated tests that reload app.db use the
         # current engine instead of a module-import-time reference.
@@ -99,6 +101,7 @@ def _database_health() -> dict[str, object]:
 
 
 def _storage_health() -> dict[str, object]:
+    """Delegate the storage backend's readiness probe; no artifact listing is returned."""
     try:
         storage = get_artifact_storage()
         storage.check_health()

@@ -1,3 +1,6 @@
+//! Native OAuth uses the registered loopback redirect and an HTTPS token exchange.
+//! Frontend access-token adoption, OS refresh-token persistence and audit receipts
+//! are separate boundaries; none is a substitute for server-side authorization.
 use base64::{
     engine::general_purpose::{
         STANDARD as BASE64_STANDARD, URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD,
@@ -58,6 +61,7 @@ struct DesktopAuthIdentity {
     credential_vault_namespace: &'static str,
 }
 
+/// Pin redirect ports, bundle IDs and vault namespaces to the five product editions.
 fn desktop_auth_identity(edition_id: &str) -> Result<DesktopAuthIdentity, String> {
     match edition_id {
         "universal" => Ok(DesktopAuthIdentity {
@@ -119,10 +123,12 @@ fn desktop_auth_identity(edition_id: &str) -> Result<DesktopAuthIdentity, String
     }
 }
 
+/// Runtime UI input cannot select another edition's credential identity.
 fn compiled_desktop_auth_identity() -> Result<DesktopAuthIdentity, String> {
     desktop_auth_identity(env!("DRONEDREAM_DESKTOP_EDITION_ID"))
 }
 
+/// Require a build-time registered client, not the human-readable edition label.
 fn compiled_oauth_client_id() -> Result<&'static str, String> {
     let client_id = env!("DRONEDREAM_OAUTH_CLIENT_ID");
     let segments = client_id.split('-').collect::<Vec<_>>();
@@ -147,6 +153,7 @@ pub struct BrowserAuthCoordinator {
 }
 
 impl BrowserAuthCoordinator {
+    /// Reserve one listener attempt until its worker has actually exited.
     fn begin(&self) -> Result<Arc<AtomicBool>, String> {
         let mut activity = self
             .activity
@@ -160,6 +167,7 @@ impl BrowserAuthCoordinator {
         Ok(cancelled)
     }
 
+    /// Signal cancellation without freeing a port still owned by blocking work.
     fn cancel(&self) -> Result<bool, String> {
         let activity = self
             .activity
@@ -173,6 +181,7 @@ impl BrowserAuthCoordinator {
         }
     }
 
+    /// Release the single-attempt reservation after join, including worker failure.
     fn finish(&self) {
         if let Ok(mut activity) = self.activity.lock() {
             *activity = None;
@@ -186,7 +195,7 @@ pub struct BrowserAuthRequest {
     locale: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BrowserAuthSession {
     protocol_version: &'static str,
@@ -198,6 +207,18 @@ pub struct BrowserAuthSession {
     subject_hash: String,
     issued_at: String,
     completed_at: String,
+}
+
+impl std::fmt::Debug for BrowserAuthSession {
+    /// The IPC payload needs a token, but logging/debug assertions never do.
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("BrowserAuthSession")
+            .field("edition_id", &self.edition_id)
+            .field("subject_hash", &self.subject_hash)
+            .field("access_token", &"[redacted]")
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Deserialize)]
@@ -222,6 +243,7 @@ enum VaultRestoreOutcome {
     Restored(Box<BrowserAuthSession>),
 }
 
+/// Transient server/rate-limit failures must not delete a reusable refresh token.
 fn token_status_is_credential_rejection(status: StatusCode) -> bool {
     matches!(
         status,
@@ -229,13 +251,24 @@ fn token_status_is_credential_rejection(status: StatusCode) -> bool {
     )
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Eq, PartialEq)]
 enum AuthorizationCallback {
     Authorized { code: String, state: String },
     Denied { state: String },
 }
 
+impl std::fmt::Debug for AuthorizationCallback {
+    /// Authorization codes and callback state are not diagnostic text.
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::Authorized { .. } => "Authorized { code: [redacted], state: [redacted] }",
+            Self::Denied { .. } => "Denied { state: [redacted] }",
+        })
+    }
+}
+
 impl AuthorizationCallback {
+    /// Both success and user denial must prove the original attempt's state.
     fn state(&self) -> &str {
         match self {
             Self::Authorized { state, .. } | Self::Denied { state } => state,
@@ -249,17 +282,22 @@ struct HttpRequest {
     headers: HashMap<String, String>,
 }
 
+/// Start native browser sign-in without moving blocking sockets onto the UI loop.
 #[tauri::command]
 pub async fn begin_browser_auth(
     app: AppHandle,
     request: BrowserAuthRequest,
 ) -> Result<BrowserAuthSession, String> {
     validate_request(&request)?;
+    let identity = compiled_desktop_auth_identity()?;
+    // Snapshot on the command thread, before delayed blocking work can race logout.
+    let vault_revision =
+        browser_auth_vault::begin_vault_operation(identity.credential_vault_namespace)?;
     let coordinator = app.state::<BrowserAuthCoordinator>();
     let cancelled = coordinator.begin()?;
     let app_for_listener = app.clone();
     let operation = tauri::async_runtime::spawn_blocking(move || {
-        run_browser_auth(app_for_listener, request, cancelled)
+        run_browser_auth(app_for_listener, request, cancelled, vault_revision)
     })
     .await
     .map_err(|error| format!("Browser sign-in task failed: {error}"))
@@ -268,6 +306,7 @@ pub async fn begin_browser_auth(
     operation
 }
 
+/// Cancel the current attempt; the worker owns cleanup and completion publication.
 #[tauri::command]
 pub fn cancel_browser_auth(
     coordinator: tauri::State<'_, BrowserAuthCoordinator>,
@@ -275,6 +314,7 @@ pub fn cancel_browser_auth(
     coordinator.cancel()
 }
 
+/// Local logout clears this edition's vault and records the result, not server revocation.
 #[tauri::command]
 pub fn clear_browser_auth_vault() -> Result<bool, String> {
     let identity = compiled_desktop_auth_identity()?;
@@ -305,6 +345,7 @@ pub fn clear_browser_auth_vault() -> Result<bool, String> {
     outcome
 }
 
+/// Refresh saved OS credentials off the UI thread; no browser-token fallback is used.
 #[tauri::command]
 pub async fn restore_browser_auth_vault() -> Result<Option<BrowserAuthSession>, String> {
     tauri::async_runtime::spawn_blocking(restore_browser_auth_vault_sync)
@@ -312,6 +353,7 @@ pub async fn restore_browser_auth_vault() -> Result<Option<BrowserAuthSession>, 
         .map_err(|error| format!("Desktop session restoration task failed: {error}"))?
 }
 
+/// Locale is the only caller-selected field, and enters the HTML template directly.
 fn validate_request(request: &BrowserAuthRequest) -> Result<(), String> {
     if request.locale != "en" && request.locale != "zh-CN" {
         return Err("Browser sign-in locale must be en or zh-CN.".to_owned());
@@ -319,10 +361,12 @@ fn validate_request(request: &BrowserAuthRequest) -> Result<(), String> {
     Ok(())
 }
 
+/// Own the PKCE listener, token exchange and generation-checked secret publication.
 fn run_browser_auth(
     app: AppHandle,
     request: BrowserAuthRequest,
     cancelled: Arc<AtomicBool>,
+    vault_revision: browser_auth_vault::VaultRevision,
 ) -> Result<BrowserAuthSession, String> {
     let identity = compiled_desktop_auth_identity()?;
     let state = random_hex_32();
@@ -331,6 +375,7 @@ fn run_browser_auth(
     let code_verifier = random_hex_32();
     let issued_at = Utc::now();
     let issued_at_text = issued_at.to_rfc3339();
+    let mut committed_revision = None;
     let outcome = (|| -> Result<(BrowserAuthSession, TcpStream), String> {
         let oauth_client_id = compiled_oauth_client_id()?;
         if app.config().identifier != identity.bundle_identifier {
@@ -486,19 +531,33 @@ fn run_browser_auth(
                                 "Browser sign-in did not return a refresh token.".to_owned()
                             })?
                             .to_owned();
-                        if let Err(error) = browser_auth_vault::store_refresh_token(
-                            identity.credential_vault_namespace,
+                        // Cancellation/deadline can change during the HTTP exchange.
+                        // A successful remote response does not renew this local attempt.
+                        if cancelled.load(Ordering::SeqCst) {
+                            return Err("Browser sign-in was cancelled.".to_owned());
+                        }
+                        if Instant::now() >= deadline {
+                            return Err(
+                                "Browser sign-in timed out. Start it again to retry.".to_owned()
+                            );
+                        }
+                        match browser_auth_vault::store_refresh_token(
+                            &vault_revision,
                             &subject_hash,
                             &refresh_token,
                         ) {
-                            let page = render_auth_result_page(
-                                &request.locale,
-                                identity,
-                                false,
-                                &attempt_id,
-                            )?;
-                            let _ = write_html_response(&mut stream, page.as_bytes(), &attempt_id);
-                            return Err(error);
+                            Ok(revision) => committed_revision = Some(revision),
+                            Err(error) => {
+                                let page = render_auth_result_page(
+                                    &request.locale,
+                                    identity,
+                                    false,
+                                    &attempt_id,
+                                )?;
+                                let _ =
+                                    write_html_response(&mut stream, page.as_bytes(), &attempt_id);
+                                return Err(error);
+                            }
                         }
                         return Ok((
                             BrowserAuthSession {
@@ -534,6 +593,15 @@ fn run_browser_auth(
         }
     })();
 
+    let outcome = if cancelled.load(Ordering::SeqCst) {
+        if let Some(revision) = &committed_revision {
+            let _ = browser_auth_vault::clear_refresh_token_if_current(revision);
+        }
+        Err("Browser sign-in was cancelled.".to_owned())
+    } else {
+        outcome
+    };
+
     let completed_at = outcome
         .as_ref()
         .map(|(session, _stream)| session.completed_at.clone())
@@ -567,7 +635,9 @@ fn run_browser_auth(
     );
     if let Err(error) = browser_auth_audit::append_browser_auth_audit(&receipt) {
         if let Ok((_session, mut stream)) = outcome {
-            let _ = browser_auth_vault::clear_refresh_token(identity.credential_vault_namespace);
+            if let Some(revision) = &committed_revision {
+                let _ = browser_auth_vault::clear_refresh_token_if_current(revision);
+            }
             if let Ok(page) = render_auth_result_page(&request.locale, identity, false, &attempt_id)
             {
                 let _ = write_html_response(&mut stream, page.as_bytes(), &attempt_id);
@@ -587,6 +657,7 @@ fn run_browser_auth(
     }
 }
 
+/// Reduce detailed local errors to a bounded allowlisted receipt code.
 fn browser_auth_failure_code(error: &str) -> &'static str {
     let error = error.to_ascii_lowercase();
     if error.contains("denied or cancelled") {
@@ -614,18 +685,22 @@ fn browser_auth_failure_code(error: &str) -> &'static str {
     }
 }
 
+/// Concatenate two random UUIDs into 64 printable hex characters (UUID bits remain).
 fn random_hex_32() -> String {
     format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple())
 }
 
+/// Bind receipt identifiers without persisting raw state, attempt or account IDs.
 fn sha256_hex(value: &[u8]) -> String {
     hex::encode(Sha256::digest(value))
 }
 
+/// RFC 7636 S256 challenge; the verifier stays inside this native process.
 fn pkce_challenge(code_verifier: &str) -> String {
     BASE64_URL_SAFE_NO_PAD.encode(Sha256::digest(code_verifier.as_bytes()))
 }
 
+/// Only the fixed broker URL receives the public challenge and registered redirect.
 fn build_authorize_url(
     identity: DesktopAuthIdentity,
     oauth_client_id: &str,
@@ -647,6 +722,7 @@ fn build_authorize_url(
     Ok(url)
 }
 
+/// Reject duplicate/unexpected query fields before checking state or exchanging a code.
 fn parse_authorization_callback(
     target: &str,
     expected_path: &str,
@@ -698,6 +774,7 @@ fn parse_authorization_callback(
     Ok(AuthorizationCallback::Authorized { code, state })
 }
 
+/// Exchange once: replaying an ambiguously completed one-time code is not a retry policy.
 fn exchange_authorization_code(
     oauth_client_id: &str,
     redirect_uri: &str,
@@ -718,6 +795,7 @@ fn exchange_authorization_code(
     }
 }
 
+/// Bound connection, overall HTTP time and decoded body bytes; forbid credential redirects.
 fn send_token_request(fields: &[(&str, &str)]) -> Result<TokenHttpOutcome, String> {
     let client = Client::builder()
         .connect_timeout(TOKEN_REQUEST_TIMEOUT)
@@ -760,6 +838,8 @@ fn send_token_request(fields: &[(&str, &str)]) -> Result<TokenHttpOutcome, Strin
     Ok(TokenHttpOutcome::Accepted(parsed))
 }
 
+/// Decode claims from this module's fixed HTTPS exchange, NOT verify JWT signatures.
+/// Never reuse this helper as an authentication check for caller-supplied JWTs.
 fn jwt_payload(token: &str) -> Result<serde_json::Value, String> {
     validate_token("identity token", token)?;
     let parts = token.split('.').collect::<Vec<_>>();
@@ -773,6 +853,7 @@ fn jwt_payload(token: &str) -> Result<serde_json::Value, String> {
         .map_err(|_| "Browser sign-in returned invalid identity claims.".to_owned())
 }
 
+/// OIDC audience may be one string or a list containing this registered client.
 fn audience_matches(value: &serde_json::Value, expected: &str) -> bool {
     value.as_str() == Some(expected)
         || value
@@ -780,6 +861,7 @@ fn audience_matches(value: &serde_json::Value, expected: &str) -> bool {
             .is_some_and(|items| items.iter().any(|item| item.as_str() == Some(expected)))
 }
 
+/// Initial authorization binds access/identity subjects, issuer, audience and nonce.
 fn validate_token_response(
     response: &OAuthTokenResponse,
     oauth_client_id: &str,
@@ -820,6 +902,7 @@ fn validate_token_response(
     Ok(access_subject)
 }
 
+/// Refresh need not include an ID token, but access subject/client/expiry must match.
 fn validate_access_token_response(
     response: &OAuthTokenResponse,
     oauth_client_id: &str,
@@ -836,7 +919,8 @@ fn validate_access_token_response(
         .get("sub")
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| "Browser sign-in account subject is missing.".to_owned())?;
-    if access_claims.get("iss").and_then(serde_json::Value::as_str) != Some(EXPECTED_ISSUER)
+    if access_subject.trim().is_empty()
+        || access_claims.get("iss").and_then(serde_json::Value::as_str) != Some(EXPECTED_ISSUER)
         || access_claims
             .get("client_id")
             .and_then(serde_json::Value::as_str)
@@ -850,6 +934,7 @@ fn validate_access_token_response(
     Ok(access_subject.to_owned())
 }
 
+/// Compare Unix seconds to UTC; a decode or refresh cannot extend an expired claim.
 fn validate_claim_expiry(claims: &serde_json::Value) -> Result<(), String> {
     let expires_at = claims
         .get("exp")
@@ -861,15 +946,17 @@ fn validate_claim_expiry(claims: &serde_json::Value) -> Result<(), String> {
     Ok(())
 }
 
+/// Read a vault ticket, refresh remotely, then commit/clean up only that same generation.
 fn restore_browser_auth_vault_sync() -> Result<Option<BrowserAuthSession>, String> {
     let identity = compiled_desktop_auth_identity()?;
     let attempt_id = random_hex_32();
     let attempt_id_hash = sha256_hex(attempt_id.as_bytes());
     let state_hash = sha256_hex(format!("restore:{attempt_id}").as_bytes());
     let issued_at = Utc::now().to_rfc3339();
+    let mut committed_revision = None;
     let outcome = (|| -> Result<VaultRestoreOutcome, String> {
         let oauth_client_id = compiled_oauth_client_id()?;
-        let Some(stored) =
+        let Some((stored, revision)) =
             browser_auth_vault::load_refresh_token(identity.credential_vault_namespace)?
         else {
             return Ok(VaultRestoreOutcome::NoSavedSession);
@@ -881,18 +968,17 @@ fn restore_browser_auth_vault_sync() -> Result<Option<BrowserAuthSession>, Strin
         ])? {
             TokenHttpOutcome::Accepted(response) => response,
             TokenHttpOutcome::Rejected => {
-                browser_auth_vault::clear_refresh_token(identity.credential_vault_namespace)?;
+                browser_auth_vault::clear_refresh_token_if_current(&revision)?;
                 return Ok(VaultRestoreOutcome::ReauthorizationRequired);
             }
         };
         let subject = validate_access_token_response(&token_response, oauth_client_id)
             .inspect_err(|_error| {
-                let _ =
-                    browser_auth_vault::clear_refresh_token(identity.credential_vault_namespace);
+                let _ = browser_auth_vault::clear_refresh_token_if_current(&revision);
             })?;
         let subject_hash = sha256_hex(subject.as_bytes());
         if subject_hash != stored.subject_hash {
-            let _ = browser_auth_vault::clear_refresh_token(identity.credential_vault_namespace);
+            let _ = browser_auth_vault::clear_refresh_token_if_current(&revision);
             return Err("The stored desktop session belongs to a different account.".to_owned());
         }
         let refresh_token = token_response
@@ -900,11 +986,11 @@ fn restore_browser_auth_vault_sync() -> Result<Option<BrowserAuthSession>, Strin
             .as_deref()
             .unwrap_or(&stored.refresh_token)
             .to_owned();
-        browser_auth_vault::store_refresh_token(
-            identity.credential_vault_namespace,
+        committed_revision = Some(browser_auth_vault::store_refresh_token(
+            &revision,
             &subject_hash,
             &refresh_token,
-        )?;
+        )?);
         let completed_at = Utc::now().to_rfc3339();
         Ok(VaultRestoreOutcome::Restored(Box::new(
             BrowserAuthSession {
@@ -952,7 +1038,9 @@ fn restore_browser_auth_vault_sync() -> Result<Option<BrowserAuthSession>, Strin
     );
     if let Err(error) = browser_auth_audit::append_browser_auth_audit(&receipt) {
         if matches!(&outcome, Ok(VaultRestoreOutcome::Restored(_))) {
-            let _ = browser_auth_vault::clear_refresh_token(identity.credential_vault_namespace);
+            if let Some(revision) = &committed_revision {
+                let _ = browser_auth_vault::clear_refresh_token_if_current(revision);
+            }
         }
         return Err(error);
     }
@@ -964,6 +1052,7 @@ fn restore_browser_auth_vault_sync() -> Result<Option<BrowserAuthSession>, Strin
     }
 }
 
+/// Render a credential-free result page; JSON-encode script values, pin CSP nonce.
 fn render_auth_result_page(
     locale: &str,
     identity: DesktopAuthIdentity,
@@ -1016,10 +1105,26 @@ fn render_auth_result_page(
     Ok(page)
 }
 
+/// A whole header has one deadline, not a fresh three seconds per incoming byte.
 fn read_http_request(stream: &mut TcpStream) -> Result<HttpRequest, String> {
+    read_http_request_until(stream, Instant::now() + Duration::from_secs(3))
+}
+
+/// Parse one bounded GET-only loopback request; reject bodies and duplicate headers.
+fn read_http_request_until(
+    stream: &mut TcpStream,
+    deadline: Instant,
+) -> Result<HttpRequest, String> {
     let mut received = Vec::with_capacity(4096);
     let mut buffer = [0_u8; 4096];
     let header_end = loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err("Browser sign-in request timed out.".to_owned());
+        }
+        stream
+            .set_read_timeout(Some(remaining))
+            .map_err(|_| "Could not bound the local sign-in request.".to_owned())?;
         let count = stream
             .read(&mut buffer)
             .map_err(|error| format!("Could not read browser request: {error}"))?;
@@ -1027,7 +1132,15 @@ fn read_http_request(stream: &mut TcpStream) -> Result<HttpRequest, String> {
             return Err("Browser closed the local sign-in request.".to_owned());
         }
         received.extend_from_slice(&buffer[..count]);
+        if Instant::now() >= deadline {
+            return Err("Browser sign-in request timed out.".to_owned());
+        }
         if let Some(index) = find_bytes(&received, b"\r\n\r\n") {
+            // The terminating chunk counts too; checking only incomplete chunks
+            // allowed an oversized header to pass when its final CRLF arrived.
+            if index + 4 > MAX_HEADER_BYTES {
+                return Err("Browser sign-in headers are too large.".to_owned());
+            }
             break index + 4;
         }
         if received.len() > MAX_HEADER_BYTES {
@@ -1094,11 +1207,13 @@ fn read_http_request(stream: &mut TcpStream) -> Result<HttpRequest, String> {
     })
 }
 
+/// Prevent alternate Host names from routing a browser request into this loopback service.
 fn host_is_exact(request: &HttpRequest, port: u16) -> bool {
     let expected = format!("127.0.0.1:{port}");
     request.headers.get("host") == Some(&expected)
 }
 
+/// Bound token syntax before decoding; errors never include token contents.
 fn validate_token(label: &str, token: &str) -> Result<(), String> {
     if token.is_empty()
         || token.len() > MAX_TOKEN_BYTES
@@ -1110,6 +1225,7 @@ fn validate_token(label: &str, token: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Compare all supplied bytes without a data-dependent early mismatch exit.
 fn constant_time_equal(left: &[u8], right: &[u8]) -> bool {
     let mut difference = left.len() ^ right.len();
     let length = left.len().max(right.len());
@@ -1121,16 +1237,19 @@ fn constant_time_equal(left: &[u8], right: &[u8]) -> bool {
     difference == 0
 }
 
+/// Locate the nonempty HTTP header delimiter inside the bounded receive buffer.
 fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack
         .windows(needle.len())
         .position(|window| window == needle)
 }
 
+/// Success/error HTML shares the same non-cacheable credential-free response policy.
 fn write_html_response(stream: &mut TcpStream, body: &[u8], nonce: &str) -> Result<(), String> {
     write_text_response(stream, 200, "OK", "text/html; charset=utf-8", body, nonce)
 }
 
+/// Bound writes as well as reads, so an unresponsive local peer cannot retain the listener.
 fn write_text_response(
     stream: &mut TcpStream,
     status: u16,
@@ -1139,6 +1258,9 @@ fn write_text_response(
     body: &[u8],
     nonce: &str,
 ) -> Result<(), String> {
+    stream
+        .set_write_timeout(Some(Duration::from_secs(3)))
+        .map_err(|_| "Could not bound the local sign-in response.".to_owned())?;
     let headers = format!(
         "HTTP/1.1 {status} {reason}\r\n\
          Content-Type: {content_type}\r\n\
@@ -1165,18 +1287,21 @@ mod tests {
     use super::*;
     use std::io::Cursor;
 
+    /// No fixture contains real credentials or invokes the remote OAuth service.
     fn valid_request() -> BrowserAuthRequest {
         BrowserAuthRequest {
             locale: "en".to_owned(),
         }
     }
 
+    /// Deliberately unsigned: these tests cover trusted-response binding, not crypto verification.
     fn fake_jwt(claims: serde_json::Value) -> String {
         let header = BASE64_URL_SAFE_NO_PAD.encode(br#"{"alg":"RS256","typ":"JWT"}"#);
         let payload = BASE64_URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).unwrap());
         format!("{header}.{payload}.test-signature")
     }
 
+    /// Synthesize paired access/identity claims with a short future expiry.
     fn token_response(client_id: &str, nonce: &str) -> OAuthTokenResponse {
         let expiration = Utc::now().timestamp() + 600;
         OAuthTokenResponse {
@@ -1489,5 +1614,52 @@ mod tests {
         assert!(constant_time_equal(b"same", b"same"));
         assert!(!constant_time_equal(b"same", b"samf"));
         assert!(!constant_time_equal(b"same", b"same-longer"));
+    }
+
+    #[test]
+    fn final_header_chunk_cannot_bypass_the_byte_cap() {
+        let raw = format!(
+            "GET /callback HTTP/1.1\r\nHost: 127.0.0.1\r\nX-Padding: {}\r\n\r\n",
+            "a".repeat(MAX_HEADER_BYTES)
+        );
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let address = listener.local_addr().unwrap();
+        let writer = thread::spawn(move || {
+            let mut client = TcpStream::connect(address).unwrap();
+            let _ = client.write_all(raw.as_bytes());
+        });
+        let (mut server, _) = listener.accept().unwrap();
+        let result = read_http_request(&mut server);
+        writer.join().unwrap();
+        assert!(
+            result.is_err(),
+            "the terminating chunk is still part of the header budget"
+        );
+    }
+
+    #[test]
+    fn expired_header_budget_is_not_renewed_by_buffered_data() {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let mut client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let (mut server, _) = listener.accept().unwrap();
+        client
+            .write_all(b"GET /callback HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n")
+            .unwrap();
+        assert!(read_http_request_until(&mut server, Instant::now()).is_err());
+    }
+
+    #[test]
+    fn diagnostic_output_hides_callback_secrets_and_empty_subjects_are_rejected() {
+        let callback = AuthorizationCallback::Authorized {
+            code: "synthetic-code-secret".into(),
+            state: "synthetic-state-secret".into(),
+        };
+        let debug = format!("{callback:?}");
+        assert!(!debug.contains("synthetic"));
+        let mut response = token_response("client", "nonce");
+        response.access_token = fake_jwt(serde_json::json!({
+            "sub": " ", "iss": EXPECTED_ISSUER, "client_id": "client", "exp": Utc::now().timestamp() + 600,
+        }));
+        assert!(validate_access_token_response(&response, "client").is_err());
     }
 }

@@ -41,6 +41,7 @@ _StatusQ: schemas.JobStatus | None = Query(None)
 
 
 def _raise(err: job_service.JobServiceError) -> None:
+    """Preserve the service's ownership/state error classification at the HTTP boundary."""
     raise HTTPException(
         status_code=err.http_status,
         detail={"code": err.code, "message": err.message},
@@ -68,6 +69,7 @@ def create_job(
     user: Annotated[models.User, Depends(get_current_user)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> dict[str, object]:
+    """Create one owned job and commit its replay receipt in the same transaction."""
     gate = begin_mutation(
         db,
         user=user,
@@ -148,6 +150,7 @@ def list_jobs(
     page_size: int = _PageSizeQ,
     status: schemas.JobStatus | None = _StatusQ,
 ) -> dict[str, object]:
+    """Return an owner-scoped page with a total computed by the same service filter."""
     try:
         items, total = job_service.list_jobs(
             db, user=user, page=page, page_size=page_size, status=status
@@ -170,6 +173,7 @@ def compare_jobs(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
+    """Compare only authorized jobs; this read-only operation does not rerun them."""
     try:
         data = job_service.compare_jobs(db, req, user=user)
     except job_service.JobServiceError as err:
@@ -183,6 +187,7 @@ def compare_jobs_csv(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
 ) -> PlainTextResponse:
+    """Serialize the same authorized comparison into CSV with proper field escaping."""
     req = schemas.JobsCompareRequest(job_ids=[item for item in job_ids.split(",") if item])
     try:
         data = job_service.compare_jobs(db, req, user=user)
@@ -238,6 +243,7 @@ def get_job(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
+    """Resolve caller ownership before exposing state, inputs or result metadata."""
     try:
         job = job_service.get_job(db, job_id, user=user)
     except job_service.JobServiceError as err:
@@ -281,6 +287,7 @@ def update_job(
         Query(alias="control_version", ge=1),
     ] = None,
 ) -> dict[str, object]:
+    """Apply a version-checked mutation; commit=False lets the replay gate own the commit."""
     gate = begin_mutation(
         db,
         user=user,
@@ -318,6 +325,7 @@ def rerun_job(
     req: schemas.JobRerunRequest | None = None,
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> dict[str, object]:
+    """Create a separate run from an owned source, with explicitly supplied model access."""
     gate = begin_mutation(
         db,
         user=user,
@@ -358,6 +366,7 @@ def continue_exploration(
         Query(alias="control_version", ge=1),
     ] = None,
 ) -> dict[str, object]:
+    """Create a child exploration from current parent evidence without overwriting its history."""
     gate = begin_mutation(
         db,
         user=user,
@@ -398,6 +407,7 @@ def cancel_job(
         Query(alias="control_version", ge=1),
     ] = None,
 ) -> dict[str, object]:
+    """Persist cancellation intent with stale-control protection, not an immediate motor command."""
     gate = begin_mutation(
         db,
         user=user,
@@ -433,6 +443,7 @@ def delete_job(
         Query(alias="control_version", ge=1),
     ] = None,
 ) -> dict[str, object]:
+    """Commit owned metadata deletion before attempting cleanup of its artifact payloads."""
     gate = begin_mutation(
         db,
         user=user,
@@ -461,6 +472,8 @@ def delete_job(
         resource_type="job",
         resource_id=job_id,
     )
+    # Files cannot be rolled back with SQL. Never erase them before metadata and
+    # the idempotency receipt commit successfully.
     job_service.cleanup_deleted_job_artifacts(deferred_artifact_cleanup)
     return committed_response
 
@@ -555,6 +568,7 @@ def list_job_trials(
     page: int = _PageQ,
     page_size: int = _TrialPageSizeQ,
 ) -> dict[str, object]:
+    """Paginate an owned job's trials, preserving list compatibility via pagination headers."""
     try:
         trials, total = job_service.list_job_trials(
             db,
@@ -594,6 +608,7 @@ def get_job_report(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
+    """Return a ready owned report, rechecking any bound winner receipt before serialization."""
     try:
         job = job_service.get_job(db, job_id, user=user)
     except job_service.JobServiceError as err:
@@ -603,7 +618,7 @@ def get_job_report(
     # report. These are all 409 (the job exists, the report simply isn't and
     # will never be available in this form). See docs/04_API_SPEC.md.
     #
-    # Phase 8: FAILED GPT jobs can still have a best-so-far READY report
+    # FAILED GPT jobs can still have a best-so-far READY report
     # (e.g. MAX_ITERATIONS_REACHED). Prefer returning that report over
     # JOB_FAILED when it exists so the UI can render best-so-far metrics
     # alongside the failure banner.
@@ -702,14 +717,13 @@ def list_job_artifacts(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
+    """List job and child-trial artifacts without granting their separate download permission."""
     try:
         job = job_service.get_job(db, job_id, user=user)
     except job_service.JobServiceError as err:
         _raise(err)
 
-    from app import models
-
-    # Phase 8: surface both job-scoped artifacts (report/global) AND
+    # Surface both job-scoped artifacts (report/global) AND
     # trial-scoped artifacts (e.g. trajectory_plot / telemetry_json / worker_log
     # written by the real_cli simulator adapter). ``owner_type`` and
     # ``owner_id`` are preserved on the payload so callers can still scope

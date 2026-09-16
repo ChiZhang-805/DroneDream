@@ -327,6 +327,7 @@ export interface AutonomyMissionDraft {
   };
   planningBrief: string;
   planningRunId: string | null;
+  planningError?: string | null;
   conversationId: string | null;
   messages: AutonomyConversationMessage[];
   aircraftProfileId: string;
@@ -937,6 +938,8 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
     }))
     : fallback.aircraft.sensorMounts.filter((sensor) => storedSensors.includes(sensor.kind));
   const bundledMyDroneSensorContractMigrated = String(aircraft.id) === "aircraft-my-drone"
+    // 仅迁移没有内容绑定的旧默认值；实际认证的新机型可以拥有 GPS 以外的传感器。
+    && !normalizeAgentCoreVehicleContract(aircraft.agentCoreRuntimeContract, aircraft.agentCoreAssetId ?? null, aircraft.agentCoreContentSha256 ?? null)
     && (storedSensors.some((sensor) => sensor !== "gps")
       || storedSensorMounts.some((sensor) => sensor.kind !== "gps"));
   const normalizedSensors = bundledMyDroneSensorContractMigrated
@@ -1183,6 +1186,9 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
       planningBrief: boundedText(mission.planningBrief, fallback.mission.planningBrief, 4_000),
       planningRunId: typeof mission.planningRunId === "string"
         ? boundedText(mission.planningRunId, "", 160) || null
+        : null,
+      planningError: typeof mission.planningError === "string"
+        ? boundedText(mission.planningError, "", 2_000) || null
         : null,
       conversationId: typeof mission.conversationId === "string"
         ? boundedText(mission.conversationId, "", 160) || null

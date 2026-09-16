@@ -16,6 +16,7 @@ const STATUS_TONE: Record<AnyStatus, string> = {
   CANCELLED: "muted",
 };
 
+/** Present server-owned state; an active FINALIZING badge does not imply completed artifacts. */
 export function StatusBadge({ status }: { status: AnyStatus }) {
   const { t } = useI18n();
   const tone = STATUS_TONE[status] ?? "muted";

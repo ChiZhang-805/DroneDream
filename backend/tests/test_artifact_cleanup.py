@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import create_engine, select, text, update
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
@@ -662,3 +662,61 @@ def test_sqlite_registration_guard_holds_reserved_writer_lock(tmp_path: Path) ->
         cleanup.execute(text("BEGIN IMMEDIATE"))
         cleanup.rollback()
     engine.dispose()
+
+
+def test_cleanup_refreshes_cached_job_before_selecting_files(tmp_path: Path, db: Session) -> None:
+    """A caller's identity map cannot override the current durable owner state."""
+    now = datetime(2026, 7, 11, tzinfo=timezone.utc)
+    old_time = now - timedelta(days=10)
+    root = tmp_path / "artifacts"
+    db.expire_on_commit = False
+    job = _job("job_cached_state", status="COMPLETED", timestamp=old_time)
+    path = _file(root, job.id, "payload.bin", 11, old_time)
+    db.add(job)
+    db.commit()
+    with Session(db.get_bind()) as other:
+        other.execute(update(models.Job).where(models.Job.id == job.id).values(status="RUNNING"))
+        other.commit()
+    assert job.status == "COMPLETED"  # Deliberately stale local ORM object.
+
+    result = _cleanup(db, settings=_settings(root), now=now)
+    assert result.deleted_files == 0
+    assert result.protected_active_job_files == 1
+    assert path.exists()
+
+
+def test_cleanup_refreshes_owner_after_scan_before_removing_metadata(
+    tmp_path: Path, db: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Lock acquisition must refresh objects already read during the scan."""
+    now = datetime(2026, 7, 11, tzinfo=timezone.utc)
+    old_time = now - timedelta(days=10)
+    root = tmp_path / "artifacts"
+    db.expire_on_commit = False
+    job = _job("job_after_scan", status="COMPLETED", timestamp=old_time)
+    path = _file(root, job.id, "payload.bin", 11, old_time)
+    db.add(job)
+    db.add(_artifact("art_after_scan", job_id=job.id, path=path, created_at=old_time))
+    db.commit()
+    original_execute = db.execute
+    changed = False
+
+    def execute_with_state_change(statement: Any, *args: Any, **kwargs: Any) -> Any:
+        nonlocal changed
+        # Advance durable state just before cleanup's no-op UPDATE takes the
+        # SQLite writer lock; this is a separate, committed connection.
+        if not changed and getattr(statement, "is_update", False):
+            changed = True
+            with Session(db.get_bind()) as other:
+                other.execute(
+                    update(models.Job).where(models.Job.id == job.id).values(status="RUNNING")
+                )
+                other.commit()
+        return original_execute(statement, *args, **kwargs)
+
+    monkeypatch.setattr(db, "execute", execute_with_state_change)
+    with pytest.raises(RuntimeError, match="owner changed from terminal state"):
+        _cleanup(db, settings=_settings(root, artifact_retention_max_age_seconds=3600), now=now)
+    assert changed
+    assert path.exists()
+    assert db.get(models.Artifact, "art_after_scan") is not None

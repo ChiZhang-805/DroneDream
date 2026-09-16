@@ -26,6 +26,7 @@ router = APIRouter(tags=["benchmark-campaigns"])
 
 
 def _raise(error: service.BenchmarkCampaignError) -> None:
+    """Translate campaign ownership or preregistration failures into the API error contract."""
     raise HTTPException(
         status_code=error.http_status,
         detail={"code": error.code, "message": error.message},
@@ -33,6 +34,7 @@ def _raise(error: service.BenchmarkCampaignError) -> None:
 
 
 def _raise_coordinator(error: coordinator.BenchmarkCoordinatorError) -> None:
+    """Preserve lease/budget rejection codes; callers must not treat a denial as a retry receipt."""
     raise HTTPException(
         status_code=error.http_status,
         detail={"code": error.code, "message": error.message},
@@ -46,6 +48,7 @@ def create_benchmark_campaign(
     user: Annotated[models.User, Depends(get_current_user)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> dict[str, object]:
+    """Bind a preregistered manifest and replay receipt without running trials."""
     gate = begin_mutation(
         db,
         user=user,
@@ -75,6 +78,7 @@ def list_benchmark_campaigns(
     page: Annotated[int, Query(ge=1)] = 1,
     page_size: Annotated[int, Query(ge=1, le=100)] = 25,
 ) -> dict[str, object]:
+    """Read an owner-scoped page of campaigns without claiming coordinator authority."""
     campaigns, total = service.list_campaigns(
         db,
         user=user,
@@ -97,6 +101,7 @@ def get_benchmark_campaign(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
+    """Authorize the requested campaign before exposing its manifest and bindings."""
     try:
         campaign = service.get_campaign(db, campaign_id, user=user)
     except service.BenchmarkCampaignError as error:
@@ -111,6 +116,7 @@ def claim_benchmark_coordinator(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
+    """Commit a time-limited coordinator lease; the service fences conflicting owners."""
     try:
         lease = coordinator.claim_lease(
             db,
@@ -141,6 +147,7 @@ def renew_benchmark_coordinator(
         ),
     ],
 ) -> dict[str, object]:
+    """Extend only the matching token/generation lease, never revive another owner's lease."""
     try:
         lease = coordinator.renew_lease(
             db,
@@ -172,6 +179,7 @@ def release_benchmark_coordinator(
         ),
     ],
 ) -> dict[str, object]:
+    """Release the presented lease generation and return usage, not permission to run new work."""
     try:
         usage = coordinator.release_lease(
             db,
@@ -202,6 +210,7 @@ def reserve_benchmark_budget(
         ),
     ],
 ) -> dict[str, object]:
+    """Reserve under a valid lease and commit before dispatch; reservation is not actual spend."""
     try:
         reservation = coordinator.reserve_budget(
             db,
@@ -223,6 +232,7 @@ def get_benchmark_campaign_usage(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
+    """Read server-accounted budget state without trusting client-reported trial totals."""
     try:
         usage = coordinator.get_usage(db, campaign_id, user=user)
     except coordinator.BenchmarkCoordinatorError as error:
@@ -245,6 +255,7 @@ def bind_benchmark_batch(
         ),
     ],
 ) -> dict[str, object]:
+    """Attach an owned batch to its reserved benchmark slot under the active coordinator lease."""
     try:
         binding = coordinator.bind_batch(
             db,
@@ -266,6 +277,7 @@ def list_benchmark_batch_bindings(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
+    """Return persisted bindings for this owner; missing bindings are not completed trials."""
     try:
         bindings = coordinator.list_batch_bindings(db, campaign_id, user=user)
     except coordinator.BenchmarkCoordinatorError as error:

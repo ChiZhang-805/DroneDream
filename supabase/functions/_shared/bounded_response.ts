@@ -20,6 +20,7 @@ export class BoundedResponseError extends Error {
   }
 }
 
+// Upstream headers may be absent or inaccurate, so they cannot replace byte counting.
 function validContentLength(value: string | null): number | null {
   const normalized = value?.trim() ?? "";
   if (!/^(0|[1-9][0-9]*)$/u.test(normalized)) return null;
@@ -51,6 +52,10 @@ async function cancelBody(
   }
 }
 
+/** Bound decoded upstream content without accepting partial or invalid UTF-8.
+ * Callers own fetch cancellation/deadlines and provider-specific JSON validation.
+ * A successful read does not establish that a model request succeeded or was billed.
+ */
 export async function readBoundedResponseText(
   response: Response,
   limitBytes: number,

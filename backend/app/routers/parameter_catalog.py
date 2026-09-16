@@ -73,6 +73,7 @@ class SearchValidationRequest(BaseModel):
 
 
 def _bad_catalog_request(exc: ValueError) -> HTTPException:
+    """Translate catalog input errors into a client response without starting an experiment."""
     return HTTPException(
         status_code=400,
         detail={
@@ -186,6 +187,7 @@ def validate_parameter_search_space(
         )
         normalized_vehicle = normalize_vehicle_type(request.vehicle_type)
         family = classify_airframe(request.airframe)
+        # Locked values participate in coupling checks below but are not search dimensions.
         active = [
             selection
             for selection in request.selections
@@ -220,12 +222,14 @@ def validate_parameter_search_space(
         }
 
         def add_coupling_error(issue: ValidationIssue) -> None:
+            """Merge dependency errors without duplicating the base validator's findings."""
             key = (issue.code, issue.parameter, issue.field, issue.related_parameter)
             if key not in error_keys:
                 error_keys.add(key)
                 coupling_errors.append(issue)
 
         def add_coupling_warning(issue: ValidationIssue) -> None:
+            """Keep feasible-but-risky intervals advisory rather than calling them impossible."""
             key = (issue.code, issue.parameter, issue.field, issue.related_parameter)
             if key not in warning_keys:
                 warning_keys.add(key)
@@ -316,6 +320,8 @@ def validate_parameter_search_space(
                     # range. Coupling analysis must not turn that user error
                     # into an assertion-driven HTTP 500.
                     continue
+                # Empty feasible intersection is an error. A partly feasible
+                # interval is only a warning: generated candidates still need validation.
                 less_equal = dependency.kind == "less_than_or_equal"
                 impossible = (less_equal and selection_min > counterpart_max) or (
                     not less_equal and selection_max < counterpart_min
@@ -351,6 +357,8 @@ def validate_parameter_search_space(
                         )
                     )
 
+        # Check the actual chosen starting values, including locked dependencies;
+        # a valid search interval alone says nothing about this initial tuple.
         enabled_baselines = {
             selection.name.strip().upper(): selection.initial_value
             for selection in request.selections

@@ -55,6 +55,39 @@ describe("cloud model access client", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it.each([null, [], 42, "not an envelope", { data: null }, { data: [] }, { data: 42 }])(
+    "rejects invalid usage envelopes as typed errors: %j", async (body) => {
+      const { cloud, auth } = await loadCloudAccess();
+      auth.setAuthAccessToken("signed-user-token");
+      const fetchMock = vi.fn().mockResolvedValue(jsonResponse(body));
+      vi.stubGlobal("fetch", fetchMock);
+      await expect(cloud.getManagedModelUsage()).rejects.toMatchObject({
+        name: "CloudModelAccessError", code: "INVALID_RESPONSE", status: 200,
+      });
+      // No retry or local Free-plan replacement after an unusable cloud reply.
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(["null", "[]", "42", "{"])(
+    "normalizes invalid model response bodies without retry: %s", async (body) => {
+      const { cloud } = await loadCloudAccess();
+      const fetchMock = vi.fn().mockResolvedValue(new Response(body, {
+        status: 200, headers: { "Content-Type": "application/json" },
+      }));
+      vi.stubGlobal("fetch", fetchMock);
+      await expect(cloud.completeManagedModelChat({
+        access_mode: "platform", grant: `ddg_${"a".repeat(48)}`,
+        scope: "assistant", expires_at: "2026-08-08T01:00:00Z", max_calls: 1,
+        gateway_base_url: "https://cloud.example.test/functions/v1/model-gateway",
+        managed_model: "DroneDream Managed", usage: {} as never,
+      }, [{ role: "user", content: "test" }])).rejects.toMatchObject({
+        name: "CloudModelAccessError", code: "INVALID_RESPONSE", status: 200,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it("issues a scoped grant without exposing the platform provider key", async () => {
     const { cloud, auth } = await loadCloudAccess();
     auth.setAuthAccessToken("signed-user-token");

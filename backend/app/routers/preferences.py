@@ -27,6 +27,7 @@ def read_experience_preferences(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
+    """Read only the authenticated account's preferences; absence is not saved consent."""
     preferences = get_user_experience_preferences(db, user_id=user.id)
     return ok(serialize_user_experience_preferences(preferences).model_dump(mode="json"))
 
@@ -38,6 +39,7 @@ def write_experience_preferences(
     user: Annotated[models.User, Depends(get_current_user)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> dict[str, object]:
+    """Apply only supplied fields and atomically record their idempotent response."""
     gate = begin_mutation(
         db,
         user=user,
@@ -46,6 +48,7 @@ def write_experience_preferences(
         payload=request.model_dump(mode="json", exclude_unset=True),
     )
     if gate.replay is not None:
+        # Replays return the original result without deleting memories a second time.
         return gate.replay
     preferences, deleted_memory_count = update_user_experience_preferences(
         db,
@@ -67,6 +70,7 @@ def erase_experience_preferences(
     user: Annotated[models.User, Depends(get_current_user)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> dict[str, object]:
+    """Erase this user's saved defaults and cross-job memories, not task history."""
     gate = begin_mutation(
         db,
         user=user,

@@ -1,3 +1,12 @@
+/**
+ * Native IPC boundary: TypeScript declarations do not validate JSON at runtime.
+ * Parsers below check shape AND cross-field consistency before exposing a result
+ * to React. Hash syntax is not signature verification; native code still owns
+ * integrity, credentials, installation transactions and all hardware authority.
+ */
+import { validateFieldHarnessRequest } from "./fieldHarnessRequest";
+import { isFieldTuningDemoRequest } from "./fieldTuningRequest";
+
 export interface WindowsInfo {
   caption: string;
   version: string;
@@ -958,6 +967,7 @@ function getTauriCore(): TauriCore | null {
   return core && typeof core.invoke === "function" ? core : null;
 }
 
+/** Return a usable native window API or null; browser previews must not simulate window actions. */
 export function getDesktopWindowHandle(): DesktopWindowHandle | null {
   if (typeof window === "undefined") return null;
   const windowApi = window.__TAURI__?.window;
@@ -991,6 +1001,7 @@ export class DesktopCommandContractError extends Error {
   }
 }
 
+/** Validate every IPC response centrally; preserve native command errors rather than mislabeling them as JSON errors. */
 async function invokeDesktop<T>(
   command: string,
   parse: (value: unknown) => T,
@@ -1007,6 +1018,7 @@ async function invokeDesktop<T>(
   }
 }
 
+/** Detect IPC availability only, not runtime readiness or hardware permission. */
 export function isDesktopRuntime(): boolean {
   return getTauriCore() !== null;
 }
@@ -1071,6 +1083,7 @@ export interface LabCalibrationCycleReceipt {
   [key: string]: unknown;
 }
 
+/** Calibration diagnostics remain untrusted and cannot grant execution or hardware qualification. */
 function parseLabCalibrationCycleReceipt(value: unknown): LabCalibrationCycleReceipt {
   const receipt = expectRecord(value, "lab calibration receipt");
   const nextAction = expectString(receipt.nextAction, "lab calibration receipt.nextAction");
@@ -1137,6 +1150,7 @@ function parseLabCalibrationCycleReceipt(value: unknown): LabCalibrationCycleRec
   return parsed;
 }
 
+/** Request offline gap analysis; this does not train a model or qualify a vehicle. */
 export function evaluateLabCalibrationCycle(
   request: LabCalibrationCycleRequest,
 ): Promise<LabCalibrationCycleReceipt> {
@@ -1164,6 +1178,7 @@ export function getFieldAdapterCatalog(): Promise<FieldAdapterCatalogReport> {
   return invokeDesktop("get_field_adapter_catalog", parseFieldAdapterCatalog);
 }
 
+/** Install data-only protocol metadata, never executable extensions or flight authority. */
 export function installFieldAdapter(
   request: FieldAdapterInstallRequest,
 ): Promise<FieldAdapterInstallReceipt> {
@@ -1173,9 +1188,17 @@ export function installFieldAdapter(
   ) {
     return Promise.reject(new Error("Field adapter install request is invalid."));
   }
-  return invokeDesktop("install_field_adapter", parseFieldAdapterInstallReceipt, { request });
+  const binding = { ...request };
+  return invokeDesktop("install_field_adapter", (value) => {
+    const receipt = parseFieldAdapterInstallReceipt(value);
+    if (receipt.adapterId !== binding.adapterId || receipt.packageSha256 !== binding.expectedPackageSha256) {
+      throw new Error("Field adapter install receipt does not match the requested package.");
+    }
+    return receipt;
+  }, { request: binding });
 }
 
+/** Inspect supplied MAVLink bytes without opening a device. */
 export function inspectFieldAdapterFrame(
   request: FieldAdapterFrameInspectionRequest,
 ): Promise<FieldAdapterFrameInspection> {
@@ -1192,6 +1215,7 @@ export function inspectFieldAdapterFrame(
   });
 }
 
+/** Translate an already supplied vendor frame into bounded scalars; no live transport is opened. */
 export function inspectFieldProtocolFrame(
   request: FieldProtocolFrameInspectionRequest,
 ): Promise<FieldProtocolFrameInspection> {
@@ -1208,6 +1232,7 @@ export function inspectFieldProtocolFrame(
   });
 }
 
+/** Explicitly confirmed bounded serial read; discovery alone cannot open a port. */
 export function probeFieldMavlinkTelemetry(
   request: FieldMavlinkTelemetryProbeRequest,
 ): Promise<FieldMavlinkTelemetryProbeReceipt> {
@@ -1224,17 +1249,27 @@ export function probeFieldMavlinkTelemetry(
   ) {
     return Promise.reject(new Error("Field MAVLink telemetry probe request is invalid."));
   }
+  const binding = { ...request };
   return invokeDesktop(
     "probe_field_mavlink_telemetry",
-    parseFieldMavlinkTelemetryProbeReceipt,
-    { request },
+    (value) => {
+      const receipt = parseFieldMavlinkTelemetryProbeReceipt(value);
+      if (receipt.adapterId !== binding.adapterId || receipt.observationId !== binding.observationId
+        || receipt.portName !== binding.portName || receipt.baudRate !== binding.baudRate) {
+        throw new Error("Field telemetry receipt does not match the requested observation.");
+      }
+      return receipt;
+    },
+    { request: binding },
   );
 }
 
+/** Read the serial registry inventory, not live telemetry or a validated vehicle identity. */
 export function discoverFieldDevices(): Promise<FieldDeviceDiscoveryReport> {
   return invokeDesktop("discover_field_devices", parseFieldDeviceDiscoveryReport);
 }
 
+/** Persist imported parameters with their observation binding; never write the values to a device. */
 export function createFieldParameterSnapshot(
   request: FieldParameterSnapshotRequest,
 ): Promise<FieldParameterSnapshot> {
@@ -1248,17 +1283,25 @@ export function listFieldParameterSnapshots(): Promise<FieldParameterSnapshotSum
   return invokeDesktop("list_field_parameter_snapshots", parseFieldParameterSnapshotSummaries);
 }
 
+/** Load by full identity; a well-shaped snapshot from another selection is still invalid. */
 export function loadFieldParameterSnapshot(
   snapshotSha256: string,
 ): Promise<FieldParameterSnapshot> {
   if (!/^[a-f0-9]{64}$/.test(snapshotSha256)) {
     return Promise.reject(new Error("Field parameter snapshot hash is invalid."));
   }
-  return invokeDesktop("load_field_parameter_snapshot", parseFieldParameterSnapshot, {
+  return invokeDesktop("load_field_parameter_snapshot", (value) => {
+    const snapshot = parseFieldParameterSnapshot(value);
+    if (snapshot.snapshotSha256 !== snapshotSha256) {
+      throw new Error("Field parameter snapshot does not match the requested hash.");
+    }
+    return snapshot;
+  }, {
     request: { snapshotSha256 },
   });
 }
 
+/** Compute a read-only diff against an explicitly identified baseline. */
 export function compareFieldParameterSnapshot(
   request: FieldParameterDiffRequest,
 ): Promise<FieldParameterDiffReceipt> {
@@ -1268,6 +1311,7 @@ export function compareFieldParameterSnapshot(
   });
 }
 
+/** Prepare recovery evidence without executing any of the proposed changes. */
 export function prepareFieldParameterRollback(
   request: FieldParameterDiffRequest,
 ): Promise<FieldRollbackPlan> {
@@ -1277,6 +1321,7 @@ export function prepareFieldParameterRollback(
   });
 }
 
+/** Declared zone bounds are not proof of safety; native quorum remains authoritative. */
 export function prepareFieldPreflight(
   request: FieldPreflightRequest,
 ): Promise<FieldPreflightPlan> {
@@ -1311,21 +1356,15 @@ export function prepareFieldPreflight(
 export function runFieldTuningDemo(
   request: FieldTuningDemoRequest,
 ): Promise<FieldTuningDemoReceipt> {
-  if (
-    request.objective.trim() === "" ||
-    request.objective.length > 120 ||
-    !Number.isInteger(request.maxIterations) ||
-    request.maxIterations < 2 ||
-    request.maxIterations > 8 ||
-    !Number.isFinite(request.targetScore) ||
-    request.targetScore < 0.15 ||
-    request.targetScore > 0.9
-  ) {
+  // Browser fixtures and native dispatch share one request boundary; neither
+  // permits an oversized allocation or an implicitly coerced score/budget.
+  if (!isFieldTuningDemoRequest(request)) {
     return Promise.reject(new Error("Field tuning demo request is outside its bounded contract."));
   }
   return invokeDesktop("run_field_tuning_demo", parseFieldTuningDemoReceipt, { request });
 }
 
+/** Request a gate plan, not permission to execute its listed phases. */
 export function prepareFieldHardwareTuning(
   request: FieldHardwareTuningRequest,
 ): Promise<FieldHardwareTuningPlan> {
@@ -1357,26 +1396,48 @@ export function prepareFieldHardwareTuning(
   });
 }
 
+/** Analyze existing records only; the proposed next parameters are not applied here. */
 export function runFieldHarnessJob(
   request: FieldHarnessJobRequest,
 ): Promise<FieldHarnessJobReceipt> {
   validateFieldHarnessRequest(request);
-  return invokeDesktop("run_field_harness_job", parseFieldHarnessJobReceipt, { request });
+  // Snapshot primitive bindings now, before caller-owned form data can change.
+  const binding = { ...request };
+  return invokeDesktop("run_field_harness_job", (value) => {
+    const receipt = parseFieldHarnessJobReceipt(value);
+    for (const key of ["jobName", "objective", "targetScore", "deviceObservationId",
+      "observationSha256", "snapshotSha256", "vehiclePackId", "controllerId",
+      "firmwareVersion", "adapterId"] as const) {
+      if (receipt[key] !== binding[key]) {
+        throw new Error(`Field Harness receipt does not match request.${key}.`);
+      }
+    }
+    if (receipt.budget.maxIterations !== binding.maxIterations) {
+      throw new Error("Field Harness receipt does not match the requested budget.");
+    }
+    return receipt;
+  }, { request });
 }
 
 export function listFieldHarnessJobs(): Promise<FieldHarnessJobSummary[]> {
   return invokeDesktop("list_field_harness_jobs", parseFieldHarnessJobSummaries);
 }
 
+/** The hardware workspace exists in three editions; native code enforces its own edition. */
 export function loadFieldHarnessJob(jobId: string): Promise<FieldHarnessJobReceipt> {
-  if (!/^field-harness-[a-f0-9]{16}-[a-f0-9]{8}$/.test(jobId)) {
+  if (!/^(?:field|lab|autonomy)-harness-[a-f0-9]{16}-[a-f0-9]{8}$/.test(jobId)) {
     return Promise.reject(new Error("Field Harness job id is invalid."));
   }
-  return invokeDesktop("load_field_harness_job", parseFieldHarnessJobReceipt, {
+  return invokeDesktop("load_field_harness_job", (value) => {
+    const receipt = parseFieldHarnessJobReceipt(value);
+    if (receipt.jobId !== jobId) throw new Error("Field Harness receipt has the wrong job identity.");
+    return receipt;
+  }, {
     request: { jobId },
   });
 }
 
+/** Start native PKCE ownership; do not inject application tokens through this request. */
 export function beginBrowserAuth(
   request: BrowserAuthRequest,
 ): Promise<BrowserAuthSession> {
@@ -1393,23 +1454,27 @@ export function beginBrowserAuth(
   );
 }
 
+/** Cancel the active sign-in attempt without conflating cancellation with vault deletion. */
 export function cancelBrowserAuth(): Promise<boolean> {
   return invokeDesktop("cancel_browser_auth", (value) =>
     expectBoolean(value, "response"));
 }
 
+/** Explicitly clear native credentials; the caller must also invalidate local account state. */
 export function clearBrowserAuthVault(): Promise<boolean> {
   return invokeDesktop("clear_browser_auth_vault", (value) =>
     expectBoolean(value, "response"),
   );
 }
 
+/** Restore a strictly parsed session; absent credentials and malformed credentials are different outcomes. */
 export function restoreBrowserAuthVault(): Promise<BrowserAuthSession | null> {
   return invokeDesktop("restore_browser_auth_vault", (value) =>
     value === null ? null : parseBrowserAuthSession(value),
   );
 }
 
+/** Bind the returned preview to a detached copy of the exact requested selection. */
 export function validateDistributionPlan(
   request: DistributionPlanRequest,
 ): Promise<DistributionPlanValidation> {
@@ -1496,6 +1561,7 @@ export function getAppUpdateProgress(): Promise<NativeAppUpdateSnapshot> {
   return invokeDesktop("get_app_update_progress", parseNativeAppUpdateSnapshot);
 }
 
+/** Subscribe before install; the caller owns the returned native listener cleanup. */
 export async function listenAppUpdateProgress(
   onProgress: (progress: NativeAppUpdateProgress) => void,
 ): Promise<() => void> {
@@ -1509,6 +1575,7 @@ export async function listenAppUpdateProgress(
   );
 }
 
+/** Release progress subscriptions even when download, signature verification or installation fails. */
 export async function installAppUpdateInBackground(
   onProgress: (progress: NativeAppUpdateProgress) => void,
 ): Promise<void> {
@@ -1558,6 +1625,7 @@ export async function getRuntimeInstallPlan(
   );
 }
 
+/** Normalize only product-owned target roots before asking the managed installer to change disk state. */
 export function startRuntimeInstall(
   request: RuntimeInstallRequest,
 ): Promise<RuntimeInstallSnapshot> {
@@ -1569,6 +1637,7 @@ export function startRuntimeInstall(
   );
 }
 
+/** An omitted manifest URL selects the native trusted source, not a frontend download fallback. */
 export function startRuntimeUpgrade(
   request: RuntimeUpgradeRequest = {},
 ): Promise<RuntimeInstallSnapshot> {
@@ -1625,6 +1694,7 @@ export function repairRuntime(): Promise<RuntimeStatusReport> {
   return invokeDesktop("repair_runtime", parseRuntimeStatus);
 }
 
+/** Require the native void receipt before treating shutdown as successful. */
 export function stopRuntimeForExit(): Promise<void> {
   return invokeDesktop("stop_runtime_for_exit", (value) => {
     if (value !== null) {
@@ -1633,6 +1703,7 @@ export function stopRuntimeForExit(): Promise<void> {
   });
 }
 
+/** Route app API traffic through IPC; native code enforces method, path and credential policy. */
 export function desktopApiRequest(
   request: DesktopApiRequest,
 ): Promise<DesktopApiResponse> {
@@ -1648,6 +1719,7 @@ export function desktopApiRequest(
   );
 }
 
+/** Native code owns destination checks and persistence; a returned path is a receipt, not file authority. */
 export function desktopDownloadArtifact(
   request: DesktopArtifactDownloadRequest,
 ): Promise<DesktopArtifactDownloadResponse> {
@@ -1658,6 +1730,7 @@ export function desktopDownloadArtifact(
   );
 }
 
+/** Reject extra credential fields and inconsistent time ordering before updating account state. */
 function parseBrowserAuthSession(value: unknown): BrowserAuthSession {
   const record = expectExactRecord(value, "response", [
     "protocolVersion",
@@ -1701,6 +1774,7 @@ function parseBrowserAuthSession(value: unknown): BrowserAuthSession {
   };
 }
 
+/** Rebuild the selection with unique modules instead of retaining caller-owned arrays. */
 function parseDistributionPlanSelection(
   value: unknown,
   path: string,
@@ -1735,6 +1809,7 @@ function parseDistributionPlanSelection(
   return selection;
 }
 
+/** Check reference shape only; this is not proof that the referenced installation is recoverable. */
 function parseDistributionRollbackReference(
   value: unknown,
   path: string,
@@ -1782,6 +1857,7 @@ function parseDistributionPlanRequest(
   };
 }
 
+/** Reconcile selection, rollback and blockers while keeping preview capabilities deny-only. */
 function parseDistributionPlanValidation(
   value: unknown,
   request: DistributionPlanRequest,
@@ -1953,6 +2029,7 @@ function parseDistributionPlanValidation(
   };
 }
 
+/** Reject unsafe tokens without including their values in diagnostics. */
 function expectBrowserAuthToken(value: unknown, path: string): string {
   const token = expectString(value, path);
   if (
@@ -1979,6 +2056,7 @@ function parseDesktopArtifactDownloadResponse(
   };
 }
 
+/** Validate HTTP metadata and base64 framing; domain-specific body validation belongs to the consumer. */
 function parseDesktopApiResponse(value: unknown): DesktopApiResponse {
   const record = expectRecord(value, "response");
   const status = expectNonNegativeInteger(record.status, "response.status");
@@ -2004,6 +2082,7 @@ function parseDesktopApiResponse(value: unknown): DesktopApiResponse {
   };
 }
 
+/** Preserve missing probes as null/errors instead of inventing available resources. */
 function parsePrerequisiteReport(value: unknown): SystemPrerequisiteReport {
   const record = expectRecord(value, "report");
   return {
@@ -2103,6 +2182,7 @@ function parseGpuInfo(value: unknown, path: string): GpuInfo {
   };
 }
 
+/** Reject duplicate components before evaluating aggregate installed/running/ready consistency. */
 function parseRuntimeStatus(value: unknown): RuntimeStatusReport {
   const record = expectRecord(value, "report");
   const components = expectArray(record.components, "report.components").map(
@@ -2123,6 +2203,7 @@ function parseRuntimeStatus(value: unknown): RuntimeStatusReport {
   return report;
 }
 
+/** Pack digests and source commits are separate identities; an unsupported manager requires a runtime update. */
 function parseEnginePackStatus(value: unknown): EnginePackStatus {
   const record = expectRecord(value, "enginePack");
   const status: EnginePackStatus = {
@@ -2215,6 +2296,7 @@ function parseComponentVersion(value: unknown, path: string): string {
   return version;
 }
 
+/** Enforce catalog bounds and forbid silently installing user-confirmed asset packs. */
 function parseComponentUpdateCandidate(
   value: unknown,
   index: number,
@@ -2275,6 +2357,7 @@ function parseComponentUpdateCandidate(
   return candidate;
 }
 
+/** Reject duplicate packs, dependency cycles and impossible catalog lifetime ordering. */
 function parseComponentUpdateReport(value: unknown): ComponentUpdateReport {
   const record = expectRecord(value, "componentUpdate");
   const candidates = expectArray(
@@ -2332,6 +2415,7 @@ function parseComponentInstallResult(value: unknown): ComponentInstallResult {
   };
 }
 
+/** Registry counts and safety blockers must agree; a pack count never independently authorizes flight. */
 function parseFieldTuningStatus(value: unknown): FieldTuningStatus {
   const record = expectRecord(value, "fieldTuningStatus");
   const editionId = expectHardwareDomainEdition(
@@ -2439,6 +2523,7 @@ function parseFieldAdapterCapabilities(value: unknown, path: string): FieldAdapt
   };
 }
 
+/** Reconcile installed hashes with delivery metadata without granting authority from installation. */
 function parseFieldAdapterEntry(value: unknown, index: number): FieldAdapterCatalogEntry {
   const path = `fieldAdapterCatalog.entries[${index}]`;
   const record = expectExactRecord(value, path, [
@@ -2554,6 +2639,7 @@ function parseFieldAdapterEntry(value: unknown, index: number): FieldAdapterCata
   return entry;
 }
 
+/** Accept unique source-bound data entries only, never executable extension loading. */
 function parseFieldAdapterCatalog(value: unknown): FieldAdapterCatalogReport {
   const record = expectExactRecord(value, "fieldAdapterCatalog", [
     "schemaVersion",
@@ -2607,6 +2693,7 @@ function parseFieldAdapterCatalog(value: unknown): FieldAdapterCatalogReport {
   };
 }
 
+/** Installation confirms metadata only; device opens and hardware writes must remain zero. */
 function parseFieldAdapterInstallReceipt(value: unknown): FieldAdapterInstallReceipt {
   const record = expectExactRecord(value, "fieldAdapterInstallReceipt", [
     "schemaVersion",
@@ -2662,6 +2749,7 @@ function parseFieldAdapterInstallReceipt(value: unknown): FieldAdapterInstallRec
   };
 }
 
+/** Bound decoded header values and preserve the passive zero-device-I/O contract. */
 function parseFieldAdapterFrameInspection(value: unknown): FieldAdapterFrameInspection {
   const record = expectExactRecord(value, "fieldAdapterFrameInspection", [
     "schemaVersion",
@@ -2760,6 +2848,7 @@ function parseFieldAdapterFrameInspection(value: unknown): FieldAdapterFrameInsp
   };
 }
 
+/** Only small scalar results are allowed; nested payloads cannot become executable extensions. */
 function parseFieldProtocolFrameInspection(
   value: unknown,
 ): FieldProtocolFrameInspection {
@@ -2875,6 +2964,7 @@ function parseFieldProtocolFrameInspection(
   };
 }
 
+/** Require a single read-only probe with zero parameter reads/writes, arm or flight attempts. */
 function parseFieldMavlinkTelemetryProbeReceipt(
   value: unknown,
 ): FieldMavlinkTelemetryProbeReceipt {
@@ -3032,6 +3122,7 @@ function parseFieldMavlinkTelemetryProbeReceipt(
   };
 }
 
+/** A discovered COM port remains unopened and unvalidated even when discovery is supported. */
 function parseFieldDeviceDiscoveryReport(value: unknown): FieldDeviceDiscoveryReport {
   const record = expectRecord(value, "fieldDeviceDiscovery");
   const devices = expectArray(record.devices, "fieldDeviceDiscovery.devices").map(
@@ -3102,6 +3193,7 @@ function parseFieldDeviceDiscoveryReport(value: unknown): FieldDeviceDiscoveryRe
   return report;
 }
 
+/** Decode synthetic candidates separately from measured evidence replay. */
 function parseFieldTuningCandidate(
   value: unknown,
   index: number,
@@ -3134,6 +3226,7 @@ function parseFieldTuningCandidate(
   };
 }
 
+/** A synthetic demo can qualify only its fixture, never a measured hardware run. */
 function parseFieldTuningDemoReceipt(value: unknown): FieldTuningDemoReceipt {
   const record = expectRecord(value, "fieldTuningReceipt");
   const budget = expectRecord(record.budget, "fieldTuningReceipt.budget");
@@ -3208,7 +3301,12 @@ function parseFieldTuningDemoReceipt(value: unknown): FieldTuningDemoReceipt {
     receiptSha256: expectLowercaseHex(record.receiptSha256, "fieldTuningReceipt.receiptSha256", 64),
   };
   if (
+    receipt.budget.maxIterations < 2 || receipt.budget.maxIterations > 8 ||
+    receipt.budget.usedIterations > receipt.budget.maxIterations ||
     receipt.candidates.length !== receipt.budget.usedIterations ||
+    receipt.candidates.some((candidate, index) => candidate.iteration !== index + 1) ||
+    new Set(receipt.candidates.map((candidate) => candidate.candidateSha256)).size !== receipt.candidates.length ||
+    receipt.holdout.passed !== (receipt.qualification.status === "demo-qualified") ||
     receipt.hardwareActionsPerformed.length !== 0 ||
     !receipt.candidates.some((candidate) => candidate.candidateSha256 === receipt.selectedCandidateSha256)
   ) {
@@ -3217,89 +3315,14 @@ function parseFieldTuningDemoReceipt(value: unknown): FieldTuningDemoReceipt {
   return receipt;
 }
 
-function validateFieldHarnessRequest(request: FieldHarnessJobRequest): void {
-  const identities = [
-    request.jobName,
-    request.objective,
-    request.deviceObservationId,
-    request.vehiclePackId,
-    request.controllerId,
-    request.firmwareVersion,
-    request.adapterId,
-  ];
-  if (
-    identities.some((value) => value.trim() !== value || value.length === 0 || value.length > 240)
-    || !/^[a-f0-9]{64}$/.test(request.observationSha256)
-    || !/^[a-f0-9]{64}$/.test(request.snapshotSha256)
-    || !Number.isFinite(request.targetScore)
-    || request.targetScore < 0.01
-    || request.targetScore > 1
-    || !Number.isInteger(request.maxIterations)
-    || request.maxIterations < 2
-    || request.maxIterations > 32
-    || request.trials.length < 3
-    || request.trials.length > 32
-  ) {
-    throw new Error("Field Harness request is outside its bounded contract.");
-  }
-  const names = Object.keys(request.parameterBounds).sort();
-  if (names.length === 0 || names.length > 64) {
-    throw new Error("Field Harness parameter bounds are empty or oversized.");
-  }
-  for (const name of names) {
-    const bound = request.parameterBounds[name];
-    if (
-      !/^[A-Za-z0-9_.:-]{1,80}$/.test(name)
-      || !Number.isFinite(bound.min)
-      || !Number.isFinite(bound.max)
-      || !Number.isFinite(bound.maxStep)
-      || bound.min >= bound.max
-      || bound.maxStep <= 0
-      || bound.maxStep > bound.max - bound.min
-    ) {
-      throw new Error(`Field Harness parameter bound ${name} is invalid.`);
-    }
-  }
-  for (const trial of request.trials) {
-    const trialNames = Object.keys(trial.parameters).sort();
-    if (
-      trial.trialId.trim() !== trial.trialId
-      || trial.trialId.length === 0
-      || trial.trialId.length > 80
-      || !/^[a-f0-9]{64}$/.test(trial.telemetrySha256)
-      || trialNames.join("\n") !== names.join("\n")
-    ) {
-      throw new Error("Field Harness trial identity or parameter set is invalid.");
-    }
-    for (const name of names) {
-      const parameter = trial.parameters[name];
-      const bound = request.parameterBounds[name];
-      if (!Number.isFinite(parameter) || parameter < bound.min || parameter > bound.max) {
-        throw new Error(`Field Harness trial parameter ${name} is outside its bound.`);
-      }
-    }
-    const metrics = trial.metrics;
-    if (
-      ![metrics.trackingError, metrics.overshootPercent, metrics.controlEffort]
-        .every((metric) => Number.isFinite(metric) && metric >= 0 && metric <= 1_000)
-      || !Number.isSafeInteger(metrics.constraintViolations)
-      || metrics.constraintViolations < 0
-      || !Number.isSafeInteger(metrics.emergencyInterventions)
-      || metrics.emergencyInterventions < 0
-    ) {
-      throw new Error("Field Harness trial metrics are invalid.");
-    }
-  }
-  if (
-    request.trials.filter((trial) => trial.independentHoldout).length !== 1
-    || request.trials.at(-1)?.independentHoldout !== true
-  ) {
-    throw new Error("Field Harness requires one final independent holdout trial.");
-  }
-}
 
+/** Error/effort metrics are non-negative magnitudes, not signed control commands. */
 function parseFieldHarnessMetrics(value: unknown, path: string): FieldHarnessMetrics {
   const record = expectRecord(value, path);
+  for (const name of ["trackingError", "overshootPercent", "controlEffort"] as const) {
+    const metric = expectFiniteNumber(record[name], `${path}.${name}`);
+    if (metric < 0 || metric > 1_000) throw new Error(`${path}.${name} is out of range`);
+  }
   return {
     trackingError: expectFiniteNumber(record.trackingError, `${path}.trackingError`),
     overshootPercent: expectFiniteNumber(record.overshootPercent, `${path}.overshootPercent`),
@@ -3340,6 +3363,7 @@ function parseFieldHarnessTrial(value: unknown, index: number): FieldHarnessTria
   };
 }
 
+/** Reconcile replay accounting and holdout separation; hash authentication stays native. */
 function parseFieldHarnessJobReceipt(value: unknown): FieldHarnessJobReceipt {
   const path = "fieldHarnessJob";
   const record = expectRecord(value, path);
@@ -3443,17 +3467,44 @@ function parseFieldHarnessJobReceipt(value: unknown): FieldHarnessJobReceipt {
     hardwareAuthority: expectLiteral(record.hardwareAuthority, false, `${path}.hardwareAuthority`),
     receiptSha256: expectLowercaseHex(record.receiptSha256, `${path}.receiptSha256`, 64),
   };
-  if (
-    receipt.trials.filter((trial) => trial.independentHoldout).length !== 1
-    || !receipt.trials.some(
-      (trial) => trial.candidateSha256 === receipt.selectedCandidateSha256,
-    )
+  const training = receipt.trials.filter((trial) => !trial.independentHoldout);
+  const holdout = receipt.trials.at(-1);
+  const selected = training.find((trial) => trial.candidateSha256 === receipt.selectedCandidateSha256);
+  // Training may revisit one candidate, but the holdout must be the final,
+  // independently captured record and cannot influence selection of that candidate.
+  if (receipt.trials.length < 3 || receipt.trials.length > 32
+    || receipt.trials.filter((trial) => trial.independentHoldout).length !== 1
+    || !holdout?.independentHoldout || holdout.trialId !== receipt.holdoutTrialId || !selected
+    || new Set(receipt.trials.map((trial) => trial.trialId)).size !== receipt.trials.length
+    || training.some((trial) => trial.telemetrySha256 === holdout.telemetrySha256)
+    || receipt.budget.maxIterations < 2 || receipt.budget.maxIterations > 32
+    || training.length !== receipt.budget.usedTrainingTrials
+    || training.length > receipt.budget.maxIterations
+    || receipt.budget.remainingIterations !== receipt.budget.maxIterations - training.length
+    || receipt.targetScore < 0.01 || receipt.targetScore > 1
+    || receipt.qualification.recordedEvidencePassed !== (status === "recorded-evidence-passed")
   ) {
     throw new Error("Field Harness receipt violates holdout or selection semantics");
+  }
+  for (const trial of receipt.trials) {
+    const safe = trial.metrics.constraintViolations === 0 && trial.metrics.emergencyInterventions === 0;
+    const accepted = safe && trial.score <= receipt.targetScore;
+    const failureClass = trial.metrics.emergencyInterventions > 0 ? "emergency-intervention"
+      : trial.metrics.constraintViolations > 0 ? "constraint-violation"
+        : trial.score > receipt.targetScore ? "objective-miss" : "none";
+    if (trial.score < 0 || trial.accepted !== accepted || trial.failureClass !== failureClass) {
+      throw new Error("Field Harness trial verdict disagrees with its metrics.");
+    }
+  }
+  const evidencePassed = selected.accepted && holdout.accepted
+    && holdout.candidateSha256 === selected.candidateSha256;
+  if (receipt.qualification.recordedEvidencePassed !== evidencePassed) {
+    throw new Error("Field Harness qualification disagrees with the selected trial and holdout.");
   }
   return receipt;
 }
 
+/** Bound persisted history before rendering; summaries remain non-authoritative metadata. */
 function parseFieldHarnessJobSummaries(value: unknown): FieldHarnessJobSummary[] {
   const records = expectArray(value, "fieldHarnessJobSummaries");
   if (records.length > 1_000) throw new Error("Field Harness job history is oversized");
@@ -3480,6 +3531,7 @@ function parseFieldHarnessJobSummaries(value: unknown): FieldHarnessJobSummary[]
   });
 }
 
+/** Validate names and finite magnitudes before consuming imported parameters. */
 function parseFieldParameterMap(value: unknown, path: string): Record<string, number> {
   const record = expectRecord(value, path);
   const entries = Object.entries(record);
@@ -3502,6 +3554,7 @@ function validateFieldParameterMap(parameters: Record<string, number>, path: str
   parseFieldParameterMap(parameters, path);
 }
 
+/** Bind imported values to one observation, vehicle, controller and firmware tuple. */
 function validateFieldSnapshotRequest(request: FieldParameterSnapshotRequest): void {
   for (const value of [
     request.deviceObservationId,
@@ -3522,6 +3575,7 @@ function validateFieldSnapshotRequest(request: FieldParameterSnapshotRequest): v
   validateFieldParameterMap(request.parameters, "fieldParameterSnapshotRequest.parameters");
 }
 
+/** Require an explicit baseline hash rather than inferring it from current UI selection. */
 function validateFieldDiffRequest(request: FieldParameterDiffRequest): void {
   if (!/^[a-f0-9]{64}$/.test(request.snapshotSha256)) {
     throw new Error("Field parameter snapshot hash is invalid.");
@@ -3529,6 +3583,7 @@ function validateFieldDiffRequest(request: FieldParameterDiffRequest): void {
   validateFieldParameterMap(request.currentParameters, "fieldParameterDiffRequest.currentParameters");
 }
 
+/** Added/removed values use null deltas; numeric changes tolerate only floating-point roundoff. */
 function parseFieldParameterChange(value: unknown, index: number): FieldParameterChange {
   const path = `fieldParameterChanges[${index}]`;
   const record = expectExactRecord(value, path, ["name", "before", "after", "delta"]);
@@ -3568,6 +3623,7 @@ function parseFieldParameterChange(value: unknown, index: number): FieldParamete
   return change;
 }
 
+/** Bound recovery-preview size and reject duplicate parameter rows. */
 function parseFieldParameterChanges(value: unknown, path: string): FieldParameterChange[] {
   const raw = expectArray(value, path);
   if (raw.length > 256) throw new Error(`${path} exceeds its bounded length`);
@@ -3586,6 +3642,7 @@ function parseFieldRecoveryIdentity(value: unknown, path: string): string {
   return parsed;
 }
 
+/** Reconcile content count while preserving observation identity and deny-only authority. */
 function parseFieldParameterSnapshot(value: unknown): FieldParameterSnapshot {
   const path = "fieldParameterSnapshot";
   const record = expectExactRecord(value, path, [
@@ -3704,6 +3761,7 @@ function parseFieldParameterSnapshotSummary(
   };
 }
 
+/** Native history is strictly hash-ordered; duplicates or ambiguous ordering are rejected. */
 function parseFieldParameterSnapshotSummaries(
   value: unknown,
 ): FieldParameterSnapshotSummary[] {
@@ -3720,6 +3778,7 @@ function parseFieldParameterSnapshotSummaries(
   return summaries;
 }
 
+/** The declared count must equal the validated changes. */
 function parseFieldParameterDiffReceipt(value: unknown): FieldParameterDiffReceipt {
   const path = "fieldParameterDiff";
   const record = expectExactRecord(value, path, [
@@ -3751,6 +3810,7 @@ function parseFieldParameterDiffReceipt(value: unknown): FieldParameterDiffRecei
   };
 }
 
+/** Listed changes do not bypass required rollback evidence or enable execution. */
 function parseFieldRollbackPlan(value: unknown): FieldRollbackPlan {
   const path = "fieldRollbackPlan";
   const record = expectExactRecord(value, path, [
@@ -3781,6 +3841,7 @@ function parseFieldRollbackPlan(value: unknown): FieldRollbackPlan {
   return plan;
 }
 
+/** Separate declared geometry from verified evidence and preserve every action denial. */
 function parseFieldPreflightPlan(value: unknown): FieldPreflightPlan {
   const path = "fieldPreflightPlan";
   const record = expectExactRecord(value, path, [
@@ -3872,6 +3933,7 @@ function parseFieldPreflightPlan(value: unknown): FieldPreflightPlan {
   return plan;
 }
 
+/** Phase names do not authorize work; provider, device-write and execution budgets remain denied. */
 function parseFieldHardwareTuningPlan(value: unknown): FieldHardwareTuningPlan {
   const record = expectExactRecord(value, "fieldHardwarePlan", [
     "schemaVersion", "kind", "jobId", "editionId", "executionDomain", "sourceCommit",
@@ -3956,6 +4018,7 @@ function parseFieldHardwareTuningPlan(value: unknown): FieldHardwareTuningPlan {
   return plan;
 }
 
+/** Ready requires installed/running state and readiness of every required component. */
 function validateRuntimeSemantics(report: RuntimeStatusReport): void {
   if (report.runtimeName !== RUNTIME_NAME) {
     throw new Error(`report.runtimeName must equal ${RUNTIME_NAME}`);
@@ -4015,6 +4078,7 @@ function parseRuntimeComponent(value: unknown, index: number): RuntimeComponentS
   };
 }
 
+/** Verify destination ownership syntax and ordered phases, not merely a plausible progress display. */
 function parseInstallPlan(
   value: unknown,
   expectedTargetRoot?: string,
@@ -4108,6 +4172,7 @@ function normalizeRuntimeInstallRequest(
   return { targetRoot, releaseManifestUrl };
 }
 
+/** Normalize transport syntax only; host trust, signatures and redirect policy remain native responsibilities. */
 function normalizeReleaseManifestUrl(value: string): string {
   const urlString = expectSafeNonEmptyString(value, "releaseManifestUrl");
   let url: URL;
@@ -4122,6 +4187,7 @@ function normalizeReleaseManifestUrl(value: string): string {
   return url.toString();
 }
 
+/** Decode one operation snapshot before enforcing phase-dependent progress and error invariants. */
 function parseRuntimeInstallSnapshot(value: unknown): RuntimeInstallSnapshot {
   const record = expectRecord(value, "snapshot");
   const phase = expectString(record.phase, "snapshot.phase");
@@ -4241,6 +4307,7 @@ function parseInstallerRuntimeDiscardResult(
   };
 }
 
+/** App-only intent must not be mistaken for permission to install a runtime. */
 function validateInstallerRuntimeIntent(intent: InstallerRuntimeIntent): void {
   if (intent.status === "ready") {
     if (intent.mode !== "install-all" && intent.mode !== "custom") {
@@ -4265,6 +4332,7 @@ function validateInstallerRuntimeIntent(intent: InstallerRuntimeIntent): void {
   }
 }
 
+/** Resumed/started operations must bind the same target in envelope and nested snapshot. */
 function validateInstallerRuntimeAutoStartResult(
   result: InstallerRuntimeAutoStartResult,
 ): void {
@@ -4390,6 +4458,7 @@ function runtimeErrorCharacterIsSeparator(character: string): boolean {
     /\s/u.test(character);
 }
 
+/** Reject contradictory progress and terminal states instead of displaying false completion. */
 function validateRuntimeInstallSnapshot(snapshot: RuntimeInstallSnapshot): void {
   if (
     snapshot.bytesTotal !== null &&
@@ -4465,6 +4534,7 @@ function expectRecord(value: unknown, path: string): UnknownRecord {
   return value as UnknownRecord;
 }
 
+/** Authority-bearing closed records require explicit changes when fields are added or removed. */
 function expectExactRecord(
   value: unknown,
   path: string,
@@ -4515,7 +4585,9 @@ function expectIdentifier(value: unknown, path: string): string {
 
 function expectControllerKey(value: unknown, path: string): string {
   const controllerKey = expectSafeNonEmptyString(value, path);
-  if (controllerKey.length > 160 || controllerKey.split("::").length !== 2) {
+  const parts = controllerKey.split("::");
+  if (controllerKey.length > 160 || new TextEncoder().encode(controllerKey).length > 160
+    || parts.length !== 2 || parts.some((part) => part.length === 0 || part.trim() !== part)) {
     throw new Error(`${path} must contain exactly one controller namespace separator`);
   }
   return controllerKey;
@@ -4530,6 +4602,7 @@ function expectCanonicalComPort(value: unknown, path: string): string {
   return port;
 }
 
+/** Check representation only; this does not recompute or authenticate a digest. */
 function expectLowercaseHex(
   value: unknown,
   path: string,
@@ -4558,6 +4631,7 @@ function expectCanonicalRuntimeTargetRoot(value: unknown, path: string): string 
   return targetRoot;
 }
 
+/** Reject ambiguous device/traversal segments lexically; native code still checks filesystem ownership. */
 function expectAbsoluteWindowsPath(value: unknown, path: string): string {
   const windowsPath = expectSafeNonEmptyString(value, path);
   const containsUnsafeUnicode = [...windowsPath].some((character) => {
@@ -4603,7 +4677,19 @@ function expectNullableSafeNonEmptyString(
 function parseNullableTimestamp(value: unknown, path: string): string | null {
   if (value == null) return null;
   const timestamp = expectSafeNonEmptyString(value, path);
-  if (!/^\d{4}-\d{2}-\d{2}T/u.test(timestamp) || Number.isNaN(Date.parse(timestamp))) {
+  // Date.parse normalizes dates such as February 30 and accepts zone-less local
+  // times. Receipts need an actual calendar instant, independent of the user's TZ.
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(?:Z|([+-])(\d{2}):(\d{2}))$/u.exec(timestamp);
+  if (!match) throw new Error(`${path} must be an ISO 8601 timestamp with a timezone`);
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText, , offsetHour, offsetMinute] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (month < 1 || month > 12 || Number(dayText) < 1 || Number(dayText) > days[month - 1]
+    || Number(hourText) > 23 || Number(minuteText) > 59 || Number(secondText) > 59
+    || Number(offsetHour ?? 0) > 23 || Number(offsetMinute ?? 0) > 59
+    || Number.isNaN(Date.parse(timestamp))) {
     throw new Error(`${path} must be an ISO 8601 timestamp`);
   }
   return timestamp;
@@ -4647,6 +4733,7 @@ function expectSha256Id(value: unknown, path: string): string {
   return identity;
 }
 
+/** Reject coercion, NaN and infinity; the caller decides whether signed values are meaningful. */
 function expectFiniteNumber(value: unknown, path: string): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     throw new Error(`${path} must be a finite number`);
@@ -4660,6 +4747,7 @@ function expectPositiveInteger(value: unknown, path: string): number {
   return number;
 }
 
+/** Byte totals and resource counts must be exact safe integers, not approximate measurements. */
 function expectNonNegativeNumber(value: unknown, path: string): number {
   if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 0) {
     throw new Error(`${path} must be a safe non-negative integer`);

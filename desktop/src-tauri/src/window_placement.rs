@@ -19,10 +19,12 @@ struct PixelRect {
 }
 
 impl PixelRect {
+    /// Physical pixel extents must be positive and representable before Win32 calls.
     fn width(self) -> Option<i32> {
         self.right.checked_sub(self.left).filter(|width| *width > 0)
     }
 
+    /// Negative-monitor coordinates are valid; a reversed or overflowing extent is not.
     fn height(self) -> Option<i32> {
         self.bottom
             .checked_sub(self.top)
@@ -31,6 +33,7 @@ impl PixelRect {
 }
 
 impl From<RECT> for PixelRect {
+    /// Preserve Win32 physical coordinates rather than mixing in logical/DPI-scaled units.
     fn from(rect: RECT) -> Self {
         Self {
             left: rect.left,
@@ -41,6 +44,7 @@ impl From<RECT> for PixelRect {
     }
 }
 
+/// Move first, shrinking only if necessary; use work area so the taskbar stays visible.
 fn clamp_rect_to_work_area(window: PixelRect, work_area: PixelRect) -> Option<PixelRect> {
     let window_width = window.width()?;
     let window_height = window.height()?;

@@ -6,6 +6,7 @@ import json
 import logging
 import math
 import threading
+from contextlib import closing
 from datetime import datetime, timezone
 from typing import Any
 
@@ -14,10 +15,12 @@ _MAX_HEARTBEAT_BYTES = 4096
 
 
 def _now() -> datetime:
+    """Use UTC for a presence lease shared by separate worker/API processes."""
     return datetime.now(timezone.utc)
 
 
 def _settings() -> Any:
+    """Read the current configuration without retaining a replaced module cache."""
     # Several test/development workflows reload app.config after changing the
     # environment. Resolve it lazily so this long-lived module never holds a
     # stale cached get_settings function.
@@ -27,6 +30,7 @@ def _settings() -> Any:
 
 
 def _client() -> Any:
+    """Allocate a bounded-I/O Redis client; the caller must close its pool."""
     settings = _settings()
     if not settings.redis_url:
         raise RuntimeError("REDIS_URL is not configured")
@@ -43,6 +47,7 @@ def _client() -> Any:
 
 
 def _validated_worker_id(worker_id: object) -> str:
+    """Normalize the diagnostic identity before publishing or starting a thread."""
     if not isinstance(worker_id, str):
         raise ValueError("worker_id must be a string")
     normalized = worker_id.strip()
@@ -72,14 +77,18 @@ def publish_worker_heartbeat(worker_id: str) -> bool:
         separators=(",", ":"),
     )
     try:
-        _client().set(
-            settings.worker_presence_key,
-            payload,
-            ex=settings.worker_presence_ttl_seconds,
-        )
+        # Each probe owns a fresh client/pool. Release it on network errors too;
+        # recurring heartbeats must not accumulate connections until GC runs.
+        with closing(_client()) as client:
+            client.set(
+                settings.worker_presence_key,
+                payload,
+                ex=settings.worker_presence_ttl_seconds,
+            )
         return True
-    except Exception:
-        logger.warning("failed to publish worker heartbeat", exc_info=True)
+    except Exception as exc:
+        # Redis exceptions can contain credential-bearing URLs.
+        logger.warning("failed to publish worker heartbeat exception_type=%s", type(exc).__name__)
         return False
 
 
@@ -96,13 +105,15 @@ def worker_presence_health() -> dict[str, object]:
             }
         return {"ok": True, "status": "not_required"}
     try:
-        client = _client()
-        client.ping()
-        raw = client.getrange(
-            settings.worker_presence_key,
-            0,
-            _MAX_HEARTBEAT_BYTES,
-        )
+        with closing(_client()) as client:
+            client.ping()
+            # GETRANGE's end is inclusive: one extra byte distinguishes an
+            # oversized record without downloading an unbounded Redis value.
+            raw = client.getrange(
+                settings.worker_presence_key,
+                0,
+                _MAX_HEARTBEAT_BYTES,
+            )
         if not raw:
             return {"ok": False, "status": "missing", "detail": "no live worker signal"}
         if (
@@ -129,7 +140,14 @@ def worker_presence_health() -> dict[str, object]:
                 "status": "invalid",
                 "detail": "worker signal observation time must be numeric",
             }
-        observed_epoch = float(raw_epoch)
+        try:
+            observed_epoch = float(raw_epoch)
+        except OverflowError:
+            return {
+                "ok": False,
+                "status": "invalid",
+                "detail": "worker signal has an invalid observation time",
+            }
         try:
             worker_id = _validated_worker_id(raw_worker_id)
         except ValueError:
@@ -174,6 +192,7 @@ class WorkerPresenceHeartbeat:
     """Background signal that remains live while a long trial is executing."""
 
     def __init__(self, worker_id: str) -> None:
+        """Prepare a one-shot background publisher without starting network I/O."""
         self._worker_id = _validated_worker_id(worker_id)
         self._stop = threading.Event()
         self._thread = threading.Thread(
@@ -183,13 +202,16 @@ class WorkerPresenceHeartbeat:
         )
 
     def start(self) -> None:
+        """Start the one-shot presence thread alongside the trial executor."""
         self._thread.start()
 
     def stop(self) -> None:
+        """Request shutdown and bound the wait; in-flight I/O has its own timeout."""
         self._stop.set()
         self._thread.join(timeout=2.0)
 
     def _run(self) -> None:
+        """Publish immediately, then renew until stop interrupts the interval."""
         settings = _settings()
         publish_worker_heartbeat(self._worker_id)
         while not self._stop.wait(settings.worker_presence_interval_seconds):

@@ -3,7 +3,7 @@ use std::os::windows::io::AsRawHandle;
 use std::process::{Command, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use wait_timeout::ChildExt;
 use windows_sys::Win32::Foundation::{CloseHandle, HANDLE};
 use windows_sys::Win32::System::JobObjects::{
@@ -42,6 +42,7 @@ struct KillOnCloseJob {
 unsafe impl Send for KillOnCloseJob {}
 
 impl KillOnCloseJob {
+    /// Configure containment before launching any helper; close a failed job immediately.
     fn new(label: &str) -> Result<Self, String> {
         // SAFETY: null security attributes and name request an unnamed job with
         // the caller's default security descriptor.
@@ -78,6 +79,8 @@ impl KillOnCloseJob {
         Ok(Self { handle })
     }
 
+    /// Adopt a just-spawned cooperative helper. This is not an untrusted-process
+    /// sandbox: descendants launched before assignment can escape the job.
     fn assign(&self, child: &std::process::Child, label: &str) -> Result<(), String> {
         let process = child.as_raw_handle() as HANDLE;
         // SAFETY: both handles remain valid for this call. The child is owned
@@ -102,6 +105,7 @@ impl Drop for KillOnCloseJob {
     }
 }
 
+/// Construct a hidden Windows process; callers pass arguments separately, not shell text.
 pub(crate) fn windows_command(program: &str) -> Command {
     use std::os::windows::process::CommandExt;
 
@@ -111,8 +115,8 @@ pub(crate) fn windows_command(program: &str) -> Command {
 }
 
 /// A long-lived child process contained in a kill-on-close Windows Job Object.
-/// Dropping this value terminates the complete process tree, which makes it
-/// suitable for helpers that must live exactly as long as the desktop app.
+/// Dropping terminates the processes assigned to its job, including descendants
+/// created after assignment. External service/WSL guest work has separate ownership.
 pub(crate) struct ContainedChild {
     child: std::process::Child,
     job: Option<KillOnCloseJob>,
@@ -120,6 +124,7 @@ pub(crate) struct ContainedChild {
 }
 
 impl ContainedChild {
+    /// Reap/check the direct child without blocking; a false result is not its success status.
     pub(crate) fn is_running(&mut self) -> Result<bool, String> {
         self.child
             .try_wait()
@@ -168,7 +173,11 @@ pub(crate) fn command_output(
     timeout: Duration,
     label: &str,
 ) -> Result<CapturedOutput, String> {
-    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    let deadline = command_deadline(timeout, label)?;
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
     let job = KillOnCloseJob::new(label)?;
     let mut child = command
         .spawn()
@@ -195,7 +204,8 @@ pub(crate) fn command_output(
     let stdout_reader = std::thread::spawn(move || read_limited(stdout));
     let stderr_reader = std::thread::spawn(move || read_limited(stderr));
 
-    let status = match child.wait_timeout(timeout) {
+    // Spawn and pipe setup consume the same budget rather than renewing it.
+    let status = match child.wait_timeout(deadline.saturating_duration_since(Instant::now())) {
         Ok(Some(status)) => {
             // The direct process has exited, but a descendant may still own a
             // pipe. Closing the job terminates those descendants before join.
@@ -237,15 +247,23 @@ pub(crate) fn command_output(
 
 /// Run a potentially long-lived Windows command while retaining the same
 /// process-tree containment guarantees as [`command_output`].  Cancellation
-/// closes the Job Object, so descendants (including a WSL import helper) are
-/// terminated as a unit rather than leaving an orphaned background process.
+/// closes the host Job Object. Work handed to an existing service or WSL guest
+/// is not thereby proven stopped; the runtime manager owns that separate lifecycle.
 pub(crate) fn command_output_cancelable(
     mut command: Command,
     timeout: Duration,
     label: &str,
     cancelled: &AtomicBool,
 ) -> Result<CapturedOutput, String> {
-    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+    // Cancellation already observed at entry must not launch a command with side effects.
+    if cancelled.load(Ordering::Acquire) {
+        return Err(format!("{label} was cancelled."));
+    }
+    let deadline = command_deadline(timeout, label)?;
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
     let job = KillOnCloseJob::new(label)?;
     let mut child = command
         .spawn()
@@ -271,7 +289,6 @@ pub(crate) fn command_output_cancelable(
     };
     let stdout_reader = std::thread::spawn(move || read_limited(stdout));
     let stderr_reader = std::thread::spawn(move || read_limited(stderr));
-    let started = std::time::Instant::now();
 
     let status = loop {
         if cancelled.load(Ordering::Acquire) {
@@ -285,8 +302,11 @@ pub(crate) fn command_output_cancelable(
                 drop(job);
                 break status;
             }
-            Ok(None) if started.elapsed() < timeout => {
-                std::thread::sleep(Duration::from_millis(100));
+            Ok(None) if Instant::now() < deadline => {
+                std::thread::sleep(
+                    Duration::from_millis(100)
+                        .min(deadline.saturating_duration_since(Instant::now())),
+                );
             }
             Ok(None) => {
                 terminate_process_tree(&mut child, Some(job));
@@ -321,12 +341,26 @@ pub(crate) fn command_output_cancelable(
     })
 }
 
+/// Validate before spawning, including durations too large for the monotonic clock.
+fn command_deadline(timeout: Duration, label: &str) -> Result<Instant, String> {
+    if timeout.is_zero() {
+        return Err(format!("{label} timeout must be positive."));
+    }
+    Instant::now()
+        .checked_add(timeout)
+        .ok_or_else(|| format!("{label} timeout is too large."))
+}
+
+/// Retain bounded output but keep draining excess bytes, avoiding a blocked child pipe.
 fn read_limited(mut reader: impl Read) -> io::Result<LimitedOutput> {
     let mut bytes = Vec::new();
     let mut buffer = [0_u8; 8192];
     let mut truncated = false;
     loop {
-        let count = reader.read(&mut buffer)?;
+        let count = match reader.read(&mut buffer) {
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            result => result?,
+        };
         if count == 0 {
             break;
         }
@@ -338,6 +372,7 @@ fn read_limited(mut reader: impl Read) -> io::Result<LimitedOutput> {
     Ok(LimitedOutput { bytes, truncated })
 }
 
+/// Reader panic and I/O failure are command errors, not successful empty output.
 fn join_reader(
     reader: JoinHandle<io::Result<LimitedOutput>>,
     label: &str,
@@ -349,6 +384,7 @@ fn join_reader(
         .map_err(|error| format!("Unable to read {label} {stream}: {error}"))
 }
 
+/// Drop the owned host job first, then use bounded waits and direct-process fallback.
 fn terminate_process_tree(child: &mut std::process::Child, job: Option<KillOnCloseJob>) {
     // Closing an assigned KILL_ON_JOB_CLOSE job is the primary termination
     // mechanism and covers descendants even after the direct child exits.
@@ -430,5 +466,48 @@ mod tests {
             elapsed < deadline,
             "the inherited pipe remained open for {elapsed:?}"
         );
+    }
+
+    #[test]
+    fn cancelled_or_zero_budget_commands_are_rejected_before_spawn() {
+        let nonexistent = || windows_command("dronedream-nonexistent-test-program.exe");
+        let error = command_output_cancelable(
+            nonexistent(),
+            Duration::from_secs(1),
+            "cancel test",
+            &AtomicBool::new(true),
+        )
+        .unwrap_err();
+        assert!(
+            error.contains("cancelled"),
+            "must not reach program launch: {error}"
+        );
+        let error = command_output(nonexistent(), Duration::ZERO, "zero budget").unwrap_err();
+        assert!(
+            error.contains("timeout"),
+            "must not reach program launch: {error}"
+        );
+    }
+
+    #[test]
+    fn interrupted_pipe_read_is_retried_without_losing_bytes() {
+        struct InterruptedOnce(u8);
+        impl Read for InterruptedOnce {
+            fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+                if self.0 == 0 {
+                    self.0 = 1;
+                    return Err(io::ErrorKind::Interrupted.into());
+                }
+                if self.0 == 1 && !buffer.is_empty() {
+                    self.0 = 2;
+                    buffer[0] = b'x';
+                    return Ok(1);
+                }
+                Ok(0)
+            }
+        }
+        let output = read_limited(InterruptedOnce(0)).unwrap();
+        assert_eq!(output.bytes, b"x");
+        assert!(!output.truncated);
     }
 }

@@ -1,3 +1,7 @@
+//! Source-bound distribution previews, not installers or hardware authorization.
+//! Embedded JSON is cross-checked by raw and canonical hashes; a manifest's own
+//! "verified" flag is not detached-signature verification. Apply remains denied.
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
@@ -155,7 +159,7 @@ struct VerifiedCatalog {
     vehicle_packs: BTreeMap<String, VerifiedDocument>,
 }
 
-// E5-C intentionally keeps this verified snapshot behind the native decision
+// Keep this verified snapshot behind the native decision
 // boundary without registering a Tauri command or an execution handler yet.
 #[allow(dead_code)]
 #[derive(Debug, Clone)]
@@ -172,6 +176,7 @@ fn sha256_hex(bytes: impl AsRef<[u8]>) -> String {
     hex::encode(Sha256::digest(bytes.as_ref()))
 }
 
+/// Bind exact embedded bytes; canonical payload hashing is a separate check below.
 fn parse_document(raw: &str, label: &str) -> Result<VerifiedDocument, String> {
     let value =
         serde_json::from_str(raw).map_err(|error| format!("{label} is invalid JSON: {error}"))?;
@@ -203,6 +208,7 @@ fn array_at<'a>(document: &'a Value, pointer: &str, label: &str) -> Result<&'a V
         .ok_or_else(|| format!("{label} must be an array"))
 }
 
+/// Reject duplicate policy entries rather than hiding them during set conversion.
 fn string_array_at(document: &Value, pointer: &str, label: &str) -> Result<Vec<String>, String> {
     let values = array_at(document, pointer, label)?;
     let mut result = Vec::with_capacity(values.len());
@@ -220,6 +226,7 @@ fn string_array_at(document: &Value, pointer: &str, label: &str) -> Result<Vec<S
     Ok(result)
 }
 
+/// An embedded document must match its assigned slot, not merely carry a valid-looking ID.
 fn require_identity(
     document: &Value,
     kind: &str,
@@ -236,6 +243,7 @@ fn require_identity(
     Ok(())
 }
 
+/// Exclude the integrity envelope to avoid hashing a document's own digest recursively.
 fn vehicle_payload_sha256(document: &Value, label: &str) -> Result<String, String> {
     let mut payload = document.clone();
     let object = payload
@@ -249,6 +257,7 @@ fn vehicle_payload_sha256(document: &Value, label: &str) -> Result<String, Strin
     Ok(sha256_hex(canonical))
 }
 
+/// Verify the complete embedded policy/edition/registry/pack chain before any preview decision.
 fn verify_embedded_catalog() -> Result<VerifiedCatalog, String> {
     let policy = parse_document(CAPABILITY_POLICY_RAW, "capability policy")?;
     require_identity(
@@ -401,6 +410,17 @@ fn is_lowercase_hex(value: &str, length: usize) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+/// Match the frontend's identifier grammar without relying on TypeScript or string coercion.
+fn safe_identifier(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 128
+        && value.as_bytes()[0].is_ascii_alphanumeric()
+        && value.bytes().all(|byte| {
+            byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'.')
+        })
+}
+
+/// Validate syntax first; later catalog lookups decide whether a valid identifier is supported.
 fn validate_request(request: &DistributionPlanRequest) -> Result<(), String> {
     let selection = &request.selection;
     if selection.schema_version != 1 {
@@ -411,12 +431,7 @@ fn validate_request(request: &DistributionPlanRequest) -> Result<(), String> {
         ("region", selection.region.as_str()),
         ("vehiclePackId", selection.vehicle_pack_id.as_str()),
     ] {
-        if value.is_empty()
-            || value.len() > 128
-            || !value.bytes().all(|byte| {
-                byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'.')
-            })
-        {
+        if !safe_identifier(value) {
             return Err(format!("selection.{label} is not a safe identifier"));
         }
     }
@@ -425,12 +440,7 @@ fn validate_request(request: &DistributionPlanRequest) -> Result<(), String> {
     }
     let mut unique_modules = BTreeSet::new();
     for module_id in &selection.optional_modules {
-        if module_id.is_empty()
-            || module_id.len() > 128
-            || !module_id.bytes().all(|byte| {
-                byte.is_ascii_lowercase() || byte.is_ascii_digit() || matches!(byte, b'-' | b'.')
-            })
-        {
+        if !safe_identifier(module_id) {
             return Err("selection.optionalModules contains an unsafe identifier".to_string());
         }
         if !unique_modules.insert(module_id) {
@@ -440,10 +450,11 @@ fn validate_request(request: &DistributionPlanRequest) -> Result<(), String> {
     if let Some(controller_key) = &selection.controller_key {
         if controller_key.is_empty()
             || controller_key.len() > 160
-            || controller_key
-                .chars()
-                .any(|character| matches!(character, '\r' | '\n' | '\0'))
+            || controller_key.chars().any(char::is_control)
             || controller_key.matches("::").count() != 1
+            || controller_key
+                .split("::")
+                .any(|part| part.is_empty() || part.trim() != part)
         {
             return Err("selection.controllerKey is malformed".to_string());
         }
@@ -463,6 +474,7 @@ fn validate_request(request: &DistributionPlanRequest) -> Result<(), String> {
     Ok(())
 }
 
+/// A controller match includes region as well as vendor/model identity.
 fn controller_matches(
     pack: &Value,
     region: &str,
@@ -499,6 +511,7 @@ fn controller_matches(
     Ok(None)
 }
 
+/// Hash the complete derived preview except its own digest field; no execution grant is added.
 fn plan_hash(plan: &DistributionPlanValidation) -> Result<String, String> {
     let mut value = serde_json::to_value(plan)
         .map_err(|error| format!("distribution plan cannot be serialized: {error}"))?;
@@ -511,6 +524,16 @@ fn plan_hash(plan: &DistributionPlanValidation) -> Result<String, String> {
     Ok(sha256_hex(canonical))
 }
 
+/// Deny contradictions between required/optional/forbidden policy sets before presenting a plan.
+fn require_disjoint(left: &[String], right: &[String], label: &str) -> Result<(), String> {
+    let right = right.iter().collect::<BTreeSet<_>>();
+    if left.iter().any(|value| right.contains(value)) {
+        return Err(format!("{label} must not overlap"));
+    }
+    Ok(())
+}
+
+/// Build a diagnostic preview with explicit blockers, never a native apply operation.
 fn build_distribution_plan(
     request: DistributionPlanRequest,
 ) -> Result<DistributionPlanValidation, String> {
@@ -550,6 +573,26 @@ fn build_distribution_plan(
         &edition.value,
         "/capabilities/forbidden",
         "edition denied capabilities",
+    )?;
+    require_disjoint(
+        &required_modules,
+        &allowed_optional_modules,
+        "required/optional modules",
+    )?;
+    require_disjoint(
+        &required_modules,
+        &forbidden_modules,
+        "required/forbidden modules",
+    )?;
+    require_disjoint(
+        &allowed_optional_modules,
+        &forbidden_modules,
+        "optional/forbidden modules",
+    )?;
+    require_disjoint(
+        &enabled_or_conditioned,
+        &denied,
+        "enabled/denied capabilities",
     )?;
     let supported_editions = string_array_at(
         &pack.value,
@@ -739,6 +782,7 @@ pub fn validate_distribution_plan(
 }
 
 #[allow(dead_code)]
+/// Return owned JSON copies so a downstream policy consumer cannot mutate the verified catalog.
 pub(crate) fn native_safety_catalog_snapshot(
     edition_id: &str,
     vehicle_pack_id: &str,
@@ -763,8 +807,12 @@ pub(crate) fn native_safety_catalog_snapshot(
 }
 
 #[allow(dead_code)]
+/// Count declared validated hardware packs for display/gating, not cryptographically authorized devices.
 pub(crate) fn native_hardware_validated_pack_count() -> Result<usize, String> {
-    let edition_id = env!("DRONEDREAM_DESKTOP_EDITION_ID");
+    let edition_id = match env!("DRONEDREAM_DESKTOP_EDITION_ID") {
+        "universal" => "field",
+        edition => edition,
+    };
     if !matches!(edition_id, "lab" | "field" | "autonomy") {
         return Ok(0);
     }
@@ -964,5 +1012,33 @@ mod tests {
             vehicle_payload_sha256(&mutated, "fixture").unwrap(),
             expected
         );
+    }
+
+    #[test]
+    fn malformed_identifiers_and_empty_controller_names_are_rejected() {
+        for id in ["-leading", ".leading", "Upper", "has space"] {
+            let mut request = sim_request();
+            request.selection.region = id.to_string();
+            assert!(validate_request(&request).is_err());
+        }
+        for key in [
+            "::",
+            "Vendor::",
+            "::Model",
+            " Vendor::Model",
+            "Vendor:: Model",
+            "Vendor::Mo\tdel",
+        ] {
+            let mut request = sim_request();
+            request.selection.controller_key = Some(key.to_string());
+            assert!(validate_request(&request).is_err());
+        }
+    }
+
+    #[test]
+    fn policy_sets_cannot_simultaneously_allow_and_deny_an_item() {
+        let allow = vec!["hardware.flight".to_string()];
+        assert!(require_disjoint(&allow, &allow, "capabilities").is_err());
+        assert!(require_disjoint(&allow, &["hardware.arm".to_string()], "capabilities").is_ok());
     }
 }

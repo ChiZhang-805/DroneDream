@@ -9,11 +9,12 @@ the long-term-memory policy in this module.
 
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
-from typing import Final, Literal, NamedTuple, cast
+from datetime import date, datetime, timedelta
+from typing import Final, Literal, NamedTuple, cast, get_args
 
 EditionId = Literal["universal", "sim", "lab", "field", "autonomy"]
 ModelHarnessDomain = Literal[
@@ -210,6 +211,9 @@ _FORBIDDEN_SECRET_KEYS: Final[frozenset[str]] = frozenset(
         "one_time_token",
         "refresh_token",
         "secret",
+        "password",
+        "private_key",
+        "client_secret",
     }
 )
 _FORBIDDEN_LONG_TERM_TEXT: Final[tuple[re.Pattern[str], ...]] = (
@@ -251,12 +255,29 @@ class MemoryLifecycle:
     status: MemoryLifecycleStatus
 
     def __post_init__(self) -> None:
-        if self.evidence_count < 1:
+        """Validate typed lifecycle metadata before it can become durable advisory evidence."""
+        if (
+            self.source not in get_args(MemorySource)
+            or self.status not in get_args(MemoryLifecycleStatus)
+        ):
+            raise ValueError("memory lifecycle source and status must be supported values")
+        if type(self.evidence_count) is not int or self.evidence_count < 1:
             raise ValueError("memory lifecycle requires at least one evidence item")
-        if not 0.0 <= self.confidence <= 1.0:
+        if (
+            type(self.confidence) not in (int, float)
+            or not 0.0 <= self.confidence <= 1.0
+        ):
             raise ValueError("memory lifecycle confidence must be between zero and one")
-        if self.ttl_days < 1:
+        if type(self.ttl_days) is not int or self.ttl_days < 1:
             raise ValueError("memory lifecycle TTL must be positive")
+        if not isinstance(self.recency_at, datetime) or self.recency_at.utcoffset() is None:
+            raise ValueError("memory lifecycle recency must include a timezone")
+        try:
+            self.recency_at + timedelta(days=self.ttl_days)
+        except OverflowError as exc:
+            raise ValueError(
+                "memory lifecycle expiration exceeds the supported time range"
+            ) from exc
 
 
 def consolidated_verified_outcome_lifecycle(
@@ -310,6 +331,13 @@ def model_harness_memory_domain(domain: ModelHarnessDomain) -> MemoryDomain:
     return cast(MemoryDomain, domain)
 
 
+def _normalized_memory_key(value: str) -> str:
+    """Match common camel-case and qualified spellings without modifying stored field names."""
+    acronym_split = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", value.strip())
+    word_split = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", acronym_split)
+    return re.sub(r"[.\s-]+", "_", word_split).lower()
+
+
 def validate_long_term_memory_payload(
     payload: object,
     *,
@@ -337,6 +365,7 @@ def validate_long_term_memory_payload(
     item_count = 0
 
     def account_bytes(value: str) -> None:
+        """Bound individual UTF-8 strings and aggregate content, separately from item count."""
         nonlocal total_bytes
         encoded_size = len(value.encode("utf-8"))
         if encoded_size > MAX_LONG_TERM_MEMORY_STRING_BYTES:
@@ -346,6 +375,7 @@ def validate_long_term_memory_payload(
             raise ValueError("long-term memory payload exceeds the bounded size")
 
     def visit(value: object, *, depth: int = 0) -> None:
+        """Reject unsafe nested data; bounded depth also prevents cycles exhausting the stack."""
         nonlocal item_count
         if depth > 12:
             raise ValueError("long-term memory nesting exceeds the bounded depth")
@@ -359,7 +389,7 @@ def validate_long_term_memory_payload(
                 if not isinstance(raw_key, str):
                     raise ValueError("long-term memory keys must be strings")
                 account_bytes(raw_key)
-                normalized = raw_key.strip().lower().replace("-", "_")
+                normalized = _normalized_memory_key(raw_key)
                 key_parts = frozenset(part for part in re.split(r"[._]+", normalized) if part)
                 # ``parameter_write_authorized`` is covered by write +
                 # authorized, while ordinary telemetry such as
@@ -369,8 +399,10 @@ def validate_long_term_memory_payload(
                     key_parts & _AUTHORITY_SUBJECT_PARTS and key_parts & _AUTHORITY_MARKER_PARTS
                 )
                 if (
-                    normalized in _FORBIDDEN_LONG_TERM_KEYS
-                    or normalized in _FORBIDDEN_SECRET_KEYS
+                    any(
+                        normalized == key or normalized.endswith("_" + key)
+                        for key in _FORBIDDEN_LONG_TERM_KEYS | _FORBIDDEN_SECRET_KEYS
+                    )
                     or authority_bearing
                 ):
                     raise ValueError(
@@ -394,6 +426,8 @@ def validate_long_term_memory_payload(
         if isinstance(value, datetime | date):
             account_bytes(value.isoformat())
             return
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ValueError("long-term memory numbers must be finite")
         if value is None or isinstance(value, bool | int | float):
             account_bytes(str(value))
             return

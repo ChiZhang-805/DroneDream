@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any, Generic, Literal, TypeVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 T = TypeVar("T")
 
@@ -64,8 +64,3 @@ __all__ = [
     "err",
     "ok",
 ]
-
-
-# Silence an unused-import style warning for the Field import kept available
-# for future schema reuse without triggering ruff's F401.
-_ = Field

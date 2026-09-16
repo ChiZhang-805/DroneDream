@@ -97,6 +97,7 @@ const BROWSER_ARTIFACT_RESPONSE_MAX_BYTES = 256 * 1024 * 1024;
 const DESKTOP_API_REQUEST_MAX_BYTES = 25 * 1024 * 1024;
 
 function authHeaders(): Record<string, string> {
+  // Tokens remain process-local; never put an authorization value in a URL.
   const accessToken = currentAccessToken();
   if (!accessToken) {
     return {};
@@ -105,10 +106,12 @@ function authHeaders(): Record<string, string> {
 }
 
 function currentAccessToken(): string | null {
+  // A signed-in account overrides the explicitly configured demo-build identity.
   return getAuthAccessToken() ?? DEMO_AUTH_TOKEN ?? null;
 }
 
 export function artifactDownloadUrl(artifactId: string): string {
+  // This locator contains no grant; authenticated downloads use the methods below.
   return `${API_BASE_URL}/api/v1/artifacts/${encodeURIComponent(artifactId)}/download`;
 }
 
@@ -116,6 +119,7 @@ async function triggerBrowserDownload(
   content: Blob,
   filename: string,
 ): Promise<void> {
+  // Keep the Blob alive through the browser's next task, then release its URL.
   const objectUrl = URL.createObjectURL(content);
   const link = document.createElement("a");
   try {
@@ -151,6 +155,7 @@ const CANONICAL_UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 function loadPendingMutations(now = Date.now()): PendingMutation[] {
+  // Restored keys are hints for reconciliation, never proof a write succeeded.
   try {
     const parsed = JSON.parse(
       localStorage.getItem(PENDING_MUTATIONS_STORAGE_KEY) ?? "[]",
@@ -178,6 +183,7 @@ function loadPendingMutations(now = Date.now()): PendingMutation[] {
 }
 
 function savePendingMutations(entries: PendingMutation[]): void {
+  // Persist only hashes, UUIDs and times, not request bodies or model credentials.
   try {
     if (entries.length === 0) {
       localStorage.removeItem(PENDING_MUTATIONS_STORAGE_KEY);
@@ -197,6 +203,7 @@ async function mutationFingerprint(
   path: string,
   init: RequestInit | undefined,
 ): Promise<string | null> {
+  // Hash the exact wire request. Reordered JSON is a different serialized request.
   if (!crypto.subtle) return null;
   const method = (init?.method ?? "GET").toUpperCase();
   const body = typeof init?.body === "string" ? init.body : "";
@@ -213,6 +220,7 @@ async function preparePendingMutation(
   path: string,
   init: RequestInit | undefined,
 ): Promise<PendingMutation> {
+  // Reuse a still-pending logical write's UUID without automatically replaying it.
   const fingerprint = await mutationFingerprint(path, init);
   const now = Date.now();
   const existing = loadPendingMutations(now);
@@ -232,6 +240,7 @@ async function preparePendingMutation(
 }
 
 function clearPendingMutation(pending: PendingMutation | null): void {
+  // Only remove the matching operation; concurrent pending mutations retain keys.
   if (!pending || pending.fingerprint === "0".repeat(64)) return;
   savePendingMutations(
     loadPendingMutations().filter(
@@ -242,11 +251,46 @@ function clearPendingMutation(pending: PendingMutation | null): void {
   );
 }
 
+function assertRequestSession(accessToken: string | null): void {
+  // Refresh/sign-out may happen while awaiting readiness, hashing or a response.
+  // Fail closed rather than running an old UI action with a newly adopted token.
+  if (currentAccessToken() !== accessToken) {
+    throw new ApiClientError(
+      "AUTH_SESSION_CHANGED", "The account session changed during this request. Try again.",
+    );
+  }
+}
+
+function validatedEnvelope<T>(value: unknown, status: number): ApiEnvelope<T> {
+  // TypeScript casts do not validate JSON. Check the envelope, leaving each
+  // domain responsible for its data schema; never include the raw body in errors.
+  const invalid = () => new ApiClientError(
+    "INVALID_RESPONSE", `The API returned an invalid envelope (HTTP ${status}).`, null, status,
+  );
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw invalid();
+  const envelope = value as Record<string, unknown>;
+  if (envelope.success === true) {
+    if (!Object.hasOwn(envelope, "data") || envelope.error != null) throw invalid();
+  } else if (envelope.success === false) {
+    const error = envelope.error;
+    if (!error || typeof error !== "object" || Array.isArray(error)) throw invalid();
+    const fields = error as Record<string, unknown>;
+    if (typeof fields.code !== "string" || !fields.code.trim()
+      || typeof fields.message !== "string" || !fields.message.trim()) throw invalid();
+  } else {
+    throw invalid();
+  }
+  return value as ApiEnvelope<T>;
+}
+
 async function request<T>(
   path: string,
   init?: RequestInit,
   policy: RequestPolicy = {},
 ): Promise<T> {
+  // One credential snapshot covers preparation, transport and response adoption.
+  // An ambiguous mutation remains pending; this layer does not blindly retry it.
+  const accessToken = currentAccessToken();
   if (isDesktopRuntime() && policy.requireRuntimeLiveness) {
     const readiness = getDesktopReadinessSession()?.snapshot;
     if (!readiness?.ready) {
@@ -287,11 +331,12 @@ async function request<T>(
     : null;
   const idempotencyKey = pendingMutation?.idempotencyKey ?? null;
   const send = () =>
-    transportRequest(path, init, "application/json", idempotencyKey);
+    transportRequest(path, init, "application/json", idempotencyKey, accessToken);
   let response: Response;
   try {
     response = await send();
   } catch (networkError) {
+    if (networkError instanceof ApiClientError) throw networkError;
     if (networkError instanceof FetchResponseSizeError) {
       throw new ApiClientError(
         "RESPONSE_TOO_LARGE",
@@ -314,8 +359,11 @@ async function request<T>(
 
   let envelope: ApiEnvelope<T>;
   try {
-    envelope = (await response.json()) as ApiEnvelope<T>;
+    const payload: unknown = await response.json();
+    assertRequestSession(accessToken);
+    envelope = validatedEnvelope<T>(payload, response.status);
   } catch (error) {
+    if (error instanceof ApiClientError) throw error;
     if (error instanceof FetchDeadlineError) {
       throw new ApiClientError("NETWORK_ERROR", error.message, null, 0);
     }
@@ -367,7 +415,11 @@ async function transportRequest(
   accept: "application/json" | "application/octet-stream" | "text/csv" =
     "application/json",
   idempotencyKey: string | null = null,
+  accessToken: string | null = currentAccessToken(),
 ): Promise<Response> {
+  // Desktop transports use the native bridge; browser requests retain byte/time
+  // limits. Neither path may switch credentials after asynchronous body conversion.
+  assertRequestSession(accessToken);
   if (isDesktopRuntime()) {
     const method = (init?.method ?? "GET").toUpperCase();
     if (!(method === "GET" || method === "POST" || method === "PUT" || method === "PATCH" || method === "DELETE")) {
@@ -388,13 +440,14 @@ async function transportRequest(
     } else if (init?.body != null) {
       throw new Error("The desktop API request body type is not supported.");
     }
+    assertRequestSession(accessToken);
     const bridged = await desktopApiRequest({
       method,
       path: `/api/v1${path}`,
       body,
       bodyBase64,
       contentType,
-      accessToken: currentAccessToken(),
+      accessToken,
       accept,
       idempotencyKey,
     });
@@ -427,6 +480,7 @@ async function transportRequest(
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
+  // Chunk argument spreads so a large upload cannot exhaust the JS call stack.
   let binary = "";
   const chunkSize = 0x8000;
   for (let offset = 0; offset < bytes.length; offset += chunkSize) {
@@ -436,6 +490,7 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 function base64ToBytes(value: string): Uint8Array {
+  // Decode native response bytes before constructing a standard Response object.
   const binary = atob(value);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) {
@@ -445,6 +500,7 @@ function base64ToBytes(value: string): Uint8Array {
 }
 
 function buildQuery(params: Record<string, string | number | undefined>): string {
+  // Encode identifiers/filters and retain explicit zero rather than dropping it.
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined) continue;
@@ -455,14 +511,17 @@ function buildQuery(params: Record<string, string | number | undefined>): string
 }
 
 export const apiClient = {
+  /** Query product-owned connector metadata; this does not execute an importer. */
   async listAutonomyAssetConnectors(): Promise<AutonomyAssetConnectorCatalogResponse> {
     return request<AutonomyAssetConnectorCatalogResponse>("/autonomy/asset-connectors");
   },
 
+  /** Load the backend's current scene catalog rather than a UI-only map list. */
   async listAutonomyScenes(): Promise<AutonomySceneCatalogResponse> {
     return request<AutonomySceneCatalogResponse>("/autonomy/scenes");
   },
 
+  /** Compile a proposal and its checks; compilation is not an execution request. */
   async compileAutonomyMission(
     req: AutonomyCompileRequest,
   ): Promise<AutonomyCompileResponse> {
@@ -472,6 +531,7 @@ export const apiClient = {
     });
   },
 
+  /** Compile a responsibility-scoped workflow without claiming physical execution. */
   async compileTaskWorkflow(
     req: TaskWorkflowCompileRequest,
   ): Promise<TaskWorkflowContract> {
@@ -481,6 +541,7 @@ export const apiClient = {
     });
   },
 
+  /** Bind selected aircraft/map capabilities before requesting a model plan. */
   async inspectAutonomyHarness(
     req: AutonomyHarnessInspectRequest,
   ): Promise<AutonomyHarnessInspectResponse> {
@@ -490,6 +551,7 @@ export const apiClient = {
     });
   },
 
+  /** Persist server-validated aircraft metadata; receipt checks remain server-owned. */
   async qualifyAutonomyVehiclePack(
     req: AutonomyVehiclePackQualificationRequest,
   ): Promise<AutonomyVehiclePackQualificationReceipt> {
@@ -499,6 +561,7 @@ export const apiClient = {
     });
   },
 
+  /** Upload raw bytes for admission; accepting a file does not qualify it for flight. */
   async admitAutonomyMapAsset(file: File): Promise<AutonomyMapAssetAdmissionReceipt> {
     return request<AutonomyMapAssetAdmissionReceipt>(`/autonomy/map-assets/admit?filename=${encodeURIComponent(file.name)}`, {
       method: "POST",
@@ -507,6 +570,7 @@ export const apiClient = {
     });
   },
 
+  /** Request qualification of the admitted map's declared planning contract. */
   async qualifyAutonomyMapPack(
     req: AutonomyMapPackQualificationRequest,
   ): Promise<AutonomyMapPackQualificationReceipt> {
@@ -516,6 +580,7 @@ export const apiClient = {
     });
   },
 
+  /** Create a mission session under the caller's stable request identity. */
   async createAutonomyRuntimeSession(
     mission: AutonomyCompileRequest,
     clientRequestId: string,
@@ -526,6 +591,7 @@ export const apiClient = {
     });
   },
 
+  /** Read current runtime state; never infer it from a locally animated trajectory. */
   async getAutonomyRuntimeSession(
     sessionId: string,
   ): Promise<AutonomyRuntimeSession> {
@@ -534,6 +600,7 @@ export const apiClient = {
     );
   },
 
+  /** Submit ordered observations; server-side provenance/freshness still governs use. */
   async ingestAutonomyRuntimeObservation(
     sessionId: string,
     observation: AutonomyRuntimeObservation,
@@ -544,6 +611,7 @@ export const apiClient = {
     );
   },
 
+  /** Request a held interruption before applying a replacement mission. */
   async interruptAutonomyRuntimeSession(
     sessionId: string,
     interruption: AutonomyRuntimeInterruptionRequest,
@@ -554,6 +622,7 @@ export const apiClient = {
     );
   },
 
+  /** Bind a confirmed replacement to its interruption and expected graph revision. */
   async applyAutonomyRuntimeReplan(
     sessionId: string,
     replan: AutonomyRuntimeReplanApplyRequest,
@@ -564,6 +633,7 @@ export const apiClient = {
     );
   },
 
+  /** Send explicit hold/resume/abort intent; the backend decides admissible transitions. */
   async stopAutonomyRuntimeSession(
     sessionId: string,
     action: "hold" | "resume" | "abort",
@@ -575,6 +645,7 @@ export const apiClient = {
     );
   },
 
+  /** Call only from confirmed execution UI; bind the run to the exact planner digest. */
   async startAutonomySimulationExecution(
     runtimeSessionId: string,
     contractId: string,
@@ -593,6 +664,7 @@ export const apiClient = {
     });
   },
 
+  /** Retrieve backend execution evidence rather than synthesizing progress client-side. */
   async getAutonomySimulationExecution(
     executionId: string,
   ): Promise<AutonomySimulationExecution> {
@@ -601,6 +673,7 @@ export const apiClient = {
     );
   },
 
+  /** Request simulation abort with an auditable reason; completion requires a receipt. */
   async abortAutonomySimulationExecution(
     executionId: string,
     reason: string,
@@ -611,6 +684,7 @@ export const apiClient = {
     );
   },
 
+  /** Submit one structured assistant turn; no automatic ambiguous-call retry occurs. */
   async compileExperimentAssistantTurn(
     req: ExperimentAssistantTurnRequest,
   ): Promise<ExperimentAssistantTurnResponse> {
@@ -620,10 +694,12 @@ export const apiClient = {
     });
   },
 
+  /** Read account-owned experience defaults, not cached UI permission assumptions. */
   async getUserExperiencePreferences(): Promise<UserExperiencePreferences> {
     return request<UserExperiencePreferences>("/preferences/experience");
   },
 
+  /** Save allowlisted preferences with a retained reconciliation key. */
   async updateUserExperiencePreferences(
     req: UserExperiencePreferencesUpdate,
   ): Promise<UserExperiencePreferencesMutation> {
@@ -633,21 +709,25 @@ export const apiClient = {
     }, { idempotentMutation: true });
   },
 
+  /** Remove this account's experience state using an idempotent logical operation. */
   async deleteUserExperiencePreferences(): Promise<DeleteUserExperiencePreferencesResponse> {
     return request<DeleteUserExperiencePreferencesResponse>("/preferences/experience", {
       method: "DELETE",
     }, { idempotentMutation: true });
   },
 
+  /** Query backend capability availability before enabling corresponding UI actions. */
   async getCapabilities(): Promise<BackendCapabilitiesResponse> {
     return request<BackendCapabilitiesResponse>("/capabilities");
   },
 
+  /** Resolve the requested PX4 parameter contract instead of reusing another version. */
   async getParameterCatalog(px4Version: string): Promise<ParameterCatalogApiResponse> {
     const qs = buildQuery({ px4_version: px4Version });
     return request<ParameterCatalogApiResponse>(`/parameter-catalog${qs}`);
   },
 
+  /** Create an experiment only after desktop readiness; public demos remain read-only. */
   async createJob(req: JobCreateRequest): Promise<Job> {
     if (publicDemoConsole) {
       throw new ApiClientError(
@@ -666,6 +746,7 @@ export const apiClient = {
     });
   },
 
+  /** Load bounded job pages; the explicitly marked public demo has no actual jobs. */
   async listJobs(params?: {
     page?: number;
     page_size?: number;
@@ -687,10 +768,12 @@ export const apiClient = {
     return request<PaginatedJobs>(`/jobs${qs}`);
   },
 
+  /** Read one account-authorized job using an escaped path identity. */
   async getJob(jobId: string): Promise<Job> {
     return request<Job>(`/jobs/${encodeURIComponent(jobId)}`);
   },
 
+  /** Apply metadata against the UI's viewed control version, preventing stale overwrites. */
   async updateJob(
     jobId: string,
     req: JobUpdateRequest,
@@ -702,6 +785,7 @@ export const apiClient = {
       body: JSON.stringify(req),
     }, { idempotentMutation: true });
   },
+  /** Request version-bound deletion; backend active-job and artifact guards still apply. */
   async deleteJob(
     jobId: string,
     controlVersion: number,
@@ -745,35 +829,41 @@ export const apiClient = {
     return items;
   },
 
+  /** Fetch scored candidates and constraint-aware recommendations for this job. */
   async listJobCandidates(jobId: string): Promise<OptimizationHistory> {
     return request<OptimizationHistory>(
       `/jobs/${encodeURIComponent(jobId)}/candidates`,
     );
   },
 
+  /** Load one trial's actual stored result, not an optimizer's prediction. */
   async getTrial(trialId: string): Promise<Trial> {
     return request<Trial>(`/trials/${encodeURIComponent(trialId)}`);
   },
 
+  /** Request a report whose evidence and entitlement checks belong to the backend. */
   async getJobReport(jobId: string): Promise<JobReport> {
     return request<JobReport>(
       `/jobs/${encodeURIComponent(jobId)}/report`,
     );
   },
 
+  /** List owned artifact descriptors; each download is authenticated separately. */
   async listJobArtifacts(jobId: string): Promise<Artifact[]> {
     return request<Artifact[]>(
       `/jobs/${encodeURIComponent(jobId)}/artifacts`,
     );
   },
 
+  /** Save authenticated bytes through native streaming or a bounded browser Blob. */
   async downloadArtifact(artifactId: string, filename?: string): Promise<void> {
+    const accessToken = currentAccessToken();
     if (isDesktopRuntime()) {
       try {
         await desktopDownloadArtifact({
           artifactId,
           filename: filename ?? `artifact-${artifactId}`,
-          accessToken: currentAccessToken(),
+          accessToken,
         });
         return;
       } catch (networkError) {
@@ -793,6 +883,8 @@ export const apiClient = {
         `/artifacts/${encodeURIComponent(artifactId)}/download`,
         undefined,
         "application/octet-stream",
+        null,
+        accessToken,
       );
     } catch (networkError) {
       if (networkError instanceof FetchResponseSizeError) {
@@ -823,8 +915,11 @@ export const apiClient = {
     }
 
     try {
+      const content = await response.blob();
+      // A completed server read is not permission to show it in a new account.
+      assertRequestSession(accessToken);
       await triggerBrowserDownload(
-        await response.blob(),
+        content,
         filename ?? `artifact-${artifactId}`,
       );
     } catch (error) {
@@ -840,13 +935,17 @@ export const apiClient = {
     }
   },
 
+  /** Decode a bounded artifact as JSON; callers still validate its domain-specific schema. */
   async fetchArtifactJson<T>(artifactId: string): Promise<T> {
+    const accessToken = currentAccessToken();
     let response: Response;
     try {
       response = await transportRequest(
         `/artifacts/${encodeURIComponent(artifactId)}/download`,
         undefined,
         "application/json",
+        null,
+        accessToken,
       );
     } catch (networkError) {
       if (networkError instanceof FetchResponseSizeError) {
@@ -890,6 +989,7 @@ export const apiClient = {
       }
       throw error;
     }
+    assertRequestSession(accessToken);
     try {
       return JSON.parse(payloadText) as T;
     } catch {
@@ -902,6 +1002,7 @@ export const apiClient = {
     }
   },
 
+  /** Cancel the viewed job revision without silently repeating an uncertain write. */
   async cancelJob(jobId: string, controlVersion: number): Promise<Job> {
     const qs = buildQuery({ control_version: controlVersion });
     return request<Job>(`/jobs/${encodeURIComponent(jobId)}/cancel${qs}`, {
@@ -909,6 +1010,7 @@ export const apiClient = {
     }, { idempotentMutation: true });
   },
 
+  /** Create a readiness-checked rerun, keeping any explicit provider override in its body. */
   async rerunJob(jobId: string, req?: JobRerunRequest): Promise<Job> {
     return request<Job>(`/jobs/${encodeURIComponent(jobId)}/rerun`, {
       method: "POST",
@@ -919,6 +1021,7 @@ export const apiClient = {
     });
   },
 
+  /** Bind the additional search budget to the parent's expected control version. */
   async continueExploration(
     jobId: string,
     controlVersion: number,
@@ -938,6 +1041,7 @@ export const apiClient = {
     );
   },
 
+  /** Ask the backend to compare owned job results without running new experiments. */
   async compareJobs(jobIds: string[]): Promise<JobCompareResponse> {
     return request<JobCompareResponse>("/jobs/compare", {
       method: "POST",
@@ -945,12 +1049,15 @@ export const apiClient = {
     });
   },
 
+  /** Build a grant-free locator; use downloadCompareJobsCsv for authenticated transport. */
   compareJobsCsvUrl(jobIds: string[]): string {
     const joined = encodeURIComponent(jobIds.join(","));
     return `${API_BASE_URL}/api/v1/jobs/compare.csv?job_ids=${joined}`;
   },
 
+  /** Download bounded comparison data and release the browser's temporary Blob URL. */
   async downloadCompareJobsCsv(jobIds: string[]): Promise<void> {
+    const accessToken = currentAccessToken();
     let response: Response;
     try {
       const joined = encodeURIComponent(jobIds.join(","));
@@ -958,6 +1065,8 @@ export const apiClient = {
         `/jobs/compare.csv?job_ids=${joined}`,
         undefined,
         "text/csv",
+        null,
+        accessToken,
       );
     } catch (networkError) {
       if (networkError instanceof FetchResponseSizeError) {
@@ -986,8 +1095,10 @@ export const apiClient = {
       );
     }
     try {
+      const content = await response.blob();
+      assertRequestSession(accessToken);
       await triggerBrowserDownload(
-        await response.blob(),
+        content,
         `job-compare-${jobIds.join("_")}.csv`,
       );
     } catch (error) {
@@ -1003,6 +1114,7 @@ export const apiClient = {
     }
   },
 
+  /** Submit a readiness-checked batch under one stable mutation identity. */
   async createBatch(req: BatchCreateRequest): Promise<BatchJob> {
     return request<BatchJob>("/batches", {
       method: "POST",
@@ -1013,6 +1125,7 @@ export const apiClient = {
     });
   },
 
+  /** Fetch a bounded batch page, preserving zero-valued query inputs for server validation. */
   async listBatches(params?: {
     page?: number;
     page_size?: number;
@@ -1024,14 +1137,17 @@ export const apiClient = {
     return request<PaginatedBatchJobs>(`/batches${qs}`);
   },
 
+  /** Read one batch's current aggregate state. */
   async getBatch(batchId: string): Promise<BatchJob> {
     return request<BatchJob>(`/batches/${encodeURIComponent(batchId)}`);
   },
 
+  /** Enumerate a server-bounded batch's children under normal ownership checks. */
   async listBatchJobs(batchId: string): Promise<Job[]> {
     return request<Job[]>(`/batches/${encodeURIComponent(batchId)}/jobs`);
   },
 
+  /** Cancel only the batch revision the user actually inspected. */
   async cancelBatch(
     batchId: string,
     controlVersion: number,

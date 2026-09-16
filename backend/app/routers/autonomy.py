@@ -1,4 +1,8 @@
-"""Read-only compilation and qualification API for shared mission autonomy."""
+"""Owned autonomy compilation, qualification, supervision and simulation execution API.
+
+Compilation does not start flight. Explicit simulation start/abort endpoints
+delegate to the execution service; supervision observations are not motor commands.
+"""
 
 from __future__ import annotations
 
@@ -55,6 +59,7 @@ router = APIRouter(prefix="/autonomy", tags=["autonomy"])
 
 
 def _runtime_error(exc: AutonomyRuntimeError) -> HTTPException:
+    """Preserve the runtime service's classified denial rather than returning a success shell."""
     return HTTPException(
         status_code=exc.status_code,
         detail={"code": exc.code, "message": exc.message},
@@ -62,6 +67,7 @@ def _runtime_error(exc: AutonomyRuntimeError) -> HTTPException:
 
 
 def _credential_conflict(exc: QualificationCredentialConflict) -> HTTPException:
+    """Tell clients to refresh qualification state when the asset identity has changed."""
     return HTTPException(
         status_code=409,
         detail={
@@ -81,6 +87,11 @@ async def _authorize_compile_request(
     VerifiedPlannerArtifactReceipt | None,
     VerifiedAutonomyAssetReceipt,
 ]:
+    """Bind owner, current asset credentials, harness hash and simulation planner evidence.
+
+    A caller-supplied map or vehicle declaration is not a credential. Replans
+    repeat these checks so an older mission receipt cannot authorize new assets.
+    """
     asset_context = request.asset_context
     if asset_context is None:
         raise HTTPException(
@@ -151,6 +162,7 @@ def read_autonomy_asset_connectors(
 def read_autonomy_scenes(
     _current_user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
+    """List bundled compiler scenes and manifests, not user-uploaded or active runtime maps."""
     return ok(
         {
             "schema_version": "dronedream.autonomy.scene-catalog.v1",
@@ -295,6 +307,7 @@ def read_runtime_capabilities(
 def read_simulation_execution_capabilities(
     _current_user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
+    """Describe the configured execution adapter without starting any simulator process."""
     return ok(simulation_executions.capabilities())
 
 
@@ -303,6 +316,7 @@ async def start_simulation_execution(
     request: SimulationExecutionStartRequest,
     current_user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
+    """Request execution through the owner's qualified session; the service owns start gates."""
     try:
         result = await asyncio.to_thread(simulation_executions.start, current_user.id, request)
     except AutonomyRuntimeError as exc:
@@ -315,6 +329,7 @@ def read_simulation_execution(
     execution_id: str,
     current_user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
+    """Return one owned execution's observed state, never infer success from a start request."""
     try:
         result = simulation_executions.get(current_user.id, execution_id)
     except AutonomyRuntimeError as exc:
@@ -328,6 +343,7 @@ async def abort_simulation_execution(
     command: RuntimeOperatorCommand,
     current_user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
+    """Accept only an explicit abort command and delegate shutdown to the execution owner."""
     if command.action != "abort":
         raise HTTPException(
             status_code=422,
@@ -381,6 +397,7 @@ def read_runtime_session(
     session_id: str,
     current_user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
+    """Read the caller's bounded process-local supervision state, not a persistent flight log."""
     try:
         result = runtime_sessions.get(current_user.id, session_id)
     except AutonomyRuntimeError as exc:
@@ -414,7 +431,7 @@ async def interrupt_runtime_session(
     request: RuntimeInterruptionRequest,
     current_user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
-    """Hold immediately; model interpretation and replanning happen only afterward."""
+    """Put supervision into hold before interpretation/replanning, not a direct actuator command."""
 
     try:
         result = await asyncio.to_thread(

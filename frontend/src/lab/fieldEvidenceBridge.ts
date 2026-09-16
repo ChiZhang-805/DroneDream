@@ -1,5 +1,8 @@
 import type { LabEvidencePreview } from "./evidencePreview";
+import { validateEvidenceTree } from "./evidenceInput";
 
+// Pinned compatibility donor, not the current checkout's identity. Updating
+// these bindings requires requalifying the corresponding recorded-evidence format.
 export const FIELD_PRODUCT_SOURCE = "2f8fa28564dab7b1ff264c853705535373cb9068";
 export const FIELD_PRODUCT_TREE = "afb7b4db584bf71e03d2f0b707b8b992e96bc7e7";
 export const FIELD_EDITION_MANIFEST_SHA256 =
@@ -95,6 +98,7 @@ export class FieldEvidenceBridgeError extends Error {
   }
 }
 
+/** Shape guard only; provenance comes from subsequent exact source/content checks. */
 function objectValue(value: unknown, label: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new FieldEvidenceBridgeError(`${label} must be an object.`);
@@ -102,6 +106,7 @@ function objectValue(value: unknown, label: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+/** Avoid retaining undeclared fields that a second consumer might interpret differently. */
 function assertExactKeys(
   value: Record<string, unknown>,
   expected: readonly string[],
@@ -114,18 +119,9 @@ function assertExactKeys(
   }
 }
 
-function assertNoSensitiveFields(value: unknown, path = "receipt"): void {
-  if (Array.isArray(value)) {
-    value.forEach((item, index) => assertNoSensitiveFields(item, `${path}[${index}]`));
-    return;
-  }
-  if (!value || typeof value !== "object") return;
-  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-    if (FORBIDDEN_FIELD.test(key)) {
-      throw new FieldEvidenceBridgeError(`Sensitive field is not allowed at ${path}.${key}.`);
-    }
-    assertNoSensitiveFields(child, `${path}.${key}`);
-  }
+/** Depth and element limits apply before recursive receipt hashing. */
+function assertNoSensitiveFields(value: unknown): void {
+  validateEvidenceTree(value, FieldEvidenceBridgeError, FORBIDDEN_FIELD);
 }
 
 function stringValue(value: unknown, label: string): string {
@@ -135,6 +131,7 @@ function stringValue(value: unknown, label: string): string {
   return value.trim();
 }
 
+/** Bound UI/identity strings and prohibit control characters in exported summaries. */
 function safeText(value: unknown, label: string, maximumLength: number): string {
   const text = stringValue(value, label);
   const containsControlCharacter = [...text].some((character) => {
@@ -147,6 +144,7 @@ function safeText(value: unknown, label: string, maximumLength: number): string 
   return text;
 }
 
+/** Syntax normalization alone does not establish that the referenced artifact exists. */
 function shaValue(value: unknown, label: string): string {
   const sha = stringValue(value, label).toLowerCase();
   if (!SHA256.test(sha)) {
@@ -155,6 +153,7 @@ function shaValue(value: unknown, label: string): string {
   return sha;
 }
 
+/** No string/boolean coercion: copied metrics must retain numeric semantics. */
 function finiteNumber(value: unknown, label: string, minimum = 0): number {
   if (typeof value !== "number" || !Number.isFinite(value) || value < minimum) {
     throw new FieldEvidenceBridgeError(`${label} must be a finite number at least ${minimum}.`);
@@ -162,9 +161,10 @@ function finiteNumber(value: unknown, label: string, minimum = 0): number {
   return value;
 }
 
+/** Counts must survive JavaScript arithmetic exactly, not merely have no fractional part. */
 function integerValue(value: unknown, label: string, minimum = 0): number {
   const number = finiteNumber(value, label, minimum);
-  if (!Number.isInteger(number)) {
+  if (!Number.isSafeInteger(number)) {
     throw new FieldEvidenceBridgeError(`${label} must be an integer.`);
   }
   return number;
@@ -193,6 +193,7 @@ function booleanValue(value: unknown, label: string): boolean {
   return value;
 }
 
+/** Copy a bounded candidate domain; this is not authorization to write those parameters. */
 function parametersValue(value: unknown, label: string): Record<string, number> {
   const parameters = objectValue(value, label);
   if (Object.keys(parameters).length === 0 || Object.keys(parameters).length > 64) {
@@ -206,6 +207,7 @@ function parametersValue(value: unknown, label: string): Record<string, number> 
   }));
 }
 
+/** Metric limits match the recorded-evidence scorer, not a live flight controller. */
 function parseMetrics(value: unknown, label: string): FieldHarnessMetrics {
   const metrics = objectValue(value, label);
   assertExactKeys(metrics, [
@@ -239,6 +241,7 @@ function parseMetrics(value: unknown, label: string): FieldHarnessMetrics {
   };
 }
 
+/** Parse one bounded offline trial; acceptance is recomputed after shape validation. */
 function parseTrial(value: unknown, index: number): FieldHarnessTrialReceipt {
   const label = `Field trial ${index + 1}`;
   const trial = objectValue(value, label);
@@ -269,6 +272,7 @@ function parseTrial(value: unknown, index: number): FieldHarnessTrialReceipt {
   };
 }
 
+/** Replay the fixed normalized objective and penalties; never score raw motor commands. */
 function roundedScore(metrics: FieldHarnessMetrics): number {
   const safetyPenalty = metrics.constraintViolations * 10
     + metrics.emergencyInterventions * 100;
@@ -280,6 +284,7 @@ function roundedScore(metrics: FieldHarnessMetrics): number {
   ) * 1_000_000) / 1_000_000;
 }
 
+/** Safety interventions take precedence over an otherwise favorable objective score. */
 function expectedFailureClass(
   metrics: FieldHarnessMetrics,
   score: number,
@@ -290,7 +295,14 @@ function expectedFailureClass(
   return score > targetScore ? "objective-miss" : "none";
 }
 
+/** Deterministic producer-compatible JSON; a content hash is not a trusted signature. */
 export function canonicalizeJson(value: unknown): string {
+  validateEvidenceTree(value, FieldEvidenceBridgeError);
+  return canonicalizeValidatedJson(value);
+}
+
+/** Internal recursion is safe only after the public entry validates the whole bounded tree. */
+function canonicalizeValidatedJson(value: unknown): string {
   if (value === null || typeof value === "boolean" || typeof value === "string") {
     return JSON.stringify(value);
   }
@@ -299,19 +311,21 @@ export function canonicalizeJson(value: unknown): string {
     return JSON.stringify(value);
   }
   if (Array.isArray(value)) {
-    return `[${value.map(canonicalizeJson).join(",")}]`;
+    return `[${value.map(canonicalizeValidatedJson).join(",")}]`;
   }
   const object = objectValue(value, "Canonical JSON value");
   return `{${Object.keys(object).sort().map((key) => (
-    `${JSON.stringify(key)}:${canonicalizeJson(object[key])}`
+    `${JSON.stringify(key)}:${canonicalizeValidatedJson(object[key])}`
   )).join(",")}}`;
 }
 
+/** Digest exact UTF-8 text asynchronously; this establishes integrity, not provenance. */
 export async function sha256Text(value: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+/** Compare actual parameter content, not only repeated candidate identifiers. */
 async function assertCandidateHashes(trials: FieldHarnessTrialReceipt[]): Promise<void> {
   for (const trial of trials) {
     const actual = await sha256Text(canonicalizeJson(trial.parameters));
@@ -321,6 +335,7 @@ async function assertCandidateHashes(trials: FieldHarnessTrialReceipt[]): Promis
   }
 }
 
+/** Verify offline replay consistency, source binding and explicit denial of device activity. */
 export async function parseFieldHarnessReceipt(
   fileName: string,
   source: string,
@@ -367,7 +382,8 @@ export async function parseFieldHarnessReceipt(
     );
   }
   const createdAt = stringValue(receipt.createdAt, "Field receipt timestamp");
-  if (!RFC3339_SECONDS_UTC.test(createdAt) || Number.isNaN(Date.parse(createdAt))) {
+  if (!RFC3339_SECONDS_UTC.test(createdAt) || Number.isNaN(Date.parse(createdAt))
+    || new Date(createdAt).toISOString() !== createdAt.replace("Z", ".000Z")) {
     throw new FieldEvidenceBridgeError("The Field receipt timestamp is invalid.");
   }
   const jobId = safeText(receipt.jobId, "Field job ID", 96);
@@ -433,6 +449,9 @@ export async function parseFieldHarnessReceipt(
   if (!holdout?.independentHoldout || trials.slice(0, -1).some((trial) => trial.independentHoldout)) {
     throw new FieldEvidenceBridgeError("Exactly one final independent Field holdout is required.");
   }
+  if (trials.slice(0, -1).some((trial) => trial.telemetrySha256 === holdout.telemetrySha256)) {
+    throw new FieldEvidenceBridgeError("Independent holdout telemetry must differ from training.");
+  }
   const selectedCandidateSha256 = shaValue(
     receipt.selectedCandidateSha256,
     "Selected candidate hash",
@@ -448,6 +467,9 @@ export async function parseFieldHarnessReceipt(
     throw new FieldEvidenceBridgeError("Field holdout trial identity drifted.");
   }
   const proposedParameters = parametersValue(receipt.proposedParameters, "Proposed parameters");
+  if (Object.keys(proposedParameters).sort().join("\u0000") !== parameterNames) {
+    throw new FieldEvidenceBridgeError("Proposed parameter set differs from the trial domain.");
+  }
   const proposedCandidateSha256 = shaValue(
     receipt.proposedCandidateSha256,
     "Proposed candidate hash",
@@ -550,6 +572,7 @@ export async function parseFieldHarnessReceipt(
   };
 }
 
+/** Match declared lineage only; missing normalization and authority gates remain denied. */
 export function evaluateSimFieldBridge(
   simulation: LabEvidencePreview | null,
   field: FieldHarnessReceipt | null,

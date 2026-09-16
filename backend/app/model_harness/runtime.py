@@ -73,6 +73,7 @@ class HarnessRuntimeOperation(_StrictModel):
 
     @model_validator(mode="after")
     def _validate_runtime_owner(self) -> HarnessRuntimeOperation:
+        """Prevent availability metadata from claiming a completed call or missing executor."""
         if self.status == "refused":
             if self.boundary != "not_integrated" or self.refusal_code is None:
                 raise ValueError("refused operations require a stable not-integrated code")
@@ -101,6 +102,7 @@ class HarnessRuntimeHandler(_StrictModel):
 
     @model_validator(mode="after")
     def _validate_operation_coverage(self) -> HarnessRuntimeHandler:
+        """Require unique operations and an explicit post-planning execution disposition."""
         operation_ids = [operation.operation_id for operation in self.operations]
         if len(operation_ids) != len(set(operation_ids)):
             raise ValueError("runtime operation IDs must be unique within a domain")
@@ -118,6 +120,7 @@ def _available(
     *,
     receipts: tuple[str, ...] = (),
 ) -> HarnessRuntimeOperation:
+    """Advertise a concrete public entrypoint without asserting that its receipts exist."""
     return HarnessRuntimeOperation(
         operation_id=operation_id,
         status="available",
@@ -136,6 +139,7 @@ def _delegated(
     *,
     receipts: tuple[str, ...] = (),
 ) -> HarnessRuntimeOperation:
+    """Name a cloud/private owner; delegation is routing metadata, not a local executor."""
     return HarnessRuntimeOperation(
         operation_id=operation_id,
         status="delegated",
@@ -147,6 +151,7 @@ def _delegated(
 
 
 def _refused(operation_id: str, refusal_code: str) -> HarnessRuntimeOperation:
+    """Publish an explicit unsupported operation with no dispatchable handler."""
     return HarnessRuntimeOperation(
         operation_id=operation_id,
         status="refused",
@@ -348,7 +353,9 @@ def runtime_handler(domain: ModelHarnessDomain) -> HarnessRuntimeHandler:
     """Return the exhaustive runtime disposition for one Harness domain."""
 
     try:
-        return RUNTIME_HANDLERS[domain]
+        # Callers may inspect/adapt their local description, but must not alter
+        # global refusal policy or the shared workflow-gate object across domains.
+        return RUNTIME_HANDLERS[domain].model_copy(deep=True)
     except KeyError as exc:  # pragma: no cover - literal typing guards normal callers
         raise ValueError("unsupported Model + Harness runtime domain") from exc
 
@@ -384,6 +391,7 @@ def require_runnable_operation(
 
 
 def runtime_catalog() -> dict[str, object]:
+    """Serialize exhaustive runtime ownership while preserving all explicit refusals."""
     return {
         "schema_version": RUNTIME_REGISTRY_SCHEMA_VERSION,
         "domains": {

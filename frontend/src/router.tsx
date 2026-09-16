@@ -114,6 +114,13 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
               },
             },
             {
+              path: "conversations/:conversationId",
+              lazy: async () => {
+                const { AutonomyOverview } = await import("./pages/AutonomyPlatform");
+                return { Component: AutonomyOverview };
+              },
+            },
+            {
               path: "aircraft",
               lazy: async () => {
                 const { AutonomyAircraft } = await import("./pages/AutonomyPlatform");

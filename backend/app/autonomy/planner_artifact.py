@@ -15,6 +15,7 @@ from app.config import Settings, get_settings
 
 
 class PlannerArtifactVerificationError(RuntimeError):
+    """Expose a stable API error without forwarding remote response bodies or tokens."""
     def __init__(self, code: str, message: str, status_code: int) -> None:
         super().__init__(message)
         self.code = code
@@ -24,6 +25,7 @@ class PlannerArtifactVerificationError(RuntimeError):
 
 @dataclass(frozen=True, slots=True)
 class VerifiedPlannerArtifactReceipt:
+    """Freeze the owner, model run and artifact identity verified by this request."""
     owner_subject: str
     run_id: str
     provider: str
@@ -41,11 +43,13 @@ class _NoRedirect(url_request.HTTPRedirectHandler):
         headers: Any,
         newurl: str,
     ) -> None:
+        """Never forward a user's bearer credential through an HTTP redirect."""
         del req, fp, code, msg, headers, newurl
         return None
 
 
 def _orchestrator_url(settings: Settings) -> str:
+    """Derive or validate an HTTPS verifier endpoint within the configured identity origin."""
     explicit = settings.assistant_orchestrator_url.strip().rstrip("/")
     if explicit:
         parsed = urlsplit(explicit)
@@ -93,6 +97,7 @@ def _orchestrator_url(settings: Settings) -> str:
 
 
 def _read_bounded_response(response: Any, maximum_bytes: int) -> dict[str, Any]:
+    """Bound the actual response read as well as any declared length, then require JSON object."""
     declared = response.headers.get("Content-Length")
     if declared is not None:
         try:
@@ -118,7 +123,7 @@ def _read_bounded_response(response: Any, maximum_bytes: int) -> dict[str, Any]:
         )
     try:
         value = json.loads(raw)
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError) as exc:
         raise PlannerArtifactVerificationError(
             "AUTONOMY_PLANNER_RECEIPT_INVALID",
             "The assistant run did not return a valid JSON receipt.",
@@ -138,6 +143,7 @@ def _fetch_run(
     authorization: str,
     settings: Settings,
 ) -> dict[str, Any]:
+    """Fetch one owner-scoped run without redirects, retries or unbounded response reads."""
     url = f"{_orchestrator_url(settings)}/runs/{quote(run_id, safe='')}"
     request = url_request.Request(  # noqa: S310 - URL is pinned to trusted OIDC HTTPS.
         url,
@@ -158,6 +164,9 @@ def _fetch_run(
                 settings.assistant_orchestrator_max_response_bytes,
             )
     except url_error.HTTPError as exc:
+        # HTTPError is also an open response; the successful-response context
+        # manager above does not own it when opener.open raises.
+        exc.close()
         if exc.code in {401, 403, 404}:
             raise PlannerArtifactVerificationError(
                 "AUTONOMY_PLANNER_ARTIFACT_NOT_ISSUED",
@@ -182,6 +191,7 @@ def validate_planner_artifact_response(
     expected_subject: str,
     envelope: dict[str, Any],
 ) -> None:
+    """Match ownership, completed run, model and task content, not just a supplied digest."""
     planner = request.asset_context.planner_binding if request.asset_context else None
     run = envelope.get("data")
     result = run.get("result_json") if isinstance(run, dict) else None
@@ -238,6 +248,7 @@ async def verify_planner_artifact_binding(
     authorization: str | None,
     expected_subject: str | None,
 ) -> VerifiedPlannerArtifactReceipt:
+    """Verify a planning artifact off the event loop using the authenticated owner's token."""
     authorization_parts = authorization.split(" ", 1) if authorization else []
     bearer_token = authorization_parts[1].strip() if len(authorization_parts) == 2 else ""
     if (

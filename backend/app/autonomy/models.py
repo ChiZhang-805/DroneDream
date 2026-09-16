@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from collections import deque
 from datetime import datetime
 from typing import Literal
 
@@ -91,12 +92,41 @@ AutonomyToolOutcome = Literal["accepted", "blocked"]
 
 
 class StrictModel(BaseModel):
+    # Wire values reject coercion and unknown fields. Models describe contracts;
+    # evidence flags alone do not authenticate a runtime or authorize a flight.
     model_config = ConfigDict(
         extra="forbid",
         allow_inf_nan=False,
         str_strip_whitespace=True,
         strict=True,
     )
+
+    @field_validator("operator_confirmed", mode="before", check_fields=False)
+    @classmethod
+    def validate_explicit_confirmation(cls, value: object) -> object:
+        """Require JSON booleans even for Literal[True], which otherwise accepts 1."""
+        if type(value) is not bool:
+            raise ValueError("operator_confirmed must be an explicit boolean")
+        return value
+
+
+def _validate_acyclic_graph(dependencies: dict[str, list[str]]) -> None:
+    """Check the already name-bound DAG in O(nodes + edges), without recursion."""
+    dependents: dict[str, list[str]] = {identity: [] for identity in dependencies}
+    remaining = {identity: len(edges) for identity, edges in dependencies.items()}
+    for identity, edges in dependencies.items():
+        for dependency in edges:
+            dependents[dependency].append(identity)
+    ready = deque(identity for identity, count in remaining.items() if count == 0)
+    visited = 0
+    while ready:
+        visited += 1
+        for dependent in dependents[ready.popleft()]:
+            remaining[dependent] -= 1
+            if remaining[dependent] == 0:
+                ready.append(dependent)
+    if visited != len(dependencies):
+        raise ValueError("task graph must be acyclic")
 
 
 class Vector3(StrictModel):
@@ -180,17 +210,23 @@ class MissionTaskGraph(StrictModel):
 
     @model_validator(mode="after")
     def validate_graph(self) -> MissionTaskGraph:
+        """Bind every runtime dependency and reject cycles that can deadlock execution."""
         identifiers = [node.task_id for node in self.nodes]
         if len(identifiers) != len(set(identifiers)):
             raise ValueError("task graph contains duplicate task_id values")
         known = set(identifiers)
         for node in self.nodes:
+            if len(node.depends_on) != len(set(node.depends_on)):
+                raise ValueError("task graph contains duplicate dependencies")
             if node.task_id in node.depends_on:
                 raise ValueError("task graph node cannot depend on itself")
             if any(dependency not in known for dependency in node.depends_on):
                 raise ValueError("task graph dependency is missing")
         if any(task_id not in known for task_id in self.active_node_ids):
             raise ValueError("active_node_ids contains an unknown task")
+        if len(self.active_node_ids) != len(set(self.active_node_ids)):
+            raise ValueError("active_node_ids contains duplicate tasks")
+        _validate_acyclic_graph({node.task_id: node.depends_on for node in self.nodes})
         return self
 
 
@@ -207,6 +243,7 @@ class VehicleEnvelope(StrictModel):
 
     @model_validator(mode="after")
     def validate_mass_contract(self) -> VehicleEnvelope:
+        """Reject impossible launch mass; the compiler separately assesses pickup load."""
         if self.dry_mass_kg + self.launch_payload_kg > self.max_takeoff_mass_kg:
             raise ValueError("launch mass exceeds max_takeoff_mass_kg")
         return self
@@ -254,6 +291,7 @@ class AutonomyHarnessInspectRequest(StrictModel):
 
     @model_validator(mode="after")
     def validate_asset_kinds(self) -> AutonomyHarnessInspectRequest:
+        """Prevent interchangeable-looking asset records from entering the wrong slot."""
         if self.aircraft.kind != "aircraft" or self.map_pack.kind != "map":
             raise ValueError("autonomy harness assets are bound to the wrong slots")
         return self
@@ -282,6 +320,7 @@ class AutonomyPlannerTaskNode(StrictModel):
     @field_validator("depends_on")
     @classmethod
     def validate_dependencies(cls, value: list[str]) -> list[str]:
+        """Bound dependency identities before graph-level existence/cycle checks."""
         if len(value) != len(set(value)) or any(
             not dependency
             or len(dependency) > 64
@@ -296,6 +335,7 @@ class AutonomyPlannerTaskNode(StrictModel):
     @field_validator("success_evidence")
     @classmethod
     def validate_success_evidence(cls, value: list[str]) -> list[str]:
+        """Require bounded nonblank evidence descriptions, not proof of their completion."""
         if any(not evidence.strip() or len(evidence) > 120 for evidence in value):
             raise ValueError("planner task success evidence is invalid")
         return value
@@ -306,21 +346,14 @@ class AutonomyPlannerTaskGraph(StrictModel):
 
     @model_validator(mode="after")
     def validate_dag(self) -> AutonomyPlannerTaskGraph:
+        """Reject duplicate/unknown nodes before checking the model's proposed DAG."""
         identifiers = [node.node_id for node in self.nodes]
         if len(identifiers) != len(set(identifiers)):
             raise ValueError("planner task node identifiers must be unique")
         known = set(identifiers)
         if any(dependency not in known for node in self.nodes for dependency in node.depends_on):
             raise ValueError("planner task dependency is unknown")
-        remaining = {node.node_id: set(node.depends_on) for node in self.nodes}
-        while remaining:
-            roots = [node_id for node_id, dependencies in remaining.items() if not dependencies]
-            if not roots:
-                raise ValueError("planner task graph must be acyclic")
-            for node_id in roots:
-                del remaining[node_id]
-            for dependencies in remaining.values():
-                dependencies.difference_update(roots)
+        _validate_acyclic_graph({node.node_id: node.depends_on for node in self.nodes})
         return self
 
 
@@ -353,6 +386,7 @@ class AutonomyCompileAssetContext(StrictModel):
 
     @model_validator(mode="after")
     def validate_asset_kinds(self) -> AutonomyCompileAssetContext:
+        """Bind the planner's asset versions and context to the exact inspected inputs."""
         if self.aircraft.kind != "aircraft" or self.map_pack.kind != "map":
             raise ValueError("compile assets are bound to the wrong slots")
         planner = self.planner_binding
@@ -426,12 +460,18 @@ class AutonomyCompileRequest(StrictModel):
     @field_validator("natural_language")
     @classmethod
     def validate_prompt(cls, value: str) -> str:
+        """Retain ordinary multiline text while refusing hidden control characters."""
         if any(ord(char) < 32 and char not in {"\n", "\t"} for char in value):
             raise ValueError("natural_language contains control characters")
         return value
 
     @model_validator(mode="after")
     def validate_planner_task_semantics(self) -> AutonomyCompileRequest:
+        """Apply coarse required-action guards, not full natural-language understanding.
+
+        Canonical targets below apply only to the bundled pickup/return workflow;
+        generic assets still require downstream qualification and route validation.
+        """
         planner = self.asset_context.planner_binding if self.asset_context else None
         if planner is None:
             return self
@@ -521,6 +561,7 @@ class MissionMetrics(StrictModel):
     @field_validator("*")
     @classmethod
     def finite_metrics(cls, value: float) -> float:
+        """Reject invalid summaries and round display metrics, not live control state."""
         if not math.isfinite(value):
             raise ValueError("metrics must be finite")
         return round(value, 3)

@@ -26,4 +26,5 @@ class WorkerSettings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> WorkerSettings:
+    """Read this process's environment once; tests must explicitly clear the cache."""
     return WorkerSettings()

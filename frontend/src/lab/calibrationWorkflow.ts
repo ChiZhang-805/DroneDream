@@ -1,3 +1,5 @@
+import { validateEvidenceTree } from "./evidenceInput";
+
 export const MAX_LAB_CALIBRATION_INPUT_BYTES = 256 * 1024;
 
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -75,6 +77,7 @@ export class LabCalibrationInputError extends Error {
   }
 }
 
+/** Reject arrays/scalars before interpreting receipt fields; not a trust decision. */
 function objectValue(value: unknown, label: string): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new LabCalibrationInputError(`${label} must be an object.`);
@@ -82,6 +85,7 @@ function objectValue(value: unknown, label: string): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+/** Unknown fields are not silently retained in a calibration contract. */
 function assertExactKeys(
   value: Record<string, unknown>,
   expected: readonly string[],
@@ -94,18 +98,9 @@ function assertExactKeys(
   }
 }
 
-function assertNoSensitiveFields(value: unknown, path = "receipt"): void {
-  if (Array.isArray(value)) {
-    value.forEach((item, index) => assertNoSensitiveFields(item, `${path}[${index}]`));
-    return;
-  }
-  if (!value || typeof value !== "object") return;
-  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-    if (FORBIDDEN_FIELD.test(key)) {
-      throw new LabCalibrationInputError(`Sensitive field is not allowed at ${path}.${key}.`);
-    }
-    assertNoSensitiveFields(child, `${path}.${key}`);
-  }
+/** Bound recursive work and reject credentials before interpreting imported data. */
+function assertNoSensitiveFields(value: unknown): void {
+  validateEvidenceTree(value, LabCalibrationInputError, FORBIDDEN_FIELD);
 }
 
 function stringValue(value: unknown, label: string): string {
@@ -123,6 +118,7 @@ function identifierValue(value: unknown, label: string): string {
   return identifier;
 }
 
+/** Normalize content identifiers; matching digest syntax does not verify a receipt. */
 function shaValue(value: unknown, label: string): string {
   const sha = stringValue(value, label).toLowerCase();
   if (!SHA256.test(sha)) {
@@ -135,12 +131,18 @@ function metricValue(value: unknown, label: string, integer = false): number {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
     throw new LabCalibrationInputError(`${label} must be a finite non-negative number.`);
   }
-  if (integer && !Number.isInteger(value)) {
+  if (integer && !Number.isSafeInteger(value)) {
     throw new LabCalibrationInputError(`${label} must be an integer.`);
+  }
+  // Percentages divide by at least 0.001 and multiply by 100. This is a
+  // representability bound, not a claim about physically valid sensor ranges.
+  if (value > Number.MAX_VALUE / 100_000) {
+    throw new LabCalibrationInputError(`${label} exceeds the finite analysis range.`);
   }
   return value;
 }
 
+/** Retain metric units and reject invalid counters before percentage arithmetic. */
 function parseMetrics(value: unknown, label: string): CalibrationMetrics {
   const metrics = objectValue(value, label);
   assertExactKeys(
@@ -160,6 +162,7 @@ function parseMetrics(value: unknown, label: string): CalibrationMetrics {
   };
 }
 
+/** Parse a bounded historical/test import; hashes remain claims, never flight permission. */
 export function parseLabCalibrationInput(
   fileName: string,
   source: string,
@@ -298,16 +301,25 @@ export function parseLabCalibrationInput(
   };
 }
 
+/** Round display values only after checking that intermediate arithmetic remained finite. */
 function round(value: number): number {
+  if (!Number.isFinite(value)) throw new LabCalibrationInputError("Metric analysis overflowed.");
   return Number(value.toFixed(3));
 }
 
+/** Compare supplied summaries locally, without running training, simulation or hardware. */
 export function analyzeLabCalibration(
   input: LabCalibrationInput,
   objective: LabObjective,
   tolerancePercent: number,
   cycleBudget: number,
 ): LabCalibrationAnalysis {
+  if (!["tracking", "stability", "energy", "robustness"].includes(objective)) {
+    throw new LabCalibrationInputError("Calibration objective is unsupported.");
+  }
+  // Callers can mutate parsed objects. Validate again before computing a new result.
+  const simulationMetrics = parseMetrics(input.simulation, "Simulation metrics");
+  const realMetrics = parseMetrics(input.realObservation, "Real observation metrics");
   if (!Number.isFinite(tolerancePercent) || tolerancePercent < 1 || tolerancePercent > 100) {
     throw new LabCalibrationInputError("Gap tolerance must be between 1 and 100 percent.");
   }
@@ -321,8 +333,8 @@ export function analyzeLabCalibration(
     "overshootCount",
   ];
   const gaps = keys.map((key) => {
-    const simulation = input.simulation[key];
-    const real = input.realObservation[key];
+    const simulation = simulationMetrics[key];
+    const real = realMetrics[key];
     const absolute = Math.abs(real - simulation);
     const denominator = Math.max(Math.abs(simulation), key === "overshootCount" ? 1 : 0.001);
     const percent = (absolute / denominator) * 100;
@@ -336,7 +348,7 @@ export function analyzeLabCalibration(
     };
   });
   const aggregateGapPercent = round(
-    gaps.reduce((total, gap) => total + gap.percent, 0) / gaps.length,
+    gaps.reduce((total, gap) => total + gap.percent / gaps.length, 0),
   );
   const gapWithinTolerance = gaps.every((gap) => gap.withinTolerance);
   const recommendations: string[] = [];
@@ -387,10 +399,13 @@ export function analyzeLabCalibration(
   };
 }
 
+/** Recompute the draft's conclusions from current inputs; no imported allow state survives. */
 export function buildLabCalibrationDraftReceipt(
   input: LabCalibrationInput,
   analysis: LabCalibrationAnalysis,
 ): Record<string, unknown> {
+  analysis = analyzeLabCalibration(input, analysis.objective, analysis.tolerancePercent,
+                                  analysis.cycleBudget);
   return {
     schemaVersion: 1,
     kind: "dronedream-lab-calibration-draft-receipt",
@@ -444,16 +459,18 @@ export function buildLabCalibrationDraftReceipt(
   };
 }
 
+/** Fixed code-unit ordering makes draft serialization independent of the user's locale. */
 function sortJson(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(sortJson);
   if (!value || typeof value !== "object") return value;
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left.localeCompare(right))
+      .sort(([left], [right]) => left < right ? -1 : left > right ? 1 : 0)
       .map(([key, child]) => [key, sortJson(child)]),
   );
 }
 
+/** Export an unsigned, explicitly denied draft, not trusted qualification evidence. */
 export function serializeLabCalibrationDraftReceipt(
   input: LabCalibrationInput,
   analysis: LabCalibrationAnalysis,

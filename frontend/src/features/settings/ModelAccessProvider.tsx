@@ -50,6 +50,7 @@ const MODEL_ACCESS_STORAGE_KEY = "dronedream:model-access:v1";
 const LEGACY_MODEL_ACCESS_SESSION_KEY = "dronedream:model-access-key:v1";
 const DEFAULT_PROFILE_ID = "default";
 
+/** Partition non-secret selectors by account; anonymous settings are not an account fallback. */
 function modelAccessStorageKey(accountScope: string | null | undefined): string {
   const normalized = accountScope?.trim();
   if (!normalized) return MODEL_ACCESS_STORAGE_KEY;
@@ -71,7 +72,7 @@ const DEFAULT_MODEL_ACCESS: ModelAccessSettings = {
 };
 
 function isModelApiProtocol(value: unknown): value is ModelApiProtocol {
-  return [
+  return typeof value === "string" && [
     "openai-responses",
     "openai-chat",
     "anthropic-messages",
@@ -79,13 +80,14 @@ function isModelApiProtocol(value: unknown): value is ModelApiProtocol {
     "aws-bedrock-converse",
     "ollama-chat",
     "custom-http",
-  ].includes(String(value));
+  ].includes(value);
 }
 
 function isModelAccessMode(value: unknown): value is ModelAccessMode {
   return value === "platform" || value === "byok";
 }
 
+/** UI identity only; this is neither a credential nor an authorization token. */
 function newProfileId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
     return crypto.randomUUID();
@@ -93,6 +95,7 @@ function newProfileId(): string {
   return `model-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+/** Empty editable selection; choosing a model does not certify its runtime availability. */
 function defaultProfile(): ModelAccessProfile {
   return {
     id: DEFAULT_PROFILE_ID,
@@ -100,6 +103,7 @@ function defaultProfile(): ModelAccessProfile {
   };
 }
 
+/** Recover bounded metadata from untrusted browser storage, never a saved API key. */
 function parsePersistedProfile(value: unknown): PersistedModelAccessProfile | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Record<string, unknown>;
@@ -148,6 +152,7 @@ function parsePersistedProfile(value: unknown): PersistedModelAccessProfile | nu
   };
 }
 
+/** Rehydrate account metadata and purge the retired session-key path without reading its key. */
 function loadModelAccessState(
   accountScope?: string | null,
 ): ModelAccessState {
@@ -214,10 +219,8 @@ function loadModelAccessState(
   } catch {
     persisted = null;
   }
-  // API keys deliberately start empty on every provider mount. Keeping a
-  // credential in sessionStorage still exposes it to any script executing in
-  // the WebView; the packaged credential bridge will replace this in-memory
-  // development path.
+  // API keys deliberately start empty on every provider mount. Saved credentials
+  // are resolved by the Agent Core vault using opaque IDs, not browser storage.
   try {
     window.sessionStorage.removeItem(LEGACY_MODEL_ACCESS_SESSION_KEY);
   } catch {
@@ -240,6 +243,7 @@ interface ModelAccessProviderProps {
   accountScope?: string | null;
 }
 
+/** Own editable model metadata; CustomModelSettingsPanel performs explicit vault saves. */
 export function ModelAccessProvider({
   children,
   initialSettings,
@@ -283,6 +287,7 @@ export function ModelAccessProvider({
   useEffect(() => {
     if (state.storageKey !== storageKey) return;
     try {
+      // Explicit projection is intentional: spreading a profile here would persist apiKey.
       window.localStorage.setItem(
         storageKey,
         JSON.stringify({
@@ -309,6 +314,7 @@ export function ModelAccessProvider({
     }
   }, [state, storageKey]);
 
+  /** Update a draft atomically; identity changes invalidate its saved-vault binding. */
   const updateSettings = useCallback((values: Partial<ModelAccessSettings>) => {
     setState((current) => ({
       ...current,
@@ -321,8 +327,8 @@ export function ModelAccessProvider({
               // entered it. Editing that endpoint must not silently carry the
               // old credential to a different host. A caller that deliberately
               // replaces both values in one atomic update may provide apiKey.
-              ...(values.baseUrl !== undefined
-                && values.baseUrl !== profile.baseUrl
+              ...(((values.baseUrl !== undefined && values.baseUrl !== profile.baseUrl)
+                  || (values.provider !== undefined && values.provider !== profile.provider))
                 && values.apiKey === undefined
                 ? { apiKey: "" }
                 : {}),
@@ -341,19 +347,20 @@ export function ModelAccessProvider({
     }));
   }, []);
 
+  /** Switch provider defaults only on a real change, never reset a same-provider endpoint. */
   const selectProvider = useCallback((provider: ModelProvider) => {
     setState((current) => ({
       ...current,
       profiles: current.profiles.map((profile) =>
-        profile.id === current.activeProfileId
+        profile.id === current.activeProfileId && profile.provider !== provider
           ? {
               ...profile,
               provider,
               // Credentials belong to a provider/endpoint pair. Never carry a
               // key across providers where it could be sent to the wrong host.
-              apiKey: profile.provider === provider ? profile.apiKey : "",
-              agentCoreProfileId: profile.provider === provider ? profile.agentCoreProfileId : null,
-              agentCoreSelectionId: profile.provider === provider ? profile.agentCoreSelectionId : null,
+              apiKey: "",
+              agentCoreProfileId: null,
+              agentCoreSelectionId: null,
               ...modelProviderDefaults(provider),
             }
           : profile
@@ -361,6 +368,7 @@ export function ModelAccessProvider({
     }));
   }, []);
 
+  /** Choose a platform selector; cloud entitlement and model availability remain server-owned. */
   const selectManagedProvider = useCallback((managedProvider: ManagedModelProvider) => {
     setState((current) => ({
       ...current,
@@ -381,6 +389,7 @@ export function ModelAccessProvider({
     }));
   }, []);
 
+  /** Preserve the exact catalog model ID instead of silently substituting another provider. */
   const selectManagedModel = useCallback((
     managedProvider: ManagedModelProvider,
     managedModel: string,
@@ -396,6 +405,7 @@ export function ModelAccessProvider({
     }));
   }, []);
 
+  /** Switching billing/access mode does not migrate a BYOK credential to the platform. */
   const selectAccessMode = useCallback((accessMode: ModelAccessMode) => {
     setState((current) => ({
       ...current,
@@ -407,6 +417,7 @@ export function ModelAccessProvider({
     }));
   }, []);
 
+  /** Select an existing local draft; a missing ID cannot create a phantom profile. */
   const selectProfile = useCallback((profileId: string) => {
     setState((current) =>
       current.profiles.some((profile) => profile.id === profileId)
@@ -415,6 +426,7 @@ export function ModelAccessProvider({
     );
   }, []);
 
+  /** Create one empty draft within the UI cap, without duplicating another profile's key. */
   const addProfile = useCallback(() => {
     setState((current) => {
       if (current.profiles.length >= 12) return current;
@@ -440,6 +452,7 @@ export function ModelAccessProvider({
     });
   }, []);
 
+  /** Remove local metadata only; the settings panel separately requests vault deletion. */
   const removeProfile = useCallback((profileId: string) => {
     setState((current) => {
       if (current.profiles.length === 1) {

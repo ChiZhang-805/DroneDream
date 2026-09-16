@@ -30,10 +30,12 @@ MANAGED_PLUGIN_IMPLEMENTATIONS: dict[str, tuple[str, str]] = {
 
 
 def _render(schema: dict[str, object]) -> str:
+    """Match canonical manifest bytes, including UTF-8 text and the final newline."""
     return json.dumps(schema, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
 
 
 def _managed_plugin_manifests() -> dict[str, dict[str, object]]:
+    """Bind the fixed implementation allowlist to its current source, not a release label."""
     manifests: dict[str, dict[str, object]] = {}
     for slot, (module, entrypoint) in MANAGED_PLUGIN_IMPLEMENTATIONS.items():
         source_path = "backend/" + module.replace(".", "/") + ".py"
@@ -60,6 +62,7 @@ def _managed_plugin_manifests() -> dict[str, dict[str, object]]:
 
 
 def main() -> int:
+    """Export derived contracts, or fail read-only CI verification on any drift."""
     sys.path.insert(0, str(BACKEND_ROOT))
     from app.model_harness.control_plane import (
         canonical_contract_json_schemas,

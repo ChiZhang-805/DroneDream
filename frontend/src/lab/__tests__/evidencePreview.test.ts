@@ -8,6 +8,14 @@ import {
 } from "../evidencePreview";
 
 describe("Lab evidence preview", () => {
+  it("rejects ambiguous duplicate parameter names", () => {
+    const parameter = fakeReceipt.parameterCandidate.parameters[0];
+    expect(() => parseLabEvidencePreview("duplicate.json", JSON.stringify({
+      ...fakeReceipt, parameterCandidate: {
+        ...fakeReceipt.parameterCandidate, parameters: [parameter, { ...parameter, value: 9 }],
+      },
+    }))).toThrow(/unique/);
+  });
   it("previews bounded simulation evidence without granting authority", () => {
     const preview = parseLabEvidencePreview(
       "qualification.json",

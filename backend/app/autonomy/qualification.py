@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import re
 import struct
 from collections import OrderedDict
 from collections.abc import AsyncIterable
@@ -71,6 +72,7 @@ class SensorCalibration(StrictModel):
 
     @model_validator(mode="after")
     def validate_calibration_state(self) -> SensorCalibration:
+        """Normalize the legacy flag while rejecting contradictory explicit calibration states."""
         if self.calibration_status is None:
             object.__setattr__(
                 self,
@@ -110,6 +112,7 @@ class VehiclePackQualificationRequest(StrictModel):
 
     @model_validator(mode="after")
     def validate_dimensions(self) -> VehiclePackQualificationRequest:
+        """Validate physical dimensions and resolve only the supported legacy autopilot default."""
         if self.autopilot is None:
             inferred_autopilot = (
                 "px4"
@@ -175,6 +178,7 @@ class MapOrigin(StrictModel):
 
     @model_validator(mode="after")
     def validate_geographic_pair(self) -> MapOrigin:
+        """Require a usable latitude/longitude pair rather than a half-defined origin."""
         if (self.latitude is None) != (self.longitude is None):
             raise ValueError("origin latitude and longitude must be supplied together")
         return self
@@ -211,6 +215,7 @@ class MapPackQualificationRequest(StrictModel):
 
     @model_validator(mode="after")
     def validate_bounds(self) -> MapPackQualificationRequest:
+        """Require positive extents and unique layers before hashing qualification inputs."""
         if min(self.bounds_m.x, self.bounds_m.y, self.bounds_m.z) <= 0:
             raise ValueError("bounds_m must be positive")
         if len(self.semantic_layers) != len(set(self.semantic_layers)):
@@ -241,6 +246,7 @@ class MapPackQualificationReceipt(StrictModel):
 
 
 def _now() -> datetime:
+    """Record receipt issuance in UTC, separately from its deterministic content identity."""
     return datetime.now(timezone.utc)
 
 
@@ -254,28 +260,31 @@ GEOJSON_GEOMETRY_TYPES = {
 }
 
 
-def _valid_geojson(value: object) -> bool:
-    if not isinstance(value, dict):
+def _valid_geojson(value: object, *, _depth: int = 0) -> bool:
+    """Check bounded GeoJSON container structure, not geometric/flight suitability."""
+    if _depth > 64 or not isinstance(value, dict):
         return False
     geo_type = value.get("type")
+    if not isinstance(geo_type, str):
+        return False
     if geo_type == "FeatureCollection":
         features = value.get("features")
         return isinstance(features, list) and all(
             isinstance(feature, dict)
             and feature.get("type") == "Feature"
-            and _valid_geojson(feature)
+            and _valid_geojson(feature, _depth=_depth + 1)
             for feature in features
         )
     if geo_type == "Feature":
         geometry = value.get("geometry")
         properties = value.get("properties")
-        return (geometry is None or _valid_geojson(geometry)) and (
+        return (geometry is None or _valid_geojson(geometry, _depth=_depth + 1)) and (
             properties is None or isinstance(properties, dict)
         )
     if geo_type == "GeometryCollection":
         geometries = value.get("geometries")
         return isinstance(geometries, list) and all(
-            _valid_geojson(geometry) for geometry in geometries
+            _valid_geojson(geometry, _depth=_depth + 1) for geometry in geometries
         )
     if geo_type in GEOJSON_GEOMETRY_TYPES:
         return isinstance(value.get("coordinates"), list)
@@ -285,9 +294,12 @@ def _valid_geojson(value: object) -> bool:
 def qualify_vehicle_pack(
     request: VehiclePackQualificationRequest,
 ) -> VehiclePackQualificationReceipt:
+    """Compute a conservative declared envelope; passing is unsigned, not a flight qualification."""
     issues: list[QualificationIssue] = []
     loaded_mass = request.dry_mass_kg + request.maximum_pickup_payload_kg
     thrust_to_weight = request.max_total_thrust_n / (loaded_mass * 9.80665)
+    # This bundled vehicle's verified geometry has a fixed planning envelope.
+    # Every other body uses the enclosing planar radius plus rotor clearance.
     official_geometry = (
         request.pack_id == OFFICIAL_MY_DRONE_PACK_ID
         and request.version == OFFICIAL_MY_DRONE_VERSION
@@ -592,26 +604,52 @@ def qualify_map_pack(
     )
 
 
+def _finite_json_number(value: str) -> float:
+    """Reject both explicit non-JSON constants and exponent overflow in uploaded geometry."""
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise ValueError("asset JSON numbers must be finite")
+    return parsed
+
+
+def _decode_asset_json(data: bytes) -> object:
+    """Decode inert JSON with finite numbers; callers convert parser failures into receipts."""
+    return json.loads(
+        data.decode("utf-8"), parse_constant=_finite_json_number, parse_float=_finite_json_number
+    )
+
+
+def _gltf2_asset(asset: object) -> bool:
+    """Require a textual 2.x version instead of coercing arbitrary values by prefix."""
+    return (
+        isinstance(asset, dict)
+        and isinstance(asset.get("version"), str)
+        and re.fullmatch(r"2\.[0-9]+", asset["version"]) is not None
+    )
+
+
 def _json_asset(
     data: bytes, extension: str
 ) -> tuple[str, list[MapLayer], list[QualificationIssue]]:
+    """Classify bounded uploaded JSON without loading referenced files or granting planning use."""
     issues: list[QualificationIssue] = []
     try:
-        payload = json.loads(data.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        payload = _decode_asset_json(data)
+    except (ValueError, RecursionError):
         return (
             "json",
             [],
             [
                 QualificationIssue(
-                    code="map.asset-json-invalid", severity="error", message=str(exc)[:200]
+                    code="map.asset-json-invalid",
+                    severity="error",
+                    message="Asset JSON must be valid, finite and within the nesting limit.",
                 )
             ],
         )
     if extension == "gltf":
         asset = payload.get("asset") if isinstance(payload, dict) else None
-        version = str(asset.get("version", "")) if isinstance(asset, dict) else ""
-        if not version.startswith("2"):
+        if not _gltf2_asset(asset):
             issues.append(
                 QualificationIssue(
                     code="map.gltf-version-unsupported",
@@ -630,7 +668,7 @@ def _json_asset(
             )
         return "gltf-2-json", [] if issues else ["mesh"], issues
     geo_type = payload.get("type") if isinstance(payload, dict) else None
-    if extension == "geojson" or geo_type in {
+    if extension == "geojson" or isinstance(geo_type, str) and geo_type in {
         *GEOJSON_GEOMETRY_TYPES,
         "FeatureCollection",
         "Feature",
@@ -662,6 +700,7 @@ def _json_asset(
 def _inspect_map_asset(
     data: bytes, extension: str
 ) -> tuple[str, list[MapLayer], list[QualificationIssue]]:
+    """Inspect inert headers/manifests only; mesh correctness needs separate reconstruction."""
     if extension == "glb":
         if len(data) < 12 or data[:4] != b"glTF":
             return (
@@ -714,18 +753,18 @@ def _inspect_map_asset(
             )
             return "glb-2-binary", [], issues
         try:
-            manifest = json.loads(data[20:json_end].rstrip(b" \x00").decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            manifest = _decode_asset_json(data[20:json_end].rstrip(b" \x00"))
+        except (ValueError, RecursionError):
             issues.append(
                 QualificationIssue(
                     code="map.glb-json-invalid",
                     severity="error",
-                    message=str(exc)[:200],
+                    message="GLB JSON must be valid, finite and within the nesting limit.",
                 )
             )
             return "glb-2-binary", [], issues
         asset = manifest.get("asset") if isinstance(manifest, dict) else None
-        if not isinstance(asset, dict) or not str(asset.get("version", "")).startswith("2"):
+        if not _gltf2_asset(asset):
             issues.append(
                 QualificationIssue(
                     code="map.glb-manifest-invalid",
@@ -786,7 +825,11 @@ def _inspect_map_asset(
 
 
 class MapAssetAdmissionRegistry:
+    """Retain bounded owner-scoped metadata receipts, never uploaded bytes or executable code."""
     def __init__(self, *, maximum_receipts: int = MAX_ASSET_RECEIPTS) -> None:
+        """Validate capacity before accepting uploads or mutating the receipt cache."""
+        if type(maximum_receipts) is not int or maximum_receipts <= 0:
+            raise ValueError("maximum_receipts must be a positive integer")
         self._maximum_receipts = maximum_receipts
         self._lock = RLock()
         self._receipts: OrderedDict[tuple[str, str], MapAssetAdmissionReceipt] = OrderedDict()
@@ -797,20 +840,26 @@ class MapAssetAdmissionRegistry:
         filename: str,
         chunks: AsyncIterable[bytes],
     ) -> MapAssetAdmissionReceipt:
+        """Hash immutable bounded chunks, inspect locally, then cache an isolated receipt."""
         filename = PurePath(filename or "unnamed").name[:255]
         extension = PurePath(filename).suffix.casefold().lstrip(".")
         hasher = hashlib.sha256()
-        retained_chunks: list[bytes] = []
+        # A byte buffer bounds memory by upload size; a list of millions of
+        # one-byte chunks would have disproportionate per-object overhead.
+        retained = bytearray()
         byte_size = 0
         async for chunk in chunks:
+            if not isinstance(chunk, bytes):
+                raise ValueError("map asset upload chunks must be immutable bytes")
             if not chunk:
                 continue
             byte_size += len(chunk)
             if byte_size > MAX_MAP_ASSET_BYTES:
                 raise ValueError("map asset exceeds the 25 MiB admission limit")
             hasher.update(chunk)
-            retained_chunks.append(chunk)
-        data = b"".join(retained_chunks)
+            retained.extend(chunk)
+        data = bytes(retained)
+        del retained
         digest = hasher.hexdigest()
         if extension not in SUPPORTED_MAP_FORMATS:
             parser, layers, issues = _inspect_map_asset(data, "unsupported")

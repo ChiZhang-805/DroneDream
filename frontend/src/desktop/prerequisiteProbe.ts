@@ -18,6 +18,7 @@ const DEFAULT_RETRY_POLICY: SystemProbeRetryPolicy = {
 
 let startupProbeInFlight: Promise<SystemPrerequisiteReport> | null = null;
 
+/** Normalize native diagnostics for timeout classification only, never for account state. */
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -41,7 +42,17 @@ export async function runSystemProbeWithStartupGrace<T>(
   probe: () => Promise<T>,
   policy: SystemProbeRetryPolicy = DEFAULT_RETRY_POLICY,
 ): Promise<T> {
-  const maxAttempts = Math.max(1, Math.trunc(policy.maxAttempts));
+  const maxAttempts = policy.maxAttempts;
+  if (!Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > SYSTEM_PROBE_MAX_ATTEMPTS ||
+      !Array.isArray(policy.retryDelaysMs) || policy.retryDelaysMs.some(
+        (delay) => !Number.isFinite(delay) || delay < 0 || delay > 60_000,
+      ) || typeof policy.wait !== "function") {
+    throw new RangeError("Invalid bounded system-probe retry policy.");
+  }
+  // Snapshot before the first await: a caller mutating the policy must not turn
+  // a finite startup grace window into an unbounded sequence or timer overflow.
+  const retryDelaysMs = [...policy.retryDelaysMs];
+  const wait = policy.wait;
   let lastError: unknown;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
@@ -51,9 +62,8 @@ export async function runSystemProbeWithStartupGrace<T>(
       lastError = error;
       const attemptsExhausted = attempt + 1 >= maxAttempts;
       if (attemptsExhausted || !isTransientSystemProbeTimeout(error)) throw error;
-      const delayMs = policy.retryDelaysMs[attempt] ??
-        policy.retryDelaysMs.at(-1) ?? 0;
-      if (delayMs > 0) await policy.wait(delayMs);
+      const delayMs = retryDelaysMs[attempt] ?? retryDelaysMs.at(-1) ?? 0;
+      if (delayMs > 0) await wait(delayMs);
     }
   }
 

@@ -15,12 +15,13 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
+import math
 import re
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Final, Literal, TypeAlias
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.model_harness.domains import (
     FIXED_KERNEL_RESPONSIBILITIES,
@@ -156,9 +157,10 @@ class HarnessDomainPolicy:
     plugin_slots: tuple[PluginSlotPolicy, ...]
 
     def __post_init__(self) -> None:
-        if self.maximum_model_calls < 1:
+        """Reject invalid authored limits before exporting any runtime policy."""
+        if type(self.maximum_model_calls) is not int or self.maximum_model_calls < 1:
             raise ValueError("maximum_model_calls must be positive")
-        if self.maximum_repair_cycles < 0:
+        if type(self.maximum_repair_cycles) is not int or self.maximum_repair_cycles < 0:
             raise ValueError("maximum_repair_cycles cannot be negative")
         capabilities = [slot.capability for slot in self.plugin_slots]
         if len(capabilities) != len(set(capabilities)):
@@ -179,6 +181,7 @@ def _slot(
     selection_authority: PluginSelectionAuthority = "product_managed",
     exposure: PluginExposure = "internal",
 ) -> PluginSlotPolicy:
+    """Declare one seam; defaults keep replacement internal and trust restricted."""
     return PluginSlotPolicy(
         capability=capability,
         cardinality=cardinality,
@@ -221,6 +224,7 @@ def _policy(
     maximum_repair_cycles: int,
     extra_slots: tuple[PluginSlotPolicy, ...],
 ) -> HarnessDomainPolicy:
+    """Compose shared slots without widening cross-domain memory or UI authority."""
     common_slots = _COMMON_MODEL_SLOTS
     if domain == "autonomy.mission":
         designer_slots = frozenset({"critic", "tool_provider", "prompt_pack"})
@@ -401,7 +405,51 @@ DOMAIN_POLICIES: Final[dict[ModelHarnessDomain, HarnessDomainPolicy]] = {
 
 
 class _StrictModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+    # An instance may have been mutated or created with model_copy(update=...).
+    # Revalidation at trust boundaries must not accept that instance unchecked.
+    model_config = ConfigDict(
+        extra="forbid", str_strip_whitespace=True, revalidate_instances="always"
+    )
+
+
+def _validate_json_value(value: object, depth: int = 0) -> None:
+    """Check finite, unambiguous JSON before a serializer can coerce its values.
+
+    The fixed depth bound also terminates cycles. Tuples retain the existing
+    Python-call contract: they serialize as JSON arrays, never as object keys.
+    No error includes request content, which may contain account information.
+    """
+    if depth > 64:
+        raise ValueError("structured Harness JSON exceeds the maximum depth of 64")
+    if value is None or type(value) in (str, bool, int):
+        return
+    if type(value) is float:
+        if not math.isfinite(value):
+            raise ValueError("structured Harness JSON requires finite numbers")
+        return
+    if type(value) is dict:
+        for key, item in value.items():
+            if type(key) is not str:
+                raise ValueError("structured Harness JSON requires string keys")
+            _validate_json_value(item, depth + 1)
+        return
+    if type(value) in (list, tuple):
+        for item in value:
+            _validate_json_value(item, depth + 1)
+        return
+    raise ValueError("structured Harness payload must contain only JSON values")
+
+
+def _json_bytes(value: object) -> bytes:
+    """Produce UTF-8 hash/size bytes or a stable validation error, not a crash."""
+    try:
+        return json.dumps(
+            value, ensure_ascii=False, allow_nan=False,
+            sort_keys=True, separators=(",", ":"),
+        ).encode("utf-8")
+    except (TypeError, ValueError, RecursionError) as exc:
+        # ValueError includes UTF-8 encoding and oversized integer failures.
+        raise ValueError("structured Harness payload cannot be encoded as JSON") from exc
 
 
 class ManagedPluginImplementation(_StrictModel):
@@ -458,6 +506,7 @@ class PluginSelection(_StrictModel):
 
     @model_validator(mode="after")
     def _validate_identity(self) -> PluginSelection:
+        """Accept stable identifiers and digest syntax, not a signature claim."""
         if not _PLUGIN_ID_PATTERN.fullmatch(self.plugin_id):
             raise ValueError("plugin_id must be a stable lowercase identifier")
         if not _SHA256_PATTERN.fullmatch(self.content_sha256):
@@ -477,10 +526,10 @@ class HarnessControlPlaneReceipt(_StrictModel):
     )
     domain: ModelHarnessDomain
     loop_kind: HarnessLoopKind
-    hard_maximum_model_calls: int = Field(ge=1)
-    hard_maximum_repair_cycles: int = Field(ge=0)
-    effective_maximum_model_calls: int = Field(ge=1)
-    effective_maximum_repair_cycles: int = Field(ge=0)
+    hard_maximum_model_calls: int = Field(ge=1, strict=True)
+    hard_maximum_repair_cycles: int = Field(ge=0, strict=True)
+    effective_maximum_model_calls: int = Field(ge=1, strict=True)
+    effective_maximum_repair_cycles: int = Field(ge=0, strict=True)
     fixed_kernel_responsibilities: tuple[FixedKernelResponsibility, ...]
     readable_memory_domains: tuple[MemoryDomain, ...]
     writable_memory_domain: MemoryDomain
@@ -505,6 +554,18 @@ class HarnessControlPlaneReceipt(_StrictModel):
 
     @model_validator(mode="after")
     def _validate_effective_caps(self) -> HarnessControlPlaneReceipt:
+        """Bind effective choices to product policy; a self-hash is not authority."""
+        policy = domain_policy(self.domain)
+        fixed_fields = {
+            "loop_kind": policy.loop_kind,
+            "hard_maximum_model_calls": policy.maximum_model_calls,
+            "hard_maximum_repair_cycles": policy.maximum_repair_cycles,
+            "fixed_kernel_responsibilities": FIXED_KERNEL_RESPONSIBILITIES,
+            "readable_memory_domains": policy.readable_memory_domains,
+            "writable_memory_domain": policy.writable_memory_domain,
+        }
+        if any(getattr(self, field) != expected for field, expected in fixed_fields.items()):
+            raise ValueError("control-plane receipt does not match fixed product policy")
         if self.effective_maximum_model_calls > self.hard_maximum_model_calls:
             raise ValueError("effective model-call cap cannot exceed the immutable hard cap")
         if self.effective_maximum_repair_cycles > self.hard_maximum_repair_cycles:
@@ -585,8 +646,16 @@ class HarnessInputEnvelope(_StrictModel):
     session_context: dict[str, object] = Field(default_factory=dict)
     memory_record_ids: tuple[str, ...] = Field(default=(), max_length=32)
 
+    @field_validator("current_request", "session_context", mode="before")
+    @classmethod
+    def _validate_json_context(cls, value: object) -> object:
+        """Reject ambiguous nested values before Pydantic can coerce their keys."""
+        _validate_json_value(value)
+        return value
+
     @model_validator(mode="after")
     def _validate_bindings_and_context(self) -> HarnessInputEnvelope:
+        """Apply account/task digest syntax and the existing UTF-8 context budget."""
         for digest in (
             self.owner_binding_sha256,
             self.tenant_binding_sha256,
@@ -595,15 +664,12 @@ class HarnessInputEnvelope(_StrictModel):
             if not _SHA256_PATTERN.fullmatch(digest):
                 raise ValueError("control-plane bindings must be lowercase SHA-256 digests")
         context_bytes = len(
-            json.dumps(
+            _json_bytes(
                 {
                     "current_request": self.current_request,
                     "session_context": self.session_context,
-                },
-                sort_keys=True,
-                separators=(",", ":"),
-                ensure_ascii=False,
-            ).encode()
+                }
+            )
         )
         if context_bytes > 65_536:
             raise ValueError("structured Harness input exceeds 65536 bytes")
@@ -624,8 +690,8 @@ class HarnessOutputEnvelope(_StrictModel):
     status: HarnessResultStatus
     lifecycle_stage: HarnessLifecycleStage = "proposal"
     structured_result: dict[str, object]
-    model_call_count: int = Field(ge=0)
-    repair_cycle_count: int = Field(ge=0)
+    model_call_count: int = Field(ge=0, strict=True)
+    repair_cycle_count: int = Field(ge=0, strict=True)
     tool_receipt_ids: tuple[str, ...] = Field(default=(), max_length=128)
     validation_receipt_ids: tuple[str, ...] = Field(default=(), max_length=128)
     evidence_receipt_ids: tuple[str, ...] = Field(default=(), max_length=128)
@@ -634,8 +700,17 @@ class HarnessOutputEnvelope(_StrictModel):
     grants_execution_authority: Literal[False] = False
     physical_action_performed: Literal[False] = False
 
+    @field_validator("structured_result", mode="before")
+    @classmethod
+    def _validate_json_result(cls, value: object) -> object:
+        """Keep output finite and serializable before it enters evidence or hashing."""
+        _validate_json_value(value)
+        _json_bytes(value)
+        return value
+
     @model_validator(mode="after")
     def _validate_control_plane_binding(self) -> HarnessOutputEnvelope:
+        """Reject lifecycle claims that lack their required terminal evidence."""
         if not all(
             _SHA256_PATTERN.fullmatch(digest)
             for digest in (
@@ -696,12 +771,8 @@ def canonical_contract_json_schemas() -> dict[str, dict[str, object]]:
 def harness_input_sha256(input_envelope: HarnessInputEnvelope) -> str:
     """Bind the exact validated structured input without echoing it in output."""
 
-    canonical = json.dumps(
-        input_envelope.model_dump(mode="json"),
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode()
+    input_envelope = HarnessInputEnvelope.model_validate(input_envelope)
+    canonical = _json_bytes(input_envelope.model_dump(mode="json"))
     return hashlib.sha256(canonical).hexdigest()
 
 
@@ -713,6 +784,12 @@ def validate_output_against_control_plane(
 ) -> None:
     """Enforce domain, loop budget, and evidence boundaries after model work."""
 
+    # Receipt/output objects and their nested dictionaries are mutable. Validate
+    # a fresh snapshot here, not just the values that happened to exist at creation.
+    receipt = HarnessControlPlaneReceipt.model_validate(receipt)
+    output = HarnessOutputEnvelope.model_validate(output)
+    if input_envelope is not None:
+        input_envelope = HarnessInputEnvelope.model_validate(input_envelope)
     if output.domain != receipt.domain:
         raise ValueError("Harness output domain does not match its control-plane receipt")
     if output.control_plane_selection_sha256 != receipt.selection_sha256:
@@ -760,7 +837,7 @@ def _product_managed_default(
         raw_manifest = path.read_bytes()
         payload = json.loads(raw_manifest)
         manifest = ManagedPluginManifest.model_validate(payload)
-    except (OSError, json.JSONDecodeError, ValueError) as exc:
+    except (OSError, ValueError, RecursionError) as exc:
         raise ValueError(f"invalid product-managed plugin manifest for {capability}") from exc
     canonical_manifest = (
         json.dumps(
@@ -786,6 +863,8 @@ def _product_managed_default(
     except OSError as exc:
         raise ValueError(f"product-managed plugin source is missing for {capability}") from exc
     source_sha256 = hashlib.sha256(source_bytes).hexdigest()
+    # Source comments change this digest too. Regenerate the manifest after an
+    # intentional source change; never bypass this old/new implementation check.
     if source_sha256 != manifest.implementation.source_sha256:
         raise ValueError(f"product-managed plugin source digest mismatch for {capability}")
     try:
@@ -830,7 +909,13 @@ def compile_control_plane_receipt(
     slot_by_capability = {slot.capability: slot for slot in policy.plugin_slots}
     grouped: dict[PluginCapability, list[PluginSelection]] = {}
     normalized_selections: list[PluginSelection] = []
+    identities: set[tuple[PluginCapability, str]] = set()
     for selection in selections:
+        selection = PluginSelection.model_validate(selection)
+        identity = (selection.slot, selection.plugin_id)
+        if identity in identities:
+            raise ValueError("duplicate plugin identity in the same capability slot")
+        identities.add(identity)
         if selection.source != "explicit":
             raise ValueError("product-managed default selections are issued only by the product")
         slot = slot_by_capability.get(selection.slot)
@@ -871,9 +956,17 @@ def compile_control_plane_receipt(
         if effective_maximum_repair_cycles is None
         else effective_maximum_repair_cycles
     )
-    if selected_model_calls < 1 or selected_model_calls > policy.maximum_model_calls:
+    if (
+        type(selected_model_calls) is not int
+        or selected_model_calls < 1
+        or selected_model_calls > policy.maximum_model_calls
+    ):
         raise ValueError("effective model-call cap must be within the immutable hard cap")
-    if selected_repair_cycles < 0 or selected_repair_cycles > policy.maximum_repair_cycles:
+    if (
+        type(selected_repair_cycles) is not int
+        or selected_repair_cycles < 0
+        or selected_repair_cycles > policy.maximum_repair_cycles
+    ):
         raise ValueError("effective repair-cycle cap must be within the immutable hard cap")
 
     ordered = tuple(

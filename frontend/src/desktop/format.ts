@@ -1,3 +1,4 @@
+/** Display measured binary bytes; invalid/missing telemetry must not look like zero usage. */
 export function formatBytes(bytes: number): string {
   if (!Number.isSafeInteger(bytes) || bytes < 0) return "—";
   if (bytes === 0) return "0 B";

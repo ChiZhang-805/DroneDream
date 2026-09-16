@@ -1,4 +1,4 @@
-"""Deterministic complex-terrain catalog with prevalidated reference corridors."""
+"""Bundled terrain descriptors and deterministic reference corridors."""
 
 from __future__ import annotations
 
@@ -24,9 +24,12 @@ def _p(
     phase: Literal["launch", "transit", "stairs", "gate", "pickup", "return", "land"],
     speed: float = 1.3,
 ) -> RoutePoint:
+    """Build an ENU-metre reference point with an m/s cap, not a live control command."""
     return RoutePoint(x=x, y=y, z=z, phase=phase, speed_limit_mps=speed)
 
 
+# Reference corridors seed deterministic planning/validation. They are not
+# proof of a model-controlled flight or a substitute for live collision gates.
 SCENES: dict[str, TerrainScene] = {
     "school-campus-v1": TerrainScene(
         id="school-campus-v1",
@@ -555,10 +558,13 @@ def get_bundled_map_manifest(scene_id: str) -> BundledMapManifest | None:
 
 
 def list_scenes() -> list[TerrainScene]:
+    """Expose independent copies of the product's canonical bundled map."""
     # Legacy compiler identifiers remain accepted for stored contracts, but the
     # product exposes one canonical bundled map asset and one user-visible name.
-    return [SCENES["school-campus-v1"]]
+    return [SCENES["school-campus-v1"].model_copy(deep=True)]
 
 
 def get_scene(scene_id: str) -> TerrainScene | None:
-    return SCENES.get(scene_id)
+    """Resolve an exact current or stored-contract ID without sharing mutable registry state."""
+    scene = SCENES.get(scene_id)
+    return None if scene is None else scene.model_copy(deep=True)

@@ -57,6 +57,7 @@ import {
   ArchivedExperimentManager,
   ExperimentWorkspaceSidebar,
 } from "./components/ExperimentWorkspaceSidebar";
+import { AutonomyConversationSidebar } from "./components/AutonomyConversationSidebar";
 import {
   AvatarCropDialog,
   type AvatarCropCopy,
@@ -1541,30 +1542,25 @@ function SettingsDialog({
   ];
   const level = runtimeHealthLevel(access);
   const snapshot = access.snapshot;
-  const runtimeCheckStepCount = 5 + (snapshot?.runtime.components.length ?? 0);
-  const [runtimeCheckStepIndex, setRuntimeCheckStepIndex] = useState(-1);
-  const [runtimeVisualChecking, setRuntimeVisualChecking] = useState(false);
-  const runtimeCheckActive = access.isChecking || runtimeVisualChecking;
+  const runtimeCheckPending = useRef(false);
+  const [runtimeCheckRequested, setRuntimeCheckRequested] = useState(false);
+  const runtimeCheckActive = access.isChecking || runtimeCheckRequested;
+  // 功能：
+  //   1. 手动请求真实环境检查，阻止重复请求。
+  //   2. 检查结束立即显示真实结果，不用动画计时推断检查成功。
+  // 输入：
+  //   access：桌面环境检查服务。
+  // 输出：
+  //   completion：检查完成后的 Promise<void>。
   const runRuntimeCheck = async () => {
-    if (runtimeCheckActive) return;
-    // Keep the progress legible even when the local health endpoint answers
-    // immediately: first queue every row, then visit the checks in order, and
-    // only publish the authoritative result after both work streams finish.
-    setRuntimeVisualChecking(true);
-    setRuntimeCheckStepIndex(-1);
-    const refreshPromise = access.refresh();
-    const visualPromise = (async () => {
-      await new Promise<void>((resolve) => window.setTimeout(resolve, 320));
-      for (let index = 0; index < runtimeCheckStepCount; index += 1) {
-        setRuntimeCheckStepIndex(index);
-        await new Promise<void>((resolve) => window.setTimeout(resolve, 360));
-      }
-    })();
+    if (runtimeCheckActive || runtimeCheckPending.current) return;
+    runtimeCheckPending.current = true;
+    setRuntimeCheckRequested(true);
     try {
-      await Promise.all([refreshPromise, visualPromise]);
+      await access.refresh();
     } finally {
-      setRuntimeVisualChecking(false);
-      setRuntimeCheckStepIndex(-1);
+      runtimeCheckPending.current = false;
+      setRuntimeCheckRequested(false);
     }
   };
   const runtimeCheckCopy = interfaceLocale === "zh-CN"
@@ -1592,15 +1588,14 @@ function SettingsDialog({
         success: "Ready",
         failed: "Needs attention",
       };
-  const checkedState = (
-    index: number,
-    result: boolean | null,
-  ): RuntimeCheckVisualState => {
-    if (runtimeCheckActive) {
-      if (runtimeCheckStepIndex < 0 || index > runtimeCheckStepIndex) return "pending";
-      if (index === runtimeCheckStepIndex) return "checking";
-      return "success";
-    }
+  // 功能：
+  //   将真实检查结果转换为显示状态；请求期间不使用旧结果宣称成功。
+  // 输入：
+  //   result：该项目真实检查结果，null 表示尚无结果。
+  // 输出：
+  //   state：checking、pending、success 或 error。
+  const checkedState = (result: boolean | null): RuntimeCheckVisualState => {
+    if (runtimeCheckActive) return "checking";
     if (result === null) return "pending";
     return result ? "success" : "error";
   };
@@ -1654,9 +1649,9 @@ function SettingsDialog({
       detail: component.detail ?? component.version ?? null,
       result: component.status === "ready",
     })),
-  ].map((step, index) => ({
+  ].map((step) => ({
     ...step,
-    state: checkedState(index, step.result),
+    state: checkedState(step.result),
   }));
   const details: string[] = [];
   if (snapshot) {
@@ -1682,9 +1677,7 @@ function SettingsDialog({
     details.push(t("settings.runtime.noResult"));
   }
   const uniqueDetails = [...new Set(details.filter(Boolean))];
-  const runtimeCheckVisualPhase = runtimeCheckActive
-    ? (runtimeCheckStepIndex < 0 ? "pending" : "checking")
-    : null;
+  const runtimeCheckVisualPhase: RuntimeCheckVisualState | null = runtimeCheckActive ? "checking" : null;
   const statusLabel = runtimeCheckVisualPhase === "pending"
     ? runtimeCheckCopy.pending
     : runtimeCheckVisualPhase === "checking"
@@ -4787,10 +4780,17 @@ function AppShellContent() {
             </NavLink>
           ) : null}
           </nav>
+          {activeThemeEdition === "autonomy" || activeThemeEdition === "universal" ? <AutonomyConversationSidebar
+            ownerId={auth.account?.id ?? "local"}
+            locale={locale}
+            edition={activeThemeEdition}
+            onNavigate={() => setMobileMenuOpen(false)}
+          /> : null}
           <ExperimentWorkspaceSidebar
             ownerId={auth.account?.id ?? "local"}
             locale={locale}
             edition={activeThemeEdition}
+            hideWhenEmpty={activeThemeEdition === "autonomy"}
           />
           <div className="app-sidebar-footer">
             {accountMenuOpen && auth.account ? (

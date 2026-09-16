@@ -45,6 +45,7 @@ def _receipt_payload(
     content_sha256: str,
     content_size_bytes: int,
 ) -> dict[str, object]:
+    """Bind bytes to owner, artifact kind and storage identity, not just a standalone hash."""
     return {
         "schema_id": ARTIFACT_DIGEST_RECEIPT_SCHEMA,
         "integrity_policy": ARTIFACT_INTEGRITY_POLICY,
@@ -59,6 +60,7 @@ def _receipt_payload(
 
 
 def _evidence_id(payload: dict[str, object]) -> str:
+    """Hash canonical finite JSON so DB/serializer field order cannot change receipt identity."""
     encoded = json.dumps(
         payload,
         sort_keys=True,
@@ -81,6 +83,8 @@ def require_artifact_integrity(
         raise ArtifactIntegrityError("artifact integrity accepts bytes or a digest, not both")
     receipt = artifact.digest_receipt
     if receipt is None:
+        # Legacy rows without a declared policy remain distinguishable. Consumers
+        # requiring sealed evidence reject None; do not invent a receipt on read.
         if artifact.integrity_policy is not None:
             raise ArtifactIntegrityError("artifact requires a missing digest receipt")
         return None
@@ -150,6 +154,8 @@ def bind_artifact_integrity(
         return existing
 
     artifact.integrity_policy = ARTIFACT_INTEGRITY_POLICY
+    # Stage metadata and receipt together. The owning report/trial transaction
+    # commits them; hashing a file by itself does not publish a persisted receipt.
     artifact.file_size_bytes = content_size
     receipt = models.ArtifactDigestReceipt(
         id=f"adr_{uuid4().hex[:12]}",

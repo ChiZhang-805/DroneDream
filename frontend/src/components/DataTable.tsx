@@ -14,6 +14,7 @@ interface DataTableProps<T> {
   emptyState?: ReactNode;
 }
 
+/** Render caller-owned rows without reordering; rowKey must be a stable unique identity, not an index. */
 export function DataTable<T>({
   columns,
   rows,

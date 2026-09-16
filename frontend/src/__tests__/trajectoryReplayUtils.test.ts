@@ -24,6 +24,29 @@ function makeArtifact(
 }
 
 describe("selectReplayArtifactsForTrial", () => {
+  it("never treats a reference file as measured flight just because its directory contains trajectory", () => {
+    const reference = makeArtifact("reference", "trial-1", "reference_track_json", "/trajectory/telemetry.json/reference_track.json");
+    expect(selectReplayArtifactsForTrial([reference], "trial-1")).toEqual({
+      reference, trajectory: null, telemetry: null,
+    });
+  });
+
+  it("does not let a telemetry-like parent directory outrank an explicit telemetry type", () => {
+    const wrong = makeArtifact("wrong", "trial-1", "trajectory_plot", "/telemetry_json/other.json");
+    const correct = makeArtifact("correct", "trial-1", "telemetry_json", "/data/record.json");
+    expect(selectReplayArtifactsForTrial([wrong, correct], "trial-1").telemetry).toBe(correct);
+  });
+
+  it("does not mix different trial owners even when their filenames look correct", () => {
+    const unrelated = makeArtifact("other", "trial-2", "telemetry_json", "/data/telemetry.json");
+    expect(selectReplayArtifactsForTrial([unrelated], "trial-1").trajectory).toBeNull();
+  });
+
+  it("retains explicit measured telemetry with a reference-tracking display name", () => {
+    const measured = makeArtifact("measured", "trial-1", "telemetry_json", "/data/telemetry.json");
+    measured.display_name = "Reference tracking telemetry";
+    expect(selectReplayArtifactsForTrial([measured], "trial-1").trajectory).toBe(measured);
+  });
   it("prefers telemetry_json/reference_track_json artifacts", () => {
     const trialId = "trial-1";
     const artifacts: Artifact[] = [

@@ -13,7 +13,7 @@ import type { BrandEditionId } from "../brand/edition-brand.generated";
 import { applyUniversalMode } from "../features/distribution/universalMode";
 import {
   appReducedMotionEnabled,
-  REDUCE_MOTION_CHANGE_EVENT,
+  subscribeToAppReducedMotion,
 } from "../desktop/uiMotionPreferences";
 import {
   editionTheme,
@@ -45,18 +45,25 @@ const fallbackTheme: EditionThemeContextValue = {
 
 const EditionThemeContext = createContext<EditionThemeContextValue>(fallbackTheme);
 
+/** Invalid or unavailable browser preferences fall back locally, not to a cloud account value. */
 function storedAppearance(): AppearancePreference {
-  const stored = window.localStorage.getItem(APPEARANCE_STORAGE_KEY);
+  let stored: string | null = null;
+  try { stored = window.localStorage.getItem(APPEARANCE_STORAGE_KEY); }
+  catch { /* Browser policy can deny persistence while still allowing the app. */ }
   return stored === "light" || stored === "system" || stored === "custom"
     ? stored
     : "dark";
 }
 
+/** Permit a hex color token only; arbitrary CSS is never interpolated from persisted text. */
 function storedCustomAccent(): string {
-  const stored = window.localStorage.getItem(CUSTOM_ACCENT_STORAGE_KEY) ?? "";
+  let stored = "";
+  try { stored = window.localStorage.getItem(CUSTOM_ACCENT_STORAGE_KEY) ?? ""; }
+  catch { /* Use the normal accent when the browser denies storage access. */ }
   return /^#[0-9a-f]{6}$/iu.test(stored) ? stored : "#8d72ee";
 }
 
+/** Own document-wide edition tokens and per-device appearance; mount one provider per page. */
 export function EditionThemeProvider({
   edition,
   children,
@@ -71,21 +78,20 @@ export function EditionThemeProvider({
     window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark"
   );
   const reducedMotion = useSyncExternalStore(
-    (onChange) => {
-      window.addEventListener(REDUCE_MOTION_CHANGE_EVENT, onChange);
-      return () => window.removeEventListener(REDUCE_MOTION_CHANGE_EVENT, onChange);
-    },
+    subscribeToAppReducedMotion,
     appReducedMotionEnabled,
     () => false,
   );
   const setAppearance = useCallback((next: AppearancePreference) => {
-    window.localStorage.setItem(APPEARANCE_STORAGE_KEY, next);
+    try { window.localStorage.setItem(APPEARANCE_STORAGE_KEY, next); }
+    catch { /* Apply in this mounted page without claiming durable storage. */ }
     setAppearanceState(next);
   }, []);
   const setCustomAccent = useCallback((next: string) => {
     if (!/^#[0-9a-f]{6}$/iu.test(next)) return;
     const normalized = next.toLowerCase();
-    window.localStorage.setItem(CUSTOM_ACCENT_STORAGE_KEY, normalized);
+    try { window.localStorage.setItem(CUSTOM_ACCENT_STORAGE_KEY, normalized); }
+    catch { /* State below still makes the selected color usable this session. */ }
     setCustomAccentState(normalized);
   }, []);
   const resetAppearance = useCallback(() => setAppearance("dark"), [setAppearance]);
@@ -94,8 +100,12 @@ export function EditionThemeProvider({
     if (!query) return undefined;
     const update = () => setSystemAppearance(query.matches ? "light" : "dark");
     update();
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
+    if (typeof query.addEventListener === "function") {
+      query.addEventListener("change", update);
+      return () => query.removeEventListener("change", update);
+    }
+    query.addListener?.(update);
+    return () => query.removeListener?.(update);
   }, []);
   const appearance: AppearanceMode = appearancePreference === "system"
     ? systemAppearance

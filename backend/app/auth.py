@@ -26,6 +26,7 @@ class OIDCConfigurationError(RuntimeError):
 
 
 def _extract_bearer_token(authorization: str | None) -> str | None:
+    """Extract a bounded token; parsing the header does not authenticate it."""
     if not authorization:
         return None
     parts = authorization.split(" ", 1)
@@ -40,6 +41,7 @@ def _extract_bearer_token(authorization: str | None) -> str | None:
 
 
 def _get_or_create_user(db: Session, *, email: str, display_name: str | None = None) -> models.User:
+    """Resolve only a local/demo identity, preserving OIDC issuer separation."""
     existing = db.scalars(
         select(models.User)
         .where(
@@ -101,6 +103,7 @@ def _get_or_create_oidc_user(
     email: str | None,
     display_name: str | None,
 ) -> models.User:
+    """Provision by verified issuer/subject; email is mutable profile data only."""
     existing = db.scalars(
         select(models.User)
         .where(
@@ -151,6 +154,7 @@ def _get_or_create_oidc_user(
 
 @lru_cache(maxsize=8)
 def _jwks_client(jwks_url: str, timeout_seconds: int, maximum_bytes: int) -> Any:
+    """Reuse configured key clients with bounded retrieval, never token-selected URLs."""
     parsed_url = urlsplit(jwks_url)
     try:
         _ = parsed_url.port
@@ -173,6 +177,7 @@ def _jwks_client(jwks_url: str, timeout_seconds: int, maximum_bytes: int) -> Any
 
     class _BoundedPyJWKClient(jwt.PyJWKClient):
         def fetch_data(self) -> Any:
+            """Read at most the configured JWKS bytes; clear failed retrieval from cache."""
             jwk_set: Any = None
             try:
                 request = url_request.Request(  # noqa: S310 - validated HTTP(S) URL above.
@@ -222,6 +227,11 @@ def _jwks_client(jwks_url: str, timeout_seconds: int, maximum_bytes: int) -> Any
 
 
 def _decode_oidc_token(token: str, settings: Settings) -> dict[str, Any]:
+    """Verify signature, configured algorithm, issuer, audience and expiration.
+
+    Returned claims identify an account; entitlements and per-resource ownership
+    remain separate checks rather than being inferred from an email address.
+    """
     try:
         import jwt
     except ImportError as exc:  # pragma: no cover - deployment dependency guard
@@ -266,6 +276,7 @@ def get_current_user(
     db: Annotated[Session, Depends(get_db)],
     request: Request,
 ) -> models.User:
+    """Authenticate in the configured mode, never fall back after invalid OIDC proof."""
     settings = get_settings()
     if settings.auth_mode == "disabled":
         return _get_or_create_user(db, email=_DEFAULT_USER_EMAIL, display_name=_DEFAULT_USER_NAME)

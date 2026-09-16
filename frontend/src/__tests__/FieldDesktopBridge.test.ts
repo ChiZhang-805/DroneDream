@@ -10,6 +10,7 @@ import {
   inspectFieldProtocolFrame,
   installFieldAdapter,
   listFieldParameterSnapshots,
+  loadFieldHarnessJob,
   loadFieldParameterSnapshot,
   probeFieldMavlinkTelemetry,
   prepareFieldPreflight,
@@ -138,6 +139,36 @@ describe("Field desktop bridge", () => {
     expect(invoke).toHaveBeenCalledWith("run_field_harness_job", { request });
     invoke.mockResolvedValueOnce({ ...receipt, hardwareWriteAttempts: 1 });
     await expect(runFieldHarnessJob(request)).rejects.toThrow();
+
+    // Well-formed individual fields cannot conceal contradictory evidence,
+    // accountancy, or a response belonging to a different request.
+    for (const drift of [
+      { budget: { ...receipt.budget, usedTrainingTrials: 1 } },
+      { budget: { ...receipt.budget, remainingIterations: 3 } },
+      { budget: { ...receipt.budget, maxIterations: 1 } },
+      { budget: { ...receipt.budget, maxIterations: 5, remainingIterations: 3 } },
+      { holdoutTrialId: "training-1" },
+      { trials: [receipt.trials[2], receipt.trials[0], receipt.trials[1]] },
+      { trials: [receipt.trials[0], receipt.trials[0], receipt.trials[2]] },
+      { trials: [...receipt.trials.slice(0, 2), { ...receipt.trials[2], telemetrySha256: "c".repeat(64) }] },
+      { trials: [{ ...receipt.trials[0], metrics: { ...receipt.trials[0].metrics, trackingError: -1 } }, ...receipt.trials.slice(1)] },
+      { trials: [{ ...receipt.trials[0], metrics: { ...receipt.trials[0].metrics, emergencyInterventions: 1 } }, ...receipt.trials.slice(1)] },
+      { qualification: { ...receipt.qualification, recordedEvidencePassed: false } },
+      { trials: [...receipt.trials.slice(0, 2), { ...receipt.trials[2], candidateSha256: "f".repeat(64) }] },
+      { snapshotSha256: "f".repeat(64) },
+      { objective: "another task" },
+    ]) {
+      invoke.mockResolvedValueOnce({ ...receipt, ...drift });
+      await expect(runFieldHarnessJob(request)).rejects.toThrow();
+    }
+    for (const editionId of ["field", "lab", "autonomy"] as const) {
+      const jobId = `${editionId}-harness-${"a".repeat(16)}-${"b".repeat(8)}`;
+      const owned = { ...receipt, editionId, jobId };
+      invoke.mockResolvedValueOnce(owned);
+      await expect(loadFieldHarnessJob(jobId)).resolves.toEqual(owned);
+      invoke.mockResolvedValueOnce({ ...owned, jobId: `${editionId}-harness-${"f".repeat(16)}-${"b".repeat(8)}` });
+      await expect(loadFieldHarnessJob(jobId)).rejects.toThrow(/identity/);
+    }
   });
 
   it("accepts read-only discovery while preserving zero hardware authority", async () => {

@@ -21,6 +21,7 @@ _PageSizeQ = Query(100, ge=1, le=200)
 
 
 def _raise(err: job_service.JobServiceError) -> None:
+    """Translate an already-classified service failure into the public API envelope."""
     raise HTTPException(
         status_code=err.http_status,
         detail={"code": err.code, "message": err.message},
@@ -34,6 +35,7 @@ def create_batch(
     user: Annotated[models.User, Depends(get_current_user)],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> dict[str, object]:
+    """Commit a batch and its replay receipt together; retries must not create duplicate jobs."""
     gate = begin_mutation(
         db,
         user=user,
@@ -59,6 +61,7 @@ def list_batches(
     page: int = _PageQ,
     page_size: int = _PageSizeQ,
 ) -> dict[str, object]:
+    """Paginate batches within the authenticated owner's service query."""
     try:
         items, total = job_service.list_batches(
             db,
@@ -83,6 +86,7 @@ def get_batch(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
+    """Resolve ownership before serializing a batch, including its aggregate status."""
     try:
         batch = job_service.get_batch(db, batch_id, user=user)
     except job_service.JobServiceError as err:
@@ -96,6 +100,7 @@ def get_batch_jobs(
     db: Annotated[Session, Depends(get_db)],
     user: Annotated[models.User, Depends(get_current_user)],
 ) -> dict[str, object]:
+    """Read child jobs only after authorizing their parent batch."""
     try:
         batch = job_service.get_batch(db, batch_id, user=user)
     except job_service.JobServiceError as err:
@@ -114,6 +119,7 @@ def cancel_batch(
         Query(alias="control_version", ge=1),
     ] = None,
 ) -> dict[str, object]:
+    """Request cancellation using optimistic control-version and idempotent replay guards."""
     gate = begin_mutation(
         db,
         user=user,

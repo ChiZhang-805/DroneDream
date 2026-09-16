@@ -12,6 +12,7 @@ import {
 import { setAuthAccessToken } from "../features/auth/authTokenStore";
 
 function mockFetchOnce(body: unknown, status = 200) {
+  // Serve one controlled wire envelope without contacting a running backend.
   const response = new Response(JSON.stringify(body), {
     status,
     headers: { "Content-Type": "application/json" },
@@ -64,6 +65,56 @@ afterEach(() => {
 });
 
 describe("apiClient envelope handling", () => {
+  it.each([
+    null, [], 7, { success: true }, { success: "true", data: {} },
+    { success: false, error: { code: {}, message: "bad" } },
+  ])("rejects malformed API envelopes without leaking a TypeError: %j", async (body) => {
+    mockFetchOnce(body);
+    await expect(apiClient.getJob("job_x")).rejects.toMatchObject({
+      name: "ApiClientError", code: "INVALID_RESPONSE", httpStatus: 200,
+    });
+  });
+
+  it("does not send an old-account mutation after async request preparation", async () => {
+    const request = vi.fn();
+    vi.stubGlobal("fetch", request);
+    setAuthAccessToken("old-account-token");
+    const assertion = expect(apiClient.updateJob("job_x", { display_name: "name" }, 1))
+      .rejects.toMatchObject({ code: "AUTH_SESSION_CHANGED" });
+    setAuthAccessToken("new-account-token");
+    await assertion;
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it("does not publish an old account's response to the newly signed-in account", async () => {
+    let resolve!: (response: Response) => void;
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((accept) => { resolve = accept; })));
+    setAuthAccessToken("old-account-token");
+    const assertion = expect(apiClient.getJob("job_x"))
+      .rejects.toMatchObject({ code: "AUTH_SESSION_CHANGED" });
+    setAuthAccessToken("new-account-token");
+    resolve(new Response(JSON.stringify({ success: true, data: { id: "old-job" }, error: null })));
+    await assertion;
+  });
+
+  it.each(["json", "artifact", "csv"] as const)(
+    "does not expose a late %s download after the account changes", async (kind) => {
+      let resolve!: (response: Response) => void;
+      vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((accept) => { resolve = accept; })));
+      const createUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:account-check");
+      vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+      setAuthAccessToken("old-account-token");
+      const operation = kind === "json" ? apiClient.fetchArtifactJson("artifact_x")
+        : kind === "artifact" ? apiClient.downloadArtifact("artifact_x")
+          : apiClient.downloadCompareJobsCsv(["job_x"]);
+      const assertion = expect(operation).rejects.toMatchObject({ code: "AUTH_SESSION_CHANGED" });
+      setAuthAccessToken("new-account-token");
+      resolve(new Response("{}"));
+      await assertion;
+      expect(createUrl).not.toHaveBeenCalled();
+    },
+  );
+
   it("builds artifact download URLs from VITE_API_BASE_URL", () => {
     expect(artifactDownloadUrl("art_abc")).toBe(
       "http://127.0.0.1:8000/api/v1/artifacts/art_abc/download",

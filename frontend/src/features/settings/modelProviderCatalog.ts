@@ -48,6 +48,8 @@ const OPENAI_COMPATIBLE: readonly ModelApiProtocol[] = [
   "openai-chat",
 ];
 
+// UI defaults and identification hints, not an endpoint trust allowlist or proof
+// of server availability. The execution/vault boundary validates actual requests.
 export const MODEL_PROVIDER_CATALOG: readonly ModelProviderDefinition[] = [
   {
     id: "openai",
@@ -292,6 +294,7 @@ export function isManagedModelProvider(value: unknown): value is ManagedModelPro
   return value === "openai" || value === "qwen" || value === "deepseek" || value === "kimi";
 }
 
+/** Unknown runtime input receives editable Custom metadata, never implicit OpenAI credentials. */
 export function modelProviderDefinition(provider: ModelProvider): ModelProviderDefinition {
   return PROVIDER_BY_ID.get(provider) ?? PROVIDER_BY_ID.get("custom")!;
 }
@@ -300,6 +303,7 @@ export function modelProviderLabel(provider: ModelProvider): string {
   return modelProviderDefinition(provider).label;
 }
 
+/** Return a fresh non-secret form preset, not a saved or verified model profile. */
 export function modelProviderDefaults(provider: ModelProvider) {
   const definition = modelProviderDefinition(provider);
   return {
@@ -322,6 +326,7 @@ export interface ModelProviderDetectionResult {
   matchedBy: readonly ("endpoint" | "model" | "key")[];
 }
 
+/** Local heuristic only: inspect strings without sending a key or contacting an endpoint. */
 export function detectModelProvider({
   baseUrl = "",
   model = "",
@@ -340,6 +345,7 @@ export function detectModelProvider({
       if (apiKey && provider.keyPatterns?.some((pattern) => pattern.test(apiKey.trim()))) {
         matchedBy.push("key");
       }
+      // Weighted hints rank suggestions; even a high score is not an authorization decision.
       const score = matchedBy.reduce((total, signal) => total + ({ endpoint: 5, key: 4, model: 2 }[signal]), 0);
       return { provider: provider.id, matchedBy, score };
     })

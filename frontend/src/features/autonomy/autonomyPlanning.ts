@@ -35,7 +35,7 @@ import {
   isAgentCoreUnavailable,
   planWithAgentCore,
 } from "./agentCorePlanning";
-import type { AgentCoreMissionPrepareSummary } from "./agentCore";
+import { AgentCoreRequestError, type AgentCoreMissionPrepareSummary } from "./agentCore";
 
 export type AutonomyPlanningModel =
   | {
@@ -328,7 +328,8 @@ export async function planAutonomyMission(
         edition: input.edition,
         accountId: input.accountId,
         conversationId: input.conversationId,
-        instruction: input.instruction,
+        // 补充回答必须带上原任务，不能把“东门那个”当成全新的独立任务。
+        instruction: input.intent,
         locale: input.chinese ? "zh-CN" : "en-US",
         accessMode: input.selectedModel.accessMode,
         provider: input.selectedModel.provider,
@@ -393,6 +394,13 @@ export async function planAutonomyMission(
         compiledPlan: agentCoreMissionPlanSnapshot(coreSummary, plannerBinding),
       };
     } catch (reason) {
+      if (reason instanceof AgentCoreRequestError && reason.clarificationFields.length) {
+        return {
+          planningBrief: `${input.chinese ? "请确认：" : "Please clarify:"}\n${reason.clarificationFields.map((field) => `• ${field}`).join("\n")}`,
+          planningRunId: null, planningArtifactSha256: null, plannerArtifact: null,
+          harnessInspection, compileRequest: null, compileResult: null, compiledPlan: null,
+        };
+      }
       // The installed AGENT edition has exactly one planning and execution
       // authority. A Core failure must never be hidden by charging a second
       // planner or silently switching to the public compiler/runtime.

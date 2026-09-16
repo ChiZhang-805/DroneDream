@@ -441,10 +441,12 @@ def test_download_s3_artifact_via_storage_backend(client: TestClient, monkeypatc
     assert resp.text == '{"ok":true}'
 
 
+@pytest.mark.parametrize("render_fails", [False, True])
 def test_free_s3_pdf_report_never_uses_presigned_redirect(
     client: TestClient,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    render_fails: bool,
 ) -> None:
     job_id = _seed_job()
     canonical_pdf = b"%PDF-1.4\n%canonical-unwatermarked-report\n"
@@ -511,6 +513,17 @@ def test_free_s3_pdf_report_never_uses_presigned_redirect(
         "app.routers.artifacts.resolve_report_export_tier",
         lambda **kwargs: "free",
     )
+
+    if render_fails:
+        def fail_render(*_args, **_kwargs):
+            raise RuntimeError("injected report rendering failure")
+
+        monkeypatch.setattr("app.routers.artifacts.render_job_pdf_report", fail_render)
+        with pytest.raises(RuntimeError, match="injected report rendering failure"):
+            client.get(f"/api/v1/artifacts/{artifact_id}/download")
+        assert storage.copy_calls == 1
+        assert list(tmp_path.glob("dronedream-artifact-*.download")) == []
+        return
 
     response = client.get(f"/api/v1/artifacts/{artifact_id}/download")
 

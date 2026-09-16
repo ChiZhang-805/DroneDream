@@ -10,6 +10,31 @@ import {
 } from "../calibrationWorkflow";
 
 describe("Lab calibration workflow", () => {
+  it("rejects excessive nesting with a domain error instead of exhausting the stack", () => {
+    const source = "[".repeat(10000) + "0" + "]".repeat(10000);
+    expect(() => parseLabCalibrationInput("deep.json", source)).toThrow(LabCalibrationInputError);
+  });
+
+  it("rejects metrics that overflow percentages and unsafe integer counters", () => {
+    for (const mutation of [{ energyWh: 1e308 }, { overshootCount: 2 ** 54 }]) {
+      expect(() => parseLabCalibrationInput("huge.json", JSON.stringify({
+        ...fixture, realObservation: { ...fixture.realObservation, ...mutation },
+      }))).toThrow(LabCalibrationInputError);
+    }
+  });
+
+  it("recomputes exported gaps instead of trusting a mutable analysis object", () => {
+    const input = parseLabCalibrationInput("cycle.json", JSON.stringify(fixture));
+    const analysis = analyzeLabCalibration(input, "tracking", 15, 4);
+    analysis.gapWithinTolerance = true;
+    analysis.gaps[0].percent = 0;
+    const receipt = buildLabCalibrationDraftReceipt(input, analysis);
+    expect(receipt.analysis).toMatchObject({ gapWithinTolerance: false });
+    analysis.recommendations.push("mutated-after-export");
+    expect((receipt.analysis as { recommendations: string[] }).recommendations)
+      .not.toContain("mutated-after-export");
+  });
+
   it("binds sim and real evidence into one fail-closed job", () => {
     const input = parseLabCalibrationInput("cycle.json", JSON.stringify(fixture));
     const analysis = analyzeLabCalibration(input, "tracking", 15, 4);

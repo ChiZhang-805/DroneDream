@@ -19,8 +19,9 @@ import {
 import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 import {
   parseLabEvidencePreview,
-  type LabEvidencePreview,
+  MAX_LAB_EVIDENCE_BYTES,
 } from "./evidencePreview";
+import { useEvidenceImport } from "./useEvidenceImport";
 import { LabCalibrationWorkspace } from "./LabCalibrationWorkspace";
 import vehiclePackAdapterJson from "./vehicle-pack-adapter.v1.json";
 import "./lab.css";
@@ -195,10 +196,12 @@ const COPY = {
   },
 } as const;
 
+/** Shortened display only; consumers keep the complete source identity. */
 function shortHash(value: string): string {
   return `${value.slice(0, 12)}…${value.slice(-8)}`;
 }
 
+/** Choose workflows and preview evidence without granting device access from UI state. */
 export function LabSetup({
   initialView = "calibration",
 }: {
@@ -211,8 +214,11 @@ export function LabSetup({
   const [packId, setPackId] = useState(vehiclePackAdapter.packs[0]?.packId ?? "");
   const [controllerIndex, setControllerIndex] = useState(0);
   const [firmwareIndex, setFirmwareIndex] = useState(0);
-  const [evidence, setEvidence] = useState<LabEvidencePreview | null>(null);
-  const [evidenceError, setEvidenceError] = useState<string | null>(null);
+  const evidenceImport = useEvidenceImport(MAX_LAB_EVIDENCE_BYTES, parseLabEvidencePreview);
+  const evidence = evidenceImport.value;
+  const evidenceError = evidenceImport.error ? localeSafeError(evidenceImport.error, locale, {
+    zh: "无法检查此证据文件。", en: "The evidence file could not be inspected.",
+  }) : null;
 
   const availablePacks = useMemo(
     () => vehiclePackAdapter.packs.filter((pack) => (
@@ -231,6 +237,8 @@ export function LabSetup({
     ?? selectedPack?.firmwareVersions[0];
 
   function chooseWorkspace(next: Workspace) {
+    // Switching context must not adopt a file still loading in the previous workflow.
+    evidenceImport.reset();
     const nextPacks = vehiclePackAdapter.packs.filter((pack) => (
       next === "simulation"
         ? pack.supportedEditions.includes("sim")
@@ -248,6 +256,7 @@ export function LabSetup({
   }
 
   function handleViewKeyDown(event: KeyboardEvent<HTMLButtonElement>, current: LabSetupView) {
+    // Roving tabindex keeps only the active tab in sequential keyboard navigation.
     if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
     event.preventDefault();
     const currentIndex = VIEWS.indexOf(current);
@@ -262,17 +271,7 @@ export function LabSetup({
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    try {
-      const preview = parseLabEvidencePreview(file.name, await file.text());
-      setEvidence(preview);
-      setEvidenceError(null);
-    } catch (error) {
-      setEvidence(null);
-      setEvidenceError(localeSafeError(error, locale, {
-        zh: "无法检查此证据文件。",
-        en: "The evidence file could not be inspected.",
-      }));
-    }
+    await evidenceImport.importFile(file);
   }
 
   return (
@@ -476,8 +475,8 @@ export function LabSetup({
             <button
               type="button"
               className="btn btn-ghost"
-              disabled={!evidence && !evidenceError}
-              onClick={() => { setEvidence(null); setEvidenceError(null); }}
+              disabled={!evidence && !evidenceError && !evidenceImport.loading}
+              onClick={evidenceImport.reset}
             >
               <RotateCcw aria-hidden="true" /> {copy.clearEvidence}
             </button>

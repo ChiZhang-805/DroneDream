@@ -35,6 +35,7 @@ from app.storage.integrity import authorize_artifact_integrity_deletion
 
 @dataclass(frozen=True, slots=True)
 class _ManagedFile:
+    """Bind a scan candidate to its physical identity, not merely a path string."""
     path: Path
     size_bytes: int
     modified_at: datetime
@@ -87,20 +88,24 @@ class ArtifactCleanupResult:
     errors: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
+        """Copy statistics and nested diagnostic collections for the CLI response."""
         return asdict(self)
 
 
 def _as_utc(value: datetime) -> datetime:
+    """Interpret timezone-less database timestamps using the schema's UTC convention."""
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
 
 
 def _is_under(path: Path, roots: list[Path]) -> bool:
+    """Check resolved paths against the configured jobs-only ownership boundary."""
     return any(path.is_relative_to(root) for root in roots)
 
 
 def _managed_files(roots: list[Path]) -> tuple[list[_ManagedFile], list[str]]:
+    """Inventory regular files without following links; never authorize deletion here."""
     files: list[_ManagedFile] = []
     errors: list[str] = []
     for root in roots:
@@ -156,6 +161,7 @@ def platform_supports_safe_artifact_unlink() -> bool:
 
 
 def _directory_open_flags() -> int:
+    """Require directory descriptors that reject symlinks and do not leak across exec."""
     return (
         os.O_RDONLY
         | int(getattr(os, "O_DIRECTORY", 0))
@@ -165,6 +171,7 @@ def _directory_open_flags() -> int:
 
 
 def _open_absolute_directory_no_follow(path: Path) -> int:
+    """Walk from the volume root by descriptor; transfer the final open fd to the caller."""
     if not path.is_absolute():
         raise SafeArtifactRemovalUnsupported("managed root must be absolute")
     anchor = Path(path.anchor)
@@ -215,6 +222,7 @@ def _unlink_managed_file_posix(item: _ManagedFile, roots: list[Path]) -> None:
 
 
 def _job_terminal_at(job: models.Job) -> datetime:
+    """Prefer a recorded terminal transition, falling back to older schema timestamps."""
     for value in (
         job.completed_at,
         job.failed_at,
@@ -231,6 +239,7 @@ def _job_id_for_owner(
     artifact: models.Artifact,
     trial_to_job: dict[str, str],
 ) -> str | None:
+    """Resolve supported database owners; unknown ownership must prevent expiration."""
     if artifact.owner_type == "job":
         return artifact.owner_id
     if artifact.owner_type == "trial":
@@ -239,6 +248,7 @@ def _job_id_for_owner(
 
 
 def _job_id_for_file(path: Path, roots: list[Path]) -> str | None:
+    """Extract the job directory beneath an already resolved managed jobs root."""
     for root in roots:
         if not path.is_relative_to(root):
             continue
@@ -248,6 +258,7 @@ def _job_id_for_file(path: Path, roots: list[Path]) -> str | None:
 
 
 def _resolved_local_path(storage_path: str) -> Path | None:
+    """Exclude remote/mock schemes and resolve aliases for conservative reference checks."""
     if storage_path.startswith(("mock://", "s3://")):
         return None
     try:
@@ -305,7 +316,9 @@ def cleanup_local_artifacts(
     result.bytes_before = sum(item.size_bytes for item in files)
     files_by_path = {item.path: item for item in files}
 
-    jobs = list(db.scalars(select(models.Job)))
+    # A SELECT alone reuses existing ORM objects. Refresh their attributes so
+    # a stale terminal status in the caller's identity map cannot permit removal.
+    jobs = list(db.scalars(select(models.Job).execution_options(populate_existing=True)))
     jobs_by_id = {job.id: job for job in jobs}
     terminal_job_ids = {job.id for job in jobs if job.status in schemas.JOB_TERMINAL_STATUSES}
     active_job_ids = set(jobs_by_id) - terminal_job_ids
@@ -321,7 +334,9 @@ def cleanup_local_artifacts(
         trial_id: job_id
         for trial_id, job_id in db.execute(select(models.Trial.id, models.Trial.job_id)).all()
     }
-    artifact_rows = list(db.scalars(select(models.Artifact)))
+    artifact_rows = list(
+        db.scalars(select(models.Artifact).execution_options(populate_existing=True))
+    )
 
     references_by_path: dict[Path, list[models.Artifact]] = {}
     protected_reference_paths: set[Path] = set()
@@ -374,6 +389,7 @@ def cleanup_local_artifacts(
         selected_paths[path] = "orphan"
 
     def references_are_expirable(rows: list[models.Artifact]) -> bool:
+        """Every reference must have a terminal, unprotected owner before eviction."""
         for artifact in rows:
             job_id = _job_id_for_owner(artifact, trial_to_job)
             if job_id is None or job_id not in terminal_job_ids:
@@ -383,6 +399,7 @@ def cleanup_local_artifacts(
         return True
 
     def newest_reference_time(path: Path, rows: list[models.Artifact]) -> datetime:
+        """A new alias or changed file restarts the shared file's retention age."""
         timestamps = [_as_utc(artifact.created_at) for artifact in rows]
         managed_file = files_by_path.get(path)
         if managed_file is not None:
@@ -497,14 +514,22 @@ def cleanup_local_artifacts(
                 .execution_options(synchronize_session=False)
             )
             locked_jobs = list(
-                db.scalars(select(models.Job).where(models.Job.id.in_(audit_job_ids)))
+                db.scalars(
+                    select(models.Job)
+                    .where(models.Job.id.in_(audit_job_ids))
+                    .execution_options(populate_existing=True)
+                )
             )
         else:
             locked_jobs = list(
                 db.scalars(
-                    select(models.Job).where(models.Job.id.in_(audit_job_ids)).with_for_update()
+                    select(models.Job)
+                    .where(models.Job.id.in_(audit_job_ids))
+                    .with_for_update()
+                    .execution_options(populate_existing=True)
                 )
             )
+        # Refresh again *under* the lock: state can change after the initial scan.
         locked_by_id = {job.id: job for job in locked_jobs}
         if any(
             job_id not in locked_by_id
@@ -561,7 +586,10 @@ def cleanup_local_artifacts(
             job_id = _job_id_for_file(path, roots)
             if job_id is not None:
                 owner_job = db.scalar(
-                    select(models.Job).where(models.Job.id == job_id).with_for_update()
+                    select(models.Job)
+                    .where(models.Job.id == job_id)
+                    .with_for_update()
+                    .execution_options(populate_existing=True)
                 )
                 if owner_job is not None and owner_job.status not in schemas.JOB_TERMINAL_STATUSES:
                     result.protected_active_job_files += 1
@@ -597,6 +625,7 @@ def cleanup_local_artifacts(
 
 
 def _main() -> int:
+    """Default to inspection; applying retention also requires an enabled product policy."""
     parser = argparse.ArgumentParser(
         description="Inspect or apply DroneDream local artifact retention."
     )

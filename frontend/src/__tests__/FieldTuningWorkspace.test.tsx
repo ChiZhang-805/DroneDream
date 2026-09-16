@@ -21,7 +21,7 @@ describe("FieldTuningWorkspace", () => {
 
     expect(screen.getByRole("heading", { name: "Candidate history" })).toBeInTheDocument();
     expect(screen.getAllByRole("row")).toHaveLength(6);
-    expect(screen.getByText("Independent holdout")).toBeInTheDocument();
+    expect(screen.getByText("Fixture holdout")).toBeInTheDocument();
     expect(screen.getByText("Demo-qualified only")).toBeInTheDocument();
     expect(container.querySelector("[data-authority='false']")).toBeTruthy();
     expect(container.querySelector("[data-simulation='false']")).toBeTruthy();

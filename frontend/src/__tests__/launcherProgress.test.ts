@@ -73,4 +73,22 @@ describe("launcher progress contract", () => {
       complete: true,
     })).toBe(100);
   });
+
+  it("does not reuse stale Runtime or account readiness to advance progress", () => {
+    expect(launcherProgressFromEvidence({
+      enabled: true, prerequisitesFresh: true, runtimeFresh: false,
+      runtime: runtime(["ready"]), runtimeAccessStatus: "ready", complete: true,
+    })).toBe(LAUNCHER_PROGRESS_CHECKPOINTS.prerequisites);
+    expect(launcherProgressFromEvidence({
+      enabled: true, prerequisitesFresh: false, runtimeFresh: false,
+      runtime: runtime(["ready"]), runtimeAccessStatus: "ready", complete: false,
+    })).toBe(0);
+  });
+
+  it("allows completed fresh local checks in a view without a native access provider", () => {
+    expect(launcherProgressFromEvidence({
+      enabled: true, prerequisitesFresh: true, runtimeFresh: true,
+      runtime: runtime(["ready"]), runtimeAccessStatus: "browser", complete: true,
+    })).toBe(100);
+  });
 });

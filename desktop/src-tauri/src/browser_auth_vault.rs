@@ -1,10 +1,134 @@
+//! Edition-scoped OS secrets. Network refresh must commit against the generation
+//! it read, so a late response cannot undo logout or replace a newer account.
+use std::{collections::HashMap, fmt, sync::Mutex};
+
 const CURRENT_SESSION_KEY: &str = "current";
 const MAX_CREDENTIAL_BYTES: usize = 2_560;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub(crate) struct StoredBrowserAuthSession {
     pub subject_hash: String,
     pub refresh_token: String,
+}
+
+impl fmt::Debug for StoredBrowserAuthSession {
+    /// Diagnostics must never serialize the recoverable refresh credential.
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("StoredBrowserAuthSession")
+            .field("subject_hash", &self.subject_hash)
+            .field("refresh_token", &"[redacted]")
+            .finish()
+    }
+}
+
+/// Process-local compare-and-swap ticket; not a session secret or server grant.
+#[derive(Clone, Debug)]
+pub(crate) struct VaultRevision {
+    namespace: String,
+    generation: u64,
+}
+
+struct CredentialVault<B> {
+    backend: B,
+    generations: Mutex<HashMap<String, u64>>,
+}
+
+impl<B: CredentialBackend> CredentialVault<B> {
+    /// A backend plus one lock owns every pointer/secret mutation in this process.
+    fn new(backend: B) -> Self {
+        Self {
+            backend,
+            generations: Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// Snapshot before asynchronous authorization; do not hold a lock over HTTP.
+    fn revision(&self, namespace: &str) -> Result<VaultRevision, String> {
+        validate_namespace(namespace)?;
+        let state = self
+            .generations
+            .lock()
+            .map_err(|_| "The desktop credential lock is unavailable.")?;
+        Ok(VaultRevision {
+            namespace: namespace.into(),
+            generation: *state.get(namespace).unwrap_or(&0),
+        })
+    }
+
+    /// Read the pointer and secret together with the generation they came from.
+    fn load(
+        &self,
+        namespace: &str,
+    ) -> Result<Option<(StoredBrowserAuthSession, VaultRevision)>, String> {
+        validate_namespace(namespace)?;
+        let state = self
+            .generations
+            .lock()
+            .map_err(|_| "The desktop credential lock is unavailable.")?;
+        Ok(load_with(&self.backend, namespace)?.map(|session| {
+            (
+                session,
+                VaultRevision {
+                    namespace: namespace.into(),
+                    generation: *state.get(namespace).unwrap_or(&0),
+                },
+            )
+        }))
+    }
+
+    /// Commit only if no store/logout has superseded the asynchronous operation.
+    fn store(
+        &self,
+        expected: &VaultRevision,
+        subject_hash: &str,
+        refresh_token: &str,
+    ) -> Result<VaultRevision, String> {
+        validate_namespace(&expected.namespace)?;
+        validate_subject_hash(subject_hash)?;
+        validate_refresh_token(refresh_token)?;
+        let mut state = self
+            .generations
+            .lock()
+            .map_err(|_| "The desktop credential lock is unavailable.")?;
+        let generation = state.entry(expected.namespace.clone()).or_default();
+        if *generation != expected.generation {
+            return Err("The desktop authentication session changed during sign-in.".into());
+        }
+        // Invalidate old tickets even when an OS write fails partway through.
+        *generation = generation
+            .checked_add(1)
+            .ok_or("The desktop credential generation is exhausted.")?;
+        store_with(
+            &self.backend,
+            &expected.namespace,
+            subject_hash,
+            refresh_token,
+        )?;
+        Ok(VaultRevision {
+            namespace: expected.namespace.clone(),
+            generation: *generation,
+        })
+    }
+
+    /// Explicit logout always advances; stale failure cleanup is a no-op instead.
+    fn clear(&self, namespace: &str, expected: Option<&VaultRevision>) -> Result<bool, String> {
+        validate_namespace(namespace)?;
+        let mut state = self
+            .generations
+            .lock()
+            .map_err(|_| "The desktop credential lock is unavailable.")?;
+        let generation = state.entry(namespace.into()).or_default();
+        if expected
+            .is_some_and(|ticket| ticket.namespace != namespace || ticket.generation != *generation)
+        {
+            return Ok(false);
+        }
+        *generation = generation
+            .checked_add(1)
+            .ok_or("The desktop credential generation is exhausted.")?;
+        clear_with(&self.backend, namespace)
+    }
 }
 
 trait CredentialBackend {
@@ -13,25 +137,28 @@ trait CredentialBackend {
     fn delete(&self, target: &str) -> Result<bool, String>;
 }
 
+/// Separate the active account pointer from its recoverable refresh credential.
 fn current_target(namespace: &str) -> String {
     format!("{namespace}/{CURRENT_SESSION_KEY}")
 }
 
+/// Account records are keyed by an already validated hash, never raw email.
 fn account_target(namespace: &str, subject_hash: &str) -> String {
     format!("{namespace}/{subject_hash}")
 }
 
+/// Only the five compiled product identities may own a credential namespace.
 fn validate_namespace(namespace: &str) -> Result<(), String> {
-    if !namespace.starts_with("DroneDream/Auth/")
-        || !namespace.ends_with("/v1")
-        || namespace.len() > 128
-        || namespace.chars().any(char::is_control)
+    if !["universal", "sim", "lab", "field", "autonomy"]
+        .iter()
+        .any(|edition| namespace == format!("DroneDream/Auth/{edition}/v1"))
     {
         return Err("The desktop credential namespace is invalid.".to_owned());
     }
     Ok(())
 }
 
+/// Reject ambiguous or path-like account identifiers at the vault boundary.
 fn validate_subject_hash(subject_hash: &str) -> Result<(), String> {
     if subject_hash.len() != 64
         || !subject_hash
@@ -43,6 +170,7 @@ fn validate_subject_hash(subject_hash: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Enforce the OS blob limit and the printable, whitespace-free token contract.
 fn validate_refresh_token(refresh_token: &str) -> Result<(), String> {
     if refresh_token.is_empty()
         || refresh_token.len() > MAX_CREDENTIAL_BYTES
@@ -55,10 +183,13 @@ fn validate_refresh_token(refresh_token: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Error messages describe the field, never the corrupt credential bytes.
 fn decode_utf8(value: Vec<u8>, label: &str) -> Result<String, String> {
     String::from_utf8(value).map_err(|_| format!("The stored desktop {label} is invalid."))
 }
 
+/// Publish the secret before the pointer; roll back a newly orphaned secret.
+/// Caller serializes the multi-record operation, since the OS has no transaction here.
 fn store_with<B: CredentialBackend>(
     backend: &B,
     namespace: &str,
@@ -98,6 +229,7 @@ fn store_with<B: CredentialBackend>(
     Ok(())
 }
 
+/// Remove corrupt pointers/secrets rather than returning a partially valid session.
 fn load_with<B: CredentialBackend>(
     backend: &B,
     namespace: &str,
@@ -136,6 +268,7 @@ fn load_with<B: CredentialBackend>(
     }))
 }
 
+/// Clear only this edition's active account; do not enumerate unrelated OS secrets.
 fn clear_with<B: CredentialBackend>(backend: &B, namespace: &str) -> Result<bool, String> {
     validate_namespace(namespace)?;
     let pointer_target = current_target(namespace);
@@ -158,10 +291,12 @@ struct WindowsCredentialBackend;
 
 #[cfg(windows)]
 impl WindowsCredentialBackend {
+    /// Arguments are validated before encoding; the trailing NUL is for Win32 only.
     fn wide(value: &str) -> Vec<u16> {
         value.encode_utf16().chain(std::iter::once(0)).collect()
     }
 
+    /// Keep the OS diagnostic without including credential targets or token bytes.
     fn os_error(action: &str) -> String {
         format!(
             "Windows Credential Manager could not {action} the DroneDream session: {}",
@@ -172,6 +307,7 @@ impl WindowsCredentialBackend {
 
 #[cfg(windows)]
 impl CredentialBackend for WindowsCredentialBackend {
+    /// Generic credentials remain under the current Windows user across app restarts.
     fn write(&self, target: &str, user_name: &str, value: &[u8]) -> Result<(), String> {
         use windows_sys::Win32::Security::Credentials::{
             CredWriteW, CREDENTIALW, CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC,
@@ -192,6 +328,8 @@ impl CredentialBackend for WindowsCredentialBackend {
             UserName: user_wide.as_mut_ptr(),
             ..Default::default()
         };
+        // All backing buffers outlive the FFI call. Clearing this temporary copy
+        // does not claim that the caller's String or allocator memory is zeroized.
         let written = unsafe { CredWriteW(&credential, 0) };
         blob.fill(0);
         if written == 0 {
@@ -200,6 +338,7 @@ impl CredentialBackend for WindowsCredentialBackend {
         Ok(())
     }
 
+    /// Copy a bounded blob before CredFree; distinguish missing from unreadable.
     fn read(&self, target: &str) -> Result<Option<Vec<u8>>, String> {
         use windows_sys::Win32::{
             Foundation::{GetLastError, ERROR_NOT_FOUND},
@@ -240,6 +379,7 @@ impl CredentialBackend for WindowsCredentialBackend {
         Ok(Some(value))
     }
 
+    /// Missing is idempotent success, while other OS errors remain visible.
     fn delete(&self, target: &str) -> Result<bool, String> {
         use windows_sys::Win32::{
             Foundation::{GetLastError, ERROR_NOT_FOUND},
@@ -260,49 +400,77 @@ impl CredentialBackend for WindowsCredentialBackend {
 }
 
 #[cfg(windows)]
+fn windows_vault() -> &'static CredentialVault<WindowsCredentialBackend> {
+    // One process-wide coordinator is shared by login, refresh and logout.
+    static VAULT: std::sync::OnceLock<CredentialVault<WindowsCredentialBackend>> =
+        std::sync::OnceLock::new();
+    VAULT.get_or_init(|| CredentialVault::new(WindowsCredentialBackend))
+}
+
+/// Capture ownership before starting a native browser authorization.
+#[cfg(windows)]
+pub(crate) fn begin_vault_operation(namespace: &str) -> Result<VaultRevision, String> {
+    windows_vault().revision(namespace)
+}
+
+#[cfg(not(windows))]
+pub(crate) fn begin_vault_operation(_namespace: &str) -> Result<VaultRevision, String> {
+    Err("Persistent desktop authentication is supported only on Windows.".to_owned())
+}
+
+/// Commit a new/rotated secret only while this operation still owns the session.
+#[cfg(windows)]
 pub(crate) fn store_refresh_token(
-    namespace: &str,
+    revision: &VaultRevision,
     subject_hash: &str,
     refresh_token: &str,
-) -> Result<(), String> {
-    store_with(
-        &WindowsCredentialBackend,
-        namespace,
-        subject_hash,
-        refresh_token,
-    )
+) -> Result<VaultRevision, String> {
+    windows_vault().store(revision, subject_hash, refresh_token)
 }
 
 #[cfg(not(windows))]
 pub(crate) fn store_refresh_token(
-    _namespace: &str,
+    _revision: &VaultRevision,
     _subject_hash: &str,
     _refresh_token: &str,
-) -> Result<(), String> {
+) -> Result<VaultRevision, String> {
     Err("Persistent desktop authentication is supported only on Windows.".to_owned())
 }
 
 #[cfg(windows)]
+/// Return both stored bytes and the ticket required for refresh/invalid-token cleanup.
 pub(crate) fn load_refresh_token(
     namespace: &str,
-) -> Result<Option<StoredBrowserAuthSession>, String> {
-    load_with(&WindowsCredentialBackend, namespace)
+) -> Result<Option<(StoredBrowserAuthSession, VaultRevision)>, String> {
+    windows_vault().load(namespace)
 }
 
 #[cfg(not(windows))]
 pub(crate) fn load_refresh_token(
     _namespace: &str,
-) -> Result<Option<StoredBrowserAuthSession>, String> {
+) -> Result<Option<(StoredBrowserAuthSession, VaultRevision)>, String> {
     Ok(None)
 }
 
 #[cfg(windows)]
+/// User-requested logout invalidates even a pending refresh of an empty vault.
 pub(crate) fn clear_refresh_token(namespace: &str) -> Result<bool, String> {
-    clear_with(&WindowsCredentialBackend, namespace)
+    windows_vault().clear(namespace, None)
 }
 
 #[cfg(not(windows))]
 pub(crate) fn clear_refresh_token(_namespace: &str) -> Result<bool, String> {
+    Ok(false)
+}
+
+/// Failure of an older operation must not erase credentials published since then.
+#[cfg(windows)]
+pub(crate) fn clear_refresh_token_if_current(revision: &VaultRevision) -> Result<bool, String> {
+    windows_vault().clear(&revision.namespace, Some(revision))
+}
+
+#[cfg(not(windows))]
+pub(crate) fn clear_refresh_token_if_current(_revision: &VaultRevision) -> Result<bool, String> {
     Ok(false)
 }
 
@@ -341,6 +509,67 @@ mod tests {
     const OTHER_NAMESPACE: &str = "DroneDream/Auth/lab/v1";
     const SUBJECT_A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const SUBJECT_B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+    #[test]
+    fn diagnostics_redact_refresh_secrets_and_namespaces_are_exact() {
+        let session = StoredBrowserAuthSession {
+            subject_hash: SUBJECT_A.into(),
+            refresh_token: "synthetic-secret-never-log".into(),
+        };
+        assert!(!format!("{session:?}").contains(&session.refresh_token));
+        for namespace in [
+            "DroneDream/Auth/other/v1",
+            "DroneDream/Auth/sim/../lab/v1",
+            "DroneDream/Auth//v1",
+        ] {
+            assert!(validate_namespace(namespace).is_err());
+        }
+    }
+
+    #[test]
+    fn logout_cannot_be_undone_by_a_late_refresh_or_authorization() {
+        let vault = CredentialVault::new(MemoryBackend::default());
+        let initial = vault.revision(NAMESPACE).unwrap();
+        vault.store(&initial, SUBJECT_A, "first-token").unwrap();
+        let (_, refresh) = vault.load(NAMESPACE).unwrap().unwrap();
+        let authorization = vault.revision(NAMESPACE).unwrap();
+        vault.clear(NAMESPACE, None).unwrap();
+        assert!(vault.store(&refresh, SUBJECT_A, "late-refresh").is_err());
+        assert!(vault
+            .store(&authorization, SUBJECT_B, "late-login")
+            .is_err());
+        assert!(vault.load(NAMESPACE).unwrap().is_none());
+    }
+
+    #[test]
+    fn stale_failure_and_refresh_do_not_touch_new_account_even_with_same_token() {
+        let vault = CredentialVault::new(MemoryBackend::default());
+        let first = vault.revision(NAMESPACE).unwrap();
+        let old = vault.store(&first, SUBJECT_A, "first-token").unwrap();
+        vault.clear(NAMESPACE, None).unwrap();
+        let login = vault.revision(NAMESPACE).unwrap();
+        // Include the ABA case: identical account/token bytes are still a new session.
+        vault.store(&login, SUBJECT_A, "first-token").unwrap();
+        assert!(!vault.clear(NAMESPACE, Some(&old)).unwrap());
+        assert!(vault.store(&old, SUBJECT_A, "late-token").is_err());
+        assert_eq!(
+            vault.load(NAMESPACE).unwrap().unwrap().0.refresh_token,
+            "first-token"
+        );
+    }
+
+    #[test]
+    fn generation_is_edition_scoped_and_failed_writes_invalidate_old_tickets() {
+        let vault = CredentialVault::new(MemoryBackend::default());
+        let sim = vault.revision(NAMESPACE).unwrap();
+        vault.clear(OTHER_NAMESPACE, None).unwrap();
+        *vault.backend.fail_pointer_write.borrow_mut() = true;
+        assert!(vault.store(&sim, SUBJECT_A, "failed-token").is_err());
+        *vault.backend.fail_pointer_write.borrow_mut() = false;
+        assert!(vault.store(&sim, SUBJECT_A, "late-token").is_err());
+        let retry = vault.revision(NAMESPACE).unwrap();
+        vault.store(&retry, SUBJECT_A, "new-token").unwrap();
+    }
 
     #[test]
     fn stores_loads_rotates_and_clears_only_the_current_edition_session() {

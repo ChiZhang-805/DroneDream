@@ -50,6 +50,7 @@ export interface ModelAccessContextValue {
 
 export const ModelAccessContext = createContext<ModelAccessContextValue | null>(null);
 
+/** Require the account-scoped provider; never synthesize global settings outside it. */
 export function useModelAccess(): ModelAccessContextValue {
   const context = useContext(ModelAccessContext);
   if (!context) {

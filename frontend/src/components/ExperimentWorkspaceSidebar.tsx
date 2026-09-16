@@ -39,6 +39,7 @@ interface ExperimentWorkspaceSidebarProps {
   ownerId: string;
   locale: "en" | "zh-CN";
   edition: BrandEditionId;
+  hideWhenEmpty?: boolean;
 }
 
 const COPY = {
@@ -124,6 +125,7 @@ export function ExperimentWorkspaceSidebar({
   ownerId,
   locale,
   edition,
+  hideWhenEmpty = false,
 }: ExperimentWorkspaceSidebarProps) {
   const location = useLocation();
   const copy = COPY[locale === "zh-CN" ? "zh" : "en"];
@@ -293,6 +295,8 @@ export function ExperimentWorkspaceSidebar({
     }
     updateDragState(null);
   }
+
+  if (hideWhenEmpty && visible.length === 0) return null;
 
   return (
     <section className="app-workspaces" aria-label={copy.heading}>

@@ -23,10 +23,12 @@ def get_user_experience_preferences(
     *,
     user_id: str,
 ) -> models.UserExperiencePreferences | None:
+    """Fetch by caller-validated user ID; reads never create a consent/default row."""
     return db.get(models.UserExperiencePreferences, user_id)
 
 
 def cross_job_memory_enabled(db: Session, *, user_id: str) -> bool:
+    """No saved consent means no cross-job memory, including for a brand-new account."""
     preferences = get_user_experience_preferences(db, user_id=user_id)
     return bool(preferences is not None and preferences.memory_enabled)
 
@@ -54,6 +56,7 @@ def account_shared_model_context(
 def serialize_user_experience_preferences(
     preferences: models.UserExperiencePreferences | None,
 ) -> schemas.UserExperiencePreferences:
+    """Expose persisted fields plus explicit saved/consent flags, not fabricated defaults."""
     return schemas.UserExperiencePreferences.model_validate(
         {
             "saved": preferences is not None,
@@ -74,11 +77,18 @@ def update_user_experience_preferences(
     user_id: str,
     request: schemas.UserExperiencePreferencesUpdate,
 ) -> tuple[models.UserExperiencePreferences, int]:
+    """Stage supplied fields and consent revocation in the caller's transaction.
+
+    Flush makes constraints observable but does not commit: the API mutation
+    gate commits the settings change, memory erasure and replay receipt together.
+    """
     preferences = get_user_experience_preferences(db, user_id=user_id)
     if preferences is None:
         preferences = models.UserExperiencePreferences(user_id=user_id)
         db.add(preferences)
     fields = request.model_fields_set
+    # Omitted values mean unchanged; an explicit null is a request to clear a
+    # nullable default. Do not replace this with iteration over dumped defaults.
     for field_name in (
         "memory_enabled",
         "locale",
@@ -101,6 +111,7 @@ def delete_user_experience_preferences(
     *,
     user_id: str,
 ) -> tuple[bool, int]:
+    """Stage preference and learned cross-job memory deletion for one account only."""
     preferences = get_user_experience_preferences(db, user_id=user_id)
     deleted_memory_count = delete_cross_job_experiences(db, user_id=user_id)
     if preferences is not None:

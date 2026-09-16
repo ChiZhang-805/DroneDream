@@ -5,6 +5,23 @@ import pytest
 from app.secrets import SecretStoreError, decrypt_secret, encrypt_secret, is_configured
 
 
+@pytest.mark.parametrize("app_env", ["desktop", "prod", "production"])
+def test_protected_encrypt_cannot_fall_back_when_key_is_missing(monkeypatch, app_env):
+    monkeypatch.setenv("APP_ENV", app_env)
+    monkeypatch.delenv("APP_SECRET_KEY", raising=False)
+    monkeypatch.delenv("DRONEDREAM_SECRET_KEY", raising=False)
+    assert not is_configured()
+    with pytest.raises(SecretStoreError, match="required"):
+        encrypt_secret("fixture-only-credential")
+
+
+@pytest.mark.parametrize("suffix", ["", "!!!", "YQ==!", "_w=="])
+def test_development_secret_decode_rejects_empty_or_malformed_payload(monkeypatch, suffix):
+    monkeypatch.setenv("APP_ENV", "development")
+    with pytest.raises(SecretStoreError, match="malformed"):
+        decrypt_secret("DRONEDREAM_DEV::" + suffix)
+
+
 def test_development_passphrase_is_supported(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("APP_ENV", "development")
     monkeypatch.setenv("APP_SECRET_KEY", "short-development-passphrase")

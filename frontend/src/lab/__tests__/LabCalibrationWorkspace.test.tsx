@@ -1,11 +1,12 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "../../i18n/I18nProvider";
 import { LabCalibrationWorkspace } from "../LabCalibrationWorkspace";
 import fixture from "../__fixtures__/calibration-input.fake.json";
+import * as bridge from "../../desktop/bridge";
 
 function renderWorkspace(locale: "en" | "zh-CN" = "en") {
   window.localStorage.setItem("drone-dream:locale", locale);
@@ -17,6 +18,32 @@ function renderWorkspace(locale: "en" | "zh-CN" = "en") {
 }
 
 describe("Lab calibration workspace", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it.each(["reset", "change-objective"])("discards a native export after %s", async (change) => {
+    const user = userEvent.setup();
+    vi.spyOn(bridge, "isDesktopRuntime").mockReturnValue(true);
+    type Receipt = Awaited<ReturnType<typeof bridge.evaluateLabCalibrationCycle>>;
+    let finish!: (receipt: Receipt) => void;
+    const pending = new Promise<Receipt>((resolve) => { finish = resolve; });
+    vi.spyOn(bridge, "evaluateLabCalibrationCycle").mockReturnValue(pending);
+    renderWorkspace();
+    const source = JSON.stringify(fixture);
+    const file = new File([source], "cycle.json", { type: "application/json" });
+    Object.defineProperty(file, "text", { value: async () => source });
+    await user.upload(screen.getByLabelText("Import bound cycle evidence"), file);
+    await screen.findByText("lab_job_fixture_001");
+    await user.click(screen.getByRole("button", { name: "Export draft receipt" }));
+    if (change === "reset") {
+      await user.click(screen.getByRole("button", { name: "Reset analysis" }));
+    } else {
+      await user.selectOptions(screen.getByLabelText("Optimization objective"), "energy");
+    }
+    const elements = vi.spyOn(document, "createElement");
+    await act(async () => { finish({} as Receipt); await pending; });
+    expect(elements.mock.calls.filter(([tag]) => tag === "a")).toHaveLength(0);
+  });
+
   it("renders the Lab positioning and imports one evidence-bound cycle", async () => {
     const user = userEvent.setup();
     const { container } = renderWorkspace();

@@ -16,26 +16,29 @@ export const UNIVERSAL_WORKSPACE_CHANGED_EVENT = "dronedream:universal-workspace
 
 const MODE_SET = new Set<string>(UNIVERSAL_WORKSPACE_IDS);
 
+/** Normalize presentation-only workspace IDs; unknown saved values cannot select a new capability. */
 export function parseUniversalMode(value: unknown): UniversalWorkspaceId {
   return typeof value === "string" && MODE_SET.has(value)
     ? value as UniversalWorkspaceId
     : "universal";
 }
 
-export function loadUniversalMode(storage: Pick<Storage, "getItem"> = window.localStorage) {
+/** Resolve localStorage inside the guard: the property getter itself can raise SecurityError. */
+export function loadUniversalMode(storage?: Pick<Storage, "getItem">) {
   try {
-    return parseUniversalMode(storage.getItem(UNIVERSAL_MODE_STORAGE_KEY));
+    return parseUniversalMode((storage ?? window.localStorage).getItem(UNIVERSAL_MODE_STORAGE_KEY));
   } catch {
     return "universal" as const;
   }
 }
 
+/** Notify sibling presentation views after a successful save; this never changes installed edition policy. */
 export function persistUniversalMode(
   mode: UniversalWorkspaceId,
-  storage: Pick<Storage, "setItem"> = window.localStorage,
+  storage?: Pick<Storage, "setItem">,
 ) {
   try {
-    storage.setItem(UNIVERSAL_MODE_STORAGE_KEY, mode);
+    (storage ?? window.localStorage).setItem(UNIVERSAL_MODE_STORAGE_KEY, mode);
     window.dispatchEvent(new CustomEvent(UNIVERSAL_WORKSPACE_CHANGED_EVENT, {
       detail: { mode },
     }));
@@ -45,6 +48,7 @@ export function persistUniversalMode(
   }
 }
 
+/** Set theme metadata only; these DOM attributes are explicitly not a hardware authorization source. */
 export function applyUniversalMode(
   mode: BrandEditionId,
   root: HTMLElement = document.documentElement,

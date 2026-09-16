@@ -26,6 +26,7 @@ export interface LauncherProgressEvidence {
   complete: boolean;
 }
 
+/** Required components have equal display weight; this is not an ETA or readiness authorization. */
 function componentProgress(runtime: RuntimeStatusReport): number {
   const required = runtime.components.filter((component) => component.required);
   if (required.length === 0) return LAUNCHER_PROGRESS_CHECKPOINTS.runtimeRunning;
@@ -51,23 +52,33 @@ export function launcherProgressFromEvidence({
   complete,
 }: LauncherProgressEvidence): number {
   if (!enabled || blocked) return 0;
-  if (complete) return LAUNCHER_PROGRESS_CHECKPOINTS.complete;
+  // A cached ready report or caller's stale completion flag cannot provide fresh
+  // evidence after a restart. The native access gate still owns launch permission.
+  if (complete && prerequisitesFresh && runtimeFresh && runtime?.installed &&
+      runtime.running && runtime.ready &&
+      (runtimeAccessStatus === "ready" || runtimeAccessStatus === "browser") &&
+      runtime.components.every((component) => !component.required || component.status === "ready")) {
+    // Provider-free/browser presentation has no native access gate to await.
+    // This percentage covers local checks only; explicit sign-in is a later gate.
+    return LAUNCHER_PROGRESS_CHECKPOINTS.complete;
+  }
 
   let progress = 0;
   if (prerequisitesFresh) {
     progress = LAUNCHER_PROGRESS_CHECKPOINTS.prerequisites;
   }
-  if (runtimeFresh) {
+  if (runtimeFresh && runtime) {
     progress = Math.max(progress, LAUNCHER_PROGRESS_CHECKPOINTS.runtimeRegistration);
   }
-  if (runtime?.installed) {
+  if (runtimeFresh && runtime?.installed) {
     progress = Math.max(progress, LAUNCHER_PROGRESS_CHECKPOINTS.runtimeInstalled);
   }
-  if (runtime?.running) {
+  if (runtimeFresh && runtime?.installed && runtime.running) {
     progress = Math.max(progress, LAUNCHER_PROGRESS_CHECKPOINTS.runtimeRunning);
     progress = Math.max(progress, componentProgress(runtime));
   }
-  if (runtimeAccessStatus === "ready") {
+  if (prerequisitesFresh && runtimeFresh && runtime?.installed && runtime.running &&
+      runtime.ready && runtimeAccessStatus === "ready") {
     progress = Math.max(progress, LAUNCHER_PROGRESS_CHECKPOINTS.runtimeAccess);
   }
 

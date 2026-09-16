@@ -7,6 +7,7 @@ from app.storage.s3 import S3ArtifactStorage
 
 
 def get_artifact_storage() -> ArtifactStorage:
+    """Instantiate the configured store; failures never fall back to another namespace."""
     backend = get_settings().artifact_storage_backend
     if backend == "local":
         return LocalArtifactStorage()

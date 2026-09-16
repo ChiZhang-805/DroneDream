@@ -82,6 +82,19 @@ afterEach(() => {
 });
 
 describe("Field settings update center", () => {
+  it("shows the actual Engine Pack conflict instead of hiding it in a tooltip", () => {
+    updaterState.current = {
+      ...updaterState.current,
+      status: "engineError",
+      error: "Different Engine Packs share the same source timestamp; refusing an ambiguous update.",
+    };
+    renderSettings();
+    fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
+    expect(screen.getByRole("status", { name: "software version state: Engine Pack check failed" })).toBeVisible();
+    expect(screen.getByRole("alert")).toHaveTextContent("existing Runtime was preserved");
+    expect(screen.getByRole("alert")).toBeVisible();
+  });
+
   it("offers the signed application installer from the standalone Field surface", () => {
     updaterState.current = {
       ...updaterState.current,

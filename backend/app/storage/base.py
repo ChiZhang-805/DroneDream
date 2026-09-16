@@ -5,6 +5,11 @@ from typing import BinaryIO, Protocol
 
 
 class ArtifactStorage(Protocol):
+    """Storage transport only; callers enforce account ownership and digest receipts.
+
+    A successful upload or existence check does not certify artifact integrity.
+    Large evidence uses streaming copy/digest rather than unbounded ``read_bytes``.
+    """
     def put_file(self, local_path: Path, key: str, content_type: str | None = None) -> str:
         """Persist a local file and return a storage URI/path."""
 

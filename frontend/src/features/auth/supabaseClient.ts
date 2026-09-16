@@ -12,6 +12,7 @@ const desktopRuntime = isDesktopRuntime();
 export const BROWSER_AUTH_STORAGE_KEY = "dronedream-browser-auth:v1";
 const LEGACY_BROWSER_AUTH_STORAGE_KEY = "undefined";
 
+/** Isolate desktop editions; unknown build identity must not share a default login. */
 export function editionAuthStorageKey(editionId: string | undefined): string | null {
   const normalized = editionId?.trim().toLowerCase();
   if (!normalized || !["universal", "sim", "lab", "field", "autonomy"].includes(normalized)) {
@@ -37,6 +38,7 @@ export interface BrowserAuthConfiguration {
   publishableKey: string;
 }
 
+/** Return public connection settings only; no service-role or model-provider key. */
 export function browserAuthConfiguration(): BrowserAuthConfiguration | null {
   if (!cloudAuthConfigured || !supabaseUrl || !supabasePublishableKey) return null;
   return {
@@ -45,6 +47,7 @@ export function browserAuthConfiguration(): BrowserAuthConfiguration | null {
   };
 }
 
+/** Storage-compatible fallback for blocked browser storage; lost on process exit. */
 class VolatileAuthStorage implements Storage {
   readonly #values = new Map<string, string>();
 
@@ -76,6 +79,7 @@ class VolatileAuthStorage implements Storage {
 const volatileAuthStorage = new VolatileAuthStorage();
 const STORAGE_PROBE_KEY = "__dronedream_auth_storage_probe__";
 
+/** Select the permitted persistence class; unavailable storage never broadens it. */
 function authStorage(): Storage | undefined {
   if (typeof window === "undefined") return undefined;
   // Native owns the persistent refresh grant in an edition-scoped Windows
@@ -95,6 +99,10 @@ function authStorage(): Storage | undefined {
   }
 }
 
+/**
+ * One-way browser-key migration, not an active fallback authentication path.
+ * Preserve an existing current session and remove the old key only after copy.
+ */
 export function migrateLegacyBrowserAuthStorage(
   storage: Storage | undefined,
 ): void {

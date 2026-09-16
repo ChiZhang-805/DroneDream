@@ -1,3 +1,5 @@
+// Decorative launcher choreography only: scene-unit positions, radian attitude,
+// normalized animation progress. Never use this as telemetry, a planner or flight control.
 export const DRONE_STARFLIGHT_DURATION_SECONDS = 18;
 
 export type DroneStarflightPose = {
@@ -39,16 +41,19 @@ const CITY_FLIGHT_PATH: CityFlightWaypoint[] = [
   { at: 1, x: 0, y: 0, z: 0, scale: 1 },
 ];
 
+/** Keep sampling finite; positive infinity uses the end pose and other invalid values use the start. */
 function clamp(value: number) {
   if (!Number.isFinite(value)) return value === Number.POSITIVE_INFINITY ? 1 : 0;
   return Math.min(1, Math.max(0, value));
 }
 
+/** Ease each keyframe segment to zero endpoint slope rather than discontinuous visual motion. */
 function smoothStep(value: number) {
   const clamped = clamp(value);
   return clamped * clamped * (3 - 2 * clamped);
 }
 
+/** Sample the bounded static scene path, not a user-authored or sensor-derived route. */
 function interpolate(progress: number) {
   const clamped = clamp(progress);
   let index = 0;
@@ -70,6 +75,7 @@ function interpolate(progress: number) {
   };
 }
 
+/** Derive decorative attitude from nearby samples; both animation endpoints settle upright. */
 export function getDroneStarflightPose(rawProgress: number): DroneStarflightPose {
   const progress = clamp(rawProgress);
   const position = interpolate(progress);

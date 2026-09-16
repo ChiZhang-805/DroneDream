@@ -31,10 +31,12 @@ from app.autonomy.qualification import (
 
 
 def _now() -> datetime:
+    """Timestamp qualification and revocation using the shared UTC database convention."""
     return datetime.now(timezone.utc)
 
 
 def _receipt_id(prefix: str, owner_id: str, content_sha256: str) -> str:
+    """Derive a stable owner-bound identifier; this is not a signature or flight grant."""
     owner_binding = hashlib.sha256(f"{owner_id}:{content_sha256}".encode()).hexdigest()
     return f"{prefix}-receipt-{owner_binding[:32]}"
 
@@ -79,13 +81,18 @@ def _store(
     receipt_json: dict[str, object],
     receipt_id: str,
 ) -> None:
+    """Commit one immutable asset version and revoke older active credentials atomically.
+
+    The unique owner/asset/version and active-asset indexes resolve racing
+    insertions. A conflicting winner is accepted only for the identical receipt.
+    """
     now = _now()
     history = db.scalars(
         select(orm_models.AutonomyQualificationCredential).where(
             orm_models.AutonomyQualificationCredential.user_id == owner_id,
             orm_models.AutonomyQualificationCredential.asset_kind == asset_kind,
             orm_models.AutonomyQualificationCredential.asset_id == asset_id,
-        )
+        ).with_for_update().execution_options(populate_existing=True)
     ).all()
     same_version = next(
         (item for item in history if item.asset_version == asset_version),
@@ -152,6 +159,7 @@ def issue_vehicle_credential(
     request: VehiclePackQualificationRequest,
     receipt: VehiclePackQualificationReceipt,
 ) -> VehiclePackQualificationReceipt:
+    """Persist successful declarative validation for this owner, never hardware authority."""
     if receipt.status != "validated_unsigned":
         return receipt
     bound = receipt.model_copy(
@@ -179,6 +187,7 @@ def issue_map_credential(
     request: MapPackQualificationRequest,
     receipt: MapPackQualificationReceipt,
 ) -> MapPackQualificationReceipt:
+    """Persist only a qualified map; imported-but-unqualified geometry gains no credential."""
     if receipt.status != "qualified":
         return receipt
     bound = receipt.model_copy(
@@ -202,6 +211,7 @@ def issue_map_credential(
 
 @dataclass(frozen=True)
 class CredentialVerification:
+    """Keep per-asset blockers alongside the rows used by the compiler's additional gates."""
     aircraft_issues: list[str]
     map_issues: list[str]
     aircraft: orm_models.AutonomyQualificationCredential | None
@@ -243,6 +253,7 @@ def _credential(
     owner_id: str,
     asset: AutonomyHarnessAsset,
 ) -> orm_models.AutonomyQualificationCredential | None:
+    """Resolve the requested owner's receipt and refresh any cached revocation flag."""
     if not asset.qualification_receipt_id:
         return None
     return db.scalar(
@@ -250,19 +261,23 @@ def _credential(
             orm_models.AutonomyQualificationCredential.receipt_id == asset.qualification_receipt_id,
             orm_models.AutonomyQualificationCredential.user_id == owner_id,
             orm_models.AutonomyQualificationCredential.asset_kind == asset.kind,
-        )
+        ).execution_options(populate_existing=True)
     )
 
 
 def _same_number(actual: object, expected: float, *, tolerance: float = 1e-6) -> bool:
-    return (
-        isinstance(actual, (int, float))
-        and not isinstance(actual, bool)
-        and math.isclose(float(actual), expected, rel_tol=0.0, abs_tol=tolerance)
-    )
+    """Compare finite physical quantities without accepting booleans or overflowing ints."""
+    if not isinstance(actual, (int, float)) or isinstance(actual, bool):
+        return False
+    try:
+        value = float(actual)
+    except OverflowError:
+        return False
+    return math.isfinite(value) and math.isclose(value, expected, rel_tol=0.0, abs_tol=tolerance)
 
 
 def _string_list(value: object) -> list[str] | None:
+    """Keep a declared capability list intact; do not coerce malformed items to strings."""
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         return None
     return value
@@ -272,6 +287,7 @@ def _common_issues(
     asset: AutonomyHarnessAsset,
     credential: orm_models.AutonomyQualificationCredential | None,
 ) -> list[str]:
+    """Check revocation and exact asset identity before interpreting receipt contents."""
     prefix = "aircraft" if asset.kind == "aircraft" else "map"
     if credential is None:
         return [f"{prefix}.qualification-receipt.invalid"]
@@ -285,10 +301,22 @@ def _common_issues(
     return issues
 
 
+def _same_qualification(
+    stored: VehiclePackQualificationReceipt | MapPackQualificationReceipt,
+    recomputed: VehiclePackQualificationReceipt | MapPackQualificationReceipt,
+) -> bool:
+    """Bind all derived qualification fields, excluding issuance-specific identity/time."""
+    # The content hash covers the request, not separately stored radius, thrust,
+    # layers or warnings. Recompute and compare those values as well.
+    excluded = {"receipt_id", "created_at"}
+    return stored.model_dump(exclude=excluded) == recomputed.model_dump(exclude=excluded)
+
+
 def _aircraft_binding_issues(
     asset: AutonomyHarnessAsset,
     credential: orm_models.AutonomyQualificationCredential | None,
 ) -> list[str]:
+    """Requalify stored aircraft input and bind every claimed capability to its receipt."""
     issues = _common_issues(asset, credential)
     if credential is None:
         return issues
@@ -308,6 +336,8 @@ def _aircraft_binding_issues(
         or receipt.version != credential.asset_version
         or receipt.content_sha256 != credential.content_sha256
         or requalified.content_sha256 != credential.content_sha256
+        or receipt.receipt_id != credential.receipt_id
+        or not _same_qualification(receipt, requalified)
     ):
         issues.append("aircraft.qualification-receipt.integrity-mismatch")
     expected_localization = sorted(
@@ -339,6 +369,7 @@ def _map_binding_issues(
     asset: AutonomyHarnessAsset,
     credential: orm_models.AutonomyQualificationCredential | None,
 ) -> list[str]:
+    """Require current bundled geometry, matching derived layers and unchanged map metadata."""
     issues = _common_issues(asset, credential)
     if credential is None:
         return issues
@@ -358,6 +389,8 @@ def _map_binding_issues(
         or receipt.version != credential.asset_version
         or receipt.content_sha256 != credential.content_sha256
         or requalified.content_sha256 != credential.content_sha256
+        or receipt.receipt_id != credential.receipt_id
+        or not _same_qualification(receipt, requalified)
     ):
         issues.append("map.qualification-receipt.integrity-mismatch")
     manifest = get_bundled_map_manifest(request.compiler_scene_id)
@@ -402,6 +435,7 @@ def verify_harness_credentials(
     owner_id: str,
     request: AutonomyHarnessInspectRequest,
 ) -> CredentialVerification:
+    """Collect both asset gate results without granting execution or signing authority."""
     aircraft = _credential(db, owner_id, request.aircraft)
     map_pack = _credential(db, owner_id, request.map_pack)
     return CredentialVerification(
@@ -416,6 +450,7 @@ def compile_binding_issues(
     request: AutonomyCompileRequest,
     verification: CredentialVerification,
 ) -> list[str]:
+    """Bind the proposed mission envelope to the previously verified aircraft and map."""
     issues: list[str] = []
     if request.asset_context is None:
         return ["autonomy.compile.asset-context.missing"]

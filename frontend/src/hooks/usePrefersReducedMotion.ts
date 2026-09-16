@@ -1,17 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { appReducedMotionEnabled, subscribeToAppReducedMotion } from "../desktop/uiMotionPreferences";
 
 const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
 
+/** Read only the OS signal here; the explicit in-app signal is combined below. */
 function readReducedMotionPreference() {
   return typeof window !== "undefined" && typeof window.matchMedia === "function"
     ? window.matchMedia(REDUCED_MOTION_QUERY).matches
     : false;
 }
 
-/** Keeps animation-heavy views in sync with the operating-system motion setting. */
+/** Either the OS or the user can reduce motion, including requestAnimationFrame-driven scenes. */
 export function usePrefersReducedMotion() {
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(
     readReducedMotionPreference,
+  );
+  const appReducedMotion = useSyncExternalStore(
+    subscribeToAppReducedMotion, appReducedMotionEnabled, () => false,
   );
 
   useEffect(() => {
@@ -27,5 +32,5 @@ export function usePrefersReducedMotion() {
     return () => mediaQuery.removeListener?.(updatePreference);
   }, []);
 
-  return prefersReducedMotion;
+  return prefersReducedMotion || appReducedMotion;
 }

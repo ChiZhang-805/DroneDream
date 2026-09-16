@@ -121,3 +121,15 @@ def test_runtime_catalog_is_machine_readable_and_exhaustive() -> None:
     assert catalog["schema_version"] == "dronedream.model-harness-runtime-registry.v1"
     assert set(catalog["domains"]) == set(MODEL_HARNESS_DOMAIN_VALUES)
     assert catalog["domains"]["autonomy.mission"]["domain"] == "autonomy.mission"
+
+
+def test_returned_runtime_operation_cannot_change_registry_refusal() -> None:
+    """Caller edits to a descriptor must not globally enable a refused dispatcher."""
+    original = RUNTIME_HANDLERS["operations.field"].model_copy(deep=True)
+    try:
+        local = runtime_operation("operations.field", "dispatch_hardware")
+        local.status = "available"
+        with pytest.raises(HarnessRuntimeUnavailable):
+            require_runnable_operation("operations.field", "dispatch_hardware")
+    finally:
+        RUNTIME_HANDLERS["operations.field"] = original

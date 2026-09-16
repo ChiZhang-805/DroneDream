@@ -8,11 +8,14 @@ interface Props {
   data: ComparisonPoint[];
 }
 
+/** Product score is a cost to minimize even if an older payload mislabeled its direction. */
 function effectiveLowerIsBetter(point: ComparisonPoint): boolean {
   return point.metric === "score" ? true : point.lower_is_better;
 }
 
+/** Retain units and readable precision; missing measurements must not masquerade as zero. */
 function formatValue(point: ComparisonPoint, value: number): string {
+  if (!Number.isFinite(value)) return "—";
   const rounded =
     Math.abs(value) >= 100
       ? value.toFixed(0)
@@ -22,7 +25,9 @@ function formatValue(point: ComparisonPoint, value: number): string {
   return point.unit ? `${rounded} ${point.unit}` : rounded;
 }
 
-function winner(point: ComparisonPoint): "baseline" | "optimized" | "tie" {
+/** Highlight improvement only when both sides have finite comparable measurements. */
+function winner(point: ComparisonPoint): "baseline" | "optimized" | "tie" | "unknown" {
+  if (!Number.isFinite(point.baseline) || !Number.isFinite(point.optimized)) return "unknown";
   if (point.baseline === point.optimized) return "tie";
   const optimizedBetter = effectiveLowerIsBetter(point)
     ? point.optimized < point.baseline
@@ -30,6 +35,7 @@ function winner(point: ComparisonPoint): "baseline" | "optimized" | "tie" {
   return optimizedBetter ? "optimized" : "baseline";
 }
 
+/** Compare each metric on its own absolute-magnitude scale, not across unrelated units. */
 export function ComparisonChart({ data }: Props) {
   const { t } = useI18n();
   return (
@@ -39,13 +45,15 @@ export function ComparisonChart({ data }: Props) {
         <span className="legend-swatch legend-optimized" aria-hidden /> {t("comparison.optimized")}
       </div>
       {data.map((point) => {
+        const baselineMagnitude = Number.isFinite(point.baseline) ? Math.abs(point.baseline) : 0;
+        const optimizedMagnitude = Number.isFinite(point.optimized) ? Math.abs(point.optimized) : 0;
         const scale = Math.max(
-          Math.abs(point.baseline),
-          Math.abs(point.optimized),
+          baselineMagnitude,
+          optimizedMagnitude,
           Number.EPSILON,
         );
-        const baselinePct = (Math.abs(point.baseline) / scale) * 100;
-        const optimizedPct = (Math.abs(point.optimized) / scale) * 100;
+        const baselinePct = (baselineMagnitude / scale) * 100;
+        const optimizedPct = (optimizedMagnitude / scale) * 100;
         const w = winner(point);
         return (
           <div className="comparison-row" key={point.metric} role="row">

@@ -31,6 +31,7 @@ export interface ManagedModelUsageTotals {
   credit_policy_version: number;
 }
 
+/** Display-only percentage; clamping never changes the server's quota ledger. */
 export function remainingAllowanceRatio(
   remainingCredits: number,
   includedCredits: number,
@@ -246,6 +247,7 @@ function resolveBillingCheckoutUrl(): string {
   );
 }
 
+/** Read the current account token per request; never fall back to anonymous usage. */
 function authenticatedHeaders(): Record<string, string> {
   const token = getAuthAccessToken();
   if (!token) {
@@ -262,6 +264,37 @@ function authenticatedHeaders(): Record<string, string> {
   };
 }
 
+/**
+ * Decode bounded JSON consistently for account and model endpoints. Transport
+ * success can still contain null, a scalar or malformed JSON; none is a valid
+ * account state and none should become a raw TypeError or a fabricated Free plan.
+ */
+async function readCloudObject(response: Response): Promise<Record<string, unknown>> {
+  let parsed: unknown;
+  try {
+    parsed = await response.json();
+  } catch (error) {
+    if (error instanceof FetchDeadlineError) {
+      throw new CloudModelAccessError("NETWORK_ERROR", error.message, 0);
+    }
+    if (error instanceof FetchResponseSizeError) {
+      throw new CloudModelAccessError("RESPONSE_TOO_LARGE", error.message, response.status);
+    }
+    throw new CloudModelAccessError(
+      "INVALID_RESPONSE",
+      `The cloud service returned HTTP ${response.status} without JSON.`,
+      response.status,
+    );
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new CloudModelAccessError(
+      "INVALID_RESPONSE", "The cloud service returned a non-object response.", response.status,
+    );
+  }
+  return parsed as Record<string, unknown>;
+}
+
+/** Perform one bounded request; no automatic retry of potentially chargeable writes. */
 async function cloudRequest<T>(
   baseUrl: string,
   path: string,
@@ -309,31 +342,21 @@ async function cloudRequest<T>(
       0,
     );
   }
-  let parsed: unknown;
-  try {
-    parsed = await response.json();
-  } catch (error) {
-    if (error instanceof FetchDeadlineError) {
-      throw new CloudModelAccessError("NETWORK_ERROR", error.message, 0);
-    }
-    if (error instanceof FetchResponseSizeError) {
-      throw new CloudModelAccessError(
-        "RESPONSE_TOO_LARGE",
-        error.message,
-        response.status,
-      );
-    }
-    throw new CloudModelAccessError(
-      "INVALID_RESPONSE",
-      `The cloud service returned HTTP ${response.status} without JSON.`,
-      response.status,
-    );
-  }
+  const parsed = await readCloudObject(response);
   const envelope = parsed as {
     data?: T;
     error?: { code?: string; message?: string };
   };
-  if (response.ok && envelope.data !== undefined) return envelope.data;
+  if (response.ok && envelope.data !== undefined) {
+    // All endpoints in this client return object snapshots. A null/scalar data
+    // envelope is not a usable snapshot even when the HTTP status is successful.
+    if (typeof envelope.data !== "object" || envelope.data === null || Array.isArray(envelope.data)) {
+      throw new CloudModelAccessError(
+        "INVALID_RESPONSE", "The cloud service returned invalid snapshot data.", response.status,
+      );
+    }
+    return envelope.data;
+  }
   throw new CloudModelAccessError(
     envelope.error?.code ?? "CLOUD_REQUEST_FAILED",
     envelope.error?.message ?? `The cloud request failed with HTTP ${response.status}.`,
@@ -341,10 +364,12 @@ async function cloudRequest<T>(
   );
 }
 
+/** Cloud owns subscription, reservation, consumption and reset-card state. */
 export function getManagedModelUsage(): Promise<ManagedModelUsageSnapshot> {
   return cloudRequest<ManagedModelUsageSnapshot>(modelGatewayUrl, "/usage");
 }
 
+/** Redeem one card server-side; retries for that card retain the same idempotency key. */
 export function redeemManagedAllowanceResetCard(
   cardId: string,
 ): Promise<ManagedModelUsageSnapshot> {
@@ -363,6 +388,7 @@ export function getManagedModelCatalog(): Promise<ManagedModelCatalog> {
   return cloudRequest<ManagedModelCatalog>(modelGatewayUrl, "/models");
 }
 
+/** Obtain a scoped expiring grant; provider API keys stay outside the public client. */
 export function issueManagedModelGrant(
   scope: ManagedModelGrantScope,
   scopeReference?: string | null,
@@ -387,6 +413,11 @@ export function issueManagedModelGrant(
   });
 }
 
+/**
+ * Make a slow cloud call under a grant; never use this latency budget for local
+ * flight commands. Each invocation is a new logical request with its own key;
+ * this method does not silently retry or compute quota consumption locally.
+ */
 export async function completeManagedModelChat(
   grant: ManagedModelGrant,
   messages: ManagedModelChatMessage[],
@@ -447,7 +478,7 @@ export async function completeManagedModelChat(
       0,
     );
   }
-  const parsed = await response.json() as Partial<ManagedModelChatCompletion> & {
+  const parsed = await readCloudObject(response) as Partial<ManagedModelChatCompletion> & {
     error?: { code?: string; message?: string };
   };
   if (!response.ok) {
@@ -480,6 +511,7 @@ export function getBillingAvailability(): Promise<BillingAvailability> {
   );
 }
 
+/** Create an order only; subscription activation requires the server's payment callback. */
 export function createBillingCheckout(
   planId: Exclude<ManagedModelPlanId, "free">,
   paymentMethod: PaymentMethod,

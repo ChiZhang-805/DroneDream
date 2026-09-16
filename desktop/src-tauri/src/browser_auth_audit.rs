@@ -1,10 +1,18 @@
+//! Local, edition-scoped authentication receipts. These records diagnose attempts;
+//! they contain no session secrets and are not proof of server authorization.
 use chrono::{DateTime, Utc};
 use serde::Serialize;
+#[cfg(windows)]
+use std::os::windows::fs::{MetadataExt, OpenOptionsExt};
 use std::{
     fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
     sync::{Mutex, OnceLock},
+};
+#[cfg(windows)]
+use windows_sys::Win32::Storage::FileSystem::{
+    FILE_ATTRIBUTE_REPARSE_POINT, FILE_FLAG_OPEN_REPARSE_POINT,
 };
 
 const RECEIPT_KIND: &str = "dronedream-desktop-browser-auth-attempt";
@@ -35,6 +43,7 @@ pub(crate) struct BrowserAuthAuditReceipt<'a> {
 }
 
 impl<'a> BrowserAuthAuditReceipt<'a> {
+    /// Assemble only allowlisted fields; append validates identity, hashes and time.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         edition_id: &'a str,
@@ -67,6 +76,7 @@ impl<'a> BrowserAuthAuditReceipt<'a> {
     }
 }
 
+/// Require the lowercase SHA-256 wire representation, not arbitrary identifiers.
 fn valid_hash(value: &str) -> bool {
     value.len() == HASH_BYTES
         && value
@@ -74,6 +84,7 @@ fn valid_hash(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
+/// Bound diagnostic codes so callers cannot inject prose, secrets or JSONL lines.
 fn valid_code(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 64
@@ -82,6 +93,7 @@ fn valid_code(value: &str) -> bool {
             .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
 }
 
+/// Validate before any disk change and return UTC completion time for daily grouping.
 fn validate_receipt(receipt: &BrowserAuthAuditReceipt<'_>) -> Result<DateTime<Utc>, String> {
     if !["universal", "sim", "lab", "field", "autonomy"].contains(&receipt.edition_id)
         || receipt.auth_client_id != format!("dronedream-desktop-{}", receipt.edition_id)
@@ -113,15 +125,26 @@ fn validate_receipt(receipt: &BrowserAuthAuditReceipt<'_>) -> Result<DateTime<Ut
     Ok(completed)
 }
 
+/// Resolve the fixed per-edition layout; edition_id must first pass validation.
 fn edition_directory(base: &Path, edition_id: &str) -> PathBuf {
     base.join(format!("io.dronedream.desktop.{edition_id}"))
         .join("audit")
         .join("browser-auth")
 }
 
+/// Windows junctions are reparse points but need not report as symbolic links.
+fn is_link(metadata: &fs::Metadata) -> bool {
+    #[cfg(windows)]
+    if metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+        return true;
+    }
+    metadata.file_type().is_symlink()
+}
+
+/// Reject redirection and wrong kinds without echoing account-local paths in errors.
 fn ensure_plain_path(path: &Path, label: &str) -> Result<(), String> {
     match fs::symlink_metadata(path) {
-        Ok(metadata) if metadata.file_type().is_symlink() => Err(format!(
+        Ok(metadata) if is_link(&metadata) => Err(format!(
             "The desktop authentication {label} cannot be a link."
         )),
         Ok(metadata) if label == "audit file" && !metadata.is_file() => {
@@ -138,14 +161,45 @@ fn ensure_plain_path(path: &Path, label: &str) -> Result<(), String> {
     }
 }
 
+/// Create each owned component separately, rejecting links before descending.
+/// This is not a sandbox against an adversary replacing parent directories mid-call.
+fn ensure_audit_directory(base: &Path, edition_id: &str) -> Result<PathBuf, String> {
+    if !base.is_absolute() || !base.is_dir() {
+        return Err("The desktop authentication audit root is invalid.".to_owned());
+    }
+    ensure_plain_path(base, "audit root")?;
+    let mut directory = base.to_path_buf();
+    for component in [
+        format!("io.dronedream.desktop.{edition_id}"),
+        "audit".into(),
+        "browser-auth".into(),
+    ] {
+        directory.push(component);
+        ensure_plain_path(&directory, "audit directory")?;
+        match fs::create_dir(&directory) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(_) => {
+                return Err(
+                    "The desktop authentication audit directory could not be created.".to_owned(),
+                )
+            }
+        }
+        // An AlreadyExists race is acceptable only if the winner made a plain directory.
+        ensure_plain_path(&directory, "audit directory")?;
+    }
+    debug_assert_eq!(directory, edition_directory(base, edition_id));
+    Ok(directory)
+}
+
+/// Append one bounded receipt; preserve old lines and propagate persistence errors.
 fn append_at(base: &Path, receipt: &BrowserAuthAuditReceipt<'_>) -> Result<PathBuf, String> {
     let completed = validate_receipt(receipt)?;
-    ensure_plain_path(base, "audit root")?;
-    let directory = edition_directory(base, receipt.edition_id);
-    fs::create_dir_all(&directory).map_err(|_| {
-        "The desktop authentication audit directory could not be created.".to_owned()
-    })?;
-    ensure_plain_path(&directory, "audit directory")?;
+    let _guard = APPEND_LOCK
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .map_err(|_| "The desktop authentication audit lock is unavailable.".to_owned())?;
+    let directory = ensure_audit_directory(base, receipt.edition_id)?;
     let path = directory.join(format!(
         "browser-auth-attempts-{}.v1.jsonl",
         completed.format("%Y-%m-%d")
@@ -154,19 +208,28 @@ fn append_at(base: &Path, receipt: &BrowserAuthAuditReceipt<'_>) -> Result<PathB
     let mut encoded = serde_json::to_vec(receipt)
         .map_err(|_| "The desktop authentication audit receipt is invalid.".to_owned())?;
     encoded.push(b'\n');
-    let _guard = APPEND_LOCK
-        .get_or_init(|| Mutex::new(()))
-        .lock()
-        .map_err(|_| "The desktop authentication audit lock is unavailable.".to_owned())?;
-    let existing_bytes = fs::metadata(&path).map(|value| value.len()).unwrap_or(0);
-    if existing_bytes.saturating_add(encoded.len() as u64) > MAX_DAILY_AUDIT_BYTES {
-        return Err("The daily desktop authentication audit file is full.".to_owned());
-    }
-    let mut file = OpenOptions::new()
-        .create(true)
-        .append(true)
+    let mut options = OpenOptions::new();
+    options.create(true).append(true);
+    // On Windows, deny other opens during this append and do not follow a final
+    // reparse point installed after the path check. Parent paths remain a trust boundary.
+    #[cfg(windows)]
+    options
+        .share_mode(0)
+        .custom_flags(FILE_FLAG_OPEN_REPARSE_POINT);
+    let mut file = options
         .open(&path)
         .map_err(|_| "The desktop authentication audit file could not be opened.".to_owned())?;
+    // Inspect the opened handle, not a separately resolved path. A metadata failure
+    // is not an empty file and must never bypass the retention cap.
+    let metadata = file
+        .metadata()
+        .map_err(|_| "The desktop authentication audit file is unavailable.".to_owned())?;
+    if is_link(&metadata) || !metadata.is_file() {
+        return Err("The desktop authentication audit target is not a plain file.".to_owned());
+    }
+    if metadata.len().saturating_add(encoded.len() as u64) > MAX_DAILY_AUDIT_BYTES {
+        return Err("The daily desktop authentication audit file is full.".to_owned());
+    }
     file.write_all(&encoded)
         .and_then(|()| file.sync_data())
         .map_err(|_| {
@@ -175,6 +238,7 @@ fn append_at(base: &Path, receipt: &BrowserAuthAuditReceipt<'_>) -> Result<PathB
     Ok(path)
 }
 
+/// Persist beneath this Windows user's application data, never browser storage.
 pub(crate) fn append_browser_auth_audit(
     receipt: &BrowserAuthAuditReceipt<'_>,
 ) -> Result<(), String> {
@@ -199,6 +263,7 @@ mod tests {
     const UNIVERSAL_STATE_HASH: &str =
         "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
+    /// Build synthetic identity hashes; tests never load real account credentials.
     fn receipt<'a>(result: &'a str, failure_code: Option<&'a str>) -> BrowserAuthAuditReceipt<'a> {
         BrowserAuthAuditReceipt::new(
             "sim",
@@ -322,5 +387,40 @@ mod tests {
         invalid.result = "authorized";
         invalid.callback_transport = "raw-token-loopback";
         assert!(validate_receipt(&invalid).is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn intermediate_junction_is_rejected_without_writing_to_its_target() {
+        // Both paths belong to this unique fixture. Remove the junction itself
+        // before cleaning the fixture, never recurse through its target.
+        let root = std::env::temp_dir().join(format!(
+            "dronedream-auth-audit-junction-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let base = root.join("base");
+        let outside = root.join("outside");
+        fs::create_dir_all(&base).unwrap();
+        fs::create_dir(&outside).unwrap();
+        let link = base.join("io.dronedream.desktop.sim");
+        let output = std::process::Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(&link)
+            .arg(&outside)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "junction fixture creation failed");
+        let result = append_at(&base, &receipt("authorized", None));
+        let untouched = fs::read_dir(&outside).unwrap().next().is_none();
+        fs::remove_dir(&link).unwrap();
+        fs::remove_dir_all(&root).unwrap();
+        assert!(
+            result.is_err(),
+            "audit must not follow an intermediate junction"
+        );
+        assert!(
+            untouched,
+            "audit must reject before creating target subdirectories"
+        );
     }
 }

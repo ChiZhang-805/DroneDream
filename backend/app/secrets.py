@@ -1,16 +1,14 @@
-"""Per-job secret storage (Phase 8).
+"""Short-lived per-job credential storage with a protected-environment boundary.
 
 Stores short-lived user-supplied credentials — currently only the OpenAI API
 key used by the GPT parameter proposer — as Fernet-encrypted ciphertext.
 The key is never logged, never returned to clients, and is wiped from the
 ``job_secrets`` table as soon as the job reaches a terminal state.
 
-The module intentionally falls back to an obvious local-dev-only scheme
-when neither ``APP_SECRET_KEY`` nor ``DRONEDREAM_SECRET_KEY`` is configured:
-it base64-encodes the ciphertext with a static development token so the
-iterative GPT loop still works on a developer's laptop. Production
-deployments must set the env var; the service layer rejects GPT jobs when
-no secret key is configured and the user asked for a GPT-backed run.
+An explicit non-protected development environment may use marked base64
+plaintext when no encryption key is configured. Base64 is NOT encryption.
+Desktop and production callers are rejected here as well as in the job service;
+copying an old development database does not bypass that boundary.
 """
 
 from __future__ import annotations
@@ -46,6 +44,7 @@ class _FernetCipher(Protocol):
 
 
 def _is_protected_environment() -> bool:
+    """Use the process launch mode; desktop is protected just like hosted production."""
     return (
         os.environ.get("APP_ENV", "development").strip().lower()
         in _PROTECTED_ENVS
@@ -97,6 +96,9 @@ def _load_fernet() -> _FernetCipher | None:
         Fernet(normalized.encode("ascii"))
         key_bytes = normalized.encode("ascii")
     except Exception:
+        # Preserve the established passphrase-to-key compatibility mapping.
+        # This is not a password-stretching KDF: deployments need high-entropy
+        # provisioned secret material, not a human login password.
         digest = hashlib.sha256(normalized.encode("utf-8")).digest()
         key_bytes = base64.urlsafe_b64encode(digest)
     return Fernet(key_bytes)
@@ -112,7 +114,7 @@ def is_configured() -> bool:
 
 
 def encrypt_secret(value: str) -> str:
-    """Encrypt ``value`` and return an opaque string."""
+    """Encrypt for durable storage; reject a protected caller without a real key."""
 
     if not value:
         raise SecretStoreError("Cannot encrypt an empty secret.")
@@ -120,6 +122,8 @@ def encrypt_secret(value: str) -> str:
     if cipher is not None:
         token = cipher.encrypt(value.encode("utf-8")).decode("ascii")
         return token
+    if _is_protected_environment():
+        raise SecretStoreError("APP_SECRET_KEY is required for desktop or production storage.")
     encoded = base64.urlsafe_b64encode(value.encode("utf-8")).decode("ascii")
     return f"{_DEV_MARKER}{encoded}"
 
@@ -138,9 +142,14 @@ def decrypt_secret(token: str) -> str:
                 "Local-development secret tokens are forbidden in desktop or production."
             )
         try:
-            return base64.urlsafe_b64decode(token.removeprefix(_DEV_MARKER).encode("ascii")).decode(
-                "utf-8"
-            )
+            # The development marker labels plaintext, not a lenient parser.
+            # Do not silently strip garbage or accept an empty credential.
+            decoded = base64.b64decode(
+                token.removeprefix(_DEV_MARKER).encode("ascii"), altchars=b"-_", validate=True,
+            ).decode("utf-8")
+            if not decoded:
+                raise ValueError("empty development credential")
+            return decoded
         except Exception as exc:
             raise SecretStoreError("Local-dev secret token is malformed.") from exc
     cipher = _load_fernet()

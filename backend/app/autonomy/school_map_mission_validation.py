@@ -28,6 +28,47 @@ from app.autonomy.school_map_artifact import (
 
 WorldPoint = tuple[float, float, float]
 Px4LocalTrackPoint = tuple[float, float, float]
+_MAXIMUM_ROUTE_SAMPLES = 1_000_000
+
+
+def _finite_number(value: object) -> bool:
+    """Keep booleans and unrepresentable integers out of geometric arithmetic."""
+    try:
+        return (isinstance(value, (int, float)) and not isinstance(value, bool)
+                and math.isfinite(value))
+    except OverflowError:
+        return False
+
+
+def _validate_point(point: WorldPoint) -> None:
+    """Require all three coordinates, even for single-point or empty-map checks."""
+    if not isinstance(point, (tuple, list)) or len(point) != 3:
+        raise ValueError("route point must contain three finite coordinates")
+    if not all(_finite_number(value) for value in point):
+        raise ValueError("route point must contain three finite coordinates")
+
+
+def _validate_primitive(primitive: CollisionPrimitive) -> None:
+    """Validate immutable primitives once per batch, outside the sample loop."""
+    if isinstance(primitive, MeshPrimitive):
+        return  # Visual meshes never contribute collision clearance.
+    if isinstance(primitive, BoxPrimitive):
+        dimensions = (primitive.size_x, primitive.size_y, primitive.size_z)
+    elif isinstance(primitive, CylinderPrimitive):
+        dimensions = (primitive.radius_m, primitive.height_m)
+    elif isinstance(primitive, CapsulePrimitive):
+        dimensions = (primitive.radius_m, primitive.length_m)
+    elif isinstance(primitive, SpherePrimitive):
+        dimensions = (primitive.radius_m,)
+    else:
+        raise TypeError("unsupported School Map collision primitive")
+    _validate_point((primitive.center_x, primitive.center_y, primitive.center_z))
+    if not all(_finite_number(value) and value > 0 for value in dimensions):
+        raise ValueError("collision primitive dimensions must be finite and positive")
+    if not all(_finite_number(value) for value in (
+        primitive.roll_rad, primitive.pitch_rad, primitive.yaw_rad,
+    )):
+        raise ValueError("collision primitive angles must be finite")
 
 
 @dataclass(frozen=True)
@@ -36,16 +77,28 @@ class VehicleCollisionEnvelope:
     height_m: float = VEHICLE_COLLISION_HEIGHT_M
     center_above_model_root_m: float = PX4_X500_COLLISION_CENTER_ABOVE_MODEL_ROOT_M
 
+    def __post_init__(self) -> None:
+        """Prevent an invalid envelope from making obstacles appear farther away."""
+        if not all(_finite_number(value) and value > 0 for value in (
+            self.diameter_m, self.height_m,
+        )):
+            raise ValueError("vehicle envelope dimensions must be finite and positive")
+        if not _finite_number(self.center_above_model_root_m):
+            raise ValueError("vehicle envelope center offset must be finite")
+
     @property
     def radius_m(self) -> float:
+        """Horizontal cylinder radius, in metres, for upright-object checks."""
         return self.diameter_m / 2
 
     @property
     def half_height_m(self) -> float:
+        """Vertical extent on either side of the collision-envelope center."""
         return self.height_m / 2
 
     @property
     def conservative_sphere_radius_m(self) -> float:
+        """Enclose the entire cylinder when object tilt couples its axes."""
         return math.hypot(self.radius_m, self.half_height_m)
 
 
@@ -65,6 +118,7 @@ class RouteClearanceResult:
 def _axis_endpoints(
     primitive: CylinderPrimitive | CapsulePrimitive,
 ) -> tuple[WorldPoint, WorldPoint]:
+    """Rotate a local Z axis by SDF roll/pitch/yaw and return its finite segment."""
     roll = primitive.roll_rad
     pitch = primitive.pitch_rad
     yaw = primitive.yaw_rad
@@ -92,6 +146,7 @@ def _axis_endpoints(
 
 
 def _point_segment_distance(point: WorldPoint, start: WorldPoint, end: WorldPoint) -> float:
+    """Project onto the closed segment, including the degenerate point case."""
     delta = tuple(end[index] - start[index] for index in range(3))
     length_squared = sum(component * component for component in delta)
     if length_squared <= 1e-18:
@@ -135,7 +190,20 @@ def vehicle_clearance_to_primitive_m(
     MeshPrimitive instances are visual-only in the School Map package and are
     therefore excluded from collision evaluation.
     """
+    _validate_point(envelope_center)
+    _validate_primitive(primitive)
+    clearance = _vehicle_clearance_unchecked(envelope_center, primitive, envelope)
+    if not isinstance(primitive, MeshPrimitive) and not math.isfinite(clearance):
+        raise ValueError("collision arithmetic produced non-finite clearance")
+    return clearance
 
+
+def _vehicle_clearance_unchecked(
+    envelope_center: WorldPoint,
+    primitive: CollisionPrimitive,
+    envelope: VehicleCollisionEnvelope,
+) -> float:
+    """Evaluate prevalidated geometry; callers must reject non-finite results."""
     if isinstance(primitive, MeshPrimitive):
         return math.inf
     if isinstance(primitive, BoxPrimitive):
@@ -143,6 +211,24 @@ def vehicle_clearance_to_primitive_m(
         delta_y = envelope_center[1] - primitive.center_y
         cosine = math.cos(primitive.yaw_rad)
         sine = math.sin(primitive.yaw_rad)
+        if abs(primitive.roll_rad) > 1e-12 or abs(primitive.pitch_rad) > 1e-12:
+            # Transform into the full oriented box frame using Rz*Ry*Rx transpose.
+            # A bounding sphere over-approximates the aircraft cylinder under tilt;
+            # it can conservatively reject a route, but cannot ignore a tilted beam.
+            cr, sr = math.cos(primitive.roll_rad), math.sin(primitive.roll_rad)
+            cp, sp = math.cos(primitive.pitch_rad), math.sin(primitive.pitch_rad)
+            delta_z = envelope_center[2] - primitive.center_z
+            local = (
+                cp * cosine * delta_x + cp * sine * delta_y - sp * delta_z,
+                (cosine * sp * sr - sine * cr) * delta_x
+                + (sine * sp * sr + cosine * cr) * delta_y + cp * sr * delta_z,
+                (cosine * sp * cr + sine * sr) * delta_x
+                + (sine * sp * cr - cosine * sr) * delta_y + cp * cr * delta_z,
+            )
+            outside = tuple(max(abs(value) - size / 2, 0.0) for value, size in zip(
+                local, (primitive.size_x, primitive.size_y, primitive.size_z), strict=True,
+            ))
+            return math.hypot(*outside) - envelope.conservative_sphere_radius_m
         local_x = cosine * delta_x + sine * delta_y
         local_y = -sine * delta_x + cosine * delta_y
         outside_x = max(abs(local_x) - primitive.size_x / 2, 0.0)
@@ -191,13 +277,33 @@ def vehicle_clearance_to_primitive_m(
 
 
 def sample_polyline(points: Sequence[WorldPoint], interval_m: float) -> list[WorldPoint]:
-    if not math.isfinite(interval_m) or interval_m <= 0:
+    """Sample each segment plus the final endpoint within a bounded allocation.
+
+    This is discrete route inspection, not continuous swept-volume certification.
+    Sample spacing and the runtime collision controller remain separate concerns.
+    """
+    if not _finite_number(interval_m) or interval_m <= 0:
         raise ValueError("route sample interval must be finite and greater than zero")
     if not points:
         raise ValueError("route must contain at least one waypoint")
-    samples: list[WorldPoint] = []
+    if len(points) > _MAXIMUM_ROUTE_SAMPLES:
+        raise ValueError("route exceeds the sample budget")
+    for point in points:
+        _validate_point(point)
+    # Preflight the entire count before constructing a potentially huge list.
+    segments: list[int] = []
+    total = 1
     for start, end in zip(points[:-1], points[1:], strict=True):
-        segment_samples = max(1, math.ceil(math.dist(start, end) / interval_m))
+        count = math.dist(start, end) / interval_m
+        if not math.isfinite(count) or count > _MAXIMUM_ROUTE_SAMPLES:
+            raise ValueError("route exceeds the sample budget")
+        segment_samples = max(1, math.ceil(count))
+        total += segment_samples
+        if total > _MAXIMUM_ROUTE_SAMPLES:
+            raise ValueError("route exceeds the sample budget")
+        segments.append(segment_samples)
+    samples: list[WorldPoint] = []
+    for start, end, segment_samples in zip(points[:-1], points[1:], segments, strict=True):
         samples.extend(
             (
                 start[0] + (end[0] - start[0]) * sample_index / segment_samples,
@@ -206,7 +312,7 @@ def sample_polyline(points: Sequence[WorldPoint], interval_m: float) -> list[Wor
             )
             for sample_index in range(segment_samples)
         )
-    samples.append(points[-1])
+    samples.append(tuple(points[-1]))
     return samples
 
 
@@ -217,8 +323,18 @@ def validate_route_clearance(
     penetration_tolerance_m: float = 0.001,
     maximum_reported_collisions: int = 50,
 ) -> RouteClearanceResult:
-    if penetration_tolerance_m < 0 or not math.isfinite(penetration_tolerance_m):
+    """Count all sample/object penetrations while bounding only reported details.
+
+    Invalid evidence fails closed, rather than letting NaN comparisons silently
+    drop an obstacle or sample. Static samples do not prove live flight safety.
+    """
+    if not _finite_number(penetration_tolerance_m) or penetration_tolerance_m < 0:
         raise ValueError("penetration tolerance must be finite and non-negative")
+    if type(maximum_reported_collisions) is not int or maximum_reported_collisions < 0:
+        raise ValueError("maximum reported collisions must be a non-negative integer")
+    primitives = tuple(primitives)
+    for primitive in primitives:
+        _validate_primitive(primitive)
     minimum_clearance = math.inf
     minimum_point: WorldPoint | None = None
     minimum_primitive = ""
@@ -226,9 +342,14 @@ def validate_route_clearance(
     sample_count = 0
     collision_count = 0
     for point in envelope_centers:
+        _validate_point(point)
         sample_count += 1
         for primitive in primitives:
-            clearance = vehicle_clearance_to_primitive_m(point, primitive)
+            if isinstance(primitive, MeshPrimitive):
+                continue
+            clearance = _vehicle_clearance_unchecked(point, primitive, DEFAULT_VEHICLE_ENVELOPE)
+            if not math.isfinite(clearance):
+                raise ValueError("collision arithmetic produced non-finite clearance")
             if clearance < minimum_clearance:
                 minimum_clearance = clearance
                 minimum_point = point
@@ -237,8 +358,10 @@ def validate_route_clearance(
                 collision_count += 1
                 if len(collisions) < maximum_reported_collisions:
                     collisions.append((point, primitive.name, clearance))
-    if sample_count == 0 or minimum_point is None:
+    if sample_count == 0:
         raise ValueError("route clearance validation requires at least one sample")
+    if minimum_point is None:
+        raise ValueError("route clearance validation requires physical collision geometry")
     return RouteClearanceResult(
         sample_count=sample_count,
         collision_count=collision_count,
@@ -262,6 +385,8 @@ def world_envelope_center_to_px4_local_track(
     measured physical mapping used by School Map.
     """
 
+    _validate_point(point)
+    _validate_point(model_root_world)
     model_root_x = point[0]
     model_root_y = point[1]
     model_root_z = point[2] - envelope.center_above_model_root_m
@@ -278,6 +403,9 @@ def px4_local_track_to_world_envelope_center(
     model_root_world: WorldPoint,
     envelope: VehicleCollisionEnvelope = DEFAULT_VEHICLE_ENVELOPE,
 ) -> WorldPoint:
+    """Invert north/east/up fields; these are not raw NED down-positive values."""
+    _validate_point(point)
+    _validate_point(model_root_world)
     return (
         model_root_world[0] + point[1],
         model_root_world[1] + point[0],
@@ -289,4 +417,6 @@ def model_root_to_world_envelope_center(
     point: WorldPoint,
     envelope: VehicleCollisionEnvelope = DEFAULT_VEHICLE_ENVELOPE,
 ) -> WorldPoint:
+    """Move only the origin reference, retaining world ENU axes and metre units."""
+    _validate_point(point)
     return (point[0], point[1], point[2] + envelope.center_above_model_root_m)

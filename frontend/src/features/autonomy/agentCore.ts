@@ -1,4 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
+import type { BrandEditionId } from "../../brand/edition-brand.generated";
+import { getAuthAccessToken } from "../auth/authTokenStore";
 import type { AutonomyPlannerArtifact } from "./missionHarness";
 
 export type AgentCoreActivationMode = "single" | "multiple" | "pipeline";
@@ -789,11 +791,13 @@ export class AgentCoreUnavailableError extends Error {
 
 export class AgentCoreRequestError extends Error {
   readonly status: number;
+  readonly clarificationFields: string[];
 
-  constructor(status: number, detail: string) {
+  constructor(status: number, detail: string, clarificationFields: string[] = []) {
     super(detail);
     this.name = "AgentCoreRequestError";
     this.status = status;
+    this.clarificationFields = clarificationFields;
   }
 }
 
@@ -850,11 +854,26 @@ async function requestBytes(
       path,
       bodyBase64: init.body ? bytesToBase64(init.body) : null,
       contentType: init.contentType ?? null,
+      // 身份来自当前进程会话；本机 bearer 仍只由 Rust 注入，Core 独立验签。
+      identityToken: getAuthAccessToken(),
+      publishableKey: (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined)
+        || (import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) || null,
     },
   });
   if (!isDesktopResponse(value)) throw new Error("AGENT Core returned an invalid desktop response.");
   const body = base64ToBytes(value.bodyBase64);
   if (value.status < 200 || value.status >= 300) {
+    // 只有受限的追问合同可以转为对话回复；普通接口失败仍然抛出原错误。
+    let fields: string[] = [];
+    try {
+      const detail = JSON.parse(new TextDecoder().decode(body)).detail;
+      if (value.status === 409 && detail?.code === "MISSION_CLARIFICATION_REQUIRED"
+        && Array.isArray(detail.fields) && detail.fields.length > 0 && detail.fields.length <= 16
+        && detail.fields.every((item: unknown) => typeof item === "string" && item.trim().length > 0 && item.length <= 240)) {
+        fields = detail.fields;
+      }
+    } catch { /* 非 JSON 响应交给通用诊断，不解释为模型追问。 */ }
+    if (fields.length) throw new AgentCoreRequestError(value.status, "MISSION_CLARIFICATION_REQUIRED", fields);
     throw new AgentCoreRequestError(value.status, detailFromBody(body));
   }
   return body;
@@ -1001,6 +1020,8 @@ export function patchAgentCoreThread(
 export function prepareAgentCoreMission(
   threadId: string,
   payload: {
+    expected_owner_account_id: string;
+    source_edition: BrandEditionId;
     message: string;
     map_id: string;
     map_content_sha256: string;
@@ -1078,6 +1099,9 @@ export function getAgentCoreRuntimeStatus(): Promise<AgentCoreRuntimeStatus> {
 export function executeAgentCoreMission(
   threadId: string,
   payload: {
+    expected_owner_account_id: string;
+    source_edition: BrandEditionId;
+    plan_revision_id: string;
     model_id: string;
     model_grant: string;
     gateway_base_url: string | null;
@@ -1227,6 +1251,30 @@ export function getAgentCoreAssetQualificationJobIssues(jobId: string): Promise<
 
 export function getAgentCoreAssetQualificationEvidence(jobId: string): Promise<AgentCoreAssetQualificationEvidence> {
   return requestJson(`/v1/asset-qualification-jobs/${encodeURIComponent(jobId)}/evidence`);
+}
+
+export interface AgentCoreAssetInterpretation {
+  cache_key: string;
+  cached: boolean;
+  source: { asset_id: string; content_sha256: string; kind: "map" | "vehicle" };
+  understanding: { summary: string; items: Array<{ source_id: string; explanation: string }>; limitations: string[] };
+  model_calls: Array<Record<string, unknown>>;
+}
+
+// 功能：
+//   通过现有身份桥提交资产解析，不触发规划或执行接口。
+// 输入：
+//   threadId：解析调用记录所属任务。
+//   payload：精确资产、模型授权与账户范围。
+// 输出：
+//   result：内容绑定的模型理解和调用记录。
+export function requestAgentCoreAssetInterpretation(threadId: string, payload: {
+  expected_owner_account_id: string; source_edition: BrandEditionId;
+  kind: "map" | "vehicle"; asset_id: string; content_sha256: string;
+  model_id: string; model_grant: string; gateway_base_url: string | null;
+  locale: "zh-CN" | "en-US"; force: boolean;
+}): Promise<AgentCoreAssetInterpretation> {
+  return requestJson(`/v1/threads/${encodeURIComponent(threadId)}/interpret`, { method: "POST", body: payload });
 }
 
 export function createAgentCoreAssetQualificationJob(payload: {

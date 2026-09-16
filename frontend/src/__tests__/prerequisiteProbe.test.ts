@@ -29,6 +29,21 @@ afterEach(() => {
 });
 
 describe("system prerequisite startup grace", () => {
+  it.each([NaN, Infinity, -1, 0, 1.5, 4])("rejects invalid attempts %s before a native call", async (maxAttempts) => {
+    const probe = vi.fn().mockResolvedValue(report);
+    await expect(runSystemProbeWithStartupGrace(probe, {
+      maxAttempts, retryDelaysMs: [], wait: async () => undefined,
+    })).rejects.toThrow();
+    expect(probe).not.toHaveBeenCalled();
+  });
+
+  it.each([NaN, Infinity, -1, 60_001])("rejects invalid retry delay %s before a native call", async (delay) => {
+    const probe = vi.fn().mockResolvedValue(report);
+    await expect(runSystemProbeWithStartupGrace(probe, {
+      maxAttempts: 2, retryDelaysMs: [delay], wait: async () => undefined,
+    })).rejects.toThrow();
+    expect(probe).not.toHaveBeenCalled();
+  });
   it("recognizes native timeout diagnostics without treating other failures as transient", () => {
     expect(isTransientSystemProbeTimeout(
       new Error("read-only system probe timed out after 40 seconds."),

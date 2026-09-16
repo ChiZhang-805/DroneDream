@@ -18,13 +18,14 @@ interface ApiEnvelopeShape {
   error?: unknown;
 }
 
+/** Bound bridge allocation and reject invalid UTF-8/JSON; decoding proves no user identity. */
 function decodeBoundedJson(bodyBase64: string): ApiEnvelopeShape | null {
   if (bodyBase64.length > MAX_CONTRACT_RESPONSE_BASE64_LENGTH) return null;
   try {
     const binary = atob(bodyBase64);
     const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-    const parsed = JSON.parse(new TextDecoder().decode(bytes)) as unknown;
-    return parsed && typeof parsed === "object"
+    const parsed = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes)) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
       ? parsed as ApiEnvelopeShape
       : null;
   } catch {
@@ -32,20 +33,25 @@ function decodeBoundedJson(bodyBase64: string): ApiEnvelopeShape | null {
   }
 }
 
+/** Inspect only a coherent failure envelope, not a success carrying a stray error field. */
 function errorCode(envelope: ApiEnvelopeShape | null): string | null {
-  if (!envelope?.error || typeof envelope.error !== "object") return null;
+  if (envelope?.success !== false || envelope.data != null || !envelope.error ||
+      typeof envelope.error !== "object" || Array.isArray(envelope.error)) return null;
   const code = (envelope.error as { code?: unknown }).code;
   return typeof code === "string" ? code : null;
 }
 
+/** Recognize the development/no-auth route shape without adopting its reported account. */
 function isValidAnonymousSuccess(envelope: ApiEnvelopeShape | null): boolean {
-  if (envelope?.success !== true || !envelope.data || typeof envelope.data !== "object") {
+  if (envelope?.success !== true || envelope.error != null || !envelope.data ||
+      typeof envelope.data !== "object" || Array.isArray(envelope.data)) {
     return false;
   }
   const data = envelope.data as { status?: unknown; user_id?: unknown };
   return data.status === "ready" && typeof data.user_id === "string" && data.user_id.length > 0;
 }
 
+/** Represent this capability as one required component of the existing Runtime report. */
 function contractComponent(
   status: RuntimeComponentStatus["status"],
   detail: string,
@@ -60,6 +66,7 @@ function contractComponent(
   };
 }
 
+/** Replace only our previous diagnostic; success cannot promote an otherwise unready Runtime. */
 function withContractComponent(
   report: RuntimeStatusReport,
   component: RuntimeComponentStatus,
@@ -130,6 +137,7 @@ export async function verifyRuntimeSessionContract(
   );
 }
 
+/** Expose stable repair-routing codes, never native exception text or credentials. */
 export function runtimeSessionContractFailure(
   report: RuntimeStatusReport | null,
 ): RuntimeSessionContractFailure | null {

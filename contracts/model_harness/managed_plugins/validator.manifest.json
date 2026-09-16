@@ -8,7 +8,7 @@
     "entrypoint": "validate_output_against_control_plane",
     "module": "app.model_harness.control_plane",
     "source_path": "backend/app/model_harness/control_plane.py",
-    "source_sha256": "47e26adb5b5844a1fd1679eaabd083c056a3747f8f70de0f2206f8231f1ab58c"
+    "source_sha256": "8aa1c57e737e78f695bbb9fa8690048c93fb354d5aa137c4a7176d0f6fb18482"
   },
   "plugin_id": "dronedream.managed.validator",
   "schema_version": "dronedream.managed-plugin-manifest.v1",

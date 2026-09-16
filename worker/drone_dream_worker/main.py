@@ -24,18 +24,24 @@ logger = logging.getLogger("drone_dream.worker")
 
 
 def run(max_iterations: int | None = None) -> int:
-    """Launch the worker loop. Used by both ``main()`` and tests."""
+    """Run the shared job/trial state machine, returning its terminal exit code.
+
+    The backend runner owns database access, claims and simulator selection.
+    This entrypoint only configures process logging and polling; it must not
+    log credentials embedded in a configured database connection URL.
+    """
 
     settings = get_settings()
     logging.basicConfig(
         level=settings.worker_log_level.upper(),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
+    # DATABASE_URL may include a password or credential-bearing query string.
+    # Startup diagnostics do not need it, even in development/test runs.
     logger.info(
-        "drone-dream-worker %s starting (poll_interval=%.2fs, database=%s)",
+        "drone-dream-worker %s starting (poll_interval=%.2fs)",
         __version__,
         settings.worker_poll_interval_seconds,
-        settings.database_url,
     )
     exit_code: int = run_forever(
         poll_interval_seconds=settings.worker_poll_interval_seconds,
@@ -45,6 +51,7 @@ def run(max_iterations: int | None = None) -> int:
 
 
 def main() -> None:
+    """Expose the worker outcome as the process exit status for its supervisor."""
     sys.exit(run())
 
 

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import time
+from types import SimpleNamespace
 from uuid import uuid4
 
+from fastapi import Request
 from fastapi.testclient import TestClient
 
 from app.config import get_settings
@@ -13,6 +16,56 @@ RUNTIME_ID = "123e4567-e89b-12d3-a456-426614174000"
 APP_SECRET = "desktop-unit-secret-0123456789-ABCDEFGH"
 TOKEN_A = "desktop-token-a-0123456789-ABCDEFGH"
 TOKEN_B = "desktop-token-b-0123456789-ABCDEFGH"
+
+
+def test_bridge_stops_reading_an_oversized_chunked_body_before_nonce_consumption(monkeypatch):
+    from app import desktop_bridge as bridge
+
+    monkeypatch.setattr(bridge, "_MAX_BODY_BYTES", 4)
+    reads = []
+
+    async def receive():
+        assert len(reads) < 2, "must not drain the rest of an already oversized upload"
+        reads.append(1)
+        return {"type": "http.request", "body": b"123" if len(reads) == 1 else b"45",
+                "more_body": True}
+
+    def forbidden_nonce(**_kwargs):
+        raise AssertionError("oversized requests cannot consume a valid proof")
+
+    async def forbidden_route(_request):
+        raise AssertionError("oversized requests cannot reach a route")
+
+    monkeypatch.setattr(bridge, "_consume_nonce", forbidden_nonce)
+    headers = _proof("POST", "/api/v1/jobs", body=b"12345")
+    headers["Content-Length"] = "0"  # An inaccurate header cannot bypass stream accounting.
+    request = Request({"type": "http", "method": "POST", "path": "/api/v1/jobs",
+        "headers": [(name.lower().encode(), value.encode()) for name, value in headers.items()]},
+        receive)
+    settings = SimpleNamespace(desktop_bridge_required=True, dronedream_runtime_id=RUNTIME_ID,
+                               desktop_bridge_clock_skew_seconds=30)
+    response = asyncio.run(bridge.enforce_desktop_bridge(request, forbidden_route, settings))
+    assert response.status_code == 413
+    assert len(reads) == 2
+
+
+def test_bridge_preserves_exact_boundary_body_for_downstream_readers(monkeypatch):
+    from app import desktop_bridge as bridge
+
+    monkeypatch.setattr(bridge, "_MAX_BODY_BYTES", 4)
+    chunks = iter((b"ab", b"cd"))
+
+    async def receive():
+        chunk = next(chunks)
+        return {"type": "http.request", "body": chunk, "more_body": chunk != b"cd"}
+
+    async def check():
+        request = Request({"type": "http"}, receive)
+        assert await bridge._bounded_request_body(request) == b"abcd"
+        assert await request.body() == b"abcd"
+        assert b"".join([chunk async for chunk in request.stream()]) == b"abcd"
+
+    asyncio.run(check())
 
 
 def _configure(monkeypatch: object) -> None:

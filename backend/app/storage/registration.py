@@ -13,6 +13,7 @@ class ArtifactRegistrationClosed(RuntimeError):
 
 
 def _owner_job_id(db: Session, *, owner_type: str, owner_id: str) -> str:
+    """Resolve job/trial ownership to the single job lock shared with retention."""
     if owner_type == "job":
         return owner_id
     if owner_type == "trial":

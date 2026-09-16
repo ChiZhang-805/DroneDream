@@ -19,6 +19,7 @@ from app.config import get_settings
 
 
 def _canonical_key(raw: str | None) -> str | None:
+    """Accept normalized UUID identity, rejecting truncated or alternate encodings."""
     if raw is None:
         return None
     candidate = raw.strip().lower()
@@ -32,6 +33,7 @@ def _canonical_key(raw: str | None) -> str | None:
 
 
 def _request_hash(operation: str, payload: object) -> str:
+    """Bind a retry key to operation and canonical payload, not JSON field order."""
     canonical = json.dumps(
         {"operation": operation, "payload": payload},
         ensure_ascii=False,
@@ -42,6 +44,7 @@ def _request_hash(operation: str, payload: object) -> str:
 
 
 def _http_error(status_code: int, code: str, message: str) -> HTTPException:
+    """Return stable reconciliation errors without including stored request contents."""
     return HTTPException(
         status_code=status_code,
         detail={"code": code, "message": message},
@@ -64,6 +67,7 @@ class MutationGate:
         resource_id: str | None = None,
         response_status: int = 200,
     ) -> dict[str, Any]:
+        """Commit business effects and replay evidence as one transaction, or replay once."""
         if self.replay is not None:
             return self.replay
         if self.record is not None:

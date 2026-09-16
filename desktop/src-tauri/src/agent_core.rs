@@ -51,13 +51,15 @@ impl AgentCoreState {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct AgentCoreRequest {
     method: String,
     path: String,
     body_base64: Option<String>,
     content_type: Option<String>,
+    identity_token: Option<String>,
+    publishable_key: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -321,6 +323,8 @@ pub(crate) fn start(app: &mut App) {
 }
 
 fn validate_request(request: &AgentCoreRequest) -> Result<reqwest::Method, String> {
+    validate_identity_header(request.identity_token.as_deref())?;
+    validate_identity_header(request.publishable_key.as_deref())?;
     if !request.path.starts_with("/v1/")
         || request.path.contains("..")
         || request.path.contains(['\r', '\n'])
@@ -336,6 +340,23 @@ fn validate_request(request: &AgentCoreRequest) -> Result<reqwest::Method, Strin
         "DELETE" => Ok(reqwest::Method::DELETE),
         _ => Err("AGENT Core method is not supported.".to_owned()),
     }
+}
+
+// 功能：
+//   限制可转发的身份头长度与字符；不信任客户端身份声明，最终由 Core 验签。
+// 输入：
+//   value：当前会话令牌或公开项目键，未登录的只读请求可为空。
+// 输出：
+//   result：有效值返回 Ok，否则返回不含秘密的固定错误。
+fn validate_identity_header(value: Option<&str>) -> Result<(), String> {
+    if let Some(value) = value {
+        if !(16..=16_384).contains(&value.len())
+            || !value.bytes().all(|byte| (33..=126).contains(&byte))
+        {
+            return Err("AGENT Core identity header is invalid.".to_owned());
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -461,17 +482,27 @@ pub(crate) async fn agent_core_request(
     if body.len() > MAX_REQUEST_BYTES {
         return Err("AGENT Core request exceeds 256 MiB.".to_owned());
     }
+    let timeout = core_request_timeout(&request.method, &request.path);
     let url = format!("{}{}", info.base_url, request.path);
     let token = info.token;
     let content_type = request.content_type.clone();
+    let identity_token = request.identity_token;
+    let publishable_key = request.publishable_key;
     tauri::async_runtime::spawn_blocking(move || {
         let client = reqwest::blocking::Client::builder()
+            .no_proxy()
             .connect_timeout(Duration::from_secs(3))
-            .timeout(Duration::from_secs(180))
+            .timeout(timeout)
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|error| format!("Unable to create the AGENT Core client: {error}"))?;
         let mut outbound = client.request(method, url).bearer_auth(token);
+        if let Some(value) = identity_token {
+            outbound = outbound.header("X-DroneDream-Identity-Token", value);
+        }
+        if let Some(value) = publishable_key {
+            outbound = outbound.header("X-DroneDream-Supabase-Publishable-Key", value);
+        }
         if let Some(value) = content_type {
             if value.len() > 128 || value.contains(['\r', '\n']) {
                 return Err("AGENT Core content type is invalid.".to_owned());
@@ -719,9 +750,49 @@ pub(crate) fn stop(handle: &AppHandle) {
     shutdown_state(&state);
 }
 
+// 功能：
+//   为多调用准备流程保留有界等待窗口，避免 UI 先超时、后台仍在计费处理。
+// 输入：
+//   method：经过校验的 HTTP 方法。
+//   path：Core 的本机接口路径。
+// 输出：
+//   timeout：包含响应传输余量的最大等待时间，不自动重发请求。
+fn core_request_timeout(method: &str, path: &str) -> Duration {
+    let parts: Vec<_> = path.split('/').collect();
+    if method == "POST" && parts.len() == 5 && parts[1] == "v1" && parts[2] == "threads" {
+        match parts[4] {
+            // 总预算最多 48 次，每次最多 180 秒；解析已包含在总预算内。
+            "prepare" => return Duration::from_secs(48 * 180 + 60),
+            "interpret" => return Duration::from_secs(210),
+            _ => {}
+        }
+    }
+    Duration::from_secs(180)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn multi_call_planning_does_not_use_a_single_call_timeout() {
+        assert_eq!(
+            core_request_timeout("POST", "/v1/threads/thread-test/prepare").as_secs(),
+            8700
+        );
+        assert_eq!(
+            core_request_timeout("POST", "/v1/threads/thread-test/interpret").as_secs(),
+            210
+        );
+        assert_eq!(
+            core_request_timeout("GET", "/v1/threads/thread-test/prepare").as_secs(),
+            180
+        );
+        assert_eq!(
+            core_request_timeout("POST", "/v1/plugins/prepare").as_secs(),
+            180
+        );
+    }
 
     #[test]
     fn core_request_rejects_non_v1_paths_and_unknown_methods() {
@@ -731,18 +802,24 @@ mod tests {
                 path: "/shutdown".to_owned(),
                 body_base64: None,
                 content_type: None,
+                identity_token: None,
+                publishable_key: None,
             },
             AgentCoreRequest {
                 method: "GET".to_owned(),
                 path: "/v1/../shutdown".to_owned(),
                 body_base64: None,
                 content_type: None,
+                identity_token: None,
+                publishable_key: None,
             },
             AgentCoreRequest {
                 method: "TRACE".to_owned(),
                 path: "/v1/plugins".to_owned(),
                 body_base64: None,
                 content_type: None,
+                identity_token: None,
+                publishable_key: None,
             },
         ] {
             assert!(validate_request(&request).is_err());
@@ -762,6 +839,8 @@ mod tests {
                 path: path.to_owned(),
                 body_base64: None,
                 content_type: None,
+                identity_token: None,
+                publishable_key: None,
             };
             assert!(validate_request(&request).is_ok());
         }
@@ -783,5 +862,20 @@ mod tests {
                 && !character.is_ascii_digit()
                 && !"._-".contains(character)
         }));
+    }
+
+    #[test]
+    fn identity_headers_are_bounded_and_cannot_inject_http_headers() {
+        assert!(validate_identity_header(None).is_ok());
+        assert!(validate_identity_header(Some("signed-account-access-token")).is_ok());
+        for invalid in [
+            "",
+            "short",
+            "signed-token\r\nInjected: true",
+            "secret token with spaces",
+        ] {
+            assert!(validate_identity_header(Some(invalid)).is_err());
+        }
+        assert!(validate_identity_header(Some(&"x".repeat(16_385))).is_err());
     }
 }

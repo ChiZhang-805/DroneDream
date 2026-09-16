@@ -1,16 +1,16 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { ChangeEvent } from "react";
 import { FileCheck2, GitCompareArrows, ShieldX, Upload } from "lucide-react";
 
 import { localeSafeError, useI18n } from "../i18n/I18nProvider";
-import { parseLabEvidencePreview } from "./evidencePreview";
-import type { LabEvidencePreview } from "./evidencePreview";
+import { MAX_LAB_EVIDENCE_BYTES, parseLabEvidencePreview } from "./evidencePreview";
 import {
   FIELD_PRODUCT_SOURCE,
+  MAX_FIELD_RECEIPT_BYTES,
   evaluateSimFieldBridge,
   parseFieldHarnessReceipt,
 } from "./fieldEvidenceBridge";
-import type { FieldHarnessReceipt } from "./fieldEvidenceBridge";
+import { useEvidenceImport } from "./useEvidenceImport";
 
 const COPY = {
   en: {
@@ -55,16 +55,24 @@ const COPY = {
   },
 } as const;
 
+/** Abbreviate for display only; matching still uses complete hashes. */
 function shortHash(value: string): string {
   return `${value.slice(0, 10)}…${value.slice(-6)}`;
 }
 
+/** Independent SIM and FIELD imports remain preview-only even when lineage matches. */
 export function LabEvidenceBridgePanel() {
   const { locale } = useI18n();
   const copy = COPY[locale];
-  const [simulation, setSimulation] = useState<LabEvidencePreview | null>(null);
-  const [field, setField] = useState<FieldHarnessReceipt | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const simImport = useEvidenceImport(MAX_LAB_EVIDENCE_BYTES, parseLabEvidencePreview);
+  const fieldImport = useEvidenceImport(MAX_FIELD_RECEIPT_BYTES, parseFieldHarnessReceipt);
+  const simulation = simImport.value;
+  const field = fieldImport.value;
+  // A successful upload on one side must not hide the other side's rejection.
+  const caught = simImport.error ?? fieldImport.error;
+  const error = caught ? localeSafeError(caught, locale, {
+    zh: COPY["zh-CN"].error, en: COPY.en.error,
+  }) : null;
   const decision = useMemo(
     () => evaluateSimFieldBridge(simulation, field),
     [field, simulation],
@@ -74,32 +82,14 @@ export function LabEvidenceBridgePanel() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    try {
-      setSimulation(parseLabEvidencePreview(file.name, await file.text()));
-      setError(null);
-    } catch (caught) {
-      setSimulation(null);
-      setError(localeSafeError(caught, locale, {
-        zh: COPY["zh-CN"].error,
-        en: COPY.en.error,
-      }));
-    }
+    await simImport.importFile(file);
   }
 
   async function importField(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    try {
-      setField(await parseFieldHarnessReceipt(file.name, await file.text()));
-      setError(null);
-    } catch (caught) {
-      setField(null);
-      setError(localeSafeError(caught, locale, {
-        zh: COPY["zh-CN"].error,
-        en: COPY.en.error,
-      }));
-    }
+    await fieldImport.importFile(file);
   }
 
   const status = decision.state === "waiting-for-evidence"

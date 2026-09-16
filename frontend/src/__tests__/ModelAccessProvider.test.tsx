@@ -17,6 +17,9 @@ function ModelAccessProbe() {
     <>
       <output aria-label="provider">{settings.provider}</output>
       <output aria-label="api-key">{settings.apiKey}</output>
+      <output aria-label="endpoint">{settings.baseUrl}</output>
+      <output aria-label="vault-profile">{settings.agentCoreProfileId}</output>
+      <output aria-label="protocol">{typeof settings.protocol}:{String(settings.protocol)}</output>
       <output aria-label="access-mode">{settings.accessMode}</output>
       <output aria-label="managed-provider">{settings.managedProvider}</output>
       <output aria-label="managed-model">{settings.managedModel}</output>
@@ -25,6 +28,9 @@ function ModelAccessProbe() {
       </button>
       <button type="button" onClick={() => selectProvider("qwen")}>
         Select Qwen
+      </button>
+      <button type="button" onClick={() => updateSettings({ provider: "qwen" })}>
+        Update provider directly
       </button>
       <button type="button" onClick={() => selectManagedProvider("deepseek")}>
         Select managed DeepSeek
@@ -49,6 +55,36 @@ describe("ModelAccessProvider", () => {
   afterEach(() => {
     window.localStorage.clear();
     window.sessionStorage.clear();
+  });
+
+  it("clears credentials through the generic provider update path too", () => {
+    render(<ModelAccessProvider initialSettings={{ apiKey: "old-provider-secret" }}>
+      <ModelAccessProbe />
+    </ModelAccessProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "Update provider directly" }));
+    expect(screen.getByLabelText("api-key")).toBeEmptyDOMElement();
+  });
+
+  it("does not silently reset a customized endpoint when reselecting its provider", () => {
+    render(<ModelAccessProvider initialSettings={{
+      provider: "qwen", baseUrl: "https://owned.example/v1", apiKey: "owned-secret",
+      agentCoreProfileId: `cmp-${"a".repeat(24)}`,
+    }}><ModelAccessProbe /></ModelAccessProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "Select Qwen" }));
+    expect(screen.getByLabelText("endpoint")).toHaveTextContent("https://owned.example/v1");
+    expect(screen.getByLabelText("api-key")).toHaveTextContent("owned-secret");
+    expect(screen.getByLabelText("vault-profile")).toHaveTextContent(`cmp-${"a".repeat(24)}`);
+  });
+
+  it("does not accept an array as a persisted protocol string", () => {
+    window.localStorage.setItem("dronedream:model-access:v1", JSON.stringify({
+      activeProfileId: "default", profiles: [{
+        id: "default", provider: "custom", model: "test", baseUrl: "https://owned.example",
+        protocol: ["openai-chat"],
+      }],
+    }));
+    render(<ModelAccessProvider><ModelAccessProbe /></ModelAccessProvider>);
+    expect(screen.getByLabelText("protocol")).toHaveTextContent("string:openai-chat");
   });
 
   it("clears the in-memory credential when its provider changes", async () => {

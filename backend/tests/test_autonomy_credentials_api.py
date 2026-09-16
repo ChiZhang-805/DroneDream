@@ -335,3 +335,59 @@ def test_harness_requalifies_persisted_credential_payloads(client: TestClient) -
     inspected = client.post("/api/v1/autonomy/harness/inspect", json=harness).json()["data"]
     assert inspected["planning_ready"] is False
     assert "aircraft.qualification-receipt.integrity-mismatch" in inspected["blockers"]
+
+
+@pytest.mark.parametrize("kind", ("aircraft", "map"))
+def test_harness_rejects_receipt_fields_diverging_from_requalification(
+    client: TestClient, kind: str
+) -> None:
+    """The input hash alone does not bind derived fields stored in receipt JSON."""
+    from app import db, models
+
+    vehicle, map_pack = _qualified_assets(client)
+    harness = _harness_payload(vehicle, map_pack)
+    receipt_id = vehicle["receipt_id"] if kind == "aircraft" else map_pack["receipt_id"]
+    with db.SessionLocal() as session:
+        credential = session.get(models.AutonomyQualificationCredential, receipt_id)
+        assert credential is not None
+        if kind == "aircraft":
+            credential.receipt_json = {**credential.receipt_json, "planning_radius_m": 0.1}
+            harness["aircraft"]["capabilities"]["body_radius_m"] = 0.1
+        else:
+            credential.receipt_json = {**credential.receipt_json, "planning_layers": []}
+        session.commit()
+    inspected = client.post("/api/v1/autonomy/harness/inspect", json=harness).json()["data"]
+    assert inspected["planning_ready"] is False
+    assert f"{kind}.qualification-receipt.integrity-mismatch" in inspected["blockers"]
+
+
+def test_credential_lookup_refreshes_concurrently_revoked_identity(client: TestClient) -> None:
+    """A second lookup must not reuse an active flag cached before revocation."""
+    from datetime import datetime, timezone
+
+    from sqlalchemy import update
+
+    from app import db, models
+    from app.autonomy.credentials import _credential
+    from app.autonomy.models import AutonomyHarnessAsset
+
+    vehicle, map_pack = _qualified_assets(client)
+    asset = AutonomyHarnessAsset.model_validate(_harness_payload(vehicle, map_pack)["aircraft"])
+    with db.SessionLocal() as reader:
+        cached = reader.get(models.AutonomyQualificationCredential, vehicle["receipt_id"])
+        assert cached is not None and cached.revoked_at is None
+        with db.SessionLocal() as writer:
+            writer.execute(
+                update(models.AutonomyQualificationCredential)
+                .where(models.AutonomyQualificationCredential.receipt_id == vehicle["receipt_id"])
+                .values(revoked_at=datetime.now(timezone.utc))
+            )
+            writer.commit()
+        current = _credential(reader, cached.user_id, asset)
+        assert current is not None and current.revoked_at is not None
+
+
+def test_unrepresentable_capability_returns_mismatch_instead_of_overflow() -> None:
+    from app.autonomy.credentials import _same_number
+
+    assert not _same_number(10**350, 1.0)

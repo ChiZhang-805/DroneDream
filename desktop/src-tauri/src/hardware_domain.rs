@@ -1,3 +1,4 @@
+/// Share Field's evidence namespace in Universal; never invent a new hardware authority.
 pub(crate) fn edition_id() -> &'static str {
     match env!("DRONEDREAM_DESKTOP_EDITION_ID") {
         // Universal embeds the mature FIELD hardware-domain module alongside
@@ -8,10 +9,12 @@ pub(crate) fn edition_id() -> &'static str {
     }
 }
 
+/// Use the compiled profile, not a runtime string supplied by the frontend.
 pub(crate) fn runtime_profile() -> &'static str {
     env!("DRONEDREAM_EDITION_PROFILE")
 }
 
+/// Command availability requires a supported edition/profile pair, not just an edition label.
 pub(crate) fn require_available() -> Result<(), String> {
     match (env!("DRONEDREAM_DESKTOP_EDITION_ID"), runtime_profile()) {
         ("universal", "unified-sim-lab")

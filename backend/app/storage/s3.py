@@ -14,7 +14,9 @@ class S3StorageConfigError(RuntimeError):
 
 
 class S3ArtifactStorage(ArtifactStorage):
+    """S3 transport restricted to the configured bucket/prefix, not arbitrary S3 URIs."""
     def __init__(self) -> None:
+        """Require explicit storage credentials and bounded connection/read retry settings."""
         settings = get_settings()
         if not settings.s3_bucket:
             raise S3StorageConfigError(
@@ -53,6 +55,7 @@ class S3ArtifactStorage(ArtifactStorage):
         )
 
     def put_file(self, local_path: Path, key: str, content_type: str | None = None) -> str:
+        """Upload into this store's prefix; DB registration and integrity sealing follow."""
         object_key = f"{self.prefix}{key}" if self.prefix else key
         extra: dict[str, str] = {}
         if content_type:
@@ -73,6 +76,7 @@ class S3ArtifactStorage(ArtifactStorage):
         return bucket, key
 
     def read_bytes(self, storage_uri: str) -> bytes:
+        """Read a complete payload and close its response body even on stream failure."""
         chunks: list[bytes] = []
         with _S3Body(self._object_body(storage_uri)) as body:
             while chunk := body.read(1024 * 1024):
@@ -80,6 +84,7 @@ class S3ArtifactStorage(ArtifactStorage):
         return b"".join(chunks)
 
     def content_digest(self, storage_uri: str) -> tuple[str, int]:
+        """Hash downloaded bytes, not ETag (which need not be a content SHA-256)."""
         digest = hashlib.sha256()
         size = 0
         with _S3Body(self._object_body(storage_uri)) as body:
@@ -89,6 +94,7 @@ class S3ArtifactStorage(ArtifactStorage):
         return digest.hexdigest(), size
 
     def copy_to(self, storage_uri: str, destination: BinaryIO) -> tuple[str, int]:
+        """Stream into a caller-owned sink and return the digest of exactly those bytes."""
         digest = hashlib.sha256()
         size = 0
         with _S3Body(self._object_body(storage_uri)) as body:
@@ -100,11 +106,13 @@ class S3ArtifactStorage(ArtifactStorage):
         return digest.hexdigest(), size
 
     def _object_body(self, storage_uri: str) -> object:
+        """Validate namespace before opening a response; the caller must close its body."""
         bucket, key = self._configured_location(storage_uri)
         response = self._client.get_object(Bucket=bucket, Key=key)
         return response["Body"]
 
     def exists(self, storage_uri: str) -> bool:
+        """Distinguish confirmed absence from authorization, outage and throttling errors."""
         bucket, key = self._configured_location(storage_uri)
         try:
             self._client.head_object(Bucket=bucket, Key=key)
@@ -121,12 +129,14 @@ class S3ArtifactStorage(ArtifactStorage):
             raise
 
     def delete(self, storage_uri: str) -> None:
+        """Delete one object; lifecycle authorization and receipt removal are caller-owned."""
         bucket, key = self._configured_location(storage_uri)
         self._client.delete_object(Bucket=bucket, Key=key)
 
     def presign_download(
         self, storage_uri: str, *, expires_seconds: int | None = None
     ) -> str | None:
+        """Issue temporary read access only after the route verifies account ownership."""
         bucket, key = self._configured_location(storage_uri)
         expiry = expires_seconds or get_settings().artifact_presign_expiry_seconds
         return str(
@@ -138,10 +148,12 @@ class S3ArtifactStorage(ArtifactStorage):
         )
 
     def check_health(self) -> None:
+        """Check bucket reachability without listing or modifying stored artifacts."""
         self._client.head_bucket(Bucket=self.bucket)
 
 
 def _parse_s3_uri(uri: str) -> tuple[str, str]:
+    """Parse a literal stored-object URI, rejecting query/fragment ambiguity."""
     parsed = urlparse(uri)
     key = parsed.path.lstrip("/")
     if (
@@ -160,12 +172,14 @@ class _S3Body:
     """Close a botocore streaming body without depending on its concrete type."""
 
     def __init__(self, body: object) -> None:
+        """Take response-body lifetime responsibility without assuming a botocore type."""
         self._body = body
 
     def __enter__(self) -> _S3Body:
         return self
 
     def read(self, size: int) -> bytes:
+        """Require binary chunks so evidence hashes cannot depend on implicit text decoding."""
         reader = getattr(self._body, "read", None)
         if not callable(reader):
             raise S3StorageConfigError("S3 get_object returned an unreadable body")
@@ -175,6 +189,7 @@ class _S3Body:
         return content
 
     def __exit__(self, *_args: object) -> None:
+        """Close the underlying HTTP stream on both successful and failed processing."""
         close = getattr(self._body, "close", None)
         if callable(close):
             close()

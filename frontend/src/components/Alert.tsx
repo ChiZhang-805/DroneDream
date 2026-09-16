@@ -8,6 +8,7 @@ interface AlertProps {
   children?: ReactNode;
 }
 
+/** Urgent failures use an alert; routine updates use status without initiating any side effect. */
 export function Alert({ tone = "info", title, children }: AlertProps) {
   return (
     <div className={`alert alert-${tone}`} role={tone === "danger" ? "alert" : "status"}>

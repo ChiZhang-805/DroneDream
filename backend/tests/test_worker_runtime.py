@@ -47,6 +47,7 @@ def test_worker_presence_rejects_invalid_or_future_timestamps(
         require_worker_heartbeat=True,
     )
     client = SimpleNamespace(
+        close=lambda: None,
         ping=lambda: True,
         getrange=lambda _key, _start, _end: json.dumps(
             {"worker_id": "worker", "observed_at_epoch": observed_epoch}
@@ -71,6 +72,7 @@ def test_worker_presence_rejects_oversized_heartbeat(
         require_worker_heartbeat=True,
     )
     client = SimpleNamespace(
+        close=lambda: None,
         ping=lambda: True,
         getrange=lambda _key, _start, _end: "x" * 4097,
     )

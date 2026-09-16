@@ -6,6 +6,7 @@ use std::time::Duration;
 const ENGLISH_LOCALE: &str = "en";
 const CHINESE_LOCALE: &str = "zh-CN";
 
+// NSIS language IDs seed the UI only; they are not an account preference sync.
 fn locale_from_installer_language(value: &str) -> &'static str {
     if value.trim() == "2052" {
         CHINESE_LOCALE
@@ -15,6 +16,8 @@ fn locale_from_installer_language(value: &str) -> &'static str {
 }
 
 #[tauri::command]
+/// Read the current user's installer hint with a bounded, fixed registry probe.
+/// Unavailable/unsupported hints fall back to English, never alter cloud settings.
 pub fn get_installer_locale() -> String {
     #[cfg(target_os = "windows")]
     {

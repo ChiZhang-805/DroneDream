@@ -1,13 +1,14 @@
 //! Persisted Model + Harness jobs for the Field real-device domain.
 //!
 //! Jobs consume content-bound telemetry evidence that was captured outside this
-//! command. The local model proposes a bounded next candidate; the harness
+//! command. A deterministic two-candidate extrapolator proposes the next trial;
+//! it is not a learned policy, provider call, or real-time flight controller. The harness
 //! validates budgets, scores trials, checks an independent holdout, and stores
 //! an auditable receipt. This module never opens a device or writes parameters.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 use chrono::{SecondsFormat, Utc};
@@ -24,6 +25,8 @@ const SOURCE_COMMIT: &str = env!("DRONEDREAM_SOURCE_COMMIT");
 const ENGINE_PACK_ID: &str = env!("DRONEDREAM_ENGINE_PACK_ID");
 const MAX_TRIALS: usize = 32;
 const MAX_PARAMETERS: usize = 64;
+const MAX_RECEIPT_BYTES: u64 = 1_000_000;
+const MAX_HISTORY_ENTRIES: usize = 1_000;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -166,6 +169,7 @@ fn sha256_hex(bytes: impl AsRef<[u8]>) -> String {
     hex::encode(Sha256::digest(bytes.as_ref()))
 }
 
+/// Stable content addressing, not a signature or proof that telemetry was measured.
 fn canonical_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, String> {
     serde_jcs::to_vec(value).map_err(|error| format!("Field Harness evidence is invalid: {error}"))
 }
@@ -200,6 +204,7 @@ fn finite_bounded(value: f64, min: f64, max: f64) -> bool {
     value.is_finite() && value >= min && value <= max
 }
 
+/// Validate imported evidence before creating files; snapshot identity is resolved natively.
 fn validate_request(
     request: &FieldHarnessJobRequest,
     snapshot: &FieldSnapshotBinding,
@@ -311,6 +316,16 @@ fn validate_request(
             "Field Harness requires exactly one final independent holdout trial".to_string(),
         );
     }
+    let holdout = request
+        .trials
+        .last()
+        .expect("bounded nonempty trials checked above");
+    if request.trials[..request.trials.len() - 1]
+        .iter()
+        .any(|trial| trial.telemetry_sha256 == holdout.telemetry_sha256)
+    {
+        return Err("Field Harness holdout telemetry must be independent of training".to_string());
+    }
     Ok(())
 }
 
@@ -318,6 +333,7 @@ fn rounded(value: f64) -> f64 {
     (value * 1_000_000.0).round() / 1_000_000.0
 }
 
+/// Offline ranking: safety events incur penalties, but a low score never erases a violation.
 fn score(metrics: &FieldHarnessMetrics) -> f64 {
     let safety_penalty = f64::from(metrics.constraint_violations) * 10.0
         + f64::from(metrics.emergency_interventions) * 100.0;
@@ -329,6 +345,7 @@ fn score(metrics: &FieldHarnessMetrics) -> f64 {
     )
 }
 
+/// Safety failures take precedence over the objective threshold in every replay receipt.
 fn failure_class(metrics: &FieldHarnessMetrics, score: f64, target: f64) -> String {
     if metrics.emergency_interventions > 0 {
         "emergency-intervention".to_string()
@@ -341,6 +358,7 @@ fn failure_class(metrics: &FieldHarnessMetrics, score: f64, target: f64) -> Stri
     }
 }
 
+/// Extrapolate the two best recorded candidates within both absolute and per-trial bounds.
 fn proposal(
     best: &FieldHarnessTrialReceipt,
     runner_up: &FieldHarnessTrialReceipt,
@@ -352,7 +370,11 @@ fn proposal(
             let best_value = best.parameters[name];
             let direction = best_value - runner_up.parameters[name];
             let step = (direction * 0.35).clamp(-bound.max_step, bound.max_step);
-            let value = rounded((best_value + step).clamp(bound.min, bound.max));
+            // Decimal rounding can cross a narrow bound; constrain the rounded
+            // proposal again, including max_step relative to the selected value.
+            let lower = bound.min.max(best_value - bound.max_step);
+            let upper = bound.max.min(best_value + bound.max_step);
+            let value = rounded(best_value + step).clamp(lower, upper);
             (name.clone(), value)
         })
         .collect()
@@ -367,45 +389,180 @@ fn jobs_root(app: &AppHandle) -> Result<PathBuf, String> {
         .join("jobs"))
 }
 
+/// Reject links and Windows junctions; this lexical walk is not a hostile-filesystem sandbox.
+fn reject_link(metadata: &fs::Metadata) -> Result<(), String> {
+    #[cfg(windows)]
+    let reparse = {
+        use std::os::windows::fs::MetadataExt;
+        metadata.file_attributes() & 0x400 != 0
+    };
+    #[cfg(not(windows))]
+    let reparse = false;
+    if metadata.file_type().is_symlink() || reparse {
+        return Err("Field Harness evidence cannot use a link or reparse point".to_string());
+    }
+    Ok(())
+}
+
+/// Inspect all existing parents before creating a missing app-owned evidence directory.
 fn ensure_owned_directory(path: &Path) -> Result<(), String> {
-    if path.exists() {
-        let metadata = fs::symlink_metadata(path)
-            .map_err(|error| format!("Field Harness directory cannot be inspected: {error}"))?;
-        if metadata.file_type().is_symlink() || !metadata.is_dir() {
-            return Err("Field Harness directory is not an owned physical directory".to_string());
+    for ancestor in path.ancestors() {
+        match fs::symlink_metadata(ancestor) {
+            Ok(metadata) => {
+                reject_link(&metadata)?;
+                if !metadata.is_dir() {
+                    return Err(
+                        "Field Harness directory is not an owned physical directory".to_string()
+                    );
+                }
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => {
+                return Err(format!(
+                    "Field Harness directory cannot be inspected: {error}"
+                ))
+            }
         }
-        return Ok(());
     }
     fs::create_dir_all(path)
         .map_err(|error| format!("Field Harness directory cannot be created: {error}"))?;
     Ok(())
 }
 
+/// Publish a flushed receipt exclusively, so concurrent readers never see a partial JSON file.
 fn persist_receipt(root: &Path, receipt: &FieldHarnessJobReceipt) -> Result<(), String> {
     ensure_owned_directory(root)?;
     let path = root.join(format!("{}.json", receipt.job_id));
     let bytes = canonical_bytes(receipt)?;
+    if bytes.len() as u64 > MAX_RECEIPT_BYTES {
+        return Err("Field Harness receipt exceeds its byte bound".to_string());
+    }
+    let staging = root.join(format!(".field-harness-{}.tmp", Uuid::new_v4().simple()));
     let mut file = OpenOptions::new()
         .write(true)
         .create_new(true)
-        .open(&path)
+        .open(&staging)
         .map_err(|error| format!("Field Harness job cannot be created exclusively: {error}"))?;
-    file.write_all(&bytes)
+    let write_result = file
+        .write_all(&bytes)
         .and_then(|_| file.sync_all())
-        .map_err(|error| format!("Field Harness job cannot be persisted: {error}"))
+        .map_err(|error| format!("Field Harness job cannot be persisted: {error}"));
+    drop(file);
+    // Hard-link publication is atomic and refuses to overwrite an existing job.
+    // Filesystems without that capability fail closed, with no unsafe copy fallback.
+    let result = write_result.and_then(|()| {
+        fs::hard_link(&staging, &path)
+            .map_err(|error| format!("Field Harness job cannot be published exclusively: {error}"))
+    });
+    let _ = fs::remove_file(staging); // Only the exclusively created temporary file belongs to us.
+    result
 }
 
+/// A digest detects edits but cannot authenticate the author; also enforce deny-only semantics.
 fn verify_receipt(mut receipt: FieldHarnessJobReceipt) -> Result<FieldHarnessJobReceipt, String> {
     let expected = receipt.receipt_sha256.clone();
     receipt.receipt_sha256.clear();
     let actual = canonical_sha256(&receipt)?;
     receipt.receipt_sha256 = expected.clone();
-    if expected != actual || receipt.source_commit != SOURCE_COMMIT {
+    if expected != actual
+        || receipt.source_commit != SOURCE_COMMIT
+        || receipt.engine_pack_id != ENGINE_PACK_ID
+    {
         return Err("Field Harness job integrity or source binding is invalid".to_string());
+    }
+    if receipt.schema_version != 1
+        || receipt.kind != "dronedream-field-harness-job-receipt"
+        || receipt.edition_id != hardware_domain::edition_id()
+        || receipt.execution_domain != "real-device-recorded-evidence"
+        || receipt.execution_mode != "offline-evidence-replay-no-device-io"
+        || receipt.hardware_authority
+        || receipt.qualification.hardware_valid
+        || receipt.provider_requests != 0
+        || receipt.device_open_attempts != 0
+        || receipt.hardware_write_attempts != 0
+        || receipt.arm_attempts != 0
+        || receipt.flight_attempts != 0
+    {
+        return Err(
+            "Field Harness receipt violates its non-executing evidence contract".to_string(),
+        );
+    }
+    let count = receipt.trials.len();
+    if !(3..=MAX_TRIALS).contains(&count)
+        || !(2..=32).contains(&receipt.budget.max_iterations)
+        || receipt.budget.used_training_trials != count - 1
+        || receipt.budget.used_holdout_trials != 1
+        || count - 1 > usize::from(receipt.budget.max_iterations)
+        || receipt.budget.remaining_iterations
+            != usize::from(receipt.budget.max_iterations) - (count - 1)
+        || !finite_bounded(receipt.target_score, 0.01, 1.0)
+        || chrono::DateTime::parse_from_rfc3339(&receipt.created_at).is_err()
+    {
+        return Err("Field Harness receipt has inconsistent budget or time".to_string());
+    }
+    let (holdout, training) = receipt
+        .trials
+        .split_last()
+        .expect("bounded nonempty trials checked above");
+    let mut ids = BTreeSet::new();
+    for trial in &receipt.trials {
+        let metrics = &trial.metrics;
+        if !valid_identity(&trial.trial_id, 80)
+            || !ids.insert(&trial.trial_id)
+            || !valid_hash(&trial.telemetry_sha256)
+            || trial.parameters.is_empty()
+            || trial.parameters.len() > MAX_PARAMETERS
+            || trial.parameters.iter().any(|(name, value)| {
+                !valid_parameter_name(name) || !finite_bounded(*value, -1_000_000.0, 1_000_000.0)
+            })
+            || !finite_bounded(metrics.tracking_error, 0.0, 1_000.0)
+            || !finite_bounded(metrics.overshoot_percent, 0.0, 1_000.0)
+            || !finite_bounded(metrics.control_effort, 0.0, 1_000.0)
+            || trial.candidate_sha256 != canonical_sha256(&trial.parameters)?
+            || trial.score != score(metrics)
+            || trial.failure_class != failure_class(metrics, trial.score, receipt.target_score)
+            || trial.accepted != (trial.failure_class == "none")
+        {
+            return Err("Field Harness receipt has inconsistent trial evidence".to_string());
+        }
+    }
+    let best = training
+        .iter()
+        .min_by(|left, right| left.score.total_cmp(&right.score))
+        .expect("at least two training trials checked above");
+    let passed =
+        best.accepted && holdout.accepted && holdout.candidate_sha256 == best.candidate_sha256;
+    if !holdout.independent_holdout
+        || holdout.trial_id != receipt.holdout_trial_id
+        || training.iter().any(|trial| {
+            trial.independent_holdout || trial.telemetry_sha256 == holdout.telemetry_sha256
+        })
+        || best.candidate_sha256 != receipt.selected_candidate_sha256
+        || receipt.qualification.recorded_evidence_passed != passed
+        || receipt.qualification.status
+            != if passed {
+                "recorded-evidence-passed"
+            } else {
+                "recorded-evidence-rejected"
+            }
+        || receipt.proposed_candidate_sha256 != canonical_sha256(&receipt.proposed_parameters)?
+        || !receipt
+            .proposed_parameters
+            .keys()
+            .eq(best.parameters.keys())
+        || receipt
+            .proposed_parameters
+            .values()
+            .any(|value| !finite_bounded(*value, -1_000_000.0, 1_000_000.0))
+    {
+        return Err(
+            "Field Harness receipt has inconsistent holdout or proposal evidence".to_string(),
+        );
     }
     Ok(receipt)
 }
 
+/// Read at most the receipt bound plus one byte, even if a file grows after metadata inspection.
 fn load_at(root: &Path, job_id: &str) -> Result<FieldHarnessJobReceipt, String> {
     if !job_id.starts_with(&format!("{}-harness-", hardware_domain::edition_id()))
         || job_id.len() > 96
@@ -418,19 +575,36 @@ fn load_at(root: &Path, job_id: &str) -> Result<FieldHarnessJobReceipt, String> 
     let path = root.join(format!("{job_id}.json"));
     let metadata = fs::symlink_metadata(&path)
         .map_err(|error| format!("Field Harness job is unavailable: {error}"))?;
-    if metadata.file_type().is_symlink() || !metadata.is_file() || metadata.len() > 1_000_000 {
+    reject_link(&metadata)?;
+    if !metadata.is_file() || metadata.len() > MAX_RECEIPT_BYTES {
         return Err("Field Harness job file is outside its safety bound".to_string());
     }
-    let receipt = serde_json::from_slice::<FieldHarnessJobReceipt>(
-        &fs::read(path).map_err(|error| format!("Field Harness job cannot be read: {error}"))?,
-    )
-    .map_err(|error| format!("Field Harness job is invalid JSON: {error}"))?;
+    ensure_owned_directory(root)?;
+    let file = fs::File::open(path)
+        .map_err(|error| format!("Field Harness job cannot be opened: {error}"))?;
+    let opened = file
+        .metadata()
+        .map_err(|error| format!("Field Harness job cannot be inspected: {error}"))?;
+    reject_link(&opened)?;
+    if !opened.is_file() || opened.len() > MAX_RECEIPT_BYTES {
+        return Err("Field Harness opened receipt is outside its byte bound".to_string());
+    }
+    let mut bytes = Vec::new();
+    file.take(MAX_RECEIPT_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("Field Harness job cannot be read: {error}"))?;
+    if bytes.len() as u64 > MAX_RECEIPT_BYTES {
+        return Err("Field Harness receipt grew beyond its byte bound".to_string());
+    }
+    let receipt = serde_json::from_slice::<FieldHarnessJobReceipt>(&bytes)
+        .map_err(|error| format!("Field Harness job is invalid JSON: {error}"))?;
     if receipt.job_id != job_id {
         return Err("Field Harness job filename does not match its content".to_string());
     }
     verify_receipt(receipt)
 }
 
+/// Rank only training records, then evaluate the untouched final holdout and persist the proposal.
 fn run_at(
     root: &Path,
     request: FieldHarnessJobRequest,
@@ -562,6 +736,7 @@ fn run_at(
     Ok(receipt)
 }
 
+/// Summarize only after loading/integrity checks; do not read labels directly from unchecked JSON.
 fn summary(receipt: FieldHarnessJobReceipt) -> FieldHarnessJobSummary {
     FieldHarnessJobSummary {
         job_id: receipt.job_id,
@@ -575,27 +750,45 @@ fn summary(receipt: FieldHarnessJobReceipt) -> FieldHarnessJobSummary {
     }
 }
 
+/// Bound history work and ignore only this publisher's exact temporary-file namespace.
 fn list_at(root: &Path) -> Result<Vec<FieldHarnessJobSummary>, String> {
     if !root.exists() {
         return Ok(Vec::new());
     }
     ensure_owned_directory(root)?;
     let mut jobs = Vec::new();
-    for entry in fs::read_dir(root)
+    for (index, entry) in fs::read_dir(root)
         .map_err(|error| format!("Field Harness job history cannot be read: {error}"))?
+        .enumerate()
     {
+        if index >= MAX_HISTORY_ENTRIES {
+            return Err("Field Harness job history exceeds its bounded entry count".to_string());
+        }
         let entry =
             entry.map_err(|error| format!("Field Harness job entry is invalid: {error}"))?;
         let name = entry
             .file_name()
             .into_string()
             .map_err(|_| "Field Harness job filename is not UTF-8".to_string())?;
+        if let Some(stem) = name
+            .strip_prefix(".field-harness-")
+            .and_then(|name| name.strip_suffix(".tmp"))
+        {
+            if stem.len() == 32 && stem.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                continue;
+            }
+        }
         let job_id = name
             .strip_suffix(".json")
             .ok_or_else(|| "Field Harness job history contains an unknown file".to_string())?;
         jobs.push(summary(load_at(root, job_id)?));
     }
-    jobs.sort_by(|left, right| right.created_at.cmp(&left.created_at));
+    jobs.sort_by(|left, right| {
+        right
+            .created_at
+            .cmp(&left.created_at)
+            .then_with(|| left.job_id.cmp(&right.job_id))
+    });
     Ok(jobs)
 }
 
@@ -774,5 +967,91 @@ mod tests {
         let error = load_at(&root, &receipt.job_id).expect_err("tampering must fail");
         assert!(error.contains("integrity"));
         fs::remove_dir_all(root).expect("sandbox cleanup should succeed");
+    }
+
+    #[test]
+    fn reused_training_telemetry_cannot_be_a_holdout() {
+        let (mut request, snapshot) = request();
+        request.trials[2].telemetry_sha256 = request.trials[0].telemetry_sha256.clone();
+        assert!(validate_request(&request, &snapshot)
+            .unwrap_err()
+            .contains("independent"));
+    }
+
+    #[test]
+    fn rounding_never_crosses_absolute_or_step_bounds() {
+        let root = sandbox("proposal-rounding");
+        let (request, snapshot) = request();
+        let receipt = run_at(&root, request, &snapshot).unwrap();
+        let mut best = receipt.trials[0].clone();
+        let mut runner = best.clone();
+        best.parameters = BTreeMap::from([("P".to_string(), 0.000_001_9)]);
+        runner.parameters = BTreeMap::from([("P".to_string(), 0.0)]);
+        let bounds = BTreeMap::from([(
+            "P".to_string(),
+            FieldHarnessParameterBound {
+                min: 0.0,
+                max: 0.000_002_8,
+                max_step: 0.000_001,
+            },
+        )]);
+        let next = proposal(&best, &runner, &bounds)["P"];
+        assert!(next <= bounds["P"].max);
+        assert!((next - best.parameters["P"]).abs() <= bounds["P"].max_step);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn recomputed_digest_cannot_promote_authority_or_contradict_evidence() {
+        let root = sandbox("semantics");
+        let (request, snapshot) = request();
+        let original = run_at(&root, request, &snapshot).unwrap();
+        for case in 0..7 {
+            let mut changed = original.clone();
+            match case {
+                0 => changed.hardware_authority = true,
+                1 => changed.qualification.hardware_valid = true,
+                2 => changed.engine_pack_id = format!("sha256:{}", "f".repeat(64)),
+                3 => changed.budget.remaining_iterations += 1,
+                4 => changed.trials[0].score = 0.0,
+                5 => changed.holdout_trial_id = "wrong-trial".to_string(),
+                _ => changed.proposed_parameters = parameters(999.0),
+            }
+            changed.receipt_sha256.clear();
+            changed.receipt_sha256 = canonical_sha256(&changed).unwrap();
+            assert!(verify_receipt(changed).is_err(), "case {case} accepted");
+        }
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn exclusive_publication_preserves_existing_receipt() {
+        let root = sandbox("exclusive");
+        let (request, snapshot) = request();
+        let receipt = run_at(&root, request, &snapshot).unwrap();
+        assert!(persist_receipt(&root, &receipt).is_err());
+        assert_eq!(
+            load_at(&root, &receipt.job_id).unwrap().receipt_sha256,
+            receipt.receipt_sha256
+        );
+        assert_eq!(fs::read_dir(&root).unwrap().count(), 1);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn publisher_temporary_files_do_not_break_history() {
+        let root = sandbox("temporary");
+        let (request, snapshot) = request();
+        run_at(&root, request, &snapshot).unwrap();
+        fs::write(
+            root.join(format!(".field-harness-{}.tmp", "a".repeat(32))),
+            b"partial",
+        )
+        .unwrap();
+        assert_eq!(list_at(&root).unwrap().len(), 1);
+        // Other unknown files remain explicit errors, not silently discarded evidence.
+        fs::write(root.join("unknown.tmp"), b"partial").unwrap();
+        assert!(list_at(&root).is_err());
+        fs::remove_dir_all(root).unwrap();
     }
 }

@@ -8,7 +8,7 @@
     "entrypoint": "get_asset_connector_catalog",
     "module": "app.autonomy.asset_connectors",
     "source_path": "backend/app/autonomy/asset_connectors.py",
-    "source_sha256": "065ba0193518c200ea15212e710e50f565b9370a472aef3d2297e48596b6326d"
+    "source_sha256": "ea54b80e093ec5f0573182a10719a42fe7d69cc32ee6f9cb40f8ff40fff15166"
   },
   "plugin_id": "dronedream.managed.asset-adapter",
   "schema_version": "dronedream.managed-plugin-manifest.v1",

@@ -1,5 +1,6 @@
 import type { JobStatus } from "../types/api";
 
+/** Display in the viewer's local timezone; preserve invalid source text for diagnosis. */
 export function formatDateTime(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -12,6 +13,7 @@ export function formatDateTime(iso: string | null): string {
   return `${yyyy}/${month}/${day} ${hh}:${mm}`;
 }
 
+/** Finalization still owns a live job lease and must continue polling. */
 export function isActiveJobStatus(status: JobStatus): boolean {
   return (
     status === "CREATED" ||
@@ -22,7 +24,11 @@ export function isActiveJobStatus(status: JobStatus): boolean {
   );
 }
 
+/** Presentation only: missing/non-finite metrics are not measured zeroes. */
 export function formatNumber(value: number, digits = 2): string {
+  if (!Number.isFinite(value)) return "—";
   if (Number.isInteger(value)) return value.toString();
-  return value.toFixed(digits);
+  // Restored display preferences must not trigger toFixed's RangeError in a render.
+  const precision = Number.isInteger(digits) && digits >= 0 && digits <= 100 ? digits : 2;
+  return value.toFixed(precision);
 }
