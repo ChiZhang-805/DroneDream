@@ -62,3 +62,24 @@ values or private Agent Core source are included in this public document.
 
 Existing release assets and update-channel manifests remain unchanged until
 the replacement installers satisfy the release requirements.
+
+## Open-source / SignPath preparation
+
+The maintainer authorized MIT licensing of first-party Core source, including
+modification, redistribution, and commercial use. Core license metadata has been
+updated locally. A clean source-only snapshot excludes private history, real
+session evidence, developer handoff notes, and asset archives whose existing
+license metadata is `NOASSERTION`. The original development files remain intact.
+The snapshot is not a replacement qualified asset/model package or installer.
+
+The [SignPath application packet](signpath-foundation-application.md) now lists
+all five editions and distinguishes intended signing from actual acceptance.
+`desktop/scripts/check-signpath-readiness.py` reads repository visibility and
+configuration names only; it never retrieves secret values or grants signing
+authority. The current private Core repository is not yet public. No SignPath
+application, account authorization, certificate, or token is claimed as completed.
+
+The product workflow still needs an exact public Core source binding and its
+complete build/staging before it can demonstrate the origin of every included
+first-party executable. Publishing MIT source and obtaining signing approval do
+not waive that requirement or the current model's control-protocol admission gate.

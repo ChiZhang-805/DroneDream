@@ -1,6 +1,11 @@
 # Code signing policy
 
-Free code signing provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
+**Status: preparation; acceptance is not yet confirmed.** DroneDream intends to
+apply for SignPath Foundation signing. This policy describes the intended process,
+not an existing certificate, approval, or signature on the current installer.
+
+After acceptance, the required acknowledgment will read:
+“Free code signing provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).”
 
 ## Scope
 
@@ -60,7 +65,7 @@ be presented as trusted-publisher installers.
 
 ## Signing-key protection
 
-The Authenticode private key is generated and retained by SignPath in managed
+If accepted, the Authenticode private key will be generated and retained by SignPath in managed
 hardware security infrastructure. It is not exported to this repository or to
 GitHub Actions. The separate Tauri updater private key is stored only as an
 encrypted GitHub Actions secret and in an access-controlled maintainer backup;

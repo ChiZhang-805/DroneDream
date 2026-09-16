@@ -42,6 +42,7 @@ const msvcBuildScript = readText("desktop/scripts/build-windows-msvc.ps1");
 const updaterSignerScript = readText("desktop/scripts/invoke-tauri-updater-signer.ps1");
 const desktopReleaseWorkflow = readText(".github/workflows/desktop-installer.yml");
 for (const requiredText of [
+  "Status: preparation; acceptance is not yet confirmed.",
   "Free code signing provided by [SignPath.io]",
   "certificate by [SignPath Foundation]",
   "Authors and committers",

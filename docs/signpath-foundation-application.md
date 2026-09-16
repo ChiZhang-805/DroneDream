@@ -1,150 +1,126 @@
 # SignPath Foundation application packet
 
-This document contains the verified project facts and application text for a
-free SignPath Foundation open-source code-signing subscription. It is an
-application aid, not proof that DroneDream has been accepted or signed.
+Updated 2026-09-16. **Preparation only: not submitted or accepted.** This packet
+is not a claim that the complete product already meets every condition.
 
-## Verified project information
+## Project details
 
-| Field | Value |
+| Field | Prepared answer |
 | --- | --- |
 | Project | DroneDream |
-| Repository | https://github.com/ChiZhang-805/DroneDream |
-| Maintainer | Chi Zhang (`@ChiZhang-805`) |
-| Contact | cz005623@gmail.com |
-| License | MIT |
-| Public website | https://getdronedream.com/ |
-| Releases | https://github.com/ChiZhang-805/DroneDream/releases |
-| Existing installer form | Public Windows x64 NSIS installer, currently unsigned |
-| Release workflow | `.github/workflows/desktop-installer.yml` |
-| Code signing policy | `CODE_SIGNING_POLICY.md` |
-| Privacy policy | `PRIVACY.md` |
-| Security policy | `SECURITY.md` |
+| Main repository | https://github.com/ChiZhang-805/DroneDream |
+| Website | https://getdronedream.com/ |
+| Downloads | https://github.com/ChiZhang-805/DroneDream/releases |
+| Maintainer | Chi Zhang, GitHub `ChiZhang-805` |
+| Contact | cz005623@gmail.com — owner to confirm before submission |
+| First-party license | MIT; modification, redistribution and commercial use permitted |
+| Products | Universal, SIM, LAB, FIELD, AGENT (five editions) |
+| Installer form | Windows x64 NSIS executable |
+| Signing policy | https://github.com/ChiZhang-805/DroneDream/blob/main/CODE_SIGNING_POLICY.md |
+| Privacy policy | https://github.com/ChiZhang-805/DroneDream/blob/main/PRIVACY.md |
+| Security policy | https://github.com/ChiZhang-805/DroneDream/blob/main/SECURITY.md |
 
-## Eligibility evidence
+Commercial use permitted by MIT is not commercial dual-licensing. Do not invent
+user numbers, student eligibility, reputation, or a guaranteed acceptance decision.
 
-- The repository is public and licensed under the OSI-approved MIT License.
-- The project is actively maintained and has public source history,
-  documentation, releases, stars, forks, and a public Windows NSIS preview.
-- The release workflow builds the application from the public repository on
-  GitHub-hosted runners and uses committed npm and Cargo lockfiles.
-- The repository does not track Windows installers, code-signing certificates,
-  private keys, or opaque maintainer-owned binary components.
-- The npm dependency inventories declare licenses, Rust metadata declares a
-  license for every external crate, and Runtime third-party components and
-  pinned revisions are documented in `runtime/THIRD_PARTY_NOTICES.md`.
-- The application is an engineering experiment tool, not a vulnerability
-  scanner, exploit tool, security bypass, or malware component.
-- The installer warns before system changes, supports silent install and
-  uninstall, isolates its WSL2 distribution, and does not reuse or unregister
-  an unrelated Linux distribution.
-- Network behavior, local data, credentials, third parties, retention, and
-  removal are documented in the privacy policy.
+## Technical conditions still requiring resolution
 
-## Application description
+1. The product repository is public and MIT-licensed. Core was also relicensed
+   locally to MIT, but its incubation history contains session records. Publish
+   and link a clean Core snapshot before claiming all first-party source is public.
+2. Default DDPKG archives contain `NOASSERTION` license metadata. Assets, model
+   weights, and derived datasets need separate permission/provenance decisions.
+   Do not edit hash-bound qualification receipts to manufacture compliance.
+3. The current local model package fails current control-protocol admission.
+   This is an installer/flight issue, not something signing or MIT can fix.
+4. SignPath account/project/token settings are not provisioned. The desktop
+   workflow also needs the exact public Core source binding and complete sidecar
+   build/staging. A shell-only build does not prove the whole product's origin.
+5. GitHub MFA was unavailable in the account API response; verify it in account
+   settings. A missing response field does not mean MFA is disabled.
 
-Use the following English text in the SignPath application form:
+See [Desktop publication status](DESKTOP_PUBLICATION_STATUS.md). Source preparation
+does not advance stable updater manifests or approve a flight-qualified release.
 
-> DroneDream is an open-source, local-first Windows desktop platform with four
-> separately identified products: Universal, SIM, LAB, and FIELD. It supports
-> parametric vehicle design, PX4/Gazebo simulation, bounded controller-tuning
-> experiments, simulation-to-hardware qualification, and field evidence. The
-> Windows products share a separately managed Runtime where required and do not
-> modify a user's existing Ubuntu distribution. DroneDream is an engineering
-> and research tool and does not claim to certify parameters for real aircraft.
+## Application text
 
-For the reason for requesting signing, use:
+Use after the clean public Core source is available; insert its verified URL:
 
-> DroneDream has a public NSIS installer and a small initial user group of
-> approximately 50 students and engineering users. The project is
-> non-commercial at this stage. Authenticode signing is requested so users can
-> verify that each Windows application and installer was produced by the
-> public GitHub repository and was not modified after the reviewed build. The
-> project will use SignPath's GitHub origin verification, manual approval for
-> every release, immutable versioned releases, a separate authenticated Tauri
-> updater signature, and exact SHA-256 verification between GitHub and the
-> public download website.
+> DroneDream is an MIT-licensed Windows desktop engineering and research project
+> maintained by Chi Zhang. It has five editions: Universal, SIM, LAB, FIELD, and
+> AGENT. Its source covers desktop workflows, PX4/Gazebo simulation integration,
+> and an agent architecture combining cloud-language-model planning, local
+> low-latency models, and a Harness enforcing structured contracts and safety
+> boundaries. Core source: [insert the verified public Core repository URL].
+> Production user data and credentials are private and are not distributed with
+> the source. Autonomous-flight work is evaluated in simulation; the project does
+> not claim real-aircraft flight certification.
 
-For build and release provenance, use:
+Reason for signing:
 
-> Source is built only by `.github/workflows/desktop-installer.yml` on
-> GitHub-hosted Windows runners. The workflow installs npm and Cargo
-> dependencies from committed lockfiles, runs frontend/backend/Rust tests and
-> static checks, builds and signs the application executable, bundles and signs
-> the NSIS installer, verifies both Authenticode signatures, creates the Tauri
-> updater signature, computes SHA-256, writes the edition-specific
-> `latest-<edition>.json`, and publishes an immutable per-edition GitHub
-> Release. Only after that immutable release succeeds does CI advance the
-> corresponding authenticated stable metadata channel. The public website is
-> allowed to deploy only the same version, byte length, and SHA-256.
+> We request Authenticode signing so users can verify our Windows applications
+> and NSIS installers. We intend to use verified GitHub build origin and manual
+> approval for each signing request. Tauri updater signatures are separate from
+> Windows publisher signatures. We understand that acceptance and the artifact
+> configuration require SignPath Foundation review.
 
-## Requested SignPath configuration
+Build explanation — keep future tense until the complete build works:
 
-Ask SignPath to provision one project with GitHub.com as a trusted build
-system, origin verification enabled, and two artifact configurations:
+> The intended release workflow is `.github/workflows/desktop-installer.yml`.
+> Each release will pin public source for every first-party executable, build on
+> GitHub-hosted Windows runners, retain dependency notices, and submit application
+> and final NSIS installer artifacts for separately approved Authenticode signing.
+> Only final signed installer bytes will receive the Tauri signature and SHA-256
+> metadata before channel advancement. We will not request signatures for an
+> installer containing unpublished Core source, unreviewed asset/model rights,
+> or failed release qualification.
 
-1. `windows-application`: one PE file named `drone-dream-desktop.exe`, requiring
-   `ProductName` to be exactly one of `DroneDream-Universal`, `DroneDream-Sim`,
-   `DroneDream-Lab`, or `DroneDream-Field`, and requiring
-   `ProductVersion=${version}`. Sign with Authenticode SHA-256 and a trusted
-   timestamp.
-2. `windows-installer`: one PE file whose name is exactly one of
-   `DroneDream-Universal_${version}_x64-setup.exe`,
-   `DroneDream-Sim_${version}_x64-setup.exe`,
-   `DroneDream-Lab_${version}_x64-setup.exe`, or
-   `DroneDream-Field_${version}_x64-setup.exe`, with the matching `ProductName`
-   and `ProductVersion=${version}`. Sign with Authenticode SHA-256 and a trusted
-   timestamp.
+## Configuration requested from SignPath
 
-Use a release signing policy that accepts only the public DroneDream GitHub
-repository, GitHub-hosted runners, the committed desktop workflow, and a
-manually approved signing request. Disable release signing from self-hosted
-runners and disallow rerunning an old workflow to obtain a new signature.
+Request a GitHub.com trusted build source, manual release approval, exact
+file/version restrictions, and application/installer artifact configurations.
+Agree coverage for all first-party sidecars. Do not re-sign third-party
+executables as DroneDream-owned binaries or configure broad wildcard signing.
 
-## Values supplied after acceptance
+Current product-config names: `DroneDream-Universal`, `DroneDream-Sim`,
+`DroneDream-Lab`, `DroneDream-Field`, `DroneDream-Agent`.
+NSIS names follow `<ProductName>_<version>_x64-setup.exe`.
+Main shell: `drone-dream-desktop.exe`.
+Inspect actual PE metadata; a filename does not prove ProductName.
 
-The release workflow is prepared to use these GitHub configuration values:
+The workflow expects these names; never put secret values in Git:
 
-- secret `SIGNPATH_API_TOKEN`;
-- variable `SIGNPATH_ORGANIZATION_ID`;
-- variable `SIGNPATH_PROJECT_SLUG`;
-- variable `SIGNPATH_APPLICATION_POLICY_SLUG`;
-- variable `SIGNPATH_APPLICATION_ARTIFACT_CONFIGURATION_SLUG`;
-- variable `SIGNPATH_INSTALLER_POLICY_SLUG`; and
-- variable `SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION_SLUG`.
+| Storage | Name |
+| --- | --- |
+| GitHub secret | `SIGNPATH_API_TOKEN` |
+| GitHub variable | `SIGNPATH_ORGANIZATION_ID` |
+| GitHub variable | `SIGNPATH_PROJECT_SLUG` |
+| GitHub variable | `SIGNPATH_APPLICATION_POLICY_SLUG` |
+| GitHub variable | `SIGNPATH_APPLICATION_ARTIFACT_CONFIGURATION_SLUG` |
+| GitHub variable | `SIGNPATH_INSTALLER_POLICY_SLUG` |
+| GitHub variable | `SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION_SLUG` |
 
-The same workflow also requires one registered public OAuth client identifier
-for each desktop callback identity:
+The Tauri key is independent. Existing public OAuth client IDs and Supabase
+browser configuration are not SignPath credentials; do not replace them to apply.
 
-- variable `DRONEDREAM_OAUTH_CLIENT_ID_UNIVERSAL`;
-- variable `DRONEDREAM_OAUTH_CLIENT_ID_SIM`;
-- variable `DRONEDREAM_OAUTH_CLIENT_ID_LAB`; and
-- variable `DRONEDREAM_OAUTH_CLIENT_ID_FIELD`; and
-- variable `DRONEDREAM_OAUTH_CLIENT_ID_AGENT`.
+## Human steps
 
-The SignPath GitHub App must be installed for this repository and the
-predefined GitHub.com trusted build system must be linked to the SignPath
-project before the first signed release.
+1. Confirm clean public Core repository placement and redistribution rights for
+   default maps, aircraft assets, and any shipped trained weights. Keep production
+   data, recordings, credentials, and private history excluded.
+2. Verify GitHub MFA at https://github.com/settings/security; confirm maintainer
+   name and contact email.
+3. Read https://signpath.org/terms.html. Once the technical conditions above are
+   resolved, submit https://signpath.org/apply using truthful information. This
+   document does not claim submission or terms acceptance on your behalf.
+4. If accepted, complete SignPath account setup and MFA, authorize the GitHub App
+   for the intended repositories, and approve agreed artifact/policy settings.
+5. Enter the provider-issued token directly into GitHub Actions Secrets; never
+   send it in chat or source. Enter nonsecret IDs/slugs in repository Variables.
+6. Manually approve signing requests when a qualified release is ready.
+   Application acceptance is not automatic release approval.
 
-## Human-only actions
-
-These actions require the maintainer's own identity or explicit account
-authorization and cannot be delegated to a build script:
-
-1. Enable and verify MFA on the GitHub account used to maintain DroneDream.
-2. Read and accept the SignPath Foundation conditions.
-3. Submit the application at https://signpath.org/apply using the text above.
-4. If accepted, create/authorize the SignPath account, install the SignPath
-   GitHub App, link GitHub.com as the trusted build system, and approve the
-   requested artifact/policy configuration.
-5. Register or confirm the five public desktop OAuth clients in the browser and
-   enter their public client IDs as the four GitHub repository variables above.
-6. Create a least-privilege SignPath submitter token and enter it directly as
-   the GitHub `SIGNPATH_API_TOKEN` secret. Never send the token in chat or
-   commit it to the repository.
-7. Manually approve each production signing request in SignPath.
-
-All source changes, workflow implementation, validation, artifact naming,
-release checks, and stable-channel advancement are automated. The steps above
-remain human-only because they require the maintainer's identity, account
-consent, secret entry, or an explicit production-signing approval.
+Run `python desktop/scripts/check-signpath-readiness.py` to inspect configured
+names and repository visibility without reading or printing secret values.
+Configuration presence does not prove acceptance, correct permissions, complete
+public-source licensing, or flight qualification.
