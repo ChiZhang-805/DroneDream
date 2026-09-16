@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$AgentCoreRepository,
     [ValidateSet("x86_64-pc-windows-msvc", "x86_64-pc-windows-gnullvm")]
     [string]$TargetTriple = "x86_64-pc-windows-msvc"
@@ -7,6 +7,54 @@ param(
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
+# 功能：
+#   单次有界读取组件回执，从同一批字节计算摘要并解析，避免两次读取绑定不同内容。
+# 输入：
+#   Path：当前组件构建回执的绝对路径。
+# 输出：
+#   result：包含 Bytes、Sha256 和 Receipt 的冻结读取结果。
+function Read-BoundCoreReceipt([string]$Path) {
+    $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    try {
+        if ($stream.Length -le 0 -or $stream.Length -gt 8MB) {
+            throw 'Core build receipt is empty or exceeds the 8 MiB limit.'
+        }
+        $bytes = New-Object byte[] ([int]$stream.Length)
+        $offset = 0
+        while ($offset -lt $bytes.Length) {
+            $count = $stream.Read($bytes, $offset, $bytes.Length - $offset)
+            if ($count -eq 0) { throw 'Core build receipt was truncated during reading.' }
+            $offset += $count
+        }
+        if ($stream.ReadByte() -ne -1) { throw 'Core build receipt grew during reading.' }
+    } finally {
+        $stream.Dispose()
+    }
+    $hasher = [Security.Cryptography.SHA256]::Create()
+    try {
+        $digest = [BitConverter]::ToString($hasher.ComputeHash($bytes)).Replace('-', '').ToLowerInvariant()
+    } finally {
+        $hasher.Dispose()
+    }
+    $utf8 = New-Object Text.UTF8Encoding($false, $true)
+    $parsed = $utf8.GetString($bytes) | ConvertFrom-Json
+    if ($null -eq $parsed -or $parsed -isnot [PSCustomObject]) {
+        throw 'Core build receipt must be a JSON object.'
+    }
+    $result = [PSCustomObject]@{ Bytes = $bytes; Sha256 = $digest; Receipt = $parsed }
+    return $result
+}
+
+# 功能：
+#   核对单份资源的相对路径、大小和摘要，复制后再次校验内容。
+# 输入：
+#   SourceRoot：显式的源资源根目录。
+#   TargetRoot：本次目标资源根目录。
+#   RelativePath：清单中的资源相对路径。
+#   ExpectedSha256：预期文件摘要。
+#   ExpectedBytes：预期字节数，负数表示上游未提供大小。
+# 输出：
+#   无：成功时文件写入目标目录。
 function Copy-VerifiedManifestFile {
     param(
         [Parameter(Mandatory = $true)][string]$SourceRoot,
@@ -92,6 +140,29 @@ if ($LASTEXITCODE -ne 0 -or $coreCommit -notmatch '^[0-9a-f]{40}$') {
 $coreStatus = (& git -C $coreRoot status --porcelain=v1 --untracked-files=all | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or $coreStatus) {
     throw "The AGENT Core sidecar must be staged from one clean source commit."
+}
+
+# 干净源码并不证明旧 EXE 的来源；在修改目标目录之前逐文件复验本次构建回执。
+$corePython = Join-Path $coreRoot '.venv\Scripts\python.exe'
+$coreReceipt = Join-Path $coreRoot 'artifacts\desktop\core-components-build.json'
+if (-not (Test-Path -LiteralPath $corePython -PathType Leaf) -or
+    -not (Test-Path -LiteralPath $coreReceipt -PathType Leaf)) {
+    throw 'Build the complete current Core components before staging; no unbound EXE fallback is allowed.'
+}
+$frozenReceipt = Read-BoundCoreReceipt $coreReceipt
+$boundReceiptBytes = $frozenReceipt.Bytes
+$boundReceiptHash = $frozenReceipt.Sha256
+$boundReceipt = $frozenReceipt.Receipt
+# Python 必须复验上述同一摘要的回执；后来被替换的另一个合法回执也不能代替它。
+& $corePython (Join-Path $coreRoot 'scripts\core_build_receipt.py') `
+    --repository $coreRoot --expected-commit $coreCommit --verify `
+    --expected-receipt-sha256 $boundReceiptHash
+if ($LASTEXITCODE -ne 0) { throw 'Core build receipt verification failed; existing staged output preserved.' }
+$sourceReference = Get-Content -LiteralPath (Join-Path $repoRoot 'docs\agent-core-public-source.json') -Raw | ConvertFrom-Json
+if ($sourceReference.commit -cne $coreCommit -or
+    $boundReceipt.source_commit -cne $coreCommit -or
+    $boundReceipt.source_repository -cne $sourceReference.repository) {
+    throw 'Core components do not match the product public-source pin; existing output preserved.'
 }
 
 $sourceRoot = Join-Path $coreRoot "app\desktop\src-tauri"
@@ -229,35 +300,61 @@ foreach ($asset in $assetPackages) {
         -ExpectedSha256 ([string]$asset.sha256)
 }
 
+# 复制完成后对照复制前冻结的回执再核验，防止源目录在两次读取之间被替换。
+foreach ($entry in $boundReceipt.files.PSObject.Properties) {
+    $name = [string]$entry.Name
+    if ($name.StartsWith('app/desktop/src-tauri/resources/', [StringComparison]::Ordinal)) {
+        $relative = $name.Substring('app/desktop/src-tauri/resources/'.Length)
+        $target = Join-Path $targetResourceRoot $relative
+    } elseif ($name -ceq "app/desktop/src-tauri/binaries/dronedream-autonomy-core-$sourceTriple.exe") {
+        $target = Join-Path $targetBinaryRoot $stagedCoreName
+    } elseif ($name -ceq "app/desktop/src-tauri/binaries/dronedream-plugin-isolator-$sourceTriple.exe") {
+        $target = Join-Path $targetBinaryRoot $stagedIsolatorName
+    } else {
+        throw "Unknown Core build receipt member: $name"
+    }
+    if (-not (Test-Path -LiteralPath $target -PathType Leaf) -or
+        (Get-Item -LiteralPath $target).Length -ne $entry.Value.bytes -or
+        (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant() -cne $entry.Value.sha256) {
+        throw "Staged Core bytes no longer match the frozen build receipt: $name"
+    }
+}
+$stagedIsolatorHash = (Get-FileHash -LiteralPath (Join-Path $targetBinaryRoot $stagedIsolatorName) -Algorithm SHA256).Hash
+if ((Get-FileHash -LiteralPath (Join-Path $targetResourceRoot 'dronedream-plugin-isolator.exe') -Algorithm SHA256).Hash -cne $stagedIsolatorHash) {
+    throw 'The resource isolator and sidecar isolator must have identical bytes.'
+}
+
 $receipt = [ordered]@{
     schemaVersion = 1
     kind = "dronedream-agent-core-stage"
     publicSourceCommit = (& git -C $repoRoot rev-parse --verify HEAD).Trim()
     agentCoreSourceCommit = $coreCommit
+    agentCoreBuildReceiptSha256 = $boundReceiptHash
     targetTriple = $TargetTriple
     files = @(
         [ordered]@{
             name = $stagedCoreName
-            bytes = (Get-Item -LiteralPath $coreBinary).Length
-            sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $coreBinary).Hash.ToLowerInvariant()
+            bytes = (Get-Item -LiteralPath (Join-Path $targetBinaryRoot $stagedCoreName)).Length
+            sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $targetBinaryRoot $stagedCoreName)).Hash.ToLowerInvariant()
         },
         [ordered]@{
             name = $stagedIsolatorName
-            bytes = (Get-Item -LiteralPath $isolatorBinary).Length
-            sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath $isolatorBinary).Hash.ToLowerInvariant()
+            bytes = (Get-Item -LiteralPath (Join-Path $targetBinaryRoot $stagedIsolatorName)).Length
+            sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $targetBinaryRoot $stagedIsolatorName)).Hash.ToLowerInvariant()
         }
     )
     resourceIndexSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath (
-        Join-Path $sourceResources "official-plugins\index.json"
+        Join-Path $targetResourceRoot "official-plugins\index.json"
     )).Hash.ToLowerInvariant()
     defaultAssetIndexSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath (
-        Join-Path $sourceResources "default-assets\index.json"
+        Join-Path $targetResourceRoot "default-assets\index.json"
     )).Hash.ToLowerInvariant()
     localPolicyCatalogSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath (
-        Join-Path $sourceResources "runtime\local-policy\catalog.json"
+        Join-Path $targetResourceRoot "runtime\local-policy\catalog.json"
     )).Hash.ToLowerInvariant()
     stagedAt = [DateTimeOffset]::UtcNow.ToString("o")
 }
+[IO.File]::WriteAllBytes((Join-Path $targetResourceRoot 'core-components-build.json'), $boundReceiptBytes)
 $receipt | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (
     Join-Path $targetResourceRoot "agent-core-stage.json"
 ) -Encoding UTF8

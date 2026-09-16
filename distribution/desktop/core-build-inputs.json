@@ -1,0 +1,11 @@
+{
+  "schema_version": "dronedream.core-build-inputs.v1",
+  "native": {
+    "px4_repository": "PX4/PX4-Autopilot",
+    "px4_commit": "6ea3539157ca358c70a515878b77077af7d4611d",
+    "gazebo_package": "gz-harmonic",
+    "gazebo_version": "1.0.0-1~noble",
+    "gazebo_key_sha256": "15d0300460e0c9c0efb21fa9770c0bf228988a07d71c4fac985c2161954a25a4"
+  },
+  "model_bundle": null
+}

@@ -139,6 +139,13 @@ def test_visible_installer_receipt_is_exact_source_bound_and_never_commits() -> 
     assert "-RedirectStandardError" in text
 
 
+# 功能：
+#   1. 核对 Universal 的产品身份、当前源码摘要和能力边界，不让前端模式授予执行权限。
+#   2. 区分历史视觉证据与当前构建证据，正式构建必须验证当前提交的真实视觉验收。
+# 输入：
+#   无：读取仓库中的发布配置与构建脚本。
+# 输出：
+#   None：不返回业务数据。
 def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() -> None:
     profile = _json(PROFILE)
     assert profile["artifactFileName"] == "DroneDream-Universal-1.0.0.exe"
@@ -169,6 +176,8 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
         "desktop/src-tauri/gen/brand/universal/windows/icon.ico"
     )
     shared_ui = profile["sharedUiContract"]
+    assert shared_ui["sourceFilesPurpose"] == "current-build-inputs-not-visual-qualification"
+    assert shared_ui["currentVisualEvidenceRequired"] is True
     assert shared_ui["contractId"] == "dronedream-shared-edition-ui/v1"  # type: ignore[index]
     assert shared_ui["donorCommit"] == (  # type: ignore[index]
         "62ac2345828f50a221c1aaed0ea7273a628c9d5d"
@@ -201,6 +210,11 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
         path = ROOT / source_file["path"]
         assert path.is_file()
         assert hashlib.sha256(path.read_bytes()).hexdigest() == source_file["sha256"]
+    builder = SCRIPT.read_text(encoding="utf-8-sig")
+    assert "$Build -and (-not $CurrentUiEvidencePath" in builder
+    assert "$expectedUiEvidenceCommit = $sourceCommit" in builder
+    assert "$sharedUiEvidence.subject_commit -cne $expectedUiEvidenceCommit" in builder
+    assert "historical donor evidence cannot authorize this build" in builder
     integrated_ui = profile["integratedWorkspaceUiContract"]
     assert integrated_ui == {  # type: ignore[comparison-overlap]
         "contractId": "dronedream-universal-integrated-workspaces/v2",
@@ -347,6 +361,12 @@ def test_universal_engine_payload_contains_all_editions_without_build_plans() ->
     )
 
 
+# 功能：
+#   验证构建脚本绑定固定源码、单次签名流程和独立输出位置，不用历史回执替代当前产物。
+# 输入：
+#   无：读取当前构建脚本。
+# 输出：
+#   None：不返回业务数据。
 def test_universal_build_is_single_source_bound_signed_attempt_with_external_target() -> None:
     script = SCRIPT.read_text(encoding="utf-8-sig")
     for fragment in (
@@ -375,7 +395,7 @@ def test_universal_build_is_single_source_bound_signed_attempt_with_external_tar
         'payloadContractId = "dronedream-universal-engine-payload/v1"',
         "dronedream-shared-edition-ui/v1",
         'Invoke-GitText @("merge-base", "--is-ancestor"',
-        "visualEvidenceSubjectCommit = [string]$sharedUi.visualEvidence.subjectCommit",
+        "visualEvidenceSubjectCommit = [string]$sharedUiEvidence.subject_commit",
         "Universal shared UI source binding drifted:",
         "Universal shared UI visual evidence hash drifted.",
         "dronedream-universal-integrated-workspaces/v2",

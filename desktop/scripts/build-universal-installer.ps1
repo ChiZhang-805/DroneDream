@@ -1,6 +1,8 @@
-param(
+﻿param(
     [switch]$Build,
     [string]$ExpectedSourceCommit,
+    [string]$CurrentUiEvidencePath,
+    [string]$CurrentUiEvidenceSha256,
     [string]$OutputRoot,
     [string]$CargoTargetDir,
     [ValidateSet("msvc", "gnullvm")]
@@ -9,6 +11,40 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# 功能：
+#   固定一次有界读取的验收回执字节，核对摘要后解析，避免哈希检查与读取间文件被替换。
+# 输入：
+#   Path：本次明确提供的回执路径。
+#   ExpectedSha256：调用方固定的 SHA-256。
+# 输出：
+#   receipt：通过字节身份核验的 JSON 对象。
+function Read-VerifiedUiEvidence([string]$Path, [string]$ExpectedSha256) {
+    $item = Get-Item -LiteralPath $Path
+    if ($ExpectedSha256 -cnotmatch '^[0-9a-f]{64}$' -or $item.PSIsContainer -or
+        ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw "Invalid UI evidence file or digest."
+    }
+    $stream = [IO.File]::Open($item.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    try {
+        $buffer = New-Object byte[] (4MB + 1)
+        $count = 0
+        while ($count -lt $buffer.Length) {
+            $read = $stream.Read($buffer, $count, $buffer.Length - $count)
+            if ($read -eq 0) { break }
+            $count += $read
+        }
+        if ($count -eq 0 -or $count -gt 4MB) { throw "UI evidence exceeds its size bound." }
+        $algorithm = [Security.Cryptography.SHA256]::Create()
+        try {
+            $digest = ([BitConverter]::ToString($algorithm.ComputeHash($buffer, 0, $count))).Replace('-', '').ToLowerInvariant()
+        } finally { $algorithm.Dispose() }
+        if ($digest -cne $ExpectedSha256) { throw "Universal shared UI visual evidence hash drifted." }
+        $content = [Text.UTF8Encoding]::new($false, $true).GetString($buffer, 0, $count)
+        $receipt = $content | ConvertFrom-Json
+        return $receipt
+    } finally { $stream.Dispose() }
+}
 
 function Invoke-GitText([string[]]$Arguments) {
     $output = (& git -C $repoRoot @Arguments | Out-String).Trim()
@@ -113,6 +149,8 @@ if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     $profile.brand.presentationOnly -ne $true -or
     $profile.brand.grantsHardwareAuthority -ne $false -or
     $sharedUi.contractId -cne "dronedream-shared-edition-ui/v1" -or
+    $sharedUi.sourceFilesPurpose -cne "current-build-inputs-not-visual-qualification" -or
+    $sharedUi.currentVisualEvidenceRequired -ne $true -or
     $sharedUi.donorCommit -cnotmatch "^[0-9a-f]{40}$" -or
     $sharedUi.visualEvidence.subjectCommit -cnotmatch "^[0-9a-f]{40}$" -or
     $sharedUi.visualEvidence.caseCount -ne 7 -or
@@ -139,6 +177,11 @@ if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
 }
 Invoke-GitText @("merge-base", "--is-ancestor", [string]$sharedUi.donorCommit, $sourceCommit) | Out-Null
 Invoke-GitText @("merge-base", "--is-ancestor", [string]$sharedUi.visualEvidence.subjectCommit, $sourceCommit) | Out-Null
+# A donor receipt remains historical evidence. Updating the input hash list
+# never extends that old receipt to the latest desktop source.
+if ($Build -and (-not $CurrentUiEvidencePath -or $CurrentUiEvidenceSha256 -cnotmatch '^[0-9a-f]{64}$')) {
+    throw "Current Universal UI validation is required; historical donor evidence cannot authorize this build."
+}
 $sharedUiSourceRefs = @()
 foreach ($expectedRef in @($sharedUi.sourceFiles)) {
     if ($expectedRef.path -cnotmatch "^frontend/src/" -or
@@ -154,13 +197,35 @@ foreach ($expectedRef in @($sharedUi.sourceFiles)) {
 if ($sharedUiSourceRefs.Count -ne 8) {
     throw "Universal shared UI contract must bind exactly eight source files."
 }
-$sharedUiEvidenceRef = New-RepoFileRef ([string]$sharedUi.visualEvidence.path)
-if ($sharedUiEvidenceRef.sha256 -cne [string]$sharedUi.visualEvidence.sha256) {
+# Keep current evidence outside the tracked profile: embedding the commit of
+# that same profile would create an impossible self-referential Git hash.
+$expectedUiEvidenceCommit = [string]$sharedUi.visualEvidence.subjectCommit
+$expectedUiEvidenceSha256 = [string]$sharedUi.visualEvidence.sha256
+if ($CurrentUiEvidencePath) {
+    if ($CurrentUiEvidenceSha256 -cnotmatch '^[0-9a-f]{64}$') {
+        throw "Current UI evidence requires an explicit SHA256."
+    }
+    $currentUiFile = Get-Item -LiteralPath $CurrentUiEvidencePath
+    if ($currentUiFile.PSIsContainer -or $currentUiFile.Length -gt 4MB -or
+        ($currentUiFile.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        throw "Current UI evidence must be a bounded ordinary file."
+    }
+    $sharedUiEvidenceRef = [ordered]@{
+        path = $currentUiFile.FullName
+        sha256 = Get-FileSha256Lower $currentUiFile.FullName
+    }
+    $expectedUiEvidenceCommit = $sourceCommit
+    $expectedUiEvidenceSha256 = $CurrentUiEvidenceSha256
+    $sharedUiEvidencePath = $currentUiFile.FullName
+} else {
+    $sharedUiEvidenceRef = New-RepoFileRef ([string]$sharedUi.visualEvidence.path)
+    $sharedUiEvidencePath = Join-Path $repoRoot $sharedUiEvidenceRef.path
+}
+if ($sharedUiEvidenceRef.sha256 -cne $expectedUiEvidenceSha256) {
     throw "Universal shared UI visual evidence hash drifted."
 }
-$sharedUiEvidence = Get-Content -LiteralPath (Join-Path $repoRoot $sharedUiEvidenceRef.path) `
-    -Raw -Encoding UTF8 | ConvertFrom-Json
-if ($sharedUiEvidence.subject_commit -cne [string]$sharedUi.visualEvidence.subjectCommit -or
+$sharedUiEvidence = Read-VerifiedUiEvidence $sharedUiEvidencePath $expectedUiEvidenceSha256
+if ($sharedUiEvidence.subject_commit -cne $expectedUiEvidenceCommit -or
     $sharedUiEvidence.subject_dirty -ne $false -or
     $sharedUiEvidence.status -cne "pass" -or
     @($sharedUiEvidence.cases).Count -ne [int]$sharedUi.visualEvidence.caseCount -or
@@ -325,7 +390,7 @@ if (-not $Build) {
         sharedUi = [ordered]@{
             contractId = [string]$sharedUi.contractId
             donorCommit = [string]$sharedUi.donorCommit
-            visualEvidenceSubjectCommit = [string]$sharedUi.visualEvidence.subjectCommit
+            visualEvidenceSubjectCommit = [string]$sharedUiEvidence.subject_commit
             sourceFiles = $sharedUiSourceRefs
             visualEvidence = $sharedUiEvidenceRef
             minimumDesktopViewport = $sharedUi.minimumDesktopViewport
@@ -543,7 +608,7 @@ $buildReceipt = [ordered]@{
     sharedUi = [ordered]@{
         contractId = [string]$sharedUi.contractId
         donorCommit = [string]$sharedUi.donorCommit
-        visualEvidenceSubjectCommit = [string]$sharedUi.visualEvidence.subjectCommit
+        visualEvidenceSubjectCommit = [string]$sharedUiEvidence.subject_commit
         sourceFiles = $sharedUiSourceRefs
         visualEvidence = $sharedUiEvidenceRef
         minimumDesktopViewport = $sharedUi.minimumDesktopViewport

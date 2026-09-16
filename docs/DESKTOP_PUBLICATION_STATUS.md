@@ -88,7 +88,32 @@ configuration names only; it never retrieves secret values or grants signing
 authority. The original incubation repository remains private. No SignPath
 application, account authorization, certificate, or token is claimed as completed.
 
-The product workflow still needs an exact public Core source binding and its
-complete build/staging before it can demonstrate the origin of every included
-first-party executable. Publishing MIT source and obtaining signing approval do
-not waive that requirement or the current model's control-protocol admission gate.
+## Complete-component build repair
+
+The product workflow now checks out the exact public Core source reference and
+builds the native sensor components from pinned PX4/Gazebo inputs. Windows builds
+the Core sidecar, isolator, official plugins, Runtime and default assets before
+staging them into each edition. It does not reuse a previous private Core EXE or
+skip Core by packaging the frontend alone.
+
+Core staging freezes a bounded build receipt and verifies its exact bytes,
+source commit, and every copied component. Production model preflight loads all
+ten ONNX experts and checks the current feature/control contracts, training
+lineage, independent spatial holdouts, admission and content-bound distribution
+license records. Universal builds require new UI evidence bound to their actual
+source revision; old visual evidence remains historical, not recertified.
+
+The model-download lock is deliberately unpopulated until a complete current
+package passes these checks. The historical complete package lacks current
+continuous-control outputs; older partial candidates have stale feature
+contracts. Neither filenames nor edited receipts can make them compatible.
+Current-source teacher calibration has produced real sensor/control records,
+but this is not a trained ten-expert package or autonomous flight acceptance.
+
+The final publication-contract suite passed 419 tests and 15 subtests with the
+public Core reference pinned to `e4496d73230ce5593ea44e42e8e9bb146462bc07`.
+The closed native-output/configuration tests are included in that result.
+These source checks do not claim a completed Windows installer build. Model
+training/admission, third-party weight redistribution rights, current UI
+acceptance, and approved production signing remain release prerequisites.
+No installer assets or update-channel manifests were promoted by this repair.

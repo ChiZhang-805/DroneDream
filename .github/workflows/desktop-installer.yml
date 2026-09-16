@@ -31,8 +31,85 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  native-core:
+    name: Pinned Core native components
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    outputs:
+      repository: ${{ steps.core-inputs.outputs.repository }}
+      commit: ${{ steps.core-inputs.outputs.commit }}
+    steps:
+      - name: Check out product build contracts
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Resolve complete pinned Core inputs
+        id: core-inputs
+        run: |
+          python3 desktop/scripts/prepare-core-build-inputs.py \
+            --source-reference docs/agent-core-public-source.json \
+            --inputs distribution/desktop/core-build-inputs.json \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Check out exact public Core source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: ${{ steps.core-inputs.outputs.repository }}
+          ref: ${{ steps.core-inputs.outputs.commit }}
+          path: artifacts/agent-core-source
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Check out exact PX4 magnetic-table source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: ${{ steps.core-inputs.outputs.px4_repository }}
+          ref: ${{ steps.core-inputs.outputs.px4_commit }}
+          path: artifacts/px4-source
+          persist-credentials: false
+
+      - name: Install matching Gazebo native build dependencies
+        env:
+          GAZEBO_VERSION: ${{ steps.core-inputs.outputs.gazebo_version }}
+          GAZEBO_KEY_SHA256: ${{ steps.core-inputs.outputs.gazebo_key_sha256 }}
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error \
+            https://packages.osrfoundation.org/gazebo.gpg --output "$RUNNER_TEMP/gazebo.gpg"
+          echo "$GAZEBO_KEY_SHA256  $RUNNER_TEMP/gazebo.gpg" | sha256sum --check --strict
+          sudo install -m 0644 "$RUNNER_TEMP/gazebo.gpg" /usr/share/keyrings/gazebo-archive-keyring.gpg
+          echo 'deb [arch=amd64 signed-by=/usr/share/keyrings/gazebo-archive-keyring.gpg] https://packages.osrfoundation.org/gazebo/ubuntu-stable noble main' \
+            | sudo tee /etc/apt/sources.list.d/gazebo-stable.list
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends "gz-harmonic=$GAZEBO_VERSION" \
+            build-essential cmake python3-venv
+
+      - name: Build and test current native sensor components
+        run: |
+          set -euo pipefail
+          python3 -m venv artifacts/agent-core-source/.venv
+          artifacts/agent-core-source/.venv/bin/python -m pip install -e ./artifacts/agent-core-source
+          artifacts/agent-core-source/.venv/bin/python \
+            artifacts/agent-core-source/scripts/build_native_sensor_runtime.py \
+            --px4-root "$GITHUB_WORKSPACE/artifacts/px4-source" \
+            --output "$GITHUB_WORKSPACE/artifacts/native-build"
+          artifacts/agent-core-source/.venv/bin/python \
+            artifacts/agent-core-source/scripts/stage_native_sensor_runtime.py \
+            --source "$GITHUB_WORKSPACE/artifacts/native-build" \
+            --output "$GITHUB_WORKSPACE/artifacts/native-runtime"
+
+      - name: Upload source-bound native Runtime
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: current-core-native-runtime
+          path: artifacts/native-runtime/*
+          if-no-files-found: error
+          retention-days: 3
+
   windows-nsis:
     name: Windows x64 NSIS
+    needs: native-core
     runs-on: windows-2022
     # Two SignPath requests require explicit release approval. Keep enough
     # headroom for review without turning a stalled request into an endless job.
@@ -54,6 +131,7 @@ jobs:
       # account endpoint as formal desktop builds.
       VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
       VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
+      DRONEDREAM_OAUTH_CLIENT_ID_AGENT: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_AGENT || vars.DRONEDREAM_OAUTH_CLIENT_ID_AUTONOMY }}
 
     steps:
       - name: Check out source
@@ -167,6 +245,56 @@ jobs:
         with:
           toolchain: 1.97.0
           components: rustfmt, clippy
+
+      - name: Set up Core Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+
+      - name: Check out source-bound Core for Windows
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: ${{ needs.native-core.outputs.repository }}
+          ref: ${{ needs.native-core.outputs.commit }}
+          path: artifacts/agent-core-source
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Download this run's native components
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: current-core-native-runtime
+          path: artifacts/native-runtime
+
+      - name: Download exact admitted model input
+        shell: pwsh
+        run: |
+          python desktop/scripts/prepare-core-build-inputs.py `
+            --source-reference docs/agent-core-public-source.json `
+            --inputs distribution/desktop/core-build-inputs.json `
+            --download-to artifacts/model-input
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned model input preparation failed' }
+
+      - name: Build complete Core components from source
+        shell: pwsh
+        run: |
+          python -m venv artifacts/agent-core-source/.venv
+          if ($LASTEXITCODE -ne 0) { throw 'Core Python environment creation failed' }
+          ./artifacts/agent-core-source/.venv/Scripts/python.exe -m pip install `
+            -e './artifacts/agent-core-source[dev,local-policy]'
+          if ($LASTEXITCODE -ne 0) { throw 'Core build dependency installation failed' }
+          ./artifacts/agent-core-source/scripts/build-autonomy-windows.ps1 `
+            -StageOnly `
+            -LocalPolicyPackage (Join-Path $env:GITHUB_WORKSPACE 'artifacts/model-input/package') `
+            -LocalPolicySimulationAdmission (Join-Path $env:GITHUB_WORKSPACE 'artifacts/model-input/simulation-admission.json') `
+            -LocalPolicyDistributionLicenses (Join-Path $env:GITHUB_WORKSPACE 'artifacts/model-input/licenses.json') `
+            -NativeSensorRuntime (Join-Path $env:GITHUB_WORKSPACE 'artifacts/native-runtime')
+
+      - name: Stage verified Core into product
+        shell: pwsh
+        run: |
+          ./desktop/scripts/stage-agent-core.ps1 `
+            -AgentCoreRepository (Join-Path $env:GITHUB_WORKSPACE 'artifacts/agent-core-source')
 
       - name: Verify desktop release workflow contract
         shell: pwsh

@@ -45,6 +45,7 @@
       "agent-core-resources/official-plugins": "agent-core/official-plugins",
       "agent-core-resources/default-assets": "agent-core/default-assets",
       "agent-core-resources/agent-core-stage.json": "agent-core/agent-core-stage.json",
+      "agent-core-resources/core-components-build.json": "agent-core/core-components-build.json",
       "agent-core-resources/dronedream-plugin-isolator.exe": "agent-core/dronedream-plugin-isolator.exe",
       "../../distribution/build-profiles/universal-1.0.0.v1.json": "distribution/universal-build-profile.v1.json",
       "../../distribution/capabilities/core-capabilities.v1.json": "distribution/capabilities/core-capabilities.v1.json",

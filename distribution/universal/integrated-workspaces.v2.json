@@ -3,6 +3,7 @@
   "kind": "dronedream-universal-integrated-workspaces",
   "contractId": "dronedream-universal-integrated-workspaces/v2",
   "productEdition": "universal",
+  "sourceFilesPurpose": "current-build-inputs-not-visual-qualification",
   "workspaceModes": ["sim", "lab", "field", "autonomy"],
   "workspaceSwitchMeaning": "presentation-and-module-selection-only",
   "createsCrossEditionHarnessOrchestrator": false,
@@ -65,7 +66,7 @@
     },
     {
       "path": "frontend/src/lab/LabSetup.tsx",
-      "sha256": "5b1daee01e303e5fd00cdae49acd9c0cddbc02f13bf98e3cc45222cb0d8f6941",
+      "sha256": "e5a8cdc0c9a05c06b81aa7b91ba17808af6262b4386fc2f9c74da81d79da4578",
       "donorEdition": "lab",
       "donorBlob": "b4a3a2198e8ce3b25cf766fe425b922f516bd546",
       "integration": "semantic-universal-auth-and-runtime-adaptation"
@@ -100,7 +101,7 @@
     },
     {
       "path": "frontend/src/styles.css",
-      "sha256": "39a7051a36ae6437edd5a985016cbb4ab94a06ea4dbbe6586b9344b7625b804b",
+      "sha256": "c8c8d669cd16b28ec1666474bf6f2d04279030ad507f7e0bf3e8ce4b81f6765e",
       "donorEdition": "lab",
       "donorBlob": "96deedb311f92dc2b7a058f9a61324509f9dd702",
       "integration": "semantic-universal-workspaces-and-canonical-navigation-theme"
@@ -114,7 +115,7 @@
     },
     {
       "path": "frontend/src/router.tsx",
-      "sha256": "43dfac55539cfebb0a0a99b48844e2f07358939bc66373c4cf41e15cadac71cb",
+      "sha256": "d4907d306eaf589e1f5383588fb02ea9eeb4b3456cbc5b14c7e94770e829b206",
       "donorEdition": "universal",
       "donorBlob": "307f4e0784ff125f883031daefe7d2c1cd4ea7dc",
       "integration": "semantic-universal-workspace-routing-and-shared-locale"
