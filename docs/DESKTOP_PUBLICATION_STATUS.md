@@ -125,6 +125,12 @@ for learning records, and freezes static map geometry with bounded candidate
 index caching. Distances, uncertainty and freshness checks remain active.
 468 local perception, observation-recording and adapter regressions passed;
 Core lint, 68 schema exports and seven shared Runtime source checks passed.
+The next Core revision batches map-validated rays with bounded temporary arrays,
+preserves scalar voxel ordering and adds separate current-thread CPU diagnostics.
+Its 236 focused tests passed; this does not grant flight or model qualification.
+The product publication suite was also rerun with the preceding `615732b` pin:
+419 tests and 15 subtests passed. Current-source simulation failures remain
+visible and do not advance the updater channel.
 These source checks do not claim a completed Windows installer build. Model
 training/admission, third-party weight redistribution rights, current UI
 acceptance, and approved production signing remain release prerequisites.
