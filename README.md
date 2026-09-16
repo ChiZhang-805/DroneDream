@@ -98,3 +98,8 @@ Build and audit commands remain in the report-owned documentation so this page
 can stay focused on the paper’s purpose, contents, and evidentiary boundaries.
 Release trust is documented in the
 [Code signing policy](CODE_SIGNING_POLICY.md) and [Privacy policy](PRIVACY.md).
+
+The natural-language flight Harness and local-control implementation are public
+in [DroneDream-Agent-Core](https://github.com/ChiZhang-805/DroneDream-Agent-Core)
+under MIT. School Map and My Drone have a separate hash-scoped MIT asset grant
+there. Production user data and credentials are not part of either repository.

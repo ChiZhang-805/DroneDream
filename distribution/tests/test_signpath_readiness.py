@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
+import re
 from pathlib import Path
 
 import pytest
@@ -82,3 +84,20 @@ def test_unavailable_or_private_source_is_not_ready(monkeypatch, response) -> No
 def test_repository_input_is_validated(value: str) -> None:
     with pytest.raises(argparse.ArgumentTypeError):
         MODULE.repository_name(value)
+
+
+# 功能：
+#   验证申请资料绑定公开 Core 的确定提交，同时不把源码记录冒充产品模型或用户数据。
+# 输入：
+#   无；读取仓库内的公开来源引用。
+# 输出：
+#   无；来源或保密边界改变时断言失败。
+def test_public_core_reference_preserves_scope() -> None:
+    root = SCRIPT.parents[2]
+    reference = json.loads((root / "docs/agent-core-public-source.json").read_text("utf-8"))
+    assert reference["repository"] == "ChiZhang-805/DroneDream-Agent-Core"
+    assert re.fullmatch("[0-9a-f]{40}", reference["commit"])
+    assert reference["license"] == "MIT"
+    assert reference["includes_private_history"] is False
+    assert reference["includes_production_user_data"] is False
+    assert reference["includes_model_weights"] is False

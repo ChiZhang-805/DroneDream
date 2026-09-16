@@ -58,7 +58,7 @@ Two conditions must be resolved before a new complete release can be promoted:
 
 The public registered AGENT OAuth client variable was added to GitHub so its
 builds use the same approved login identity as the local client. No credential
-values or private Agent Core source are included in this public document.
+values or private account data are included in this public document.
 
 Existing release assets and update-channel manifests remain unchanged until
 the replacement installers satisfy the release requirements.
@@ -67,16 +67,25 @@ the replacement installers satisfy the release requirements.
 
 The maintainer authorized MIT licensing of first-party Core source, including
 modification, redistribution, and commercial use. Core license metadata has been
-updated locally. A clean source-only snapshot excludes private history, real
-session evidence, developer handoff notes, and asset archives whose existing
-license metadata is `NOASSERTION`. The original development files remain intact.
-The snapshot is not a replacement qualified asset/model package or installer.
+published in the clean [DroneDream-Agent-Core repository](https://github.com/ChiZhang-805/DroneDream-Agent-Core).
+The initial public snapshot excludes private history, real session exports,
+developer handoff notes, credentials and model weights. The original private
+repository and its development files remain intact.
+The exact reviewed Core source is recorded in
+[`agent-core-public-source.json`](agent-core-public-source.json); this is a source
+reference, not a binary qualification receipt or an updater manifest.
+
+School Map and My Drone were separately authorized under MIT on 2026-09-16 and
+are included with a hash-scoped external license grant. Historical `NOASSERTION`
+metadata and qualification-bound archive bytes remain unchanged. The later
+permission does not requalify assets or models, grant third-party rights, or
+constitute a new installer release.
 
 The [SignPath application packet](signpath-foundation-application.md) now lists
 all five editions and distinguishes intended signing from actual acceptance.
 `desktop/scripts/check-signpath-readiness.py` reads repository visibility and
 configuration names only; it never retrieves secret values or grants signing
-authority. The current private Core repository is not yet public. No SignPath
+authority. The original incubation repository remains private. No SignPath
 application, account authorization, certificate, or token is claimed as completed.
 
 The product workflow still needs an exact public Core source binding and its

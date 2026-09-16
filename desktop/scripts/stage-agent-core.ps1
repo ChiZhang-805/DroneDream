@@ -68,20 +68,20 @@ if ([string]::IsNullOrWhiteSpace($AgentCoreRepository)) {
 }
 if ([string]::IsNullOrWhiteSpace($AgentCoreRepository)) {
     throw (
-        "The current private AGENT Core repository must be supplied with " +
+        "The current AGENT Core repository must be supplied with " +
         "-AgentCoreRepository or DRONEDREAM_AGENT_CORE_REPOSITORY. " +
         "Implicit checkout fallbacks are not allowed."
     )
 }
 $coreRoot = [IO.Path]::GetFullPath($AgentCoreRepository)
 if (-not (Test-Path -LiteralPath $coreRoot -PathType Container)) {
-    throw "The private DroneDream AGENT Core repository is unavailable: $coreRoot"
+    throw "The DroneDream AGENT Core repository is unavailable: $coreRoot"
 }
 $embeddedCoreRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "autonomy-core"))
 if ($coreRoot.TrimEnd('\', '/') -ieq $embeddedCoreRoot.TrimEnd('\', '/')) {
     throw (
         "The retired embedded autonomy-core snapshot is not a release input. " +
-        "Stage the explicitly selected private AGENT Core repository instead."
+        "Stage the explicitly selected AGENT Core repository instead."
     )
 }
 

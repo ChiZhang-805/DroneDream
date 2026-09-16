@@ -117,7 +117,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository", type=repository_name, default="ChiZhang-805/DroneDream")
     parser.add_argument("--core-repository", type=repository_name,
-                        default="ChiZhang-805/DroneDream-Flight-Agent-Core")
+                        default="ChiZhang-805/DroneDream-Agent-Core")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     report = inspect_readiness(args.repository, args.core_repository)

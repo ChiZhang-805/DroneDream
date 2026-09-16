@@ -9,6 +9,7 @@ is not a claim that the complete product already meets every condition.
 | --- | --- |
 | Project | DroneDream |
 | Main repository | https://github.com/ChiZhang-805/DroneDream |
+| Core repository | https://github.com/ChiZhang-805/DroneDream-Agent-Core |
 | Website | https://getdronedream.com/ |
 | Downloads | https://github.com/ChiZhang-805/DroneDream/releases |
 | Maintainer | Chi Zhang, GitHub `ChiZhang-805` |
@@ -25,12 +26,15 @@ user numbers, student eligibility, reputation, or a guaranteed acceptance decisi
 
 ## Technical conditions still requiring resolution
 
-1. The product repository is public and MIT-licensed. Core was also relicensed
-   locally to MIT, but its incubation history contains session records. Publish
-   and link a clean Core snapshot before claiming all first-party source is public.
-2. Default DDPKG archives contain `NOASSERTION` license metadata. Assets, model
-   weights, and derived datasets need separate permission/provenance decisions.
-   Do not edit hash-bound qualification receipts to manufacture compliance.
+1. The product and clean Core repositories are public and MIT-licensed. Original
+   private incubation history, real session exports, and account data remain
+   excluded. The release must bind the exact public Core commit it builds.
+2. The author explicitly granted MIT rights to School Map and My Drone on
+   2026-09-16. Core's `docs/default-assets-license.md` and hash-scoped
+   `runtime/default-assets-licenses.json` supply the later grant without changing
+   the historical `NOASSERTION` metadata or qualification-bound archive bytes.
+   Third-party dependencies, weights, and datasets still need their own verified
+   redistribution terms; the grant does not relicense them.
 3. The current local model package fails current control-protocol admission.
    This is an installer/flight issue, not something signing or MIT can fix.
 4. SignPath account/project/token settings are not provisioned. The desktop
@@ -44,14 +48,14 @@ does not advance stable updater manifests or approve a flight-qualified release.
 
 ## Application text
 
-Use after the clean public Core source is available; insert its verified URL:
+Prepared text; confirm project/contact details and complete the conditions above:
 
 > DroneDream is an MIT-licensed Windows desktop engineering and research project
 > maintained by Chi Zhang. It has five editions: Universal, SIM, LAB, FIELD, and
 > AGENT. Its source covers desktop workflows, PX4/Gazebo simulation integration,
 > and an agent architecture combining cloud-language-model planning, local
 > low-latency models, and a Harness enforcing structured contracts and safety
-> boundaries. Core source: [insert the verified public Core repository URL].
+> boundaries. Core source: https://github.com/ChiZhang-805/DroneDream-Agent-Core.
 > Production user data and credentials are private and are not distributed with
 > the source. Autonomous-flight work is evaluated in simulation; the project does
 > not claim real-aircraft flight certification.
@@ -105,9 +109,9 @@ browser configuration are not SignPath credentials; do not replace them to apply
 
 ## Human steps
 
-1. Confirm clean public Core repository placement and redistribution rights for
-   default maps, aircraft assets, and any shipped trained weights. Keep production
-   data, recordings, credentials, and private history excluded.
+1. Core repository placement and MIT rights for the two first-party default assets
+   were confirmed on 2026-09-16. Review the exact proposed binary/model inventory;
+   this confirmation does not cover third-party weights or training datasets.
 2. Verify GitHub MFA at https://github.com/settings/security; confirm maintainer
    name and contact email.
 3. Read https://signpath.org/terms.html. Once the technical conditions above are
