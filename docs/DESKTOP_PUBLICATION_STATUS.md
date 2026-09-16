@@ -116,8 +116,15 @@ The closed native-output/configuration tests are included in that result.
 The later source pin includes camera-training validation, JSON-safe camera
 readback, bounded preflight timing diagnostics and a strict ensemble CLI.
 Focused regressions passed; they do not relabel the earlier full-suite result
-as having run against this newer revision. Actual camera readback now succeeds,
-but stable preflight sensing and complete current-model training remain unqualified.
+as having run against this newer revision. Actual camera readback and preflight
+stability have passed in new teacher runs. In-flight perception expiry still
+prevented completion of the longer route; those runs safely landed and remain
+failed, not qualified model-training or autonomous-flight evidence.
+The latest repair reuses only source-identical, same-sized prepared camera pixels
+for learning records, and freezes static map geometry with bounded candidate
+index caching. Distances, uncertainty and freshness checks remain active.
+468 local perception, observation-recording and adapter regressions passed;
+Core lint, 68 schema exports and seven shared Runtime source checks passed.
 These source checks do not claim a completed Windows installer build. Model
 training/admission, third-party weight redistribution rights, current UI
 acceptance, and approved production signing remain release prerequisites.
