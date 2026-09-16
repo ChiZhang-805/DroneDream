@@ -32,6 +32,12 @@ The frontend suite passed 1,034 tests in 134 files using two workers and a
 the AGENT frontend build, and the local desktop build passed. This is not a
 cloud-model flight acceptance result.
 
+The first Pages CI run caught an unreachable `pending` branch in the Runtime
+status display. That branch was removed; the full referenced TypeScript build
+(`tsc -b --force`) and 17 focused conversation/Runtime/updater tests then passed.
+Use the referenced-project build for this check: a root-only `tsc --noEmit` run
+does not validate all frontend projects.
+
 An AGENT client-only local patch was installed on the development host. It
 preserves the existing Core, Runtime, and account data. Conversations currently
 persist locally per account; this change does not claim cross-device chat sync.

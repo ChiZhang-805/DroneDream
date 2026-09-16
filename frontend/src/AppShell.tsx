@@ -1677,11 +1677,9 @@ function SettingsDialog({
     details.push(t("settings.runtime.noResult"));
   }
   const uniqueDetails = [...new Set(details.filter(Boolean))];
-  const runtimeCheckVisualPhase: RuntimeCheckVisualState | null = runtimeCheckActive ? "checking" : null;
-  const statusLabel = runtimeCheckVisualPhase === "pending"
-    ? runtimeCheckCopy.pending
-    : runtimeCheckVisualPhase === "checking"
-      ? runtimeCheckCopy.checking
+  const runtimeCheckVisualPhase = runtimeCheckActive ? "checking" : null;
+  const statusLabel = runtimeCheckActive
+    ? runtimeCheckCopy.checking
     : level === "healthy"
       ? t("settings.runtime.healthy")
       : level === "warning"
@@ -2645,8 +2643,6 @@ function SettingsDialog({
               <span className="settings-runtime-status-icon" aria-hidden="true">
                 {runtimeCheckVisualPhase === "checking" ? (
                   <LoaderCircle className="is-spinning" />
-                ) : runtimeCheckVisualPhase === "pending" ? (
-                  <Circle />
                 ) : level === "healthy" ? (
                   <CircleCheckBig />
                 ) : level === "error" || level === "warning" ? (
