@@ -86,7 +86,9 @@ def inspect_readiness(product_repository: str, core_repository: str) -> dict:
     checks = [
         {"name": name, "state": name_state(variables, name)} for name in SIGNPATH_VARIABLES
     ]
-    checks.append({"name": "SIGNPATH_API_TOKEN", "state": name_state(secrets, "SIGNPATH_API_TOKEN")})
+    checks.append({
+        "name": "SIGNPATH_API_TOKEN", "state": name_state(secrets, "SIGNPATH_API_TOKEN"),
+    })
     for repository in (product_repository, core_repository):
         metadata = github_json(["api", f"repos/{repository}", "--jq", "{visibility}"])
         visibility = metadata.get("visibility") if isinstance(metadata, dict) else None
