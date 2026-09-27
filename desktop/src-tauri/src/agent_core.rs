@@ -758,6 +758,9 @@ pub(crate) fn stop(handle: &AppHandle) {
 // 输出：
 //   timeout：包含响应传输余量的最大等待时间，不自动重发请求。
 fn core_request_timeout(method: &str, path: &str) -> Duration {
+    if method == "GET" && path.contains("/preparation-progress?") {
+        return Duration::from_secs(10);
+    }
     let parts: Vec<_> = path.split('/').collect();
     if method == "POST" && parts.len() == 5 && parts[1] == "v1" && parts[2] == "threads" {
         match parts[4] {

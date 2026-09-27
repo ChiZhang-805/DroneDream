@@ -351,6 +351,9 @@ export interface AutonomyConversationMessage {
 }
 
 export interface AutonomyMissionPlanSnapshot {
+  routePositionsM?: AutonomyVector3[];
+  routeMapSha256?: string;
+  routeVehicleSha256?: string;
   schemaVersion: 1;
   source: "backend" | "local-preview" | "agent-core";
   contractId: string;
@@ -733,6 +736,13 @@ function normalizeMissionPlan(value: unknown): AutonomyMissionPlanSnapshot | nul
       brakingDistanceM: metrics.brakingDistanceM === null ? null : boundedNumber(metrics.brakingDistanceM, 0, 0, 100_000),
     },
     immutableSafetyRules: boundedTextList(plan.immutableSafetyRules, 24, 320),
+    ...(plan.source === "agent-core" && typeof plan.routeMapSha256 === "string"
+      && /^[a-f0-9]{64}$/u.test(plan.routeMapSha256)
+      && typeof plan.routeVehicleSha256 === "string" && /^[a-f0-9]{64}$/u.test(plan.routeVehicleSha256)
+      && Array.isArray(plan.routePositionsM) && plan.routePositionsM.length <= 100_000
+      && plan.routePositionsM.every((p) => p && [p.x, p.y, p.z].every((v) => typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= 1e6))
+      ? { routePositionsM: plan.routePositionsM.map((p) => ({ x: p.x, y: p.y, z: p.z })),
+        routeMapSha256: plan.routeMapSha256, routeVehicleSha256: plan.routeVehicleSha256 } : {}),
     compiledAt: boundedText(plan.compiledAt, new Date().toISOString(), 40),
   };
 }

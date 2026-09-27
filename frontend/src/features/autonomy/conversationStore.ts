@@ -1,9 +1,49 @@
 import type { BrandEditionId } from "../../brand/edition-brand.generated";
+import { provisionalMissionTitle } from "./missionPresentation";
 import { defaultAutonomyWorkspace, loadAutonomyWorkspace, normalizeAutonomyWorkspace, type AutonomyWorkspaceState } from "./workspaceStore";
 
 const PREFIX = "dronedream:autonomy-conversation:v1";
 export const AUTONOMY_CONVERSATIONS_CHANGED = "dronedream:autonomy-conversations-changed";
 type ConversationStorage = Pick<Storage, "getItem" | "setItem" | "key" | "length">;
+
+// 功能：
+//   独立读取会话管理信息，防止迟到的规划快照覆盖置顶、标题和删除状态。
+// 输入：
+//   ownerId：账户；edition：版本；id：会话；storage：存储接口。
+// 输出：
+//   metadata：会话管理信息；损坏时抛错，避免复活已删除会话。
+function conversationMetadata(ownerId: string, edition: BrandEditionId, id: string, storage: ConversationStorage) {
+  const raw = storage.getItem(`${conversationKey(ownerId, edition, id)}:metadata`);
+  const parsed = raw ? JSON.parse(raw) : {};
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("CONVERSATION_METADATA_INVALID");
+  return { pinned: parsed.pinned === true, deleted: parsed.deleted === true, title: typeof parsed.title === "string" ? parsed.title : "" };
+}
+
+// 功能：
+//   持久化置顶、模型短标题或删除标记；删除后拒绝其他更新，保留运行证据。
+// 输入：
+//   ownerId：账户；edition：版本；id：会话；patch：管理操作；storage：存储接口。
+// 输出：
+//   无返回值。
+export function updateAutonomyConversation(ownerId: string, edition: BrandEditionId, id: string, patch: { pinned?: boolean; title?: string; deleted?: true }, storage: ConversationStorage = window.localStorage): void {
+  const current = conversationMetadata(ownerId, edition, id, storage);
+  if (current.deleted) return;
+  if (!loadAutonomyConversation(ownerId, edition, id, storage)) throw new Error("CONVERSATION_NOT_FOUND");
+  const title = patch.title === undefined ? current.title : patch.title.replace(/[\u0000-\u001f\u007f]/gu, " ").replace(/\s+/gu, " ").trim();
+  if (patch.title !== undefined && (!title || Array.from(title).length > 32)) throw new Error("CONVERSATION_TITLE_INVALID");
+  storage.setItem(`${conversationKey(ownerId, edition, id)}:metadata`, JSON.stringify({ ...current, ...patch, title }));
+  window.dispatchEvent(new CustomEvent(AUTONOMY_CONVERSATIONS_CHANGED, { detail: { ownerId, edition, id } }));
+}
+
+// 功能：
+//   在异步返回和旧草稿迁移前检查删除标记。
+// 输入：
+//   ownerId：账户；edition：版本；id：会话；storage：存储接口。
+// 输出：
+//   deleted：会话是否已删除。
+export function isAutonomyConversationDeleted(ownerId: string, edition: BrandEditionId, id: string, storage: ConversationStorage = window.localStorage): boolean {
+  return conversationMetadata(ownerId, edition, id, storage).deleted;
+}
 
 // 功能：
 //   隔离账户、软件版本与会话的本机存储；不保存登录凭据或模型密钥。
@@ -45,6 +85,7 @@ export function saveAutonomyConversation(ownerId: string, edition: BrandEditionI
   const saved = normalizeAutonomyWorkspace(workspace);
   const id = saved.mission.conversationId;
   if (!id || (!saved.mission.messages.length && !saved.mission.compiledPlan)) throw new Error("AUTONOMY_CONVERSATION_EMPTY");
+  if (isAutonomyConversationDeleted(ownerId, edition, id, storage)) return saved;
   // 每份会话单独写入，异步返回只更新其自身，不覆盖另一个会话的记录。
   storage.setItem(conversationKey(ownerId, edition, id), JSON.stringify(saved));
   window.dispatchEvent(new CustomEvent(AUTONOMY_CONVERSATIONS_CHANGED, { detail: { ownerId, edition, id } }));
@@ -59,6 +100,7 @@ export function saveAutonomyConversation(ownerId: string, edition: BrandEditionI
 //   workspace：会话快照，缺失或无效时为 null。
 export function loadAutonomyConversation(ownerId: string, edition: BrandEditionId, id: string, storage: ConversationStorage = window.localStorage): AutonomyWorkspaceState | null {
   try {
+    if (isAutonomyConversationDeleted(ownerId, edition, id, storage)) return null;
     const raw = storage.getItem(conversationKey(ownerId, edition, id));
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
@@ -92,19 +134,20 @@ export function preserveLegacyAutonomyConversation(ownerId: string, edition: Bra
 // 输出：
 //   conversations：包含标识、标题和更新时间的会话摘要列表。
 export function listAutonomyConversations(ownerId: string, edition: BrandEditionId, storage: ConversationStorage = window.localStorage) {
-  const conversations: Array<{ id: string; title: string; updatedAt: string }> = [];
+  const conversations: Array<{ id: string; title: string; updatedAt: string; pinned: boolean; generatedTitle: boolean }> = [];
   const prefix = conversationKey(ownerId, edition);
   for (let index = 0; index < storage.length; index += 1) {
     const key = storage.key(index);
-    if (!key?.startsWith(prefix)) continue;
+    if (!key?.startsWith(prefix) || key.endsWith(":metadata")) continue;
     let id: string;
     try { id = decodeURIComponent(key.slice(prefix.length)); } catch { continue; }
     const workspace = loadAutonomyConversation(ownerId, edition, id, storage);
     if (!workspace) continue;
     const firstMessage = workspace.mission.messages.find((message) => message.role === "user");
-    conversations.push({ id, title: (firstMessage?.content || workspace.mission.intent).replace(/\s+/gu, " ").trim().slice(0, 80), updatedAt: workspace.mission.updatedAt });
+    const metadata = conversationMetadata(ownerId, edition, id, storage);
+    conversations.push({ id, title: metadata.title || provisionalMissionTitle(firstMessage?.content || workspace.mission.intent), updatedAt: workspace.mission.updatedAt, pinned: metadata.pinned, generatedTitle: Boolean(metadata.title) });
   }
-  return conversations.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id));
+  return conversations.sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id));
 }
 
 // 功能：
@@ -124,6 +167,6 @@ export function autonomyConversationPath(id: string): string {
 // 输出：
 //   id：会话标识，非会话页或无效编码时为 null。
 export function autonomyConversationId(pathname: string): string | null {
-  const match = /^\/autonomy\/conversations\/([^/]+)\/?$/u.exec(pathname);
+  const match = /^\/autonomy\/conversations\/([^/]+)(?:\/live)?\/?$/u.exec(pathname);
   try { return match ? decodeURIComponent(match[1]) : null; } catch { return null; }
 }

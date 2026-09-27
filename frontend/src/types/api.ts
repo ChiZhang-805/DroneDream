@@ -1392,7 +1392,7 @@ export interface AutonomyCompileAssetContext {
     task_graph: {
       nodes: Array<{
         node_id: string;
-        action: "resolve" | "takeoff" | "navigate" | "traverse" | "pickup" | "inspect" | "return" | "land" | "abort";
+        action: string;
         target: string;
         depends_on: string[];
         success_evidence: string[];

@@ -1130,11 +1130,13 @@ body:has(.autonomy-platform-page),
 }
 
 .autonomy-conversation-message.is-assistant .autonomy-conversation-body > p {
+  width: min(100%, 46rem);
+  max-width: 100%;
   border-bottom-left-radius: 5px;
 }
 
 .autonomy-conversation-message .autonomy-inline-plan {
-  width: 100%;
+  width: min(100%, 46rem);
   margin-top: 0.8rem;
   box-shadow: 0 12px 34px rgba(65, 43, 75, 0.07);
 }
@@ -1187,7 +1189,7 @@ body:has(.autonomy-platform-page),
   display: grid;
   min-width: 0;
   align-items: start;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.68rem;
 }
 
@@ -1245,7 +1247,7 @@ body:has(.autonomy-platform-page),
 
 .autonomy-inline-plan-bindings {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.55rem;
 }
 
@@ -1403,10 +1405,17 @@ body:has(.autonomy-platform-page),
   white-space: nowrap;
 }
 
+.autonomy-plan-steps { min-width: 0; }
+.autonomy-plan-steps h4 { margin: 0 0 0.65rem; font-size: 0.9rem; }
+.autonomy-plan-steps ol { display: grid; gap: 0.45rem; list-style: none; margin: 0; padding: 0; }
+.autonomy-plan-steps li { display: flex; align-items: center; gap: 0.65rem; padding: 0.6rem 0.7rem; border: 1px solid #e9e0ef; border-radius: 0.65rem; background: rgba(248, 245, 250, 0.65); }
+.autonomy-plan-steps li > i { flex: 0 0 1.8rem; font-size: 0.75rem; font-style: normal; font-weight: 700; color: var(--accent, #ed245e); }
+.autonomy-plan-steps li > span { min-width: 0; overflow-wrap: anywhere; font-size: 0.88rem; line-height: 1.5; }
+
 .autonomy-inline-plan > footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 0.8rem;
 }
 
@@ -2547,7 +2556,7 @@ fieldset.autonomy-form-grid {
   .autonomy-choice-grid,
   .autonomy-choice-grid.is-semantic { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .autonomy-inline-plan-bindings { grid-template-columns: 1fr; }
-  .autonomy-inline-plan > header { grid-template-columns: auto minmax(0, 1fr); }
+  .autonomy-inline-plan > header { grid-template-columns: minmax(0, 1fr); }
   .autonomy-inline-plan > header em { grid-column: 2; justify-self: start; }
   .autonomy-inline-plan > footer { align-items: stretch; flex-direction: column; }
   .autonomy-inline-plan > footer > div { flex-wrap: wrap; }
@@ -19275,7 +19284,17 @@ html[data-dd-reduced-motion="true"] .assistant-voice-button.requesting svg {
 }
 
 .app-conversations .app-workspace-row > a {
-  padding-right: 0.72rem;
+  padding-right: 4rem;
+}
+
+.app-conversations .app-workspace-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.app-conversations .app-workspace-label > svg {
+  flex: 0 0 auto;
 }
 
 .settings-update-error {
@@ -22562,6 +22581,21 @@ body {
   background-size: 54px 54px, 54px 54px, auto;
 }
 
+.autonomy-repository-preview.is-catalog::before {
+  content: attr(data-label);
+  position: absolute;
+  left: 0.75rem;
+  top: 0.75rem;
+  padding: 0.22rem 0.45rem;
+  border: 1px solid rgba(255,255,255,0.45);
+  border-radius: 999px;
+  color: rgba(255,255,255,0.9);
+  background: rgba(13, 34, 39, 0.55);
+  font-size: 0.62rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+}
+
 .autonomy-repository-preview > svg {
   width: clamp(3.8rem, 7vw, 6rem);
   height: clamp(3.8rem, 7vw, 6rem);
@@ -22749,6 +22783,11 @@ body {
   background: #292a31;
   box-shadow: 0 16px 34px rgba(28, 21, 31, 0.15);
 }
+
+.autonomy-mission-start-controls { display: flex; align-items: flex-end; flex-direction: column; gap: 0.45rem; width: 100%; min-width: 0; max-width: 100%; }
+.autonomy-mission-start-controls > small { color: #6f6275; }
+.autonomy-mission-start-controls > p { margin: 0; color: #b32249; overflow-wrap: anywhere; white-space: normal; min-width: 0; max-width: 100%; width: 100%; text-align: start; }
+.autonomy-execution-view-link { margin-top: 0.6rem; }
 
 .autonomy-live-screen {
   position: relative;

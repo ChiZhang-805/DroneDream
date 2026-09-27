@@ -428,7 +428,8 @@ foreach ($required in @(
     '${If} $UpdateMode != 0',
     'FileOpen $1 "$INSTDIR\${MAINBINARYNAME}.exe" a',
     'Sleep 100',
-    'Abort "$(DD_UpdateAppStillRunning)"'
+    'Abort "$(DD_UpdateAppStillRunning)"',
+    'RMDir /r "$INSTDIR\agent-core"'
 )) {
     if (-not $installerHook.Contains($required)) {
         throw "Updater executable-release wait contract is missing: $required"

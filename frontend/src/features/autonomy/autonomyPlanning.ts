@@ -18,6 +18,7 @@ import {
   autonomyPlannerBindingIssues,
   localAutonomyHarnessInspection,
   parseAutonomyPlannerArtifact,
+  verifyCorePlannerDigest,
   type AutonomyPlannerArtifact,
 } from "./missionHarness";
 import {
@@ -36,6 +37,7 @@ import {
   planWithAgentCore,
 } from "./agentCorePlanning";
 import { AgentCoreRequestError, type AgentCoreMissionPrepareSummary } from "./agentCore";
+import { taskUsesChinese } from "./missionPresentation";
 
 export type AutonomyPlanningModel =
   | {
@@ -67,6 +69,8 @@ export interface AutonomyPlanningInput {
   attachments?: File[];
   inputChannel?: "text" | "voice" | "camera" | "api" | "webhook" | "scheduled";
   transcriptSource?: "web-speech" | "audio-attachment" | null;
+  onConversationTitle?: (title: string) => void;
+  onProgress?: (event: import("./conversationActivity").PreparationProgressEvent) => void;
 }
 
 export interface AutonomyPlanningResult {
@@ -248,6 +252,12 @@ export function missionPlanSnapshot(
   };
 }
 
+// 功能：
+//   将 Core 的已绑定计划转换为界面快照，拒绝任务图串单和无效路线坐标。
+// 输入：
+//   summary：Core 响应；plannerBinding：已核对摘要与资产的计划绑定。
+// 输出：
+//   snapshot：界面计划；不执行解锁或起飞。
 function agentCoreMissionPlanSnapshot(
   summary: AgentCoreMissionPrepareSummary,
   plannerBinding: NonNullable<AutonomyCompileAssetContext["planner_binding"]>,
@@ -266,15 +276,30 @@ function agentCoreMissionPlanSnapshot(
     throw new Error("AGENT Core mission plan projection is invalid.");
   }
   const taskIds = new Set(plan.task_graph.nodes.map((node) => node.task_id));
+  const boundNodes = new Map(plannerBinding.task_graph.nodes.map((node) => [node.node_id, node]));
   if (
     taskIds.size !== plan.task_graph.nodes.length
+    || taskIds.size !== boundNodes.size
     || plan.task_graph.nodes.some((node) => node.depends_on.some((dependency) => !taskIds.has(dependency)))
+    || plan.task_graph.nodes.some((node) => {
+      const bound = boundNodes.get(node.task_id);
+      // 界面任务图使用 completion_evidence，不包含 Core 内部的 action/target_node 字段。
+      return !bound || JSON.stringify(bound.depends_on) !== JSON.stringify(node.depends_on)
+        || JSON.stringify(bound.success_evidence) !== JSON.stringify(node.completion_evidence);
+    })
   ) {
     throw new Error("AGENT Core mission task graph binding is invalid.");
+  }
+  if (!Array.isArray(plan.route_positions_m) || plan.route_positions_m.length < 2
+    || plan.route_positions_m.some((point) => !point || ![point.x, point.y, point.z].every((coordinate) => typeof coordinate === "number" && Number.isFinite(coordinate)))) {
+    throw new Error("AGENT Core mission route projection is invalid.");
   }
   return {
     schemaVersion: 1,
     source: "agent-core",
+    routePositionsM: plan.route_positions_m,
+    routeMapSha256: plan.asset_bindings.map_content_sha256,
+    routeVehicleSha256: plan.asset_bindings.vehicle_content_sha256,
     contractId: plan.contract_id,
     sceneId: plan.scene_id,
     sceneName: plan.scene_name,
@@ -309,6 +334,8 @@ function agentCoreMissionPlanSnapshot(
 export async function planAutonomyMission(
   input: AutonomyPlanningInput,
 ): Promise<AutonomyPlanningResult> {
+  // 消息语言优先于界面设置，同时用于模型提示、命名、通知和追问。
+  input = { ...input, chinese: taskUsesChinese(input.instruction, input.chinese) };
   const harnessRequest = autonomyHarnessRequest(input.edition, input.workspace, input.intent);
   let harnessInspection = input.publicDemo
     ? await localAutonomyHarnessInspection(harnessRequest)
@@ -347,17 +374,19 @@ export async function planAutonomyMission(
         attachments: input.attachments,
         inputChannel: input.inputChannel,
         transcriptSource: input.transcriptSource,
+        onConversationTitle: input.onConversationTitle,
+        onProgress: input.onProgress,
       });
-      plannerArtifact = parseAutonomyPlannerArtifact(coreSummary.integration_artifact);
+      plannerArtifact = parseAutonomyPlannerArtifact(coreSummary.integration_artifact, "agent-core");
       if (!plannerArtifact) throw new Error("AGENT Core returned an invalid planner artifact.");
-      const localArtifactSha256 = await autonomyCanonicalSha256(plannerArtifact);
-      if (localArtifactSha256 !== coreSummary.integration_artifact_sha256) {
+      if (!await verifyCorePlannerDigest(plannerArtifact, coreSummary.integration_artifact_canonical_json, coreSummary.integration_artifact_sha256)) {
         throw new Error("AGENT Core planner artifact digest mismatch.");
       }
       const bindingIssues = autonomyPlannerBindingIssues(
         plannerArtifact,
         harnessRequest,
         harnessInspection,
+        "agent-core",
       );
       if (bindingIssues.length) {
         throw new Error(`AGENT Core planner binding failed: ${bindingIssues.join(", ")}`);

@@ -143,8 +143,15 @@ fn expected_engine_pack_profile(manifest_dir: &std::path::Path, edition_id: &str
     profile.to_owned()
 }
 
+// 功能：
+//   校验桌面身份与登录客户端；所有 release EXE 均禁止开发占位身份。
+// 输入：
+//   manifest_dir：桌面构建配置目录。
+// 输出：
+//   edition_profile：与桌面身份匹配的运行配置。
 fn configure_desktop_auth_identity(manifest_dir: &std::path::Path) -> String {
-    let release_build = std::env::var_os("DRONEDREAM_RELEASE_SOURCE_COMMIT").is_some();
+    let release_build = std::env::var("PROFILE").as_deref() == Ok("release")
+        || std::env::var_os("DRONEDREAM_RELEASE_SOURCE_COMMIT").is_some();
     let edition_id = std::env::var("DRONEDREAM_DESKTOP_EDITION_ID").unwrap_or_else(|_| {
         assert!(
             !release_build,
@@ -160,6 +167,10 @@ fn configure_desktop_auth_identity(manifest_dir: &std::path::Path) -> String {
         "DRONEDREAM_DESKTOP_EDITION_ID is not a supported desktop edition"
     );
     let expected_profile = expected_engine_pack_profile(manifest_dir, &edition_id);
+    if let Ok(frontend_edition) = std::env::var("VITE_DRONEDREAM_EDITION") {
+        assert_eq!(frontend_edition, edition_id, "frontend and native desktop edition identities must match");
+    }
+    println!("cargo:rerun-if-env-changed=VITE_DRONEDREAM_EDITION");
     let edition_profile =
         std::env::var("DRONEDREAM_EDITION_PROFILE").unwrap_or_else(|_| expected_profile.clone());
     assert_eq!(

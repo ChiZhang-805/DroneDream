@@ -15,7 +15,6 @@ import {
   Navigation2,
   Orbit,
   Plus,
-  Radar,
   Route,
   ShieldCheck,
   Sparkles,
@@ -24,7 +23,6 @@ import {
   Play,
   Square,
   VideoOff,
-  Waypoints,
   X,
 } from "lucide-react";
 import {
@@ -50,8 +48,12 @@ import type { BrandEditionId } from "../brand/edition-brand.generated";
 import { apiClient } from "../api/client";
 import { openAppSettings } from "../appSettings";
 import { AssetInterpretButton } from "../features/autonomy/AssetInterpretButton";
-import { AUTONOMY_CONVERSATIONS_CHANGED, autonomyConversationId, autonomyConversationPath, loadAutonomyConversation, newAutonomyConversation, preserveLegacyAutonomyConversation, saveAutonomyConversation } from "../features/autonomy/conversationStore";
-import { acquireAutonomyPlanning, useAutonomyPlanning } from "../features/autonomy/conversationActivity";
+import { PreferredAirspaceView } from "../features/autonomy/PreferredAirspaceView";
+import { AUTONOMY_CONVERSATIONS_CHANGED, autonomyConversationId, autonomyConversationPath, loadAutonomyConversation, newAutonomyConversation, preserveLegacyAutonomyConversation, saveAutonomyConversation, isAutonomyConversationDeleted, listAutonomyConversations, updateAutonomyConversation } from "../features/autonomy/conversationStore";
+import { acquireAutonomyPlanning, useAutonomyPlanning, useAutonomyProgress, publishAutonomyProgress } from "../features/autonomy/conversationActivity";
+import { PreparationProgress } from "../features/autonomy/PreparationProgress";
+import { MissionPlanCard } from "../features/autonomy/MissionPlanCard";
+import { conversationUsesChinese, taskUsesChinese } from "../features/autonomy/missionPresentation";
 import { bindVerifiedAssetPair, externalAssetReferenceFromVersion, reconcileAgentCoreWorkspace } from "../features/autonomy/assetPairBinding";
 import { AssistantModelPicker } from "../components/AssistantModelPicker";
 import {
@@ -75,7 +77,6 @@ import {
 import {
   autonomyMapPackQualified,
   planAutonomyMission,
-  type AutonomyPlanningModel,
 } from "../features/autonomy/autonomyPlanning";
 import {
   AgentCoreRequestError,
@@ -95,6 +96,7 @@ import {
   getAgentCoreLiveTelemetry,
   getAgentCoreRuntimeStatus,
   listAgentCoreAssetImportJobs,
+  listAgentCoreMapResources,
   listAgentCoreAssetSourceAdapters,
   pauseAgentCoreAssetQualificationJob,
   pickAndCreateAgentCoreAssetImportJob,
@@ -112,6 +114,7 @@ import {
   type AgentCoreExecutionEvidence,
   type AgentCoreLiveSource,
   type AgentCoreLiveTelemetry,
+  type AgentCoreMapResource,
   type AgentCorePluginEntry,
 } from "../features/autonomy/agentCore";
 import {
@@ -278,6 +281,14 @@ function localizedAutonomyError(
   fallback: { zh: string; en: string },
 ): string {
   const code = value instanceof Error ? value.message.split(":", 1)[0] : "";
+  if (["HARNESS_CONFIGURATION_UPGRADE_REQUIRED", "AGENT_CORE_INTERNAL_ERROR"].includes(code)) {
+    const id = value instanceof Error ? value.message.split(":")[1] : "";
+    const suffix = id && /^[a-f0-9]{32}$/u.test(id) ? ` (${id})` : "";
+    const message = code === "HARNESS_CONFIGURATION_UPGRADE_REQUIRED"
+      ? (chinese ? "任务流程配置需要升级，原会话已保留。" : "The mission workflow configuration needs an upgrade. Your conversation is preserved.")
+      : (chinese ? "任务处理出现内部错误，诊断记录已保存。" : "Mission processing encountered an internal error. Diagnostic evidence was saved.");
+    return message + suffix;
+  }
   if (["AGENT_CORE_ASSET_PAIR_BINDING_REQUIRED", "AGENT_CORE_ASSET_PAIR_QUALIFICATION_ID_MISMATCH",
     "AGENT_CORE_ASSET_PAIR_QUALIFICATION_JOB_NOT_FOUND"].includes(code)) {
     return chinese ? "所选地图与无人机尚未绑定到同一份有效认证。请在地图页检查组合认证后重试。"
@@ -301,17 +312,6 @@ function localizedPlanIssue(
 function localizedStructuredTerm(value: string, chinese: boolean): string {
   const authored = STRUCTURED_TERM_COPY[value];
   return authored ? (chinese ? authored.zh : authored.en) : value.replaceAll("_", " ");
-}
-
-function localizedTaskNodeLabel(
-  node: { task_id: string; label: string },
-  index: number,
-  chinese: boolean,
-): string {
-  return localizedAutonomyError(node.label, chinese, {
-    zh: `任务节点 ${index + 1}（${node.task_id}）`,
-    en: `Task node ${index + 1} (${node.task_id})`,
-  });
 }
 
 function AgentCoreAssetIssueDetails({
@@ -754,6 +754,17 @@ export function AutonomyAssetQualificationPanel({ chinese }: { chinese: boolean 
   }, [refresh]);
 
   const activeJob = jobs.find((job) => job.job_id === activeJobId) ?? null;
+  const selectableQualifiedJobs = jobs.filter((job) => (
+    job.state === "qualified"
+    && Boolean(job.qualification_id)
+    && Boolean(job.result_map_content_sha256)
+    && Boolean(job.result_vehicle_content_sha256)
+  ));
+  useEffect(() => {
+    if (!activeJob || activeJob.state !== "qualified") return;
+    if (activeJob.result_map_content_sha256) setMapHash(activeJob.result_map_content_sha256);
+    if (activeJob.result_vehicle_content_sha256) setVehicleHash(activeJob.result_vehicle_content_sha256);
+  }, [activeJob]);
   useEffect(() => {
     if (!activeJob || !["preparing", "running", "validating"].includes(activeJob.state)) return undefined;
     let active = true;
@@ -888,6 +899,10 @@ export function AutonomyAssetQualificationPanel({ chinese }: { chinese: boolean 
       {state === "loading" ? <span className="autonomy-connector-state">{chinese ? "正在读取可认证资产" : "Loading eligible assets"}</span> : null}
       {state === "unavailable" ? <span className="autonomy-connector-state is-unavailable">{chinese ? "需要桌面端认证" : "Desktop qualification required"}</span> : null}
       {state === "ready" ? <div className="autonomy-pair-selectors">
+        {selectableQualifiedJobs.length > 1 ? <label><span>{chinese ? "已认证地图组合" : "Qualified map pair"}</span><select value={activeJobId ?? ""} onChange={(event) => setActiveJobId(event.target.value || null)} disabled={working}><option value="">{chinese ? "选择已认证组合" : "Choose a qualified pair"}</option>{selectableQualifiedJobs.map((job) => {
+          const mapVersion = versions.find((version) => version.asset_id === job.map_asset_id && version.content_sha256 === job.result_map_content_sha256);
+          return <option key={job.job_id} value={job.job_id}>{mapVersion ? qualificationAssetLabel(mapVersion) : job.map_asset_id}</option>;
+        })}</select></label> : null}
         <label><span>{chinese ? "地图版本" : "Map version"}</span><select value={mapHash} onChange={(event) => setMapHash(event.target.value)} disabled={working || Boolean(activeJob && !["qualified", "failed", "cancelled"].includes(activeJob.state))}><option value="">{chinese ? "选择地图" : "Choose map"}</option>{mapVersions.map((version) => <option key={version.content_sha256} value={version.content_sha256}>{qualificationAssetLabel(version)}</option>)}</select></label>
         <label><span>{chinese ? "无人机版本" : "Aircraft version"}</span><select value={vehicleHash} onChange={(event) => setVehicleHash(event.target.value)} disabled={working || Boolean(activeJob && !["qualified", "failed", "cancelled"].includes(activeJob.state))}><option value="">{chinese ? "选择无人机" : "Choose aircraft"}</option>{vehicleVersions.map((version) => <option key={version.content_sha256} value={version.content_sha256}>{qualificationAssetLabel(version)}</option>)}</select></label>
       </div> : null}
@@ -1018,66 +1033,6 @@ function resolveMissionAssets(
   });
 }
 
-function AutonomyMissionPlanCard({
-  chinese,
-  workspace,
-}: {
-  chinese: boolean;
-  workspace: AutonomyWorkspaceState;
-}) {
-  const plan = workspace.mission.compiledPlan;
-  if (!plan) return null;
-  const blockingIssues = plan.issues.filter((issue) => issue.severity === "error");
-  return (
-    <section className="autonomy-inline-plan" aria-live="polite">
-      <header>
-        <span><Waypoints aria-hidden="true" /></span>
-        <div>
-          <small>{chinese ? "自动生成的任务计划" : "Generated mission plan"}</small>
-          <h3>{workspace.mission.intent}</h3>
-        </div>
-        <em className={plan.canExecute ? "is-ready" : "is-blocked"}>
-          {plan.canExecute ? (chinese ? "可进入仿真" : "Simulation ready") : (chinese ? "需要处理" : "Action required")}
-        </em>
-      </header>
-      <div className="autonomy-inline-plan-bindings">
-        <span><Navigation2 aria-hidden="true" /><small>{chinese ? "无人机" : "Aircraft"}</small><strong>{workspace.aircraft.name}</strong></span>
-        <span><Layers3 aria-hidden="true" /><small>{chinese ? "地图" : "Map"}</small><strong>{workspace.mapPack.name}</strong></span>
-          <span><Radar aria-hidden="true" /><small>{chinese ? "感知" : "Perception"}</small><strong>{chinese ? ({ map: "地图", vision: "视觉", fusion: "融合" } as const)[plan.perceptionMode] : plan.perceptionMode}</strong></span>
-        <span><Route aria-hidden="true" /><small>{chinese ? "路线" : "Route"}</small><strong>{plan.metrics.routeLengthM.toFixed(1)} m · {Math.ceil(plan.metrics.estimatedDurationS)} s</strong></span>
-      </div>
-      {blockingIssues.length ? <ul className="autonomy-inline-plan-issues">{blockingIssues.map((issue) => <li key={issue.code}><ShieldCheck aria-hidden="true" /><span>{localizedPlanIssue(issue, chinese)}</span></li>)}</ul> : null}
-      <details className="autonomy-task-graph" open>
-        <summary>
-          <span>{chinese ? "执行任务树" : "Execution task graph"}</span>
-          <small>{plan.taskGraph.nodes.length} {chinese ? "个可审计节点" : "auditable nodes"}</small>
-        </summary>
-        <ol>
-          {plan.taskGraph.nodes.map((node, index) => <li key={node.task_id} data-risk={node.risk}>
-            <i>{String(index + 1).padStart(2, "0")}</i>
-            <div>
-              <strong>{localizedTaskNodeLabel(node, index, chinese)}</strong>
-            <span>{localizedStructuredTerm(node.executor, chinese)} · {chinese ? ({ low: "低风险", medium: "中风险", high: "高风险", critical: "严重风险" } as const)[node.risk] : node.risk} · {node.timeout_s}s · {chinese ? "失败后" : "Fallback"} {localizedStructuredTerm(node.fallback, chinese)}</span>
-              <small>{chinese ? "证据" : "Evidence"}: {node.completion_evidence.join(" · ")}</small>
-            </div>
-          </li>)}
-        </ol>
-      </details>
-      <footer>
-        <span>{plan.source === "backend"
-          ? (chinese ? "后端合同" : "Backend contract")
-          : plan.source === "agent-core"
-            ? (chinese ? "AGENT Core 哈希绑定合同" : "AGENT Core hash-bound contract")
-            : (chinese ? "本地安全预览" : "Local safety preview")} · {plan.contractId}</span>
-        <div>
-          <Link className="btn" to="/autonomy/aircraft">{chinese ? "无人机" : "Aircraft"}</Link>
-          <Link className="btn" to="/autonomy/maps">{chinese ? "地图" : "Maps"}</Link>
-          {plan.canExecute ? <Link className="btn btn-primary" to="/autonomy/live"><Airplay aria-hidden="true" />{chinese ? "进入仿真" : "Open simulation"}</Link> : null}
-        </div>
-      </footer>
-    </section>
-  );
-}
 
 export function AutonomyPlatform() {
   const auth = useOptionalAuth();
@@ -1181,6 +1136,7 @@ export function AutonomyPlatform() {
 
   const persist = useCallback((next: AutonomyWorkspaceState) => {
     const id = next.mission.conversationId;
+    if (id && isAutonomyConversationDeleted(ownerId, edition, id)) return;
     if (id && (next.mission.messages.length || next.mission.compiledPlan)) {
       saveAutonomyConversation(ownerId, edition, next);
     }
@@ -1433,6 +1389,26 @@ export function AutonomyOverview() {
   const navigate = useNavigate();
   const ownerId = auth?.account?.id ?? "local";
   const generating = useAutonomyPlanning(ownerId, edition, workspace.mission.conversationId);
+  const [executionView, setExecutionView] = useState<{ conversationId: string; state: string; sourceId: string | null } | null>(null);
+  const executionMessageId = `execution-accepted:${workspace.mission.planningRunId ?? ""}`;
+  // 功能：
+  //   在真实执行回执到达后，把受理状态写入原会话；不将受理冒充已经起飞。
+  // 输入：
+  //   无，使用当前已绑定的会话和计划修订。
+  // 输出：
+  //   无，持久化一条幂等的执行受理消息。
+  const recordExecutionAccepted = () => {
+    const id = workspace.mission.conversationId;
+    if (!id) return;
+    const current = loadAutonomyConversation(ownerId, edition, id);
+    if (!current || current.mission.planningRunId !== workspace.mission.planningRunId || current.mission.messages.some((item) => item.id === executionMessageId)) return;
+    const now = new Date().toISOString();
+    persist({ ...current, mission: { ...current.mission, updatedAt: now, messages: [...current.mission.messages, {
+      id: executionMessageId, role: "assistant", createdAt: now, planContractId: null,
+      content: conversationUsesChinese(current) ? "已收到你的开始指令，执行请求已受理，正在启动仿真并进行起飞前检查。画面就绪后可点击下方“查看运行”。" : "Your start command has been accepted. Simulation startup and preflight checks are underway. View the run below once a camera frame is available.",
+    }] } });
+  };
+  const preparationEvents = useAutonomyProgress(ownerId, edition, workspace.mission.conversationId);
   const submitting = useRef(false);
   const {
     settings: modelAccess,
@@ -1708,7 +1684,8 @@ export function AutonomyOverview() {
       const submittedAttachments = pendingAttachments.slice(0, 8);
       const selectedWorkspace = resolveMissionAssets(workspace, assetLibrary, intent);
       const turnId = crypto.randomUUID();
-      const followUpPrefix = chinese ? "\n补充指令：" : "\nFollow-up instruction: ";
+      const replyChinese = taskUsesChinese(intent, conversationUsesChinese(selectedWorkspace));
+      const followUpPrefix = replyChinese ? "\n补充指令：" : "\nFollow-up instruction: ";
       const revisedIntent = selectedWorkspace.mission.messages.length || selectedWorkspace.mission.compiledPlan
         ? `${selectedWorkspace.mission.intent.slice(0, Math.max(0, 2_000 - followUpPrefix.length - intent.length))}${followUpPrefix}${intent}`
         : intent;
@@ -1758,7 +1735,7 @@ export function AutonomyOverview() {
         instruction: intent,
         conversationId: assistantWorkspaceId,
         turnId,
-        chinese,
+        chinese: replyChinese,
         selectedModel: selectedPlanningModel,
         accountId: auth?.account?.id ?? null,
         publicDemo: publicDemoConsole,
@@ -1766,6 +1743,9 @@ export function AutonomyOverview() {
         attachments: submittedAttachments,
         inputChannel: inputProvenance === "text" ? "text" : "voice",
         transcriptSource: inputProvenance === "text" ? null : inputProvenance,
+        onConversationTitle: listAutonomyConversations(ownerId, edition).some((item) => item.id === assistantWorkspaceId && item.generatedTitle)
+          ? undefined : (title) => updateAutonomyConversation(ownerId, edition, assistantWorkspaceId, { title }),
+        onProgress: (event) => publishAutonomyProgress(ownerId, edition, assistantWorkspaceId, event),
       });
       if (!planning.compiledPlan) {
         const updatedAt = new Date().toISOString();
@@ -1869,8 +1849,17 @@ export function AutonomyOverview() {
                     {message.role === "assistant"
                       && workspace.mission.compiledPlan
                       && message.planContractId === workspace.mission.compiledPlan.contractId
-                      ? <AutonomyMissionPlanCard chinese={chinese} workspace={workspace} />
+                      ? <MissionPlanCard chinese={conversationUsesChinese(workspace)} workspace={workspace} title={listAutonomyConversations(ownerId, edition).find((item) => item.id === workspace.mission.conversationId)?.title ?? (conversationUsesChinese(workspace) ? "任务计划" : "Mission plan")} formatIssue={localizedPlanIssue} controls={edition === "autonomy" && !publicDemoConsole ? <AgentCoreLiveMission key={`${ownerId}:${workspace.mission.conversationId}:${workspace.mission.planningRunId}`} chinese={conversationUsesChinese(workspace)} workspace={workspace} planningModel={workspace.mission.planningModel} accountId={auth?.account?.id ?? null} compact onAccepted={recordExecutionAccepted} onViewState={setExecutionView} /> : undefined} />
                       : null}
+                    {message.id === executionMessageId ? <div className="autonomy-execution-view-link">
+                      {executionView?.conversationId === workspace.mission.conversationId && executionView.sourceId
+                        ? <Link className="btn btn-primary" to={`/autonomy/conversations/${encodeURIComponent(workspace.mission.conversationId!)}/live?source=${encodeURIComponent(executionView.sourceId)}&autoplay=1`}>{conversationUsesChinese(workspace) ? "查看运行" : "View run"}</Link>
+                        : <button className="btn btn-primary" type="button" disabled>{executionView?.conversationId === workspace.mission.conversationId && ["failed", "completed"].includes(executionView.state)
+                          ? (conversationUsesChinese(workspace) ? "运行已结束（无实时画面）" : "Run ended (no live camera)")
+                          : executionView?.conversationId === workspace.mission.conversationId && executionView?.state === "unavailable"
+                            ? (conversationUsesChinese(workspace) ? "运行状态暂不可用" : "Run status unavailable")
+                            : (conversationUsesChinese(workspace) ? "查看运行（等待画面）" : "View run (waiting for camera)")}</button>}
+                    </div> : null}
                   </div>
                   {message.role === "user" ? (
                     <span className="autonomy-conversation-avatar is-user-account" aria-label={auth?.account?.displayName ?? (chinese ? "本地用户" : "Local user")}>
@@ -1888,7 +1877,7 @@ export function AutonomyOverview() {
               {generating ? (
                 <article className="autonomy-conversation-message is-assistant is-generating" aria-label={chinese ? "正在生成任务计划" : "Generating mission plan"}>
                   <span className="autonomy-conversation-avatar" aria-hidden="true"><Sparkles /></span>
-                  <div className="autonomy-conversation-thinking"><i /><i /><i /></div>
+                  <PreparationProgress events={preparationEvents} chinese={conversationUsesChinese(workspace)} />
                 </article>
               ) : null}
             </div>
@@ -2202,8 +2191,16 @@ export function AutonomyAircraft() {
 export function AutonomyMaps() {
   const { edition, chinese, workspace, assetLibrary, selectMap, removeAsset } = useAutonomyWorkspace();
   const [details, setDetails] = useState<{ title: string; rows: Array<[string, string]> } | null>(null);
+  const [defaultResources, setDefaultResources] = useState<AgentCoreMapResource[]>([]);
+  const [resourceStates, setResourceStates] = useState<Record<string, "idle" | "working" | "conversion" | "ready" | "error">>({});
   const defaultMapId = defaultAutonomyWorkspace().mapPack.id;
   const externalMaps = assetLibrary.externalAssets.filter((asset) => asset.kind === "map" || asset.kind === "world");
+  const spaceMap = workspace.mapPack;
+  const spaceVehicle = workspace.aircraft;
+  const plan = workspace.mission.compiledPlan;
+  const route = plan?.source === "agent-core"
+    && plan.routeMapSha256 === spaceMap.agentCoreContentSha256
+    && plan.routeVehicleSha256 === spaceVehicle.agentCoreContentSha256 ? plan.routePositionsM : undefined;
   const openMapDetails = (mapPack: AutonomyMapPack) => setDetails({
     title: mapPack.name,
     rows: [
@@ -2213,6 +2210,54 @@ export function AutonomyMaps() {
       [chinese ? "楼层" : "Floors", String(mapPack.floorCount)],
     ],
   });
+  useEffect(() => {
+    let active = true;
+    void listAgentCoreMapResources().then((catalog) => {
+      if (active) setDefaultResources(catalog.resources);
+    }).catch(() => {
+      if (active) setDefaultResources([]);
+    });
+    return () => { active = false; };
+  }, []);
+  const resourceName = (resource: AgentCoreMapResource) => resource.display_name[chinese ? "zh-CN" : "en-US"];
+  const openResourceDetails = (resource: AgentCoreMapResource) => setDetails({
+    title: resourceName(resource),
+    rows: [
+      [chinese ? "来源" : "Source", `Open-RMF @ ${resource.analysis.source_commit.slice(0, 12)}`],
+      [chinese ? "许可证" : "License", resource.license.spdx_id],
+      [chinese ? "楼层" : "Levels", `${resource.analysis.level_count} (${resource.analysis.level_names.join(", ")})`],
+      [chinese ? "门 / 电梯" : "Doors / lifts", `${resource.analysis.door_count} / ${resource.analysis.lift_count}`],
+      [chinese ? "墙体 / 模型" : "Walls / models", `${resource.analysis.wall_count} / ${resource.analysis.model_count}`],
+      [chinese ? "预解析" : "Pre-analysis", chinese ? "已完成结构解析" : "Structural analysis complete"],
+      [chinese ? "仿真状态" : "Simulation", chinese ? "需要隔离转换和依赖检查" : "Isolated conversion and dependency check required"],
+      [chinese ? "飞行状态" : "Flight", chinese ? "尚未与无人机配对验收" : "Not yet aircraft-pair qualified"],
+    ],
+  });
+  const prepareDefaultResource = async (resource: AgentCoreMapResource) => {
+    if (resourceStates[resource.resource_id] === "working") return;
+    setResourceStates((current) => ({ ...current, [resource.resource_id]: "working" }));
+    try {
+      const created = await createAgentCoreRemoteAssetImportJob({
+        source_type: resource.source.source_type,
+        location: resource.source.location,
+        expected_kind: resource.source.expected_kind,
+        source_format: resource.source.source_format,
+        expected_sha256: resource.source.expected_sha256,
+        ...(resource.source.source_type === "git" && resource.source.git_ref
+          ? { git_ref: resource.source.git_ref } : {}),
+        ...(resource.source.source_type === "git" && resource.source.subpath
+          ? { subpath: resource.source.subpath } : {}),
+      });
+      const processed = await processAgentCoreAssetImportJob(created.job_id);
+      setResourceStates((current) => ({
+        ...current,
+        [resource.resource_id]: processed.state === "qualified" ? "ready"
+          : processed.state === "needs_input" ? "conversion" : "error",
+      }));
+    } catch {
+      setResourceStates((current) => ({ ...current, [resource.resource_id]: "error" }));
+    }
+  };
 
   return (
     <section className="autonomy-repository-page">
@@ -2241,7 +2286,40 @@ export function AutonomyMaps() {
             <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${asset.name}` : `Delete ${asset.name}`} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
           </article>
         ))}
+        {defaultResources.map((resource) => {
+          const state = resourceStates[resource.resource_id] ?? "idle";
+          return <article key={resource.resource_id} data-catalog-resource="true">
+            <button type="button" className="autonomy-repository-card-surface" onDoubleClick={() => openResourceDetails(resource)}>
+              <span className="autonomy-repository-preview is-map is-catalog" data-label={chinese ? "默认" : "DEFAULT"}><Layers3 aria-hidden="true" /></span>
+              <span className="autonomy-repository-copy">
+                <strong>{resourceName(resource)}</strong>
+                <small>{state === "conversion"
+                  ? (chinese ? "已下载 · 等待安全转换" : "Downloaded · conversion required")
+                  : state === "ready" ? (chinese ? "已安装" : "Installed")
+                    : state === "error" ? (chinese ? "准备失败" : "Preparation failed")
+                      : (chinese ? "默认资源 · 已预解析" : "Default resource · preparsed")}</small>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="autonomy-repository-interpret"
+              data-state={state === "working" ? "busy" : state === "ready" ? "done" : state === "error" ? "error" : undefined}
+              disabled={state === "working" || state === "ready" || state === "conversion"}
+              aria-label={chinese ? `准备 ${resourceName(resource)}` : `Prepare ${resourceName(resource)}`}
+              title={state === "conversion"
+                ? (chinese ? "源文件已固定并下载；需要 RMF 隔离转换后才能进入仿真" : "Source downloaded; isolated RMF conversion is required for simulation")
+                : (chinese ? "按需下载固定版本" : "Download the pinned revision on demand")}
+              onClick={() => void prepareDefaultResource(resource)}
+            ><Upload aria-hidden="true" /></button>
+          </article>;
+        })}
       </div>
+      <AutonomyAssetQualificationPanel chinese={chinese} />
+      {spaceMap.agentCoreAssetId && spaceMap.agentCoreContentSha256
+        && spaceVehicle.agentCoreAssetId && spaceVehicle.agentCoreContentSha256 ? <PreferredAirspaceView
+          chinese={chinese} route={route} request={{ map_asset_id: spaceMap.agentCoreAssetId,
+            map_content_sha256: spaceMap.agentCoreContentSha256, vehicle_asset_id: spaceVehicle.agentCoreAssetId,
+            vehicle_content_sha256: spaceVehicle.agentCoreContentSha256 }} /> : null}
       {details ? <RepositoryDetailsDialog chinese={chinese} details={details} onClose={() => setDetails(null)} /> : null}
     </section>
   );
@@ -2268,16 +2346,28 @@ function RepositoryDetailsDialog({
   );
 }
 
+// 功能：
+//   显示当前任务状态与显式启动入口；仅在确认时调用绑定计划的执行接口。
+// 输入：
+//   chinese：对话语言；workspace：当前会话；planningModel：规划时的模型；accountId：账户。
+// 输出：
+//   panel：启动检查、确认按钮及执行状态面板。
 export function AgentCoreLiveMission({
   chinese,
   workspace,
   planningModel,
   accountId,
+  compact = false,
+  onAccepted,
+  onViewState,
 }: {
   chinese: boolean;
   workspace: AutonomyWorkspaceState;
-  planningModel: AutonomyPlanningModel;
+  planningModel: AutonomyWorkspaceState["mission"]["planningModel"];
   accountId: string | null;
+  compact?: boolean;
+  onAccepted?: () => void;
+  onViewState?: (value: { conversationId: string; state: string; sourceId: string | null }) => void;
 }) {
   const [thread, setThread] = useState<Awaited<ReturnType<typeof getBoundAgentCoreThread>>>(null);
   const [runtimeReady, setRuntimeReady] = useState<boolean | null>(null);
@@ -2286,6 +2376,10 @@ export function AgentCoreLiveMission({
   const [working, setWorking] = useState(false);
   const [runtimeMessage, setRuntimeMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const callbacks = useRef({ onAccepted, onViewState });
+  callbacks.current = { onAccepted, onViewState };
+  const startLock = useRef(false);
+  const [accepted, setAccepted] = useState(false);
   const conversationId = workspace.mission.conversationId;
   const binding = useMemo(() => ({
     edition: "autonomy" as const,
@@ -2294,9 +2388,16 @@ export function AgentCoreLiveMission({
   }), [accountId, conversationId]);
 
   useEffect(() => {
+    setThread(null);
+    setRuntimeReady(null);
+    setExecutionEvidence(null);
+    setError(null);
     if (!conversationId) return undefined;
     let cancelled = false;
+    let refreshing = false;
     const refresh = async () => {
+      if (refreshing) return;
+      refreshing = true;
       try {
         const [nextThread, runtime] = await Promise.all([
           getBoundAgentCoreThread(binding),
@@ -2306,7 +2407,23 @@ export function AgentCoreLiveMission({
         setThread(nextThread);
         setRuntimeReady(runtime.runtime_available && runtime.resources_ready && runtime.provisioned);
         setRuntimeIssue(runtime.issue);
-        if (nextThread && ["executing", "completed", "failed"].includes(nextThread.state)) {
+        if (compact && callbacks.current.onViewState) {
+          let sourceId: string | null = null;
+          if (nextThread && ["executing", "holding", "landing"].includes(nextThread.state)) {
+            try {
+              const catalog = await getAgentCoreLiveSources(nextThread.thread_id);
+              const source = catalog.sources.find((item) => item.mode === "simulation" && item.ready && item.transport === "agent-core-frame");
+              if (source) {
+                const frame = await getAgentCoreLiveFrame(nextThread.thread_id, source.id);
+                const bitmap = await createImageBitmap(frame);
+                if (bitmap.width > 0 && bitmap.height > 0) sourceId = source.id;
+                bitmap.close();
+              }
+            } catch { /* No decodable current frame: keep viewing disabled. */ }
+          }
+          if (!cancelled) callbacks.current.onViewState({ conversationId, state: nextThread?.state ?? "unbound", sourceId });
+        }
+        if (!compact && nextThread && ["executing", "completed", "failed"].includes(nextThread.state)) {
           try {
             setExecutionEvidence(await getAgentCoreExecutionEvidence(nextThread.thread_id));
           } catch (reason) {
@@ -2317,10 +2434,16 @@ export function AgentCoreLiveMission({
           setExecutionEvidence(null);
         }
       } catch (reason) {
-        if (!cancelled) setError(localizedAutonomyError(reason, chinese, {
+        if (!cancelled) {
+          setRuntimeReady(false);
+          callbacks.current.onViewState?.({ conversationId, state: "unavailable", sourceId: null });
+          setError(localizedAutonomyError(reason, chinese, {
           zh: "AGENT Core 暂时不可用。",
           en: "AGENT Core is unavailable.",
         }));
+        }
+      } finally {
+        refreshing = false;
       }
     };
     void refresh();
@@ -2329,7 +2452,7 @@ export function AgentCoreLiveMission({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [binding, chinese, conversationId]);
+  }, [binding, chinese, conversationId, compact]);
 
   const executionInput = {
     ...binding,
@@ -2345,17 +2468,22 @@ export function AgentCoreLiveMission({
       : null,
   };
   const start = async () => {
+    if (startLock.current || accepted || working || runtimeReady !== true || thread?.state !== "awaiting_confirmation" || !workspace.mission.planningRunId) return;
+    startLock.current = true;
     setWorking(true);
     setError(null);
     try {
-      await executeBoundAgentCoreMission(executionInput);
-      setThread(await getBoundAgentCoreThread(binding));
+      const receipt = await executeBoundAgentCoreMission(executionInput);
+      setAccepted(true);
+      setThread((current) => current ? { ...current, state: receipt.state } : current);
+      callbacks.current.onAccepted?.();
     } catch (reason) {
       setError(localizedAutonomyError(reason, chinese, {
         zh: "AGENT Core 执行失败。",
         en: "AGENT Core execution failed.",
       }));
     } finally {
+      startLock.current = false;
       setWorking(false);
     }
   };
@@ -2389,9 +2517,9 @@ export function AgentCoreLiveMission({
           : thread.state === "landing"
             ? (chinese ? "安全降落中" : "Landing safely")
             : thread.state === "completed"
-              ? (chinese ? "已通过验收" : "Acceptance passed")
+              ? (chinese ? "运行已完成" : "Run completed")
               : thread.state === "failed"
-                ? (chinese ? "未通过验收" : "Acceptance failed")
+                ? (chinese ? "运行失败，请查看下方原因" : "Run failed; see details below")
                 : chinese ? "正在准备任务" : "Preparing mission";
   const statusMessages = (thread?.messages ?? [])
     .filter((message) => message.kind === "status" || message.kind === "error")
@@ -2399,6 +2527,14 @@ export function AgentCoreLiveMission({
   const evidenceResult = executionEvidence?.result;
   const evidenceGates = evidenceResult ? Object.values(evidenceResult.gates) : [];
   const passedEvidenceGates = evidenceGates.filter(Boolean).length;
+  if (compact) return <div className="autonomy-mission-start-controls">
+    <button className="btn btn-primary" type="button" disabled={accepted || working || runtimeReady !== true || thread?.state !== "awaiting_confirmation" || !workspace.mission.planningRunId} onClick={() => void start()}><Play aria-hidden="true" />{thread?.state === "failed" ? (chinese ? "运行失败" : "Run failed") : thread?.state === "completed" ? (chinese ? "已完成" : "Completed") : working ? (chinese ? "正在启动" : "Starting") : accepted || ["executing", "holding", "landing"].includes(thread?.state ?? "") ? (chinese ? "正在运行" : "Running") : (chinese ? "开始仿真" : "Start simulation")}</button>
+    {thread?.state === "failed" ? <p role="alert">{statusMessages.filter((message) => message.kind === "error").at(-1)?.content || (chinese ? "本次运行已结束，未取得成功完成的证据。请保留对话和运行日志以便排查。" : "This run ended without successful completion evidence. Keep the conversation and logs for diagnosis.")}</p> : null}
+    {runtimeReady === null ? <small>{chinese ? "正在检查运行环境" : "Checking runtime"}</small> : null}
+    {runtimeReady === false ? <small>{localizedAutonomyError(runtimeIssue, chinese, { zh: "运行环境尚未就绪", en: "Runtime not ready" })}</small> : null}
+    {thread && thread.state !== "awaiting_confirmation" ? <small>{stateLabel}</small> : null}
+    {error ? <p role="alert">{error}</p> : null}
+  </div>;
   return (
     <section className="agent-core-live-mission" aria-live="polite">
       <header>
@@ -2416,7 +2552,8 @@ export function AgentCoreLiveMission({
       {thread?.state === "awaiting_confirmation" ? (
         <div className="agent-core-live-confirmation">
           <p>{chinese ? "确认后才会启动真实的 Gazebo 与 PX4 SITL；规划合同、地图和无人机哈希在启动前会再次校验。" : "Gazebo and PX4 SITL start only after confirmation. The mission contract and exact asset hashes are revalidated before launch."}</p>
-          <button className="btn btn-primary" type="button" disabled={working || runtimeReady !== true} onClick={() => void start()}><Airplay aria-hidden="true" />{working ? (chinese ? "正在启动" : "Starting") : (chinese ? "确认并开始仿真" : "Confirm and start simulation")}</button>
+          <button className="btn btn-primary" type="button" disabled={working || runtimeReady !== true || !workspace.mission.planningRunId} onClick={() => void start()}><Airplay aria-hidden="true" />{working ? (chinese ? "正在启动" : "Starting") : (chinese ? "确认并开始仿真" : "Confirm and start simulation")}</button>
+          {!workspace.mission.planningRunId ? <p role="alert">{chinese ? "当前计划缺少版本标识，请返回对话重新生成计划。" : "The plan revision is missing. Return to the conversation and generate a new plan."}</p> : null}
         </div>
       ) : null}
       {thread?.state === "executing" ? (
@@ -2499,7 +2636,10 @@ async function persistLiveRecording(blob: Blob, fileName: string) {
 }
 
 export function AutonomyLive() {
-  const { chinese, workspace } = useAutonomyWorkspace();
+  const location = useLocation();
+  const autoplayedRequest = useRef<string | null>(null);
+  const { chinese: interfaceChinese, workspace } = useAutonomyWorkspace();
+  const chinese = workspace.mission.messages.length ? conversationUsesChinese(workspace) : interfaceChinese;
   const auth = useOptionalAuth();
   const edition = useEditionTheme().id;
   const conversationId = workspace.mission.conversationId;
@@ -2623,6 +2763,16 @@ export function AutonomyLive() {
   }, [stream]);
 
   const selectedSource = sources.find((source) => source.id === sourceId) ?? null;
+  // 仅自动打开经过真实帧就绪检查的仿真来源，绝不自动启用用户摄像头或启动飞行。
+  useEffect(() => {
+    const query = new URLSearchParams(location.search);
+    const requestKey = location.pathname + location.search;
+    if (autoplayedRequest.current === requestKey) return;
+    const requested = query.get("source");
+    if (query.get("autoplay") !== "1" || !requested) return;
+    const source = coreSources.find((item) => item.id === requested && item.ready && item.mode === "simulation" && item.transport === "agent-core-frame");
+    if (source) { autoplayedRequest.current = requestKey; setSourceId(source.id); setPlaying(true); }
+  }, [location.pathname, location.search, coreSources]);
   const play = async () => {
     if (!selectedSource) return;
     if (selectedSource.transport === "media-device") {
@@ -2646,7 +2796,7 @@ export function AutonomyLive() {
       if (busy) return;
       busy = true;
       try {
-        const frame = await getAgentCoreLiveFrame(threadId);
+        const frame = await getAgentCoreLiveFrame(threadId, selectedSource.id);
         const bitmap = await createImageBitmap(frame);
         const canvas = canvasRef.current;
         if (canvas && !cancelled) {
@@ -2669,7 +2819,7 @@ export function AutonomyLive() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [playing, selectedSource?.transport, threadId]);
+  }, [playing, selectedSource?.transport, selectedSource?.id, threadId]);
 
   useEffect(() => {
     if (!playing || selectedSource?.kind !== "gps") {

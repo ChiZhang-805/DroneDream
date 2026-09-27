@@ -23,7 +23,8 @@ export type AutonomyPlannerAction =
   | "inspect"
   | "return"
   | "land"
-  | "abort";
+  | "abort"
+  | `${string}.${string}`;
 
 export interface AutonomyPlannerTaskNode {
   node_id: string;
@@ -379,7 +380,13 @@ export function autonomyModelContext(
   };
 }
 
-export function parseAutonomyPlannerArtifact(value: unknown): AutonomyPlannerArtifact | null {
+// 功能：
+//   按调用方选择的协议校验计划；Core 插件动作不等于获得飞行授权。
+// 输入：
+//   value：返回的计划；source：调用链确定的来源，不能由计划自行声明。
+// 输出：
+//   artifact：有效原始计划；校验失败返回 null。
+export function parseAutonomyPlannerArtifact(value: unknown, source: "public" | "agent-core" = "public"): AutonomyPlannerArtifact | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const artifact = value as Partial<AutonomyPlannerArtifact>;
   if (
@@ -397,7 +404,9 @@ export function parseAutonomyPlannerArtifact(value: unknown): AutonomyPlannerArt
     || !Array.isArray(artifact.tool_receipts)
     || !Array.isArray(artifact.assumptions)
     || !Array.isArray(artifact.blockers)
-    || !validPlannerTaskGraph(artifact.task_graph, artifact.status === "draft")
+    || !validPlannerTaskGraph(artifact.task_graph, artifact.status === "draft", source)
+    || artifact.assumptions.some((item) => typeof item !== "string")
+    || artifact.blockers.some((item) => typeof item !== "string")
   ) return null;
   const bindings = artifact.asset_bindings;
   if (
@@ -415,8 +424,11 @@ export function parseAutonomyPlannerArtifact(value: unknown): AutonomyPlannerArt
   if (
     !Number.isSafeInteger(artifact.repair.attempt)
     || artifact.repair.attempt < 0
-    || artifact.repair.attempt > 3
-    || artifact.repair.max_attempts !== 3
+    || !Number.isSafeInteger(artifact.repair.max_attempts)
+    || artifact.repair.max_attempts < 1
+    || artifact.repair.max_attempts > (source === "agent-core" ? 5 : 3)
+    || (source === "public" && artifact.repair.max_attempts !== 3)
+    || artifact.repair.attempt > artifact.repair.max_attempts
     || !Number.isSafeInteger(artifact.repair.repeated_plan_hashes)
     || artifact.repair.repeated_plan_hashes < 0
     || artifact.repair.repeated_plan_hashes > 2
@@ -439,10 +451,16 @@ const PLANNER_ACTIONS = new Set<AutonomyPlannerAction>([
   "abort",
 ]);
 
-function validPlannerTaskGraph(value: unknown, requireNodes: boolean): value is AutonomyPlannerTaskGraph {
+// 功能：
+//   检查动作标识、节点边界和无环依赖；公共演示仍只接受原动作集合。
+// 输入：
+//   value：任务图；requireNodes：是否必须包含步骤；source：协议来源。
+// 输出：
+//   valid：结构及依赖合法时为 true。
+function validPlannerTaskGraph(value: unknown, requireNodes: boolean, source: "public" | "agent-core"): value is AutonomyPlannerTaskGraph {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const graph = value as Partial<AutonomyPlannerTaskGraph>;
-  if (!Array.isArray(graph.nodes) || graph.nodes.length > 64) return false;
+  if (!Array.isArray(graph.nodes) || graph.nodes.length > (source === "agent-core" ? 128 : 64)) return false;
   if (requireNodes && graph.nodes.length === 0) return false;
   const identifiers = new Set<string>();
   for (const node of graph.nodes) {
@@ -456,10 +474,12 @@ function validPlannerTaskGraph(value: unknown, requireNodes: boolean): value is 
       || !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(node.node_id)
       || identifiers.has(node.node_id)
       || typeof node.action !== "string"
-      || !PLANNER_ACTIONS.has(node.action as AutonomyPlannerAction)
+      || !(source === "agent-core"
+        ? node.action.length >= 3 && node.action.length <= 120 && /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/u.test(node.action)
+        : PLANNER_ACTIONS.has(node.action as AutonomyPlannerAction))
       || typeof node.target !== "string"
       || node.target.trim().length === 0
-      || node.target.length > 160
+      || (source === "public" && node.target.length > 160)
       || !Array.isArray(node.depends_on)
       || node.depends_on.length > 16
       || node.depends_on.some((dependency) => (
@@ -471,7 +491,7 @@ function validPlannerTaskGraph(value: unknown, requireNodes: boolean): value is 
       || node.success_evidence.length < 1
       || node.success_evidence.length > 16
       || node.success_evidence.some((evidence) => (
-        typeof evidence !== "string" || !evidence.trim() || evidence.length > 120
+        typeof evidence !== "string" || !evidence.trim() || (source === "public" && evidence.length > 120)
       ))
     ) return false;
     identifiers.add(node.node_id);
@@ -495,6 +515,7 @@ export function autonomyPlannerBindingIssues(
   artifact: AutonomyPlannerArtifact,
   request: AutonomyHarnessInspectRequest,
   inspection: AutonomyHarnessInspectResponse,
+  source: "public" | "agent-core" = "public",
 ): string[] {
   const issues: string[] = [];
   if (artifact.status !== "draft") issues.push(`planner.status.${artifact.status}`);
@@ -527,7 +548,8 @@ export function autonomyPlannerBindingIssues(
     issues.push("planner.task-graph.return-missing");
   }
   if (
-    pickupRequested
+    source === "public"
+    && pickupRequested
     && returnRequested
     && request.aircraft.asset_id === "aircraft-my-drone"
     && request.map_pack.asset_id === "map-school"
@@ -567,6 +589,23 @@ export function autonomyPlannerBindingIssues(
   }
   if (artifact.blockers.length > 0) issues.push("planner.blockers.present");
   return issues;
+}
+
+// 功能：
+//   校验 Core 原始规范字节与展示对象一致，再核对摘要，避免跨语言数字重编码误报。
+// 输入：
+//   artifact：展示对象；canonical：Core 生成的规范 JSON；expected：原始摘要。
+// 输出：
+//   valid：内容与摘要均一致时为 true；旧响应保留既有摘要检查。
+export async function verifyCorePlannerDigest(artifact: AutonomyPlannerArtifact, canonical: unknown, expected: string): Promise<boolean> {
+  if (!/^[0-9a-f]{64}$/u.test(expected)) return false;
+  if (canonical === undefined) return await autonomyCanonicalSha256(artifact) === expected;
+  if (typeof canonical !== "string" || canonical.length > 8_000_000) return false;
+  try {
+    if (canonicalJson(JSON.parse(canonical)) !== canonicalJson(artifact)) return false;
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
+    return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("") === expected;
+  } catch { return false; }
 }
 
 export function autonomyAssetBlockerMessage(

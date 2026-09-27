@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Pin, PinOff, Trash2 } from "lucide-react";
 import type { BrandEditionId } from "../brand/edition-brand.generated";
-import { AUTONOMY_CONVERSATIONS_CHANGED, autonomyConversationPath, listAutonomyConversations, preserveLegacyAutonomyConversation } from "../features/autonomy/conversationStore";
+import { AUTONOMY_CONVERSATIONS_CHANGED, autonomyConversationPath, listAutonomyConversations, preserveLegacyAutonomyConversation, updateAutonomyConversation } from "../features/autonomy/conversationStore";
 
 // 功能：
 //   展示独立自主任务会话入口，首条消息保存后立即更新，切换账户时隔离列表。
@@ -11,6 +12,7 @@ import { AUTONOMY_CONVERSATIONS_CHANGED, autonomyConversationPath, listAutonomyC
 //   sidebar：可重新进入历史会话的侧边栏。
 export function AutonomyConversationSidebar({ ownerId, edition, locale, onNavigate }: { ownerId: string; edition: BrandEditionId; locale: string; onNavigate?: () => void }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [, setRevision] = useState(0);
   const [error, setError] = useState(false);
   useEffect(() => {
@@ -41,8 +43,21 @@ export function AutonomyConversationSidebar({ ownerId, edition, locale, onNaviga
           return (
             <div key={conversation.id} className={`app-workspace-row${location.pathname === path ? " active" : ""}`}>
               <NavLink to={path} title={conversation.title} onClick={onNavigate}>
-                <span className="app-workspace-label"><strong>{conversation.title}</strong></span>
+                <span className="app-workspace-label">{conversation.pinned ? <Pin size={12} aria-hidden="true" /> : null}<strong>{conversation.title}</strong></span>
               </NavLink>
+              <div className="app-workspace-actions">
+                <button type="button" aria-label={locale === "zh-CN" ? (conversation.pinned ? "取消置顶" : "置顶对话") : (conversation.pinned ? "Unpin conversation" : "Pin conversation")} onClick={() => {
+                  try { updateAutonomyConversation(ownerId, edition, conversation.id, { pinned: !conversation.pinned }); setError(false); } catch { setError(true); }
+                }}>{conversation.pinned ? <PinOff /> : <Pin />}</button>
+                <button type="button" aria-label={locale === "zh-CN" ? "删除对话" : "Delete conversation"} onClick={() => {
+                  if (!window.confirm(locale === "zh-CN" ? "删除此对话？这不会终止正在执行的飞行，运行记录仍会保留。" : "Delete this conversation? This will not stop an active flight; run history is preserved.")) return;
+                  try {
+                    updateAutonomyConversation(ownerId, edition, conversation.id, { deleted: true });
+                    if (location.pathname === path) navigate("/autonomy");
+                    setError(false);
+                  } catch { setError(true); }
+                }}><Trash2 /></button>
+              </div>
             </div>
           );
         })}

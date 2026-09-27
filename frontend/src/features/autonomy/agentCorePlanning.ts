@@ -13,6 +13,7 @@ import {
   patchAgentCoreThread,
   prepareAgentCoreMission,
   requestAgentCoreAssetInterpretation,
+  requestAgentCoreConversationTitle,
   submitAgentCoreRuntimeMessage,
   uploadAgentCoreAttachment,
   type AgentCoreAssetKind,
@@ -28,8 +29,11 @@ import type {
 } from "../../types/api";
 import { verifiedAutonomyHarnessInspection } from "./missionHarness";
 import type { AutonomyWorkspaceState } from "./workspaceStore";
+import { taskUsesChinese } from "./missionPresentation";
 
 const THREAD_BINDING_PREFIX = "dronedream:agent-core-thread:v1";
+import { followPreparationProgress } from "./preparationProgressTransport";
+import type { PreparationProgressEvent } from "./conversationActivity";
 
 export interface AgentCorePlanningInput {
   edition: BrandEditionId;
@@ -49,6 +53,8 @@ export interface AgentCorePlanningInput {
   attachments?: File[];
   inputChannel?: "text" | "voice" | "camera" | "api" | "webhook" | "scheduled";
   transcriptSource?: "web-speech" | "audio-attachment" | null;
+  onConversationTitle?: (title: string) => void;
+  onProgress?: (event: PreparationProgressEvent) => void;
 }
 
 /** BYOK selects a Core-owned credential profile, never a key copied into the draft. */
@@ -157,7 +163,8 @@ export async function interpretAgentCoreAsset(input: Pick<AgentCorePlanningInput
   const version = latestAssetVersion(bootstrap.asset_versions, input.assetId, input.contentSha256, input.kind);
   const thread = await createAgentCoreThread({ title: input.locale === "zh-CN" ? "资产解析" : "Asset interpretation", selected_model: modelId });
   const grant = input.accessMode === "platform"
-    ? await issueManagedModelGrant("assistant", thread.thread_id, input.provider as "openai" | "deepseek" | "qwen" | "kimi", input.model)
+    // 资产解析包含验证和有限重试，不能使用只允许两次调用的普通聊天授权。
+    ? await issueManagedModelGrant("job", thread.thread_id, input.provider as "openai" | "deepseek" | "qwen" | "kimi", input.model)
     : await issueAgentCoreCustomModelGrant(input.agentCoreProfileId!, thread.thread_id);
   const result = await requestAgentCoreAssetInterpretation(thread.thread_id, {
     expected_owner_account_id: input.accountId, source_edition: input.edition,
@@ -429,7 +436,6 @@ async function ensureThread(input: AgentCorePlanningInput): Promise<{
     saveThreadBinding(input, thread.thread_id);
   }
   thread = await patchAgentCoreThread(thread.thread_id, {
-    title,
     selected_model: modelSelectionId,
     selected_map_id: mapVersion.asset_id,
     selected_map_content_sha256: mapVersion.content_sha256,
@@ -439,16 +445,18 @@ async function ensureThread(input: AgentCorePlanningInput): Promise<{
   return { thread, mapVersion, vehicleVersion };
 }
 
-/**
- * Prepare, but do not execute, a mission using a scoped platform/BYOK grant.
- * Attachments and asset hashes accompany the request; returned bindings must
- * match exactly before the plan can be shown for confirmation.
- */
+// 功能：
+//   使用任务级有限授权完成资产理解、规划与复核，核验资产绑定后返回计划，不启动飞行。
+// 输入：
+//   input：账户、会话、模型、精确资产版本及用户自然语言任务。
+// 输出：
+//   summary：真实后端生成、等待用户确认的任务规划结果。
 export async function planWithAgentCore(
   input: AgentCorePlanningInput,
 ): Promise<AgentCoreMissionPrepareSummary> {
   if (!input.accountId) throw new Error("AGENT_CORE_ACCOUNT_REQUIRED");
   const { thread, mapVersion, vehicleVersion } = await ensureThread(input);
+  input.onProgress?.({ stage: "assets", zh: "已绑定所选地图和无人机的精确版本，正在准备本次模型调用授权。", en: "Exact selected map and aircraft versions are bound; preparing authorization for this model job." });
   const modelSelectionId = selectedModelId(input);
   const attachmentIds: string[] = [];
   for (const file of (input.attachments ?? []).slice(0, 8)) {
@@ -457,13 +465,36 @@ export async function planWithAgentCore(
   }
   const grant = input.accessMode === "platform"
     ? await issueManagedModelGrant(
-        "assistant",
+        // 一次用户消息对应多阶段 Harness 作业，不是一次普通聊天调用。
+        "job",
         thread.thread_id,
         input.provider as "openai" | "deepseek" | "qwen" | "kimi",
         input.model,
       )
     : await issueAgentCoreCustomModelGrant(input.agentCoreProfileId!, thread.thread_id);
-  const summary = await prepareAgentCoreMission(thread.thread_id, {
+  if (input.onConversationTitle && input.requestPurpose === "initial_plan") {
+    input.onProgress?.({ stage: "naming", zh: "正在根据首次需求生成简短会话名称，随后进入地图理解和任务规划。", en: "Generating a short name from your first request before asset interpretation and mission planning." });
+    try {
+      // BYOK 授权只能消费一次，命名使用独立授权，不挤占规划连接。
+      const titleGrant = input.accessMode === "platform" ? grant : await issueAgentCoreCustomModelGrant(input.agentCoreProfileId!, thread.thread_id);
+      const result = await requestAgentCoreConversationTitle(thread.thread_id, {
+        expected_owner_account_id: input.accountId, source_edition: input.edition,
+        message: input.instruction.slice(0, 2000), model_id: modelSelectionId,
+        model_grant: titleGrant.grant, gateway_base_url: modelGatewayBaseUrl(titleGrant), locale: input.locale,
+      });
+      // 模型偶尔忽略语言要求时保留同语言临时标题，不把错误语言写入侧边栏。
+      if (taskUsesChinese(result.title) === (input.locale === "zh-CN")) input.onConversationTitle(result.title);
+    } catch {
+      // 命名不是飞行条件；失败保留临时标题，主规划继续正常报告自身错误。
+    }
+  }
+  const progressRequestId = crypto.randomUUID();
+  input.onProgress?.({ stage: "assets", zh: "正在提交规划请求；后端将检查已有地图解析，未命中的内容才需要调用模型处理。", en: "Submitting the planning request. The backend will check reusable asset knowledge before requesting new interpretation." });
+  const stopProgress = input.onProgress ? followPreparationProgress(thread.thread_id, progressRequestId, input.onProgress) : () => {};
+  let summary: AgentCoreMissionPrepareSummary;
+  try {
+  summary = await prepareAgentCoreMission(thread.thread_id, {
+    progress_request_id: progressRequestId,
     expected_owner_account_id: input.accountId,
     source_edition: input.edition,
     message: input.instruction,
@@ -495,6 +526,7 @@ export async function planWithAgentCore(
       attachment_count: attachmentIds.length,
     },
   });
+  } finally { stopProgress(); }
   if (
     summary.mission_plan.asset_bindings.map_asset_id !== mapVersion.asset_id
     || summary.mission_plan.asset_bindings.map_content_sha256 !== mapVersion.content_sha256
@@ -573,7 +605,8 @@ export async function executeBoundAgentCoreMission(input: AgentCoreExecutionInpu
   }
   const grant = input.accessMode === "platform"
     ? await issueManagedModelGrant(
-        "assistant",
+        // 执行中的高层复核和重规划使用独立任务授权；飞行确认仍在上方单独校验。
+        "job",
         threadId,
         input.provider as "openai" | "deepseek" | "qwen" | "kimi",
         input.model,

@@ -164,20 +164,29 @@ function jsonResponse(
   });
 }
 
-function errorResponse(request: Request, error: unknown): Response {
+// 功能：
+//   把网关及数据库已知错误映射为稳定状态码，不向客户端泄漏原始诊断。
+// 输入：
+//   request：当前 HTTP 请求。
+//   error：异常或 Supabase 返回的普通错误对象。
+// 输出：
+//   response：仅含已知错误码与固定安全说明的 HTTP 响应。
+export function errorResponse(request: Request, error: unknown): Response {
   if (error instanceof GatewayError) {
     return jsonResponse(request, error.status, {
       error: { code: error.code, message: error.message },
     });
   }
-  const rawMessage = error instanceof Error ? error.message : "";
+  // PostgREST 错误通常是普通对象而非 Error；否则授权耗尽会被误报为 500。
+  const rawMessage = error instanceof Error ? error.message
+    : isRecord(error) && typeof error.message === "string" ? error.message : "";
   const knownCode = [
     "MODEL_QUOTA_EXHAUSTED",
     "MODEL_GRANT_INVALID",
     "MODEL_PLAN_UNAVAILABLE",
     "CREDIT_POLICY_MISMATCH",
     "IDEMPOTENCY_CONFLICT",
-  ].find((code) => rawMessage.includes(code));
+  ].find((code) => rawMessage === code);
   if (knownCode) {
     const status = knownCode === "MODEL_QUOTA_EXHAUSTED" ? 402 : 409;
     return jsonResponse(request, status, {

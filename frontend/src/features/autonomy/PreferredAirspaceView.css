@@ -1,0 +1,7 @@
+.preferred-airspace-view { width: 100%; margin-top: 1rem; }
+.preferred-airspace-view header, .preferred-airspace-view footer { display: flex; align-items: center; flex-wrap: wrap; gap: .75rem; }
+.preferred-airspace-view header span, .preferred-airspace-view small { color: var(--text-muted, #6c6475); font-size: .85rem; }
+.preferred-airspace-view small { flex-basis: 100%; }
+.preferred-airspace-view label { display: inline-flex; align-items: center; gap: .4rem; }
+.preferred-airspace-canvas { width: 100%; height: min(55vh, 650px); min-height: 300px; }
+.preferred-airspace-canvas canvas { display: block; }

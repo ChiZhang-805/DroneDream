@@ -1,0 +1,8 @@
+.autonomy-preparation-progress { min-width: 0; max-width: 760px; padding: .3rem 0 .7rem; }
+.autonomy-preparation-progress h3 { margin: 0 0 .8rem; color: var(--text); font-size: .95rem; font-weight: 650; animation: preparation-stage-in 160ms ease-out; }
+.autonomy-preparation-detail { border-left: 2px solid color-mix(in srgb, var(--primary) 20%, transparent); padding-left: 1rem; color: var(--text-muted); white-space: pre-wrap; overflow-wrap: anywhere; font-size: .9rem; line-height: 1.8; }
+.autonomy-progress-cursor { display: inline-block; height: .9em; width: 2px; margin-left: 3px; background: currentColor; animation: preparation-cursor 1s steps(2) infinite; }
+.autonomy-progress-accessible { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+@keyframes preparation-stage-in { from { opacity: .25; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes preparation-cursor { to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .autonomy-preparation-progress h3, .autonomy-progress-cursor { animation: none; } }

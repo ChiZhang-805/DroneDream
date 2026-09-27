@@ -4,8 +4,29 @@ import {
   managedProviderReasoningPolicy,
   publicModelGatewayBaseUrl,
   reconcileManagedUsage,
+  errorResponse,
   type ModelPolicyRow,
 } from "./index.ts";
+
+Deno.test("plain PostgREST authorization errors are not reported as HTTP 500", async () => {
+  for (const error of [new Error("MODEL_GRANT_INVALID"), {
+    code: "P0001", message: "MODEL_GRANT_INVALID", details: "private diagnostic", hint: "private hint",
+  }]) {
+    const response = errorResponse(new Request("https://project.supabase.co/model-gateway/chat/completions"), error);
+    assert(response.status === 409, "expired/exhausted grant must be a non-retryable authorization error");
+    const body = await response.text();
+    assert(body.includes("MODEL_GRANT_INVALID"), "authorization reason was lost");
+    assert(!body.includes("private"), "raw database details leaked");
+  }
+});
+
+Deno.test("quota errors preserve HTTP 402 without exposing database details", async () => {
+  const response = errorResponse(new Request("https://project.supabase.co/model-gateway/chat/completions"), {
+    code: "P0001", message: "MODEL_QUOTA_EXHAUSTED", details: "private quota ledger",
+  });
+  assert(response.status === 402, "quota exhaustion must not become a server failure");
+  assert(!(await response.text()).includes("private"), "quota details leaked");
+});
 
 function assert(value: unknown, message: string): asserts value {
   if (!value) throw new Error(message);

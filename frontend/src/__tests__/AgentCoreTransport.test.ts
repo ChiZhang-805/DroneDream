@@ -11,6 +11,11 @@ beforeEach(() => {
 afterEach(() => { delete (window as Window & { __TAURI__?: unknown }).__TAURI__; });
 
 describe("desktop Core identity and typed clarification", () => {
+  it("preserves a structured error code and bounded diagnostic reference", async () => {
+    const detail = { code: "HARNESS_CONFIGURATION_UPGRADE_REQUIRED", error_id: "a".repeat(32) };
+    invoke.mockResolvedValue({ status: 409, contentType: "application/json", bodyBase64: btoa(JSON.stringify({ detail })) });
+    await expect(getAgentCoreBootstrap()).rejects.toThrow(`${detail.code}:${detail.error_id}`);
+  });
   it("forwards the current in-memory identity without persisting a credential", async () => {
     invoke.mockResolvedValue({ status: 200, contentType: "application/json", bodyBase64: btoa("{}") });
     const write = vi.spyOn(Storage.prototype, "setItem");

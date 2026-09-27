@@ -166,6 +166,16 @@
     dronedream_main_binary_ready:
   ${EndIf}
 
+  ; Bundled AGENT Core resources are a versioned, installer-owned snapshot.
+  ; NSIS overwrites files that still exist but does not remove files dropped by
+  ; a newer build. Clear the old managed tree after every process and Runtime
+  ; handoff gate has succeeded, then let the install section recreate only the
+  ; files present in the current signed package. User data and the separately
+  ; managed DroneDreamRuntime installation are outside this directory.
+  !if "${DRONEDREAM_EDITION_ID}" == "autonomy"
+    RMDir /r "$INSTDIR\agent-core"
+  !endif
+
   Pop $1
   Pop $0
 !macroend
