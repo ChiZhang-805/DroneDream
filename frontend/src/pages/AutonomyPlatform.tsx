@@ -4,6 +4,8 @@ import {
   Blocks,
   Cable,
   Camera,
+  ChevronLeft,
+  ChevronRight,
   CircleUserRound,
   Cpu,
   GitBranch,
@@ -54,6 +56,13 @@ import { acquireAutonomyPlanning, useAutonomyPlanning, useAutonomyProgress, publ
 import { PreparationProgress } from "../features/autonomy/PreparationProgress";
 import { MissionPlanCard } from "../features/autonomy/MissionPlanCard";
 import { conversationUsesChinese, taskUsesChinese } from "../features/autonomy/missionPresentation";
+import {
+  catalogAssetDefinitions,
+  catalogAssetKey,
+  catalogAssetPresentation,
+  unrepresentedExternalAssets,
+  type CatalogAssetKind,
+} from "../features/autonomy/assetPresentation";
 import { bindVerifiedAssetPair, externalAssetReferenceFromVersion, reconcileAgentCoreWorkspace } from "../features/autonomy/assetPairBinding";
 import { AssistantModelPicker } from "../components/AssistantModelPicker";
 import {
@@ -87,6 +96,7 @@ import {
   getAgentCoreAssetImportJobIssues,
   getAgentCoreAssetQualificationEvidence,
   getAgentCoreBootstrap,
+  getAgentCoreAssetPairCatalog,
   getAgentCoreStatus,
   getAgentCoreAssetQualificationJob,
   getAgentCoreAssetQualificationJobIssues,
@@ -107,6 +117,7 @@ import {
   startAgentCoreAssetQualificationJob,
   type AgentCoreAssetImportJob,
   type AgentCoreAssetIssue,
+  type AgentCoreAssetPairCatalog,
   type AgentCoreAssetPairRuntimeContracts,
   type AgentCoreAssetQualificationEvidence,
   type AgentCoreAssetQualificationJob,
@@ -119,6 +130,13 @@ import {
   type AgentCoreVehicleResource,
   type AgentCorePluginEntry,
 } from "../features/autonomy/agentCore";
+import {
+  compatibleAircraftChoices,
+  compatibleMapChoices,
+  FALLBACK_ASSET_PAIR_CATALOG,
+  selectedPair,
+  type PairCatalogChoice,
+} from "../features/autonomy/assetPairSelection";
 import {
   executeBoundAgentCoreMission,
   getBoundAgentCoreThread,
@@ -1380,8 +1398,6 @@ export function AutonomyOverview() {
     chinese,
     workspace,
     assetLibrary,
-    selectAircraft,
-    selectMap,
     persist,
     agentCorePlugins,
     missionComposerDraft: composer,
@@ -1421,6 +1437,10 @@ export function AutonomyOverview() {
     selectProfile,
   } = useModelAccess();
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [contextSubmenu, setContextSubmenu] = useState<"aircraft" | "map" | null>(null);
+  const [selectedContextAircraftId, setSelectedContextAircraftId] = useState<string | null>(null);
+  const [selectedContextMapId, setSelectedContextMapId] = useState<string | null>(null);
+  const [assetPairCatalog, setAssetPairCatalog] = useState<AgentCoreAssetPairCatalog>(FALLBACK_ASSET_PAIR_CATALOG);
   const [voiceConsentPending, setVoiceConsentPending] = useState(false);
   const [voiceConsentGranted, setVoiceConsentGranted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1437,6 +1457,9 @@ export function AutonomyOverview() {
     setPendingAttachments([]);
     setInputProvenance("text");
     setContextMenuOpen(false);
+    setContextSubmenu(null);
+    setSelectedContextAircraftId(null);
+    setSelectedContextMapId(null);
   }, [ownerId, edition, workspace.mission.conversationId]);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1472,9 +1495,19 @@ export function AutonomyOverview() {
     placeholder: "描述目标、途经点、环境和需要完成的工作…",
     workflow: "自主飞行任务",
     context: "任务上下文",
-    aircraft: "当前无人机",
-    map: "当前地图",
+    aircraft: "选择无人机",
+    map: "选择地图",
     selected: "已选择",
+    notSelected: "未选择",
+    clearSelection: "清除选择",
+    back: "返回",
+    allAircraft: "未选择地图，显示全部 13 种无人机",
+    allMaps: "未选择无人机，显示全部 8 张地图",
+    filteredAircraft: "只显示与已选地图匹配的无人机",
+    filteredMaps: "只显示与已选无人机匹配的地图",
+    chooseBoth: "请同时选择一架无人机和一张匹配的地图，或将两项都清除后让系统根据任务自动选择。",
+    pairNeedsQualification: "该无人机与地图在结构上兼容，但尚未完成实际仿真配对验收，请先在资产页完成配对认证。",
+    selectedPairUnavailable: "已选无人机和地图的合格运行资产未安装，不能悄悄改用默认资产。",
     edit: "管理",
     send: "生成任务合同",
     model: "模型",
@@ -1507,9 +1540,19 @@ export function AutonomyOverview() {
     placeholder: "Describe the goal, waypoints, environment, and work to complete…",
     workflow: "Autonomous mission",
     context: "Mission context",
-    aircraft: "Current aircraft",
-    map: "Current map",
+    aircraft: "Select aircraft",
+    map: "Select map",
     selected: "Selected",
+    notSelected: "Not selected",
+    clearSelection: "Clear selection",
+    back: "Back",
+    allAircraft: "No map selected; showing all 13 aircraft",
+    allMaps: "No aircraft selected; showing all 8 maps",
+    filteredAircraft: "Only aircraft compatible with the selected map are shown",
+    filteredMaps: "Only maps compatible with the selected aircraft are shown",
+    chooseBoth: "Select both a compatible aircraft and map, or clear both to let the mission choose automatically.",
+    pairNeedsQualification: "This aircraft and map are structurally compatible but have not completed simulation pair qualification.",
+    selectedPairUnavailable: "The qualified runtime assets for this selection are not installed; the app will not silently use defaults.",
     edit: "Manage",
     send: "Build mission contract",
     model: "Model",
@@ -1538,13 +1581,21 @@ export function AutonomyOverview() {
       { title: "Unknown environment", body: "Use only the start and goal, build a local map in flight, plan a safe route, and replan as the world changes." },
     ],
   };
-  const publicWorkspace = defaultAutonomyWorkspace();
-  const publicAircraft = publicDemoConsole
-    ? assetLibrary.aircraft.find((aircraft) => aircraft.id === publicWorkspace.aircraft.id) ?? publicWorkspace.aircraft
-    : workspace.aircraft;
-  const publicMap = publicDemoConsole
-    ? assetLibrary.maps.find((mapPack) => mapPack.id === publicWorkspace.mapPack.id) ?? publicWorkspace.mapPack
-    : workspace.mapPack;
+  const allAircraftChoices = useMemo(() => compatibleAircraftChoices(assetPairCatalog, null), [assetPairCatalog]);
+  const allMapChoices = useMemo(() => compatibleMapChoices(assetPairCatalog, null), [assetPairCatalog]);
+  const aircraftChoices = useMemo(
+    () => compatibleAircraftChoices(assetPairCatalog, selectedContextMapId),
+    [assetPairCatalog, selectedContextMapId],
+  );
+  const mapChoices = useMemo(
+    () => compatibleMapChoices(assetPairCatalog, selectedContextAircraftId),
+    [assetPairCatalog, selectedContextAircraftId],
+  );
+  const selectedAircraftChoice = allAircraftChoices.find((choice) => choice.resourceId === selectedContextAircraftId) ?? null;
+  const selectedMapChoice = allMapChoices.find((choice) => choice.resourceId === selectedContextMapId) ?? null;
+  const localizedChoiceName = useCallback((choice: PairCatalogChoice | null) => (
+    choice ? choice.name[chinese ? "zh-CN" : "en-US"] : copy.notSelected
+  ), [chinese, copy.notSelected]);
   const appendTranscript = useCallback((transcript: string) => {
     setInputProvenance("web-speech");
     setComposer((current) => {
@@ -1606,6 +1657,18 @@ export function AutonomyOverview() {
       : [];
 
   useEffect(() => {
+    let active = true;
+    void getAgentCoreAssetPairCatalog().then((catalog) => {
+      if (active && catalog.map_count === 8 && catalog.vehicle_count === 13 && catalog.pair_count === catalog.pairs.length) {
+        setAssetPairCatalog(catalog);
+      }
+    }).catch(() => {
+      // The immutable built-in matrix keeps the picker complete while the sidecar starts.
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
     if (!auth?.account) {
       setManagedModels(DEFAULT_MANAGED_MODEL_CATALOG);
       setManagedModelsReady(true);
@@ -1648,10 +1711,16 @@ export function AutonomyOverview() {
   useEffect(() => {
     if (!contextMenuOpen) return undefined;
     const closeOnOutside = (event: PointerEvent) => {
-      if (!contextMenuRef.current?.contains(event.target as Node)) setContextMenuOpen(false);
+      if (!contextMenuRef.current?.contains(event.target as Node)) {
+        setContextMenuOpen(false);
+        setContextSubmenu(null);
+      }
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setContextMenuOpen(false);
+      if (event.key === "Escape") {
+        if (contextSubmenu) setContextSubmenu(null);
+        else setContextMenuOpen(false);
+      }
     };
     document.addEventListener("pointerdown", closeOnOutside);
     document.addEventListener("keydown", closeOnEscape);
@@ -1659,7 +1728,7 @@ export function AutonomyOverview() {
       document.removeEventListener("pointerdown", closeOnOutside);
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [contextMenuOpen]);
+  }, [contextMenuOpen, contextSubmenu]);
 
   const submitMission = async (event: FormEvent) => {
     event.preventDefault();
@@ -1684,7 +1753,39 @@ export function AutonomyOverview() {
     let submittedWorkspace: AutonomyWorkspaceState | null = null;
     try {
       const submittedAttachments = pendingAttachments.slice(0, 8);
-      const selectedWorkspace = resolveMissionAssets(workspace, assetLibrary, intent);
+      let selectedWorkspace: AutonomyWorkspaceState;
+      if (!selectedContextAircraftId && !selectedContextMapId) {
+        selectedWorkspace = resolveMissionAssets(workspace, assetLibrary, intent);
+      } else {
+        if (!selectedContextAircraftId || !selectedContextMapId) throw new Error(copy.chooseBoth);
+        const pair = selectedPair(assetPairCatalog, selectedContextMapId, selectedContextAircraftId);
+        if (!pair?.compatible) throw new Error(copy.chooseBoth);
+        if (pair.status !== "qualified_builtin" || !pair.qualification_id) throw new Error(copy.pairNeedsQualification);
+        const selectedMapKey = catalogAssetKey("map", selectedContextMapId, pair.map_display_name["en-US"]);
+        const selectedAircraftKey = catalogAssetKey("vehicle", selectedContextAircraftId, pair.vehicle_display_name["en-US"]);
+        const mapPack = assetLibrary.maps.find((candidate) => (
+          autonomyMapPackQualified(candidate)
+          && candidate.qualificationReceiptId === pair.qualification_id
+          && catalogAssetKey("map", candidate.agentCoreAssetId?.trim() || candidate.id, candidate.name) === selectedMapKey
+        ));
+        const aircraft = assetLibrary.aircraft.find((candidate) => (
+          isAutonomyAircraftAssetQualified(candidate)
+          && candidate.qualificationReceiptId === pair.qualification_id
+          && catalogAssetKey("vehicle", candidate.agentCoreAssetId?.trim() || candidate.id, candidate.name) === selectedAircraftKey
+        ));
+        if (!mapPack || !aircraft) throw new Error(copy.selectedPairUnavailable);
+        selectedWorkspace = normalizeAutonomyWorkspace(updatedWorkspace(workspace, {
+          aircraft,
+          mapPack,
+          mission: {
+            ...workspace.mission,
+            aircraftProfileId: aircraft.id,
+            mapPackId: mapPack.id,
+            compiledPlan: null,
+            updatedAt: new Date().toISOString(),
+          },
+        }));
+      }
       const turnId = crypto.randomUUID();
       const replyChinese = taskUsesChinese(intent, conversationUsesChinese(selectedWorkspace));
       const followUpPrefix = replyChinese ? "\n补充指令：" : "\nFollow-up instruction: ";
@@ -1981,42 +2082,80 @@ export function AutonomyOverview() {
                 title={copy.context}
                 aria-haspopup="dialog"
                 aria-expanded={contextMenuOpen}
-                onClick={() => setContextMenuOpen((current) => !current)}
+                onClick={() => setContextMenuOpen((current) => {
+                  if (current) setContextSubmenu(null);
+                  return !current;
+                })}
               >
                 <Plus aria-hidden="true" strokeWidth={1.8} />
               </button>
               {contextMenuOpen ? (
                 <div className="assistant-add-popover autonomy-context-popover" role="dialog" aria-label={copy.context}>
-                  <strong className="assistant-task-popover-title">{copy.context}</strong>
-                  {edition === "autonomy" ? (
-                    <button
-                      type="button"
-                      className="autonomy-context-file-action"
-                      onClick={() => {
+                  {contextSubmenu ? (
+                    <>
+                      <button type="button" className="autonomy-context-back" onClick={() => setContextSubmenu(null)}><ChevronLeft aria-hidden="true" />{copy.back}</button>
+                      <strong className="assistant-task-popover-title">{contextSubmenu === "aircraft" ? copy.aircraft : copy.map}</strong>
+                      <small className="autonomy-context-filter-note">
+                        {contextSubmenu === "aircraft"
+                          ? selectedContextMapId ? copy.filteredAircraft : copy.allAircraft
+                          : selectedContextAircraftId ? copy.filteredMaps : copy.allMaps}
+                      </small>
+                      <div className="autonomy-context-choice-list" role="radiogroup" aria-label={contextSubmenu === "aircraft" ? copy.aircraft : copy.map}>
+                        <button
+                          type="button"
+                          className="autonomy-context-choice is-clear"
+                          role="radio"
+                          aria-checked={contextSubmenu === "aircraft" ? !selectedContextAircraftId : !selectedContextMapId}
+                          onClick={() => {
+                            if (contextSubmenu === "aircraft") setSelectedContextAircraftId(null);
+                            else setSelectedContextMapId(null);
+                            setContextSubmenu(null);
+                          }}
+                        ><span><b>{copy.clearSelection}</b><small>{copy.notSelected}</small></span></button>
+                        {(contextSubmenu === "aircraft" ? aircraftChoices : mapChoices).map((choice) => {
+                          const selected = contextSubmenu === "aircraft"
+                            ? selectedContextAircraftId === choice.resourceId
+                            : selectedContextMapId === choice.resourceId;
+                          return <button
+                            type="button"
+                            className="autonomy-context-choice"
+                            role="radio"
+                            aria-checked={selected}
+                            key={choice.resourceId}
+                            onClick={() => {
+                              if (contextSubmenu === "aircraft") setSelectedContextAircraftId(choice.resourceId);
+                              else setSelectedContextMapId(choice.resourceId);
+                              setContextSubmenu(null);
+                            }}
+                          >
+                            <span><b>{choice.name[chinese ? "zh-CN" : "en-US"]}</b><small>{chinese
+                              ? `${choice.compatiblePairCount} 个可匹配组合${choice.qualifiedPairCount ? ` · ${choice.qualifiedPairCount} 个已验收` : ""}`
+                              : `${choice.compatiblePairCount} compatible pair${choice.compatiblePairCount === 1 ? "" : "s"}${choice.qualifiedPairCount ? ` · ${choice.qualifiedPairCount} qualified` : ""}`}</small></span>
+                            {selected ? <em>{copy.selected}</em> : null}
+                          </button>;
+                        })}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <strong className="assistant-task-popover-title">{copy.context}</strong>
+                      {edition === "autonomy" ? <button type="button" className="autonomy-context-file-action" onClick={() => {
                         setContextMenuOpen(false);
+                        setContextSubmenu(null);
                         fileInputRef.current?.click();
-                      }}
-                    >
-                      <Paperclip aria-hidden="true" />
-                      <span><b>{copy.addFiles}</b><small>{copy.fileLimit}</small></span>
-                    </button>
-                  ) : null}
-                  <section className="autonomy-context-group" aria-label={copy.aircraft}>
-                    <header><span><Navigation2 aria-hidden="true" />{copy.aircraft}</span><Link to="/autonomy/aircraft" onClick={() => setContextMenuOpen(false)}>{copy.edit}</Link></header>
-                    {[publicAircraft].map((aircraft) => <label className="autonomy-context-asset" key={aircraft.id}>
-                      <input type="radio" name="autonomy-aircraft" value={aircraft.id} disabled={!isAutonomyAircraftAssetQualified(aircraft)} checked={aircraft.id === workspace.aircraft.id} onChange={() => selectAircraft(aircraft.id)} />
-                      <span><b>{aircraft.name}</b><small>{aircraft.airframe} · GPS · {aircraft.controlInterface.toUpperCase()}</small></span>
-                      {aircraft.id === workspace.aircraft.id ? <em>{copy.selected}</em> : null}
-                    </label>)}
-                  </section>
-                  <section className="autonomy-context-group" aria-label={copy.map}>
-                    <header><span><Layers3 aria-hidden="true" />{copy.map}</span><Link to="/autonomy/maps" onClick={() => setContextMenuOpen(false)}>{copy.edit}</Link></header>
-                    {[publicMap].map((mapPack) => <label className="autonomy-context-asset" key={mapPack.id}>
-                      <input type="radio" name="autonomy-map" value={mapPack.id} disabled={!autonomyMapPackQualified(mapPack)} checked={mapPack.id === workspace.mapPack.id} onChange={() => selectMap(mapPack.id)} />
-                      <span><b>{mapPack.name}</b><small>{mapRepresentationLabel(mapPack.representation, chinese)} · {mapPack.coordinateFrame}</small></span>
-                      {mapPack.id === workspace.mapPack.id ? <em>{copy.selected}</em> : null}
-                    </label>)}
-                  </section>
+                      }}><Paperclip aria-hidden="true" /><span><b>{copy.addFiles}</b><small>{copy.fileLimit}</small></span></button> : null}
+                      <button type="button" className="autonomy-context-menu-row" onClick={() => setContextSubmenu("aircraft")}>
+                        <Navigation2 aria-hidden="true" /><span><b>{copy.aircraft}</b><small>{localizedChoiceName(selectedAircraftChoice)}</small></span><ChevronRight aria-hidden="true" />
+                      </button>
+                      <button type="button" className="autonomy-context-menu-row" onClick={() => setContextSubmenu("map")}>
+                        <Layers3 aria-hidden="true" /><span><b>{copy.map}</b><small>{localizedChoiceName(selectedMapChoice)}</small></span><ChevronRight aria-hidden="true" />
+                      </button>
+                      <nav className="autonomy-context-manage-links" aria-label={copy.edit}>
+                        <Link to="/autonomy/aircraft" onClick={() => setContextMenuOpen(false)}>{copy.aircraft}</Link>
+                        <Link to="/autonomy/maps" onClick={() => setContextMenuOpen(false)}>{copy.map}</Link>
+                      </nav>
+                    </>
+                  )}
                 </div>
               ) : null}
             </div>
@@ -2116,6 +2255,36 @@ function mapRepresentationLabel(value: AutonomyMapPack["representation"], chines
   return chinese ? MAP_REPRESENTATION_LABELS[value].zh : MAP_REPRESENTATION_LABELS[value].en;
 }
 
+function RepositoryAssetPreview({
+  kind,
+  previewUrl,
+  previewKey,
+  name,
+}: {
+  kind: CatalogAssetKind;
+  previewUrl: string | null;
+  previewKey: string | null;
+  name: string;
+}) {
+  const FallbackIcon = kind === "map" ? Layers3 : Navigation2;
+  return (
+    <span
+      className={`autonomy-repository-preview is-${kind === "map" ? "map" : "aircraft"}`}
+      data-preview-key={previewKey ?? undefined}
+    >
+      <FallbackIcon aria-hidden="true" />
+      {previewUrl ? (
+        <img
+          src={previewUrl}
+          alt={name}
+          loading="lazy"
+          onError={(event) => { event.currentTarget.hidden = true; }}
+        />
+      ) : null}
+    </span>
+  );
+}
+
 export function AutonomyAircraft() {
   const {
     edition,
@@ -2130,7 +2299,20 @@ export function AutonomyAircraft() {
   const [defaultResources, setDefaultResources] = useState<AgentCoreVehicleResource[]>([]);
   const [resourceStates, setResourceStates] = useState<Record<string, "idle" | "working" | "qualification" | "ready" | "error">>({});
   const defaultAircraftId = defaultAutonomyWorkspace().aircraft.id;
-  const externalAircraft = assetLibrary.externalAssets.filter((asset) => asset.kind === "vehicle");
+  const catalogDefinitions = catalogAssetDefinitions("vehicle");
+  const customAircraft = assetLibrary.aircraft.filter((aircraft) => !catalogAssetKey(
+    "vehicle",
+    aircraft.agentCoreAssetId?.trim() || aircraft.id,
+    aircraft.name,
+  ));
+  const externalAircraft = unrepresentedExternalAssets(
+    "vehicle",
+    [
+      ...catalogDefinitions.map((definition) => ({ id: definition.resourceId, name: definition.en })),
+      ...customAircraft.map((aircraft) => ({ id: aircraft.agentCoreAssetId?.trim() || aircraft.id, name: aircraft.name })),
+    ],
+    assetLibrary.externalAssets,
+  );
   const openAircraftDetails = (aircraft: AutonomyWorkspaceState["aircraft"]) => setDetails({
     title: aircraft.name,
     rows: [
@@ -2205,22 +2387,48 @@ export function AutonomyAircraft() {
         <AutonomyAssetConnectorPanel kind="vehicle" chinese={chinese} compact />
       </div>
       <div className="autonomy-repository-grid" aria-label={chinese ? "无人机仓库" : "Aircraft repository"}>
-        {assetLibrary.aircraft.map((aircraft) => (
-          <article key={aircraft.id} data-selected={workspace.aircraft.id === aircraft.id}>
+        {catalogDefinitions.map((definition) => {
+          const aircraft = assetLibrary.aircraft.find((candidate) => catalogAssetKey(
+            "vehicle",
+            candidate.agentCoreAssetId?.trim() || candidate.id,
+            candidate.name,
+          ) === definition.key);
+          const resource = defaultResources.find((candidate) => (
+            candidate.resource_id === definition.resourceId
+            || catalogAssetKey("vehicle", candidate.resource_id, resourceName(candidate)) === definition.key
+          ));
+          const presentation = catalogAssetPresentation("vehicle", definition.resourceId, definition.en, chinese);
+          const state = resource ? resourceStates[resource.resource_id] ?? "idle" : "idle";
+          return <article
+            key={definition.key}
+            data-catalog-resource="true"
+            data-selected={Boolean(aircraft && workspace.aircraft.id === aircraft.id)}
+          >
             <button
               type="button"
               className="autonomy-repository-card-surface"
-              onClick={() => selectAircraft(aircraft.id)}
-              onDoubleClick={() => openAircraftDetails(aircraft)}
+              onClick={() => { if (aircraft) selectAircraft(aircraft.id); }}
+              onDoubleClick={() => {
+                if (aircraft) openAircraftDetails(aircraft);
+                else if (resource) openResourceDetails(resource);
+                else setDetails({ title: presentation.name, rows: [[chinese ? "状态" : "Status", chinese ? "资源目录可见，运行服务启动后加载详情" : "Catalogued; details load when the runtime is ready"]] });
+              }}
             >
-              <span className="autonomy-repository-preview is-aircraft"><Navigation2 aria-hidden="true" /></span>
+              <RepositoryAssetPreview kind="vehicle" previewUrl={presentation.previewUrl} previewKey={presentation.key} name={presentation.name} />
               <span className="autonomy-repository-copy">
-                <strong>{aircraft.name}</strong>
-                <small>{[aircraft.manufacturer, aircraft.airframe].filter(Boolean).join(" · ")}</small>
+                <strong title={presentation.name}>{presentation.name}</strong>
               </span>
             </button>
-            <AssetInterpretButton edition={edition} chinese={chinese} kind="vehicle" assetId={aircraft.agentCoreAssetId ?? null} contentSha256={aircraft.agentCoreContentSha256 ?? null} name={aircraft.name} />
-            {aircraft.id !== defaultAircraftId ? (
+            {resource && !aircraft ? <button
+              type="button"
+              className="autonomy-repository-interpret"
+              data-state={state === "working" ? "busy" : state === "ready" ? "done" : state === "error" ? "error" : undefined}
+              disabled={state === "working" || state === "ready" || state === "qualification"}
+              aria-label={chinese ? `准备 ${presentation.name}` : `Prepare ${presentation.name}`}
+              title={chinese ? "准备这个无人机资源" : "Prepare this aircraft resource"}
+              onClick={() => void prepareDefaultResource(resource)}
+            ><Upload aria-hidden="true" /></button> : null}
+            {aircraft && aircraft.id !== defaultAircraftId ? (
               <button
                 type="button"
                 className="autonomy-repository-delete"
@@ -2228,8 +2436,19 @@ export function AutonomyAircraft() {
                 onClick={() => removeAsset("aircraft", aircraft.id)}
               ><Trash2 aria-hidden="true" /></button>
             ) : null}
-          </article>
-        ))}
+          </article>;
+        })}
+        {customAircraft.map((aircraft) => {
+          const presentation = catalogAssetPresentation("vehicle", aircraft.agentCoreAssetId?.trim() || aircraft.id, aircraft.name, chinese);
+          return <article key={aircraft.id} data-selected={workspace.aircraft.id === aircraft.id}>
+            <button type="button" className="autonomy-repository-card-surface" onClick={() => selectAircraft(aircraft.id)} onDoubleClick={() => openAircraftDetails(aircraft)}>
+              <RepositoryAssetPreview kind="vehicle" previewUrl={presentation.previewUrl} previewKey={presentation.key} name={presentation.name} />
+              <span className="autonomy-repository-copy"><strong title={presentation.name}>{presentation.name}</strong></span>
+            </button>
+            <AssetInterpretButton edition={edition} chinese={chinese} kind="vehicle" assetId={aircraft.agentCoreAssetId ?? null} contentSha256={aircraft.agentCoreContentSha256 ?? null} name={aircraft.name} />
+            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${aircraft.name}` : `Delete ${aircraft.name}`} onClick={() => removeAsset("aircraft", aircraft.id)}><Trash2 aria-hidden="true" /></button>
+          </article>;
+        })}
         {externalAircraft.map((asset) => (
           <article key={`${asset.id}:${asset.contentSha256}`}>
             <button
@@ -2244,40 +2463,13 @@ export function AutonomyAircraft() {
                 ],
               })}
             >
-              <span className="autonomy-repository-preview is-aircraft is-imported"><Navigation2 aria-hidden="true" /></span>
-              <span className="autonomy-repository-copy"><strong>{asset.name}</strong><small>{asset.sourceApplication || asset.sourceFormat}</small></span>
+              <RepositoryAssetPreview kind="vehicle" previewUrl={null} previewKey={null} name={asset.name} />
+              <span className="autonomy-repository-copy"><strong title={asset.name}>{asset.name}</strong></span>
             </button>
             <AssetInterpretButton edition={edition} chinese={chinese} kind="vehicle" assetId={asset.id} contentSha256={asset.contentSha256} name={asset.name} />
             <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${asset.name}` : `Delete ${asset.name}`} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
           </article>
         ))}
-        {defaultResources.map((resource) => {
-          const state = resourceStates[resource.resource_id] ?? "idle";
-          return <article key={resource.resource_id} data-catalog-resource="true">
-            <button type="button" className="autonomy-repository-card-surface" onDoubleClick={() => openResourceDetails(resource)}>
-              <span className="autonomy-repository-preview is-aircraft is-catalog" data-label={chinese ? "默认" : "DEFAULT"}><Navigation2 aria-hidden="true" /></span>
-              <span className="autonomy-repository-copy">
-                <strong>{resourceName(resource)}</strong>
-                <small>{state === "qualification"
-                  ? (chinese ? "已下载 · 等待依赖与配对验收" : "Downloaded · dependencies and qualification required")
-                  : state === "ready" ? (chinese ? "已安装" : "Installed")
-                    : state === "error" ? (chinese ? "准备失败" : "Preparation failed")
-                      : (chinese ? "默认资源 · 已预解析" : "Default resource · preparsed")}</small>
-              </span>
-            </button>
-            <button
-              type="button"
-              className="autonomy-repository-interpret"
-              data-state={state === "working" ? "busy" : state === "ready" ? "done" : state === "error" ? "error" : undefined}
-              disabled={state === "working" || state === "ready" || state === "qualification"}
-              aria-label={chinese ? `准备 ${resourceName(resource)}` : `Prepare ${resourceName(resource)}`}
-              title={state === "qualification"
-                ? (chinese ? "源文件已固定并下载；解析依赖并与地图配对验收后才能飞行" : "Source downloaded; dependencies and aircraft-map qualification are required")
-                : (chinese ? "按需下载固定版本" : "Download the pinned revision on demand")}
-              onClick={() => void prepareDefaultResource(resource)}
-            ><Upload aria-hidden="true" /></button>
-          </article>;
-        })}
       </div>
       {details ? <RepositoryDetailsDialog chinese={chinese} details={details} onClose={() => setDetails(null)} /> : null}
     </section>
@@ -2298,7 +2490,20 @@ export function AutonomyMaps() {
   const [defaultResources, setDefaultResources] = useState<AgentCoreMapResource[]>([]);
   const [resourceStates, setResourceStates] = useState<Record<string, "idle" | "working" | "conversion" | "ready" | "error">>({});
   const defaultMapId = defaultAutonomyWorkspace().mapPack.id;
-  const externalMaps = assetLibrary.externalAssets.filter((asset) => asset.kind === "map" || asset.kind === "world");
+  const catalogDefinitions = catalogAssetDefinitions("map");
+  const customMaps = assetLibrary.maps.filter((mapPack) => !catalogAssetKey(
+    "map",
+    mapPack.agentCoreAssetId?.trim() || mapPack.id,
+    mapPack.name,
+  ));
+  const externalMaps = unrepresentedExternalAssets(
+    "map",
+    [
+      ...catalogDefinitions.map((definition) => ({ id: definition.resourceId, name: definition.en })),
+      ...customMaps.map((mapPack) => ({ id: mapPack.agentCoreAssetId?.trim() || mapPack.id, name: mapPack.name })),
+    ],
+    assetLibrary.externalAssets,
+  );
   const spaceMap = workspace.mapPack;
   const spaceVehicle = workspace.aircraft;
   const plan = workspace.mission.compiledPlan;
@@ -2380,53 +2585,69 @@ export function AutonomyMaps() {
         <AutonomyAssetConnectorPanel kind="map" chinese={chinese} compact />
       </div>
       <div className="autonomy-repository-grid" aria-label={chinese ? "地图仓库" : "Map repository"}>
-        {assetLibrary.maps.map((mapPack) => (
-          <article key={mapPack.id} data-selected={workspace.mapPack.id === mapPack.id}>
+        {catalogDefinitions.map((definition) => {
+          const mapPack = assetLibrary.maps.find((candidate) => catalogAssetKey(
+            "map",
+            candidate.agentCoreAssetId?.trim() || candidate.id,
+            candidate.name,
+          ) === definition.key);
+          const resource = defaultResources.find((candidate) => (
+            candidate.resource_id === definition.resourceId
+            || catalogAssetKey("map", candidate.resource_id, resourceName(candidate)) === definition.key
+          ));
+          const presentation = catalogAssetPresentation("map", definition.resourceId, definition.en, chinese);
+          const state = resource ? resourceStates[resource.resource_id] ?? "idle" : "idle";
+          return <article
+            key={definition.key}
+            data-catalog-resource="true"
+            data-selected={Boolean(mapPack && workspace.mapPack.id === mapPack.id)}
+          >
+            <button
+              type="button"
+              className="autonomy-repository-card-surface"
+              onClick={() => { if (mapPack) selectMap(mapPack.id); }}
+              onDoubleClick={() => {
+                if (mapPack) openMapDetails(mapPack);
+                else if (resource) openResourceDetails(resource);
+                else setDetails({ title: presentation.name, rows: [[chinese ? "状态" : "Status", chinese ? "资源目录可见，运行服务启动后加载详情" : "Catalogued; details load when the runtime is ready"]] });
+              }}
+            >
+              <RepositoryAssetPreview kind="map" previewUrl={presentation.previewUrl} previewKey={presentation.key} name={presentation.name} />
+              <span className="autonomy-repository-copy"><strong title={presentation.name}>{presentation.name}</strong></span>
+            </button>
+            {resource && !mapPack ? <button
+              type="button"
+              className="autonomy-repository-interpret"
+              data-state={state === "working" ? "busy" : state === "ready" ? "done" : state === "error" ? "error" : undefined}
+              disabled={state === "working" || state === "ready" || state === "conversion"}
+              aria-label={chinese ? `准备 ${presentation.name}` : `Prepare ${presentation.name}`}
+              title={chinese ? "准备这个地图资源" : "Prepare this map resource"}
+              onClick={() => void prepareDefaultResource(resource)}
+            ><Upload aria-hidden="true" /></button> : null}
+            {mapPack && mapPack.id !== defaultMapId ? <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${mapPack.name}` : `Delete ${mapPack.name}`} onClick={() => removeAsset("map", mapPack.id)}><Trash2 aria-hidden="true" /></button> : null}
+          </article>;
+        })}
+        {customMaps.map((mapPack) => {
+          const presentation = catalogAssetPresentation("map", mapPack.agentCoreAssetId?.trim() || mapPack.id, mapPack.name, chinese);
+          return <article key={mapPack.id} data-selected={workspace.mapPack.id === mapPack.id}>
             <button type="button" className="autonomy-repository-card-surface" onClick={() => selectMap(mapPack.id)} onDoubleClick={() => openMapDetails(mapPack)}>
-              <span className="autonomy-repository-preview is-map"><Layers3 aria-hidden="true" /></span>
-              <span className="autonomy-repository-copy"><strong>{mapPack.name}</strong><small>{mapRepresentationLabel(mapPack.representation, chinese)}</small></span>
+              <RepositoryAssetPreview kind="map" previewUrl={presentation.previewUrl} previewKey={presentation.key} name={presentation.name} />
+              <span className="autonomy-repository-copy"><strong title={presentation.name}>{presentation.name}</strong></span>
             </button>
             <AssetInterpretButton edition={edition} chinese={chinese} kind="map" assetId={mapPack.agentCoreAssetId ?? null} contentSha256={mapPack.agentCoreContentSha256 ?? null} name={mapPack.name} />
-            {mapPack.id !== defaultMapId ? <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${mapPack.name}` : `Delete ${mapPack.name}`} onClick={() => removeAsset("map", mapPack.id)}><Trash2 aria-hidden="true" /></button> : null}
-          </article>
-        ))}
+            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${mapPack.name}` : `Delete ${mapPack.name}`} onClick={() => removeAsset("map", mapPack.id)}><Trash2 aria-hidden="true" /></button>
+          </article>;
+        })}
         {externalMaps.map((asset) => (
           <article key={`${asset.id}:${asset.contentSha256}`}>
             <button type="button" className="autonomy-repository-card-surface" onDoubleClick={() => setDetails({ title: asset.name, rows: [[chinese ? "来源" : "Source", asset.sourceApplication || "—"], [chinese ? "格式" : "Format", asset.sourceFormat.toUpperCase()], [chinese ? "状态" : "Status", asset.maturity.replaceAll("_", " ")]] })}>
-              <span className="autonomy-repository-preview is-map is-imported"><Layers3 aria-hidden="true" /></span>
-              <span className="autonomy-repository-copy"><strong>{asset.name}</strong><small>{asset.sourceApplication || asset.sourceFormat}</small></span>
+              <RepositoryAssetPreview kind="map" previewUrl={null} previewKey={null} name={asset.name} />
+              <span className="autonomy-repository-copy"><strong title={asset.name}>{asset.name}</strong></span>
             </button>
             <AssetInterpretButton edition={edition} chinese={chinese} kind="map" assetId={asset.id} contentSha256={asset.contentSha256} name={asset.name} />
             <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${asset.name}` : `Delete ${asset.name}`} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
           </article>
         ))}
-        {defaultResources.map((resource) => {
-          const state = resourceStates[resource.resource_id] ?? "idle";
-          return <article key={resource.resource_id} data-catalog-resource="true">
-            <button type="button" className="autonomy-repository-card-surface" onDoubleClick={() => openResourceDetails(resource)}>
-              <span className="autonomy-repository-preview is-map is-catalog" data-label={chinese ? "默认" : "DEFAULT"}><Layers3 aria-hidden="true" /></span>
-              <span className="autonomy-repository-copy">
-                <strong>{resourceName(resource)}</strong>
-                <small>{state === "conversion"
-                  ? (chinese ? "已下载 · 等待安全转换" : "Downloaded · conversion required")
-                  : state === "ready" ? (chinese ? "已安装" : "Installed")
-                    : state === "error" ? (chinese ? "准备失败" : "Preparation failed")
-                      : (chinese ? "默认资源 · 已预解析" : "Default resource · preparsed")}</small>
-              </span>
-            </button>
-            <button
-              type="button"
-              className="autonomy-repository-interpret"
-              data-state={state === "working" ? "busy" : state === "ready" ? "done" : state === "error" ? "error" : undefined}
-              disabled={state === "working" || state === "ready" || state === "conversion"}
-              aria-label={chinese ? `准备 ${resourceName(resource)}` : `Prepare ${resourceName(resource)}`}
-              title={state === "conversion"
-                ? (chinese ? "源文件已固定并下载；需要 RMF 隔离转换后才能进入仿真" : "Source downloaded; isolated RMF conversion is required for simulation")
-                : (chinese ? "按需下载固定版本" : "Download the pinned revision on demand")}
-              onClick={() => void prepareDefaultResource(resource)}
-            ><Upload aria-hidden="true" /></button>
-          </article>;
-        })}
       </div>
       <AutonomyAssetQualificationPanel chinese={chinese} />
       {spaceMap.agentCoreAssetId && spaceMap.agentCoreContentSha256

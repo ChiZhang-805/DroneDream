@@ -789,6 +789,44 @@ export interface AgentCoreAssetEntry {
   updated_at: string;
 }
 
+export type AgentCoreAssetPairStatus =
+  | "qualified_builtin"
+  | "compatible_requires_qualification"
+  | "incompatible";
+
+export interface AgentCoreAssetPairCatalogEntry {
+  schema_version: "dronedream.asset-pair-compatibility.v1";
+  pair_id: string;
+  map_resource_id: string;
+  map_display_name: { "zh-CN": string; "en-US": string };
+  environment_class: string;
+  vehicle_resource_id: string;
+  vehicle_display_name: { "zh-CN": string; "en-US": string };
+  vehicle_class: "multicopter" | "vtol" | string;
+  status: AgentCoreAssetPairStatus;
+  compatible: boolean;
+  qualification_id: string | null;
+  qualified_vehicle_asset_id: string | null;
+  qualification_scope: string | null;
+  reasons: string[];
+  required_gates: string[];
+  sensor_constraints: string[];
+}
+
+export interface AgentCoreAssetPairCatalog {
+  schema_version: "dronedream.asset-pair-catalog.v1";
+  catalog_revision: string;
+  map_count: number;
+  vehicle_count: number;
+  pair_count: number;
+  counts: {
+    qualified_builtin: number;
+    compatible_requires_qualification: number;
+    incompatible: number;
+  };
+  pairs: AgentCoreAssetPairCatalogEntry[];
+}
+
 export interface AgentCoreAssetVersion {
   asset_id: string;
   content_sha256: string;
@@ -1099,6 +1137,10 @@ export async function restartAgentCore(): Promise<AgentCoreStatus> {
 
 export function getAgentCoreBootstrap(): Promise<AgentCoreBootstrap> {
   return requestJson("/v1/bootstrap");
+}
+
+export function getAgentCoreAssetPairCatalog(): Promise<AgentCoreAssetPairCatalog> {
+  return requestJson("/v1/asset-pair-catalog");
 }
 
 export function createAgentCoreThread(payload: {

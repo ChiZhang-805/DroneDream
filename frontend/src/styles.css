@@ -883,6 +883,60 @@ body:has(.autonomy-platform-page),
   width: min(28rem, calc(100vw - 2rem));
 }
 
+.autonomy-context-menu-row,
+.autonomy-context-choice,
+.autonomy-context-back {
+  border: 0;
+  color: #342a39;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.autonomy-context-menu-row {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  padding: 0.62rem 0.7rem;
+  border: 1px solid #ece5ef;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.autonomy-context-menu-row + .autonomy-context-menu-row { margin-top: 0.42rem; }
+.autonomy-context-menu-row:hover,
+.autonomy-context-choice:hover {
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 35%, #ece5ef);
+  background: color-mix(in srgb, var(--dd-brand-light-surface) 42%, white);
+}
+.autonomy-context-menu-row > svg:first-child { width: 1.05rem; color: var(--dd-brand-middle); }
+.autonomy-context-menu-row > svg:last-child { width: 0.9rem; color: #968b99; }
+.autonomy-context-menu-row > span,
+.autonomy-context-choice > span { display: grid; min-width: 0; gap: 0.08rem; }
+.autonomy-context-menu-row b,
+.autonomy-context-choice b,
+.autonomy-context-menu-row small,
+.autonomy-context-choice small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.autonomy-context-menu-row b,
+.autonomy-context-choice b { font-size: 0.82rem; }
+.autonomy-context-menu-row small,
+.autonomy-context-choice small,
+.autonomy-context-filter-note { color: #8c808f; font-size: 0.68rem; font-weight: 500; }
+.autonomy-context-back { display: inline-flex; align-items: center; gap: 0.22rem; margin: -0.1rem 0 0.45rem; padding: 0; color: var(--dd-brand-middle); font-size: 0.7rem; font-weight: 800; }
+.autonomy-context-back svg { width: 0.9rem; }
+.autonomy-context-filter-note { display: block; margin: -0.25rem 0 0.55rem; white-space: normal; }
+.autonomy-context-choice-list { display: grid; max-height: min(22rem, 55vh); gap: 0.34rem; overflow-y: auto; }
+.autonomy-context-choice { display: grid; width: 100%; min-width: 0; align-items: center; grid-template-columns: minmax(0, 1fr) auto; gap: 0.55rem; padding: 0.56rem 0.65rem; border: 1px solid #ece5ef; border-radius: 10px; background: #fff; }
+.autonomy-context-choice[aria-checked="true"] { border-color: color-mix(in srgb, var(--dd-brand-middle) 48%, white); background: color-mix(in srgb, var(--dd-brand-light-surface) 45%, white); }
+.autonomy-context-choice em { padding: 0.22rem 0.4rem; border-radius: 999px; color: #0a8067; background: #e8f8f3; font-size: 0.56rem; font-style: normal; font-weight: 850; }
+.autonomy-context-choice.is-clear { margin-bottom: 0.2rem; border-style: dashed; }
+.autonomy-context-manage-links { display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 0.55rem; }
+.autonomy-context-manage-links a { color: var(--dd-brand-middle); font-size: 0.66rem; font-weight: 800; text-decoration: none; }
+
 .autonomy-context-popover a > span {
   display: grid;
   min-width: 0;
@@ -22600,6 +22654,51 @@ body {
   width: clamp(3.8rem, 7vw, 6rem);
   height: clamp(3.8rem, 7vw, 6rem);
   filter: drop-shadow(0 10px 18px rgba(0,0,0,0.28));
+}
+
+.autonomy-repository-preview > img {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  background: #16121f;
+}
+
+/* Map cards use a high oblique drone-like view. The enlarged crop keeps the
+   source boundary and unrelated space outside the visible card. */
+.autonomy-repository-preview.is-map > img {
+  inset: -18%;
+  width: 136%;
+  height: 136%;
+  object-fit: cover;
+  transform: perspective(760px) rotateX(43deg) rotateZ(-6deg) scale(1.48) translateY(-1%);
+  transform-origin: 50% 48%;
+  filter: saturate(1.05) contrast(1.04);
+}
+
+.autonomy-repository-preview.is-map::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  box-shadow: inset 0 0 34px 10px rgba(13, 24, 31, 0.32);
+}
+
+.autonomy-repository-preview.is-map[data-preview-key="school-map"] > img {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-position: 50% 28%;
+  transform: scale(1.22);
+}
+
+.autonomy-repository-preview.is-map[data-preview-key="campus-site"] > img,
+.autonomy-repository-preview.is-map[data-preview-key="open-test-arena"] > img {
+  transform: perspective(760px) rotateX(40deg) rotateZ(-5deg) scale(1.62) translateY(-1%);
 }
 
 .autonomy-repository-preview.is-imported::after {

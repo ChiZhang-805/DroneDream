@@ -1,0 +1,127 @@
+{
+  "schema_version": "dronedream.resource-card-previews.v1",
+  "generator": "scripts/generate_resource_card_previews.py",
+  "sources": {
+    "maps": {
+      "project": "open-rmf/rmf_demos",
+      "commit": "7851a5792d19a037833292a3e2a823b0f9e0c111",
+      "license": "Apache-2.0"
+    },
+    "school_map": {
+      "project": "DroneDream",
+      "license": "MIT"
+    },
+    "vehicles": {
+      "project": "PX4/PX4-gazebo-models",
+      "commit": "5577035667afb4b63fe1f966fb1a58bbb05d905b",
+      "license": "BSD-3-Clause"
+    }
+  },
+  "files": [
+    {
+      "path": "maps/airport-terminal.webp",
+      "bytes": 31772,
+      "sha256": "73dfcbcbc1f455a9b36d06e7c65348a22c67955c72ca5d35ed1002a5fe8b6f08"
+    },
+    {
+      "path": "maps/campus-site.webp",
+      "bytes": 63106,
+      "sha256": "c2cdc5f6ce72fd7b630d5799701c293fd0133dc67a92b99b306753bdcb0b81db"
+    },
+    {
+      "path": "maps/office.webp",
+      "bytes": 37758,
+      "sha256": "ed6f2b4e600840cce174fb6d41df44de7a57b983079a71c109c82bba44d26e00"
+    },
+    {
+      "path": "maps/open-test-arena.webp",
+      "bytes": 17158,
+      "sha256": "d397967a55cbebef312d008131724b324162e72e40383494a72d16a2de0ca785"
+    },
+    {
+      "path": "maps/school-map.webp",
+      "bytes": 28060,
+      "sha256": "e84d74ecbb2c24426bfc84bfbdc338ebe31e1bb9ad52d46385d24b6ba5fbbd25"
+    },
+    {
+      "path": "maps/three-level-hotel.webp",
+      "bytes": 16588,
+      "sha256": "377c1a313cd85e2e08776d89ffd86a9bf8948d5bba0435bb92c86797d7cc45d9"
+    },
+    {
+      "path": "maps/triple-h-corridor.webp",
+      "bytes": 8260,
+      "sha256": "d2a44433345b88e0b2519289b7e94e9d88f4b8f390b3ca60486659a4e1f0711a"
+    },
+    {
+      "path": "maps/two-level-clinic.webp",
+      "bytes": 106960,
+      "sha256": "e6f24eccf2d1e1efceb770fbe6a539cc3f7b1a6ac1b977a5afc9f0a8bd00fd11"
+    },
+    {
+      "path": "vehicles/quadtailsitter.webp",
+      "bytes": 3762,
+      "sha256": "b16dfffcb58f112ab84d44a2107eba964843de934c45b3145e83c047555d5cc0"
+    },
+    {
+      "path": "vehicles/standard-vtol.webp",
+      "bytes": 6030,
+      "sha256": "78ad19fa6554b128da7f6525b072cd15e9749bd157d1e642bfd9c6ccf6c52bd9"
+    },
+    {
+      "path": "vehicles/tiltrotor.webp",
+      "bytes": 5458,
+      "sha256": "bef1fefcb234e55de50a44c44857c8e82d00762658294531ec396fc91f0f40eb"
+    },
+    {
+      "path": "vehicles/x500-depth.webp",
+      "bytes": 6830,
+      "sha256": "ae19f8f81b492901a1670d259966866bff45ca90b0a9aaa744035ae9199eba02"
+    },
+    {
+      "path": "vehicles/x500-flow.webp",
+      "bytes": 6974,
+      "sha256": "fc88263a5733d362c35c8aa96ee62b9a662c28f3b2f2b2b173dc1169b1417f6d"
+    },
+    {
+      "path": "vehicles/x500-gimbal.webp",
+      "bytes": 7216,
+      "sha256": "96c0ac0ee5384f3034f40b2215bc5fb1c1f3eee23e6942f601ae2fca311548c7"
+    },
+    {
+      "path": "vehicles/x500-lidar-2d.webp",
+      "bytes": 6916,
+      "sha256": "dcc3b94ea200c92652644548d48d450e5f57fb48295f794824d79ba89667a215"
+    },
+    {
+      "path": "vehicles/x500-lidar-down.webp",
+      "bytes": 6896,
+      "sha256": "8b47a7a4f69924f3eefdfd8a977d4d090f4ca0bd459a8f7af53fd18e521f2512"
+    },
+    {
+      "path": "vehicles/x500-lidar-front.webp",
+      "bytes": 6834,
+      "sha256": "d1490c467f7e6e579aa85808764d7cd6a661d3c5a71d20f4d33567b04a725004"
+    },
+    {
+      "path": "vehicles/x500-mono-down.webp",
+      "bytes": 7042,
+      "sha256": "f30116c16fd352c50ff3ac1ce226e0f8b6ca05676b3a01efe56ea8a02d186c7f"
+    },
+    {
+      "path": "vehicles/x500-mono-front.webp",
+      "bytes": 6900,
+      "sha256": "3634c3c639d8ce43d0aa056c569aa2ed851246d5ef95402c714ed8473ad11384"
+    },
+    {
+      "path": "vehicles/x500-vision.webp",
+      "bytes": 6878,
+      "sha256": "3f5aad2c9092633d5acb7aca3433706f2feeeb9289f44ade90927a9bcee9ef15"
+    },
+    {
+      "path": "vehicles/x500.webp",
+      "bytes": 6878,
+      "sha256": "3f5aad2c9092633d5acb7aca3433706f2feeeb9289f44ade90927a9bcee9ef15"
+    }
+  ]
+}

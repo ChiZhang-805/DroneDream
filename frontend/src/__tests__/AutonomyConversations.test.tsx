@@ -104,6 +104,16 @@ beforeEach(() => {
 });
 
 describe("autonomy conversation persistence", () => {
+  it("always opens the Chatbot root as a blank new task even when an older conversation exists", async () => {
+    const existing = conversation("saved", "这条旧消息不能出现在新任务页");
+    saveAutonomyConversation("local", "autonomy", existing);
+    saveAutonomyWorkspace("local", "autonomy", existing);
+    renderWorkspace("/autonomy");
+    expect(await screen.findByText("What should your drone do?")).toBeVisible();
+    expect(screen.getByRole("textbox")).toHaveValue("");
+    expect(screen.queryByText("这条旧消息不能出现在新任务页")).not.toBeInTheDocument();
+  });
+
   it("isolates accounts and editions and does not create a conversation for an empty composer", () => {
     expect(listAutonomyConversations("local", "autonomy")).toEqual([]);
     saveAutonomyConversation("owner-a", "autonomy", conversation("one"));
