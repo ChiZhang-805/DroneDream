@@ -2487,6 +2487,7 @@ export function AutonomyMaps() {
     removeAsset,
   } = useAutonomyWorkspace();
   const [details, setDetails] = useState<{ title: string; rows: Array<[string, string]> } | null>(null);
+  const [expandedMapKey, setExpandedMapKey] = useState<string | null>(null);
   const [defaultResources, setDefaultResources] = useState<AgentCoreMapResource[]>([]);
   const [resourceStates, setResourceStates] = useState<Record<string, "idle" | "working" | "conversion" | "ready" | "error">>({});
   const defaultMapId = defaultAutonomyWorkspace().mapPack.id;
@@ -2597,15 +2598,27 @@ export function AutonomyMaps() {
           ));
           const presentation = catalogAssetPresentation("map", definition.resourceId, definition.en, chinese);
           const state = resource ? resourceStates[resource.resource_id] ?? "idle" : "idle";
+          const airspaceExpanded = expandedMapKey === definition.key;
+          const canShowAirspace = Boolean(
+            airspaceExpanded
+            && mapPack?.agentCoreAssetId
+            && mapPack.agentCoreContentSha256
+            && spaceVehicle.agentCoreAssetId
+            && spaceVehicle.agentCoreContentSha256,
+          );
           return <article
             key={definition.key}
             data-catalog-resource="true"
             data-selected={Boolean(mapPack && workspace.mapPack.id === mapPack.id)}
+            data-airspace-expanded={canShowAirspace}
           >
             <button
               type="button"
               className="autonomy-repository-card-surface"
-              onClick={() => { if (mapPack) selectMap(mapPack.id); }}
+              onClick={() => {
+                setExpandedMapKey((current) => current === definition.key ? null : definition.key);
+                if (mapPack) selectMap(mapPack.id);
+              }}
               onDoubleClick={() => {
                 if (mapPack) openMapDetails(mapPack);
                 else if (resource) openResourceDetails(resource);
@@ -2625,17 +2638,52 @@ export function AutonomyMaps() {
               onClick={() => void prepareDefaultResource(resource)}
             ><Upload aria-hidden="true" /></button> : null}
             {mapPack && mapPack.id !== defaultMapId ? <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${mapPack.name}` : `Delete ${mapPack.name}`} onClick={() => removeAsset("map", mapPack.id)}><Trash2 aria-hidden="true" /></button> : null}
+            {canShowAirspace ? <div className="autonomy-repository-airspace-detail">
+              <PreferredAirspaceView
+                chinese={chinese}
+                route={plan?.routeMapSha256 === mapPack?.agentCoreContentSha256 ? route : undefined}
+                request={{
+                  map_asset_id: mapPack!.agentCoreAssetId!,
+                  map_content_sha256: mapPack!.agentCoreContentSha256!,
+                  vehicle_asset_id: spaceVehicle.agentCoreAssetId!,
+                  vehicle_content_sha256: spaceVehicle.agentCoreContentSha256!,
+                }}
+              />
+            </div> : null}
           </article>;
         })}
         {customMaps.map((mapPack) => {
           const presentation = catalogAssetPresentation("map", mapPack.agentCoreAssetId?.trim() || mapPack.id, mapPack.name, chinese);
-          return <article key={mapPack.id} data-selected={workspace.mapPack.id === mapPack.id}>
-            <button type="button" className="autonomy-repository-card-surface" onClick={() => selectMap(mapPack.id)} onDoubleClick={() => openMapDetails(mapPack)}>
+          const key = catalogAssetKey("map", mapPack.agentCoreAssetId?.trim() || mapPack.id, mapPack.name);
+          const canShowAirspace = Boolean(
+            expandedMapKey === key
+            && mapPack.agentCoreAssetId
+            && mapPack.agentCoreContentSha256
+            && spaceVehicle.agentCoreAssetId
+            && spaceVehicle.agentCoreContentSha256,
+          );
+          return <article key={mapPack.id} data-selected={workspace.mapPack.id === mapPack.id} data-airspace-expanded={canShowAirspace}>
+            <button type="button" className="autonomy-repository-card-surface" onClick={() => {
+              setExpandedMapKey((current) => current === key ? null : key);
+              selectMap(mapPack.id);
+            }} onDoubleClick={() => openMapDetails(mapPack)}>
               <RepositoryAssetPreview kind="map" previewUrl={presentation.previewUrl} previewKey={presentation.key} name={presentation.name} />
               <span className="autonomy-repository-copy"><strong title={presentation.name}>{presentation.name}</strong></span>
             </button>
             <AssetInterpretButton edition={edition} chinese={chinese} kind="map" assetId={mapPack.agentCoreAssetId ?? null} contentSha256={mapPack.agentCoreContentSha256 ?? null} name={mapPack.name} />
             <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${mapPack.name}` : `Delete ${mapPack.name}`} onClick={() => removeAsset("map", mapPack.id)}><Trash2 aria-hidden="true" /></button>
+            {canShowAirspace ? <div className="autonomy-repository-airspace-detail">
+              <PreferredAirspaceView
+                chinese={chinese}
+                route={plan?.routeMapSha256 === mapPack.agentCoreContentSha256 ? route : undefined}
+                request={{
+                  map_asset_id: mapPack.agentCoreAssetId!,
+                  map_content_sha256: mapPack.agentCoreContentSha256!,
+                  vehicle_asset_id: spaceVehicle.agentCoreAssetId!,
+                  vehicle_content_sha256: spaceVehicle.agentCoreContentSha256!,
+                }}
+              />
+            </div> : null}
           </article>;
         })}
         {externalMaps.map((asset) => (
@@ -2649,12 +2697,6 @@ export function AutonomyMaps() {
           </article>
         ))}
       </div>
-      <AutonomyAssetQualificationPanel chinese={chinese} />
-      {spaceMap.agentCoreAssetId && spaceMap.agentCoreContentSha256
-        && spaceVehicle.agentCoreAssetId && spaceVehicle.agentCoreContentSha256 ? <PreferredAirspaceView
-          chinese={chinese} route={route} request={{ map_asset_id: spaceMap.agentCoreAssetId,
-            map_content_sha256: spaceMap.agentCoreContentSha256, vehicle_asset_id: spaceVehicle.agentCoreAssetId,
-            vehicle_content_sha256: spaceVehicle.agentCoreContentSha256 }} /> : null}
       {details ? <RepositoryDetailsDialog chinese={chinese} details={details} onClose={() => setDetails(null)} /> : null}
     </section>
   );

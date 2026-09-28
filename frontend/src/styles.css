@@ -22605,6 +22605,15 @@ body {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--dd-brand-middle) 12%, transparent);
 }
 
+.autonomy-repository-grid > article[data-airspace-expanded="true"] {
+  grid-column: 1 / -1;
+}
+
+.autonomy-repository-airspace-detail {
+  padding: 0 1rem 1rem;
+  border-top: 1px solid #eee8ef;
+}
+
 .autonomy-repository-card-surface {
   width: 100%;
   display: grid;

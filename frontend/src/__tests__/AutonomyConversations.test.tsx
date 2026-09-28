@@ -5,7 +5,7 @@ import { AutonomyConversationSidebar } from "../components/AutonomyConversationS
 import { acquireAutonomyPlanning } from "../features/autonomy/conversationActivity";
 import { autonomyConversationPath, listAutonomyConversations, loadAutonomyConversation, newAutonomyConversation, preserveLegacyAutonomyConversation, saveAutonomyConversation } from "../features/autonomy/conversationStore";
 import { defaultAutonomyWorkspace, saveAutonomyWorkspace } from "../features/autonomy/workspaceStore";
-import { AutonomyLive, AutonomyOverview, AutonomyPlatform } from "../pages/AutonomyPlatform";
+import { AutonomyLive, AutonomyMaps, AutonomyOverview, AutonomyPlatform } from "../pages/AutonomyPlatform";
 
 const mocks = vi.hoisted(() => ({ plan: vi.fn(), reconcile: vi.fn(), boundThread: vi.fn(), runtime: vi.fn(), execute: vi.fn(), sources: vi.fn(), frame: vi.fn(), owner: null as null | { id: string } }));
 vi.mock("../features/auth/AuthContext", () => ({ useOptionalAuth: () => ({ account: mocks.owner }) }));
@@ -30,6 +30,17 @@ vi.mock("../features/autonomy/agentCore", async (original) => ({
   getAgentCoreRuntimeStatus: mocks.runtime,
   getAgentCoreLiveSources: mocks.sources,
   getAgentCoreLiveFrame: mocks.frame,
+  listAgentCoreMapResources: async () => ({ resources: [] }),
+  getPreferredAirspace: async (request: { map_asset_id: string; map_content_sha256: string; vehicle_asset_id: string; vehicle_content_sha256: string }) => ({
+    schema_version: "dronedream.preferred-airspace.v1",
+    coordinate_frame: "ENU",
+    authority: "preference-only",
+    airspace_sha256: "c".repeat(64),
+    snapshot_sha256: "d".repeat(64),
+    binding: { sources: request, radius_m: 0.2, height_m: 0.4 },
+    volumes: [[0, 0, 1, 1, 1, 1, 0, 3]],
+    obstacles: [[-1, -1, 0, 1, 1, 0.2]],
+  }),
 }));
 vi.mock("../features/autonomy/agentCorePlanning", async (original) => ({
   ...await original<typeof import("../features/autonomy/agentCorePlanning")>(),
@@ -84,6 +95,7 @@ function renderWorkspace(initial = "/autonomy") {
       { index: true, element: <AutonomyOverview /> },
       { path: "conversations/:conversationId", element: <AutonomyOverview /> },
       { path: "conversations/:conversationId/live", element: <AutonomyLive /> },
+      { path: "maps", element: <AutonomyMaps /> },
       { path: "live", element: <AutonomyLive /> },
     ] }],
   }], { initialEntries: [initial] });
@@ -104,6 +116,23 @@ beforeEach(() => {
 });
 
 describe("autonomy conversation persistence", () => {
+  it("keeps pair qualification off the map page and reveals 3D airspace only inside the clicked map card", async () => {
+    const workspace = defaultAutonomyWorkspace();
+    workspace.mapPack.agentCoreContentSha256 = "a".repeat(64);
+    workspace.aircraft.agentCoreContentSha256 = "b".repeat(64);
+    saveAutonomyWorkspace("local", "autonomy", workspace);
+    renderWorkspace("/autonomy/maps");
+
+    expect(await screen.findByRole("button", { name: /School Map/u })).toBeVisible();
+    expect(screen.queryByText("Map and aircraft pair qualification")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "3D UAV Corridor" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /School Map/u }));
+    const corridor = await screen.findByRole("region", { name: "3D UAV Corridor" });
+    expect(corridor).toBeVisible();
+    expect(corridor.closest("article")).toHaveAttribute("data-airspace-expanded", "true");
+  });
+
   it("always opens the Chatbot root as a blank new task even when an older conversation exists", async () => {
     const existing = conversation("saved", "这条旧消息不能出现在新任务页");
     saveAutonomyConversation("local", "autonomy", existing);
