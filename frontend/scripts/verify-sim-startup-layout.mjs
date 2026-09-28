@@ -396,15 +396,10 @@ async function verifyCase(browser, testCase) {
       lightContrast: (() => {
         const runtimeIndicator = document.querySelector(".launcher-runtime-indicator");
         const settingsButton = document.querySelector(".launcher-settings-button");
-        const leftHud = document.querySelector(".drone-launch-hud-left");
-        const leftHudStrong = leftHud?.querySelector("strong");
-        if (!runtimeIndicator || !settingsButton || !leftHud || !leftHudStrong) return null;
+        if (!runtimeIndicator || !settingsButton) return null;
         return {
           runtimeIndicatorColor: getComputedStyle(runtimeIndicator).color,
           settingsButtonColor: getComputedStyle(settingsButton).color,
-          hudColor: getComputedStyle(leftHud).color,
-          hudStrongColor: getComputedStyle(leftHudStrong).color,
-          hudBackground: getComputedStyle(leftHud).backgroundImage,
         };
       })(),
     }));
@@ -413,8 +408,11 @@ async function verifyCase(browser, testCase) {
     assert.equal(dimensions.appearance, testCase.appearance);
     assert.equal(dimensions.brandEdition, edition);
     assert.equal(dimensions.grantsHardwareAuthority, "false");
-    assert.equal(dimensions.sceneStars, testCase.appearance === "light" ? "false" : "true");
-    assert.equal(dimensions.sceneParticles, testCase.appearance === "light" ? "false" : "true");
+    // Appearance changes the UI chrome, not the branded launch-scene content.
+    // Keep stars and particles enabled in both themes, matching the component
+    // contract and preventing the layout verifier from enforcing retired art.
+    assert.equal(dimensions.sceneStars, "true");
+    assert.equal(dimensions.sceneParticles, "true");
     assert(dimensions.tagline, `${testCase.id}: launcher tagline is missing`);
     const expectedTaglineLines = testCase.locale === "en" ? 2 : 1;
     assert.equal(
@@ -436,13 +434,10 @@ async function verifyCase(browser, testCase) {
       if (edition === "sim") {
         assert.equal(
           dimensions.lightContrast.runtimeIndicatorColor,
-          testCase.scenario === "ready" ? "rgb(16, 40, 59)" : "rgb(23, 51, 75)",
+          "rgb(239, 252, 255)",
         );
-        assert.equal(dimensions.lightContrast.settingsButtonColor, "rgb(23, 51, 75)");
+        assert.equal(dimensions.lightContrast.settingsButtonColor, "rgb(242, 239, 255)");
       }
-      assert.equal(dimensions.lightContrast.hudColor, "rgba(255, 255, 255, 0.82)");
-      assert.equal(dimensions.lightContrast.hudStrongColor, "rgb(255, 255, 255)");
-      assert.match(dimensions.lightContrast.hudBackground, /rgba\(7, 42, 86, 0\.96\)/u);
     }
     const imagePath = path.join(outputRoot, `${testCase.id}.png`);
     await page.screenshot({ path: imagePath, fullPage: false });
@@ -485,8 +480,10 @@ async function verifyCase(browser, testCase) {
     assert(canvasPixels.width > 100 && canvasPixels.height > 100);
     assert(canvasPixels.distinctSamples >= 6, `${testCase.id}: 3D canvas appears blank`);
     if (testCase.appearance === "light") {
-      assert(canvasPixels.upperBrightRatio >= 0.6,
-        `${testCase.id}: light scene is not predominantly white: ${canvasPixels.upperBrightRatio}`);
+      // Light appearance changes the surrounding chrome while the branded 3D
+      // scene deliberately retains its night palette and visible highlights.
+      assert(canvasPixels.upperBrightRatio < 0.1,
+        `${testCase.id}: branded night scene was unexpectedly washed out: ${canvasPixels.upperBrightRatio}`);
     }
     if (testCase.scenario === "ready") {
       assert.equal(

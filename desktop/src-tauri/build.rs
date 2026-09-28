@@ -17,11 +17,14 @@ fn require_embedded_frontend(manifest_dir: &std::path::Path) {
     println!("cargo:rerun-if-env-changed=TAURI_CONFIG");
     let base: serde_json::Value = serde_json::from_slice(
         &std::fs::read(manifest_dir.join("tauri.conf.json")).expect("Tauri base config is missing"),
-    ).expect("Tauri base config is invalid");
-    let overlay: serde_json::Value = std::env::var("TAURI_CONFIG").ok()
+    )
+    .expect("Tauri base config is invalid");
+    let overlay: serde_json::Value = std::env::var("TAURI_CONFIG")
+        .ok()
         .map(|value| serde_json::from_str(&value).expect("Tauri build overlay is invalid"))
         .unwrap_or(serde_json::Value::Null);
-    let frontend = overlay.pointer("/build/frontendDist")
+    let frontend = overlay
+        .pointer("/build/frontendDist")
         .or_else(|| base.pointer("/build/frontendDist"))
         .and_then(serde_json::Value::as_str)
         .expect("frontendDist must name an embedded directory");
@@ -168,7 +171,10 @@ fn configure_desktop_auth_identity(manifest_dir: &std::path::Path) -> String {
     );
     let expected_profile = expected_engine_pack_profile(manifest_dir, &edition_id);
     if let Ok(frontend_edition) = std::env::var("VITE_DRONEDREAM_EDITION") {
-        assert_eq!(frontend_edition, edition_id, "frontend and native desktop edition identities must match");
+        assert_eq!(
+            frontend_edition, edition_id,
+            "frontend and native desktop edition identities must match"
+        );
     }
     println!("cargo:rerun-if-env-changed=VITE_DRONEDREAM_EDITION");
     let edition_profile =
@@ -265,39 +271,98 @@ fn prepare_generated_directory(path: &std::path::Path) {
 //   output：隔离构建目录；tool：组件校验程序；python：解释器；profile：版本配置；commit：源码提交。
 // 输出：
 //   reused：是否使用显式指定的本机组件包。
-fn reuse_local_engine_pack(output: &std::path::Path, tool: &std::path::Path, python: &str, profile: &str, commit: &str) -> bool {
+fn reuse_local_engine_pack(
+    output: &std::path::Path,
+    tool: &std::path::Path,
+    python: &str,
+    profile: &str,
+    commit: &str,
+) -> bool {
     println!("cargo:rerun-if-env-changed=DRONEDREAM_LOCAL_ENGINE_PACK_DIRECTORY");
     println!("cargo:rerun-if-env-changed=DRONEDREAM_LOCAL_ENGINE_PACK_ID");
-    let Some(directory) = std::env::var_os("DRONEDREAM_LOCAL_ENGINE_PACK_DIRECTORY") else { return false; };
-    assert!(std::env::var_os("DRONEDREAM_RELEASE_SOURCE_COMMIT").is_none()
-        && std::env::var_os("DRONEDREAM_RELEASE_BUILD_NUMBER").is_none(),
-        "Official releases cannot reuse a local component override");
-    let directory = PathBuf::from(directory).canonicalize().expect("Local Engine Pack directory is missing");
+    let Some(directory) = std::env::var_os("DRONEDREAM_LOCAL_ENGINE_PACK_DIRECTORY") else {
+        return false;
+    };
+    assert!(
+        std::env::var_os("DRONEDREAM_RELEASE_SOURCE_COMMIT").is_none()
+            && std::env::var_os("DRONEDREAM_RELEASE_BUILD_NUMBER").is_none(),
+        "Official releases cannot reuse a local component override"
+    );
+    let directory = PathBuf::from(directory)
+        .canonicalize()
+        .expect("Local Engine Pack directory is missing");
     emit_rerun_tree(&directory);
     let descriptor_path = directory.join("engine-pack-bundle.json");
     let manifest_path = directory.join("engine-pack-manifest.json");
-    let descriptor: serde_json::Value = serde_json::from_slice(&std::fs::read(&descriptor_path).expect("Local Engine Pack descriptor is missing")).expect("Invalid local descriptor");
-    let manifest: serde_json::Value = serde_json::from_slice(&std::fs::read(&manifest_path).expect("Local Engine Pack manifest is missing")).expect("Invalid local manifest");
-    let expected_id = std::env::var("DRONEDREAM_LOCAL_ENGINE_PACK_ID").expect("Local Engine Pack reuse requires an explicit content identity");
-    assert_eq!(descriptor["packId"].as_str(), Some(expected_id.as_str()), "Local Engine Pack pin mismatch");
-    assert_eq!(descriptor["sourceCommit"].as_str(), Some(commit), "Local Engine Pack belongs to a different source commit");
-    assert_eq!(manifest["editionProfile"]["profileId"].as_str(), Some(profile), "Local Engine Pack belongs to a different edition");
+    let descriptor: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(&descriptor_path).expect("Local Engine Pack descriptor is missing"),
+    )
+    .expect("Invalid local descriptor");
+    let manifest: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(&manifest_path).expect("Local Engine Pack manifest is missing"),
+    )
+    .expect("Invalid local manifest");
+    let expected_id = std::env::var("DRONEDREAM_LOCAL_ENGINE_PACK_ID")
+        .expect("Local Engine Pack reuse requires an explicit content identity");
+    assert_eq!(
+        descriptor["packId"].as_str(),
+        Some(expected_id.as_str()),
+        "Local Engine Pack pin mismatch"
+    );
+    assert_eq!(
+        descriptor["sourceCommit"].as_str(),
+        Some(commit),
+        "Local Engine Pack belongs to a different source commit"
+    );
+    assert_eq!(
+        manifest["editionProfile"]["profileId"].as_str(),
+        Some(profile),
+        "Local Engine Pack belongs to a different edition"
+    );
     // 校验工具检查归档内每个文件及外部清单的大小和摘要，而非只相信版本字符串。
-    let verified = Command::new(python).arg(tool).arg("verify")
-        .arg("--descriptor").arg(&descriptor_path)
-        .arg("--archive").arg(directory.join("DroneDreamEnginePack.tar.gz"))
-        .status().expect("Unable to verify local Engine Pack");
-    assert!(verified.success(), "Local Engine Pack failed content verification");
-    for name in ["engine-pack-bundle.json", "engine-pack-manifest.json", "DroneDreamEnginePack.tar.gz"] {
-        std::fs::copy(directory.join(name), output.join(name)).expect("Unable to stage verified local Engine Pack");
+    let verified = Command::new(python)
+        .arg(tool)
+        .arg("verify")
+        .arg("--descriptor")
+        .arg(&descriptor_path)
+        .arg("--archive")
+        .arg(directory.join("DroneDreamEnginePack.tar.gz"))
+        .status()
+        .expect("Unable to verify local Engine Pack");
+    assert!(
+        verified.success(),
+        "Local Engine Pack failed content verification"
+    );
+    for name in [
+        "engine-pack-bundle.json",
+        "engine-pack-manifest.json",
+        "DroneDreamEnginePack.tar.gz",
+    ] {
+        std::fs::copy(directory.join(name), output.join(name))
+            .expect("Unable to stage verified local Engine Pack");
     }
-    let staged: serde_json::Value = serde_json::from_slice(&std::fs::read(output.join("engine-pack-bundle.json")).expect("Staged descriptor is missing")).expect("Staged descriptor is invalid");
-    assert_eq!(staged, descriptor, "Local Engine Pack changed during staging");
-    let staged_verified = Command::new(python).arg(tool).arg("verify")
-        .arg("--descriptor").arg(output.join("engine-pack-bundle.json"))
-        .arg("--archive").arg(output.join("DroneDreamEnginePack.tar.gz"))
-        .status().expect("Unable to verify staged Engine Pack");
-    assert!(staged_verified.success(), "Staged Engine Pack failed content verification");
+    let staged: serde_json::Value = serde_json::from_slice(
+        &std::fs::read(output.join("engine-pack-bundle.json"))
+            .expect("Staged descriptor is missing"),
+    )
+    .expect("Staged descriptor is invalid");
+    assert_eq!(
+        staged, descriptor,
+        "Local Engine Pack changed during staging"
+    );
+    let staged_verified = Command::new(python)
+        .arg(tool)
+        .arg("verify")
+        .arg("--descriptor")
+        .arg(output.join("engine-pack-bundle.json"))
+        .arg("--archive")
+        .arg(output.join("DroneDreamEnginePack.tar.gz"))
+        .status()
+        .expect("Unable to verify staged Engine Pack");
+    assert!(
+        staged_verified.success(),
+        "Staged Engine Pack failed content verification"
+    );
     println!("cargo:warning=Local UI build preserves explicitly pinned Engine Pack {expected_id}; this is not an official release");
     true
 }
@@ -363,24 +428,30 @@ fn build_engine_pack(manifest_dir: &std::path::Path, edition_profile: &str) {
             "python3".to_string()
         }
     });
-    if !reuse_local_engine_pack(&output_directory, &tool, &python, edition_profile, &source_commit) {
-      let status = Command::new(&python)
-        .arg(&tool)
-        .arg("build")
-        .arg("--repository-root")
-        .arg(&repository_root)
-        .arg("--output-directory")
-        .arg(&output_directory)
-        .arg("--source-commit")
-        .arg(&source_commit)
-        .arg("--edition-profile")
-        .arg(edition_profile)
-        .env("SOURCE_DATE_EPOCH", &source_date_epoch)
-        .status()
-        .unwrap_or_else(|error| {
-            panic!("unable to build the embedded Engine Pack with {python}: {error}")
-        });
-    assert!(status.success(), "embedded Engine Pack generation failed");
+    if !reuse_local_engine_pack(
+        &output_directory,
+        &tool,
+        &python,
+        edition_profile,
+        &source_commit,
+    ) {
+        let status = Command::new(&python)
+            .arg(&tool)
+            .arg("build")
+            .arg("--repository-root")
+            .arg(&repository_root)
+            .arg("--output-directory")
+            .arg(&output_directory)
+            .arg("--source-commit")
+            .arg(&source_commit)
+            .arg("--edition-profile")
+            .arg(edition_profile)
+            .env("SOURCE_DATE_EPOCH", &source_date_epoch)
+            .status()
+            .unwrap_or_else(|error| {
+                panic!("unable to build the embedded Engine Pack with {python}: {error}")
+            });
+        assert!(status.success(), "embedded Engine Pack generation failed");
     }
     let descriptor_path = output_directory.join("engine-pack-bundle.json");
     let descriptor: serde_json::Value = serde_json::from_slice(

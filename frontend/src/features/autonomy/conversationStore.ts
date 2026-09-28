@@ -29,7 +29,7 @@ export function updateAutonomyConversation(ownerId: string, edition: BrandEditio
   const current = conversationMetadata(ownerId, edition, id, storage);
   if (current.deleted) return;
   if (!loadAutonomyConversation(ownerId, edition, id, storage)) throw new Error("CONVERSATION_NOT_FOUND");
-  const title = patch.title === undefined ? current.title : patch.title.replace(/[\u0000-\u001f\u007f]/gu, " ").replace(/\s+/gu, " ").trim();
+  const title = patch.title === undefined ? current.title : patch.title.replace(/\p{Cc}/gu, " ").replace(/\s+/gu, " ").trim();
   if (patch.title !== undefined && (!title || Array.from(title).length > 32)) throw new Error("CONVERSATION_TITLE_INVALID");
   storage.setItem(`${conversationKey(ownerId, edition, id)}:metadata`, JSON.stringify({ ...current, ...patch, title }));
   window.dispatchEvent(new CustomEvent(AUTONOMY_CONVERSATIONS_CHANGED, { detail: { ownerId, edition, id } }));

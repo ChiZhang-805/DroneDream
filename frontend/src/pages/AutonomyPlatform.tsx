@@ -97,6 +97,7 @@ import {
   getAgentCoreRuntimeStatus,
   listAgentCoreAssetImportJobs,
   listAgentCoreMapResources,
+  listAgentCoreVehicleResources,
   listAgentCoreAssetSourceAdapters,
   pauseAgentCoreAssetQualificationJob,
   pickAndCreateAgentCoreAssetImportJob,
@@ -115,6 +116,7 @@ import {
   type AgentCoreLiveSource,
   type AgentCoreLiveTelemetry,
   type AgentCoreMapResource,
+  type AgentCoreVehicleResource,
   type AgentCorePluginEntry,
 } from "../features/autonomy/agentCore";
 import {
@@ -1194,7 +1196,7 @@ export function AutonomyPlatform() {
       );
     });
     return true;
-  }, [assetLibrary.aircraft, assetLibrary.maps, edition, ownerId, workspace]);
+  }, [assetLibrary, edition, ownerId, workspace]);
 
   const selectAircraft = useCallback((aircraftId: string) => {
     const aircraft = assetLibrary.aircraft.find((candidate) => candidate.id === aircraftId);
@@ -2115,8 +2117,18 @@ function mapRepresentationLabel(value: AutonomyMapPack["representation"], chines
 }
 
 export function AutonomyAircraft() {
-  const { edition, chinese, workspace, assetLibrary, selectAircraft, removeAsset } = useAutonomyWorkspace();
+  const {
+    edition,
+    chinese,
+    workspace,
+    assetLibrary,
+    selectAircraft,
+    registerExternalAsset,
+    removeAsset,
+  } = useAutonomyWorkspace();
   const [details, setDetails] = useState<{ title: string; rows: Array<[string, string]> } | null>(null);
+  const [defaultResources, setDefaultResources] = useState<AgentCoreVehicleResource[]>([]);
+  const [resourceStates, setResourceStates] = useState<Record<string, "idle" | "working" | "qualification" | "ready" | "error">>({});
   const defaultAircraftId = defaultAutonomyWorkspace().aircraft.id;
   const externalAircraft = assetLibrary.externalAssets.filter((asset) => asset.kind === "vehicle");
   const openAircraftDetails = (aircraft: AutonomyWorkspaceState["aircraft"]) => setDetails({
@@ -2128,6 +2140,63 @@ export function AutonomyAircraft() {
       [chinese ? "传感器" : "Sensors", aircraft.sensors.join(" · ") || "—"],
     ],
   });
+  useEffect(() => {
+    let active = true;
+    void listAgentCoreVehicleResources().then((catalog) => {
+      if (active) setDefaultResources(catalog.resources);
+    }).catch(() => {
+      if (active) setDefaultResources([]);
+    });
+    return () => { active = false; };
+  }, []);
+  const resourceName = (resource: AgentCoreVehicleResource) => resource.display_name[chinese ? "zh-CN" : "en-US"];
+  const openResourceDetails = (resource: AgentCoreVehicleResource) => setDetails({
+    title: resourceName(resource),
+    rows: [
+      [chinese ? "来源" : "Source", `PX4 Gazebo Models @ ${resource.analysis.source_commit.slice(0, 12)}`],
+      [chinese ? "许可证" : "License", resource.license.spdx_id],
+      [chinese ? "机型" : "Vehicle class", resource.vehicle_class],
+      [chinese ? "传感器" : "Sensors", resource.analysis.resolved_sensor_types.join(" · ") || "—"],
+      [chinese ? "模型依赖" : "Model dependencies", resource.analysis.dependency_models.join(" · ") || (chinese ? "无外部模型依赖" : "No external model dependency")],
+      [chinese ? "适合任务" : "Recommended for", resource.analysis.recommended_for.join(" · ")],
+      [chinese ? "不适合任务" : "Excluded from", resource.analysis.excluded_from.join(" · ")],
+      [chinese ? "预解析" : "Pre-analysis", chinese ? "已完成 SDF、传感器、插件和依赖解析" : "SDF, sensor, plugin, and dependency analysis complete"],
+      [chinese ? "飞行状态" : "Flight", chinese ? "需解析依赖并与具体地图配对验收" : "Requires dependencies and aircraft-map qualification"],
+    ],
+  });
+  const prepareDefaultResource = async (resource: AgentCoreVehicleResource) => {
+    if (resourceStates[resource.resource_id] === "working") return;
+    setResourceStates((current) => ({ ...current, [resource.resource_id]: "working" }));
+    try {
+      const created = await createAgentCoreRemoteAssetImportJob({
+        source_type: resource.source.source_type,
+        location: resource.source.location,
+        expected_kind: resource.source.expected_kind,
+        source_format: resource.source.source_format,
+        expected_sha256: resource.source.expected_sha256,
+        git_ref: resource.source.git_ref,
+        subpath: resource.source.subpath,
+      });
+      const processed = await processAgentCoreAssetImportJob(created.job_id);
+      if (processed.asset_id) {
+        const contentSha256 = processed.qualified_content_sha256
+          ?? processed.normalized_content_sha256;
+        const bootstrap = await getAgentCoreBootstrap();
+        const version = bootstrap.asset_versions.find((candidate) => (
+          candidate.asset_id === processed.asset_id
+          && (!contentSha256 || candidate.content_sha256 === contentSha256)
+        ));
+        if (version) registerExternalAsset(version);
+      }
+      setResourceStates((current) => ({
+        ...current,
+        [resource.resource_id]: processed.state === "qualified" ? "ready"
+          : processed.state === "needs_input" ? "qualification" : "error",
+      }));
+    } catch {
+      setResourceStates((current) => ({ ...current, [resource.resource_id]: "error" }));
+    }
+  };
 
   return (
     <section className="autonomy-repository-page">
@@ -2182,6 +2251,33 @@ export function AutonomyAircraft() {
             <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${asset.name}` : `Delete ${asset.name}`} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
           </article>
         ))}
+        {defaultResources.map((resource) => {
+          const state = resourceStates[resource.resource_id] ?? "idle";
+          return <article key={resource.resource_id} data-catalog-resource="true">
+            <button type="button" className="autonomy-repository-card-surface" onDoubleClick={() => openResourceDetails(resource)}>
+              <span className="autonomy-repository-preview is-aircraft is-catalog" data-label={chinese ? "默认" : "DEFAULT"}><Navigation2 aria-hidden="true" /></span>
+              <span className="autonomy-repository-copy">
+                <strong>{resourceName(resource)}</strong>
+                <small>{state === "qualification"
+                  ? (chinese ? "已下载 · 等待依赖与配对验收" : "Downloaded · dependencies and qualification required")
+                  : state === "ready" ? (chinese ? "已安装" : "Installed")
+                    : state === "error" ? (chinese ? "准备失败" : "Preparation failed")
+                      : (chinese ? "默认资源 · 已预解析" : "Default resource · preparsed")}</small>
+              </span>
+            </button>
+            <button
+              type="button"
+              className="autonomy-repository-interpret"
+              data-state={state === "working" ? "busy" : state === "ready" ? "done" : state === "error" ? "error" : undefined}
+              disabled={state === "working" || state === "ready" || state === "qualification"}
+              aria-label={chinese ? `准备 ${resourceName(resource)}` : `Prepare ${resourceName(resource)}`}
+              title={state === "qualification"
+                ? (chinese ? "源文件已固定并下载；解析依赖并与地图配对验收后才能飞行" : "Source downloaded; dependencies and aircraft-map qualification are required")
+                : (chinese ? "按需下载固定版本" : "Download the pinned revision on demand")}
+              onClick={() => void prepareDefaultResource(resource)}
+            ><Upload aria-hidden="true" /></button>
+          </article>;
+        })}
       </div>
       {details ? <RepositoryDetailsDialog chinese={chinese} details={details} onClose={() => setDetails(null)} /> : null}
     </section>
@@ -2189,7 +2285,15 @@ export function AutonomyAircraft() {
 }
 
 export function AutonomyMaps() {
-  const { edition, chinese, workspace, assetLibrary, selectMap, removeAsset } = useAutonomyWorkspace();
+  const {
+    edition,
+    chinese,
+    workspace,
+    assetLibrary,
+    selectMap,
+    registerExternalAsset,
+    removeAsset,
+  } = useAutonomyWorkspace();
   const [details, setDetails] = useState<{ title: string; rows: Array<[string, string]> } | null>(null);
   const [defaultResources, setDefaultResources] = useState<AgentCoreMapResource[]>([]);
   const [resourceStates, setResourceStates] = useState<Record<string, "idle" | "working" | "conversion" | "ready" | "error">>({});
@@ -2249,6 +2353,16 @@ export function AutonomyMaps() {
           ? { subpath: resource.source.subpath } : {}),
       });
       const processed = await processAgentCoreAssetImportJob(created.job_id);
+      if (processed.asset_id) {
+        const contentSha256 = processed.qualified_content_sha256
+          ?? processed.normalized_content_sha256;
+        const bootstrap = await getAgentCoreBootstrap();
+        const version = bootstrap.asset_versions.find((candidate) => (
+          candidate.asset_id === processed.asset_id
+          && (!contentSha256 || candidate.content_sha256 === contentSha256)
+        ));
+        if (version) registerExternalAsset(version);
+      }
       setResourceStates((current) => ({
         ...current,
         [resource.resource_id]: processed.state === "qualified" ? "ready"

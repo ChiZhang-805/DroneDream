@@ -89,8 +89,10 @@ def test_agent_core_platform_requests_remain_inside_the_metered_gateway() -> Non
     gateway = _text(MODEL_GATEWAY)
     planning = _text(AGENT_CORE_PLANNING)
 
-    assert "await issueManagedModelGrant(" in planning
-    assert planning.count('"assistant",') >= 2
+    assert planning.count("await issueManagedModelGrant(") >= 2
+    # Planning and execution may each invoke several model roles, so both must
+    # use the metered job grant rather than a single-call chat grant.
+    assert planning.count('"job",') >= 2
     assert "model_grant: grant.grant" in planning
     assert "gateway_base_url: modelGatewayBaseUrl(grant)" in planning
     assert planning.count("gateway_base_url: modelGatewayBaseUrl(grant)") >= 2

@@ -52,6 +52,7 @@ def _validate_primitive(primitive: CollisionPrimitive) -> None:
     """Validate immutable primitives once per batch, outside the sample loop."""
     if isinstance(primitive, MeshPrimitive):
         return  # Visual meshes never contribute collision clearance.
+    dimensions: tuple[float, ...]
     if isinstance(primitive, BoxPrimitive):
         dimensions = (primitive.size_x, primitive.size_y, primitive.size_z)
     elif isinstance(primitive, CylinderPrimitive):
@@ -312,7 +313,7 @@ def sample_polyline(points: Sequence[WorldPoint], interval_m: float) -> list[Wor
             )
             for sample_index in range(segment_samples)
         )
-    samples.append(tuple(points[-1]))
+    samples.append(points[-1])
     return samples
 
 

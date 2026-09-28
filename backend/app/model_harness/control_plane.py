@@ -19,7 +19,7 @@ import math
 import re
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Final, Literal, TypeAlias
+from typing import Final, Literal, TypeAlias, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -434,7 +434,8 @@ def _validate_json_value(value: object, depth: int = 0) -> None:
             _validate_json_value(item, depth + 1)
         return
     if type(value) in (list, tuple):
-        for item in value:
+        sequence_value = cast(list[object] | tuple[object, ...], value)
+        for item in sequence_value:
             _validate_json_value(item, depth + 1)
         return
     raise ValueError("structured Harness payload must contain only JSON values")

@@ -8,7 +8,10 @@ use std::path::{Path, PathBuf};
 //   config_dir：规范 tauri.conf.json 所在目录，不是临时覆盖配置所在目录。
 // 输出：
 //   result：有效前端目录，或阻止生成错误 EXE 的明确错误信息。
-pub fn validate_embedded_frontend(frontend_dist: &str, config_dir: &Path) -> Result<PathBuf, String> {
+pub fn validate_embedded_frontend(
+    frontend_dist: &str,
+    config_dir: &Path,
+) -> Result<PathBuf, String> {
     if frontend_dist.is_empty()
         || frontend_dist.trim() != frontend_dist
         || frontend_dist.contains(':')
@@ -18,7 +21,10 @@ pub fn validate_embedded_frontend(frontend_dist: &str, config_dir: &Path) -> Res
     }
     let directory = config_dir.join(frontend_dist);
     if !directory.join("index.html").is_file() {
-        return Err(format!("frontendDist has no index.html: {}", directory.display()));
+        return Err(format!(
+            "frontendDist has no index.html: {}",
+            directory.display()
+        ));
     }
     Ok(directory)
 }
@@ -35,8 +41,21 @@ mod tests {
     //   无；任一不安全路径未被拒绝时测试失败。
     #[test]
     fn rejects_nonembedded_destinations() {
-        for path in ["Q:/Build/frontend", "Q:\\Build\\frontend", "https://example.com", "file:///Q:/Build", "//server/share", "\\\\server\\share", "/tmp/frontend", "", " ../frontend"] {
-            assert!(validate_embedded_frontend(path, Path::new(".")).is_err(), "accepted {path}");
+        for path in [
+            "Q:/Build/frontend",
+            "Q:\\Build\\frontend",
+            "https://example.com",
+            "file:///Q:/Build",
+            "//server/share",
+            "\\\\server\\share",
+            "/tmp/frontend",
+            "",
+            " ../frontend",
+        ] {
+            assert!(
+                validate_embedded_frontend(path, Path::new(".")).is_err(),
+                "accepted {path}"
+            );
         }
     }
 
@@ -48,7 +67,8 @@ mod tests {
     //   无；入口存在时通过，入口缺失时拒绝。
     #[test]
     fn requires_an_actual_relative_entrypoint() {
-        let root = std::env::temp_dir().join(format!("dronedream-frontend-guard-{}", std::process::id()));
+        let root =
+            std::env::temp_dir().join(format!("dronedream-frontend-guard-{}", std::process::id()));
         std::fs::create_dir(&root).unwrap();
         let dist = root.join("dist");
         std::fs::create_dir(&dist).unwrap();

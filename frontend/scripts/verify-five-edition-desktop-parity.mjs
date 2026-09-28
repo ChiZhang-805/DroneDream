@@ -187,7 +187,7 @@ try {
               const main = document.querySelector(".app-main, .launcher-main");
               const lockup = document.querySelector(".app-title img, .universal-mode-switch-trigger img, .launcher-brand img");
               const title = document.querySelector(
-                "#main-content h1, #main-content h2, main h1, main h2, .assistant-hero-question, .state-title",
+                "#main-content h1, #main-content h2, main h1, main h2, .assistant-hero-question, .state-title, .app-header-title",
               );
               const adapterScroller = document.querySelector(".field-adapter-center .field-table-scroll");
               const adapterTable = document.querySelector(".field-adapter-table");

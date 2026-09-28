@@ -428,6 +428,70 @@ export interface AgentCoreMapResourceCatalog {
   resources: AgentCoreMapResource[];
 }
 
+export interface AgentCoreVehicleResource {
+  schema_version: "dronedream.vehicle-resource.v1";
+  resource_id: string;
+  display_name: Record<"zh-CN" | "en-US", string>;
+  description: Record<"zh-CN" | "en-US", string>;
+  category: "simulation_aircraft";
+  vehicle_class: "multicopter" | "vtol" | string;
+  default_resource: true;
+  install_mode: "on_demand";
+  review: {
+    status: "approved";
+    reviewed_at: string;
+    source_commit_pinned: boolean;
+    license_reviewed: boolean;
+    executable_content_required: boolean;
+  };
+  license: {
+    spdx_id: string;
+    name: string;
+    url: string;
+    commercial_use: boolean;
+    redistribution: boolean;
+    automated_analysis: boolean;
+  };
+  source: {
+    source_type: "git";
+    location: string;
+    expected_sha256: string;
+    git_ref: string;
+    subpath: string;
+    source_path_at_commit: string;
+    source_format: "gazebo-model-bundle";
+    expected_kind: "vehicle";
+    px4_sitl_model: string;
+  };
+  analysis: {
+    status: "preparsed";
+    parser: string;
+    source_commit: string;
+    sdf_version: string;
+    source_file_count: number;
+    source_size_bytes: number;
+    dependency_models: string[];
+    resolved_sensor_types: string[];
+    runtime_plugin_count: number;
+    joint_count: number;
+    recommended_for: string[];
+    excluded_from: string[];
+    notes: string[];
+  };
+  readiness: {
+    catalog: "ready";
+    planning: "preparsed";
+    simulation: "dependency_resolution_required" | "ready";
+    flight: "unqualified" | "qualified";
+    required_inputs: string[];
+  };
+}
+
+export interface AgentCoreVehicleResourceCatalog {
+  schema_version: "dronedream.vehicle-resource-catalog.v1";
+  catalog_revision: string;
+  resources: AgentCoreVehicleResource[];
+}
 export interface AgentCoreAssetQualificationJob {
   schema_version: "dronedream.asset-pair-qualification-job.v1";
   job_id: string;
@@ -1224,6 +1288,9 @@ export function listAgentCoreMapResources(): Promise<AgentCoreMapResourceCatalog
   return requestJson("/v1/map-resource-catalog");
 }
 
+export function listAgentCoreVehicleResources(): Promise<AgentCoreVehicleResourceCatalog> {
+  return requestJson("/v1/vehicle-resource-catalog");
+}
 export function listAgentCoreAssetImportJobs(): Promise<AgentCoreAssetImportJob[]> {
   return requestJson("/v1/asset-import-jobs");
 }

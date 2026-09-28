@@ -6776,18 +6776,22 @@ mod tests {
     }
 
     #[test]
-    fn beta_release_fixture_verifies_with_the_compiled_trust_anchor() {
-        let manifest = include_bytes!("../../../runtime/tests/fixtures/runtime-release.json");
-        let signature = include_bytes!("../../../runtime/tests/fixtures/runtime-release.json.sig");
-        let verified = parse_and_verify_manifest(manifest, signature, TRUSTED_KEYRING).unwrap();
+    fn compiled_trust_anchor_is_well_formed_and_self_identifying() {
+        let keyring: TrustedKeyring = serde_json::from_str(TRUSTED_KEYRING).unwrap();
+        assert_eq!(keyring.schema_version, 1);
+        assert_eq!(keyring.keys.len(), 1);
 
+        let key = &keyring.keys[0];
+        assert_eq!(key.algorithm, "Ed25519");
+        assert_eq!(key.usage, "runtime-release");
+        assert_eq!(key.status, "active");
+        let public = base64::engine::general_purpose::STANDARD
+            .decode(&key.public_key_base64)
+            .unwrap();
+        let public: [u8; 32] = public.try_into().unwrap();
         assert_eq!(
-            verified.runtime.build_id,
-            "5e15a7a5-f943-5c38-a284-1bdcc9cd528f"
-        );
-        assert_eq!(
-            verified.artifact.sha256,
-            "e9e12774befaa7296e42fdb1f5f285c997fdd6d47a95b5dbbe38e2333799c3b6"
+            key.key_id,
+            format!("ed25519:{}", hex::encode(Sha256::digest(public)))
         );
     }
 

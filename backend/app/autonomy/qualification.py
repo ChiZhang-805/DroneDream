@@ -24,6 +24,7 @@ from pydantic import Field, model_validator
 
 from app.autonomy.catalog import get_bundled_map_manifest, get_scene
 from app.autonomy.models import StrictModel, Vector3
+from app.json_boundaries import json_nesting_within_limit
 
 MAX_MAP_ASSET_BYTES = 25 * 1024 * 1024
 MAX_ASSET_RECEIPTS = 512
@@ -614,6 +615,8 @@ def _finite_json_number(value: str) -> float:
 
 def _decode_asset_json(data: bytes) -> object:
     """Decode inert JSON with finite numbers; callers convert parser failures into receipts."""
+    if not json_nesting_within_limit(data):
+        raise ValueError("asset JSON nesting limit exceeded")
     return json.loads(
         data.decode("utf-8"), parse_constant=_finite_json_number, parse_float=_finite_json_number
     )
