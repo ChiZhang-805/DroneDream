@@ -38,6 +38,24 @@ describe("qualified map and vehicle bindings", () => {
     expect(bound.mapPack.qualificationReceiptId).toBe(fixture.job.qualification_id);
   });
 
+  it("resolves the receipt-bound vehicle version instead of an unrelated newer version", async () => {
+    const vehicle = fixture.versions.find((version) => version.kind === "vehicle")!;
+    fixture.versions.push({
+      ...vehicle,
+      content_sha256: "f".repeat(64),
+      imported_at: "2099-01-01T00:00:00.000Z",
+    });
+    const original = defaultAutonomyWorkspace();
+    const pair = selectedPair(FALLBACK_ASSET_PAIR_CATALOG, "dronedream-school-map", "px4-x500-depth")!;
+    const bound = await bindCatalogAssetPair(
+      original,
+      loadAutonomyAssetLibrary("catalog-exact-receipt", "autonomy", original),
+      pair,
+    );
+    expect(bound.aircraft.agentCoreContentSha256).toBe(fixture.job.result_vehicle_content_sha256);
+    expect(bound.aircraft.agentCoreContentSha256).not.toBe("f".repeat(64));
+  });
+
   it("restores an unbound selected pair, then passes real harness inspection", async () => {
     const original = defaultAutonomyWorkspace();
     const bound = await reconcileAgentCoreWorkspace(original, loadAutonomyAssetLibrary("test", "autonomy", original));

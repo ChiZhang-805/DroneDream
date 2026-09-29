@@ -932,14 +932,22 @@ body:has(.autonomy-platform-page),
   left: calc(100% + 0.42rem);
   display: grid;
   width: 13.5rem;
-  max-height: min(31rem, calc(100vh - 3rem));
+  /* Seven rows remain visible; additional choices stay wheel-scrollable. */
+  max-height: min(17.47rem, calc(100vh - 3rem));
   gap: 0.16rem;
   padding: 0.38rem;
   overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   border: 1px solid #ddd4e0;
   border-radius: 0.78rem;
   background: rgba(255, 255, 255, 0.99);
   box-shadow: 0 16px 38px rgba(48, 27, 53, 0.16);
+}
+
+.autonomy-context-submenu::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .autonomy-context-choice {

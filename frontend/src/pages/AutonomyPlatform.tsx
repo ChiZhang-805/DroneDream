@@ -2118,6 +2118,7 @@ export function AutonomyOverview() {
                           onClick={() => {
                             if (isAircraft) setSelectedContextAircraftId(null);
                             else setSelectedContextMapId(null);
+                            setError(null);
                             setContextSubmenu(null);
                           }}
                         ><b>{copy.clearSelection}</b>{!selectedId ? <span aria-hidden="true">✓</span> : null}</button>
@@ -2132,6 +2133,7 @@ export function AutonomyOverview() {
                             onClick={() => {
                               if (isAircraft) setSelectedContextAircraftId(choice.resourceId);
                               else setSelectedContextMapId(choice.resourceId);
+                              setError(null);
                               setContextSubmenu(null);
                             }}
                           ><b>{choice.name[chinese ? "zh-CN" : "en-US"]}</b>{selected ? <span aria-hidden="true">✓</span> : null}</button>;

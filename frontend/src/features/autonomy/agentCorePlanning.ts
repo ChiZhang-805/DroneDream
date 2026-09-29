@@ -308,20 +308,52 @@ function assertVerifiedPairEvidence(
 //   workspace：当前地图与飞机选择；页面缓存的回执标识不作为认证依据。
 // 输出：
 //   pair：通过输入包、输出包、运行契约及回执交叉校验的资产组合。
-export async function resolveAgentCoreAssetPair(workspace: AutonomyWorkspaceState) {
+export async function resolveAgentCoreAssetPair(
+  workspace: AutonomyWorkspaceState,
+  preferredQualificationId?: string | null,
+) {
   const bootstrap = await getAgentCoreBootstrap();
-  const mapVersion = latestAssetVersion(
-    bootstrap.asset_versions,
-    workspace.mapPack.agentCoreAssetId,
-    workspace.mapPack.agentCoreContentSha256,
-    "map",
-  );
-  const vehicleVersion = latestAssetVersion(
-    bootstrap.asset_versions,
-    workspace.aircraft.agentCoreAssetId,
-    workspace.aircraft.agentCoreContentSha256,
-    "vehicle",
-  );
+  const preferredJob = preferredQualificationId
+    ? bootstrap.asset_qualification_jobs.find((candidate) => (
+        candidate.qualification_id === preferredQualificationId
+        && candidate.state === "qualified"
+        && candidate.progress_percent === 100
+        && candidate.map_asset_id === workspace.mapPack.agentCoreAssetId
+        && candidate.vehicle_asset_id === workspace.aircraft.agentCoreAssetId
+      ))
+    : null;
+  if (preferredQualificationId && !preferredJob) {
+    throw new Error("AGENT_CORE_ASSET_PAIR_QUALIFICATION_JOB_NOT_FOUND");
+  }
+  const mapVersion = preferredJob
+    ? bootstrap.asset_versions.find((version) => (
+        version.asset_id === preferredJob.map_asset_id
+        && (version.kind === "map" || version.kind === "world")
+        && version.maturity === "qualified"
+        && version.content_sha256 === preferredJob.result_map_content_sha256
+      ))
+    : latestAssetVersion(
+        bootstrap.asset_versions,
+        workspace.mapPack.agentCoreAssetId,
+        workspace.mapPack.agentCoreContentSha256,
+        "map",
+      );
+  const vehicleVersion = preferredJob
+    ? bootstrap.asset_versions.find((version) => (
+        version.asset_id === preferredJob.vehicle_asset_id
+        && version.kind === "vehicle"
+        && version.maturity === "qualified"
+        && version.content_sha256 === preferredJob.result_vehicle_content_sha256
+      ))
+    : latestAssetVersion(
+        bootstrap.asset_versions,
+        workspace.aircraft.agentCoreAssetId,
+        workspace.aircraft.agentCoreContentSha256,
+        "vehicle",
+      );
+  if (!mapVersion || !vehicleVersion) {
+    throw new Error("AGENT_CORE_ASSET_VERSION_NOT_FOUND:qualification");
+  }
   const jobs = bootstrap.asset_qualification_jobs.filter((candidate) => (
     candidate.state === "qualified"
     && candidate.progress_percent === 100
@@ -331,7 +363,7 @@ export async function resolveAgentCoreAssetPair(workspace: AutonomyWorkspaceStat
     && candidate.vehicle_asset_id === vehicleVersion.asset_id
     && candidate.result_vehicle_content_sha256 === vehicleVersion.content_sha256
   )).sort((left, right) => right.updated_at.localeCompare(left.updated_at));
-  const job = jobs.find((candidate) => (
+  const job = preferredJob ?? jobs.find((candidate) => (
     candidate.qualification_id === workspace.mapPack.qualificationReceiptId
     && candidate.qualification_id === workspace.aircraft.qualificationReceiptId
   )) ?? jobs[0];

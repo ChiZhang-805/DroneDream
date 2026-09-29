@@ -295,7 +295,7 @@ export async function bindCatalogAssetPair(
       agentCoreRuntimeContract: null,
     },
   };
-  const resolved = await resolveAgentCoreAssetPair(selectedWorkspace);
+  const resolved = await resolveAgentCoreAssetPair(selectedWorkspace, pair.qualification_id);
   if (resolved.job.qualification_id !== pair.qualification_id) {
     throw new Error("AGENT_CORE_ASSET_PAIR_QUALIFICATION_ID_MISMATCH");
   }
