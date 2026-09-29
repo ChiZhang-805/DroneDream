@@ -928,7 +928,8 @@ body:has(.autonomy-platform-page),
 .autonomy-context-submenu {
   position: absolute;
   z-index: 2;
-  top: -0.38rem;
+  top: auto;
+  bottom: -0.38rem;
   left: calc(100% + 0.42rem);
   display: grid;
   width: 13.5rem;
@@ -22738,16 +22739,13 @@ body {
   background: #16121f;
 }
 
-/* Map cards use a high oblique drone-like view. The enlarged crop keeps the
-   source boundary and unrelated space outside the visible card. */
 .autonomy-repository-preview.is-map > img {
-  inset: -18%;
-  width: 136%;
-  height: 136%;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  transform: perspective(760px) rotateX(43deg) rotateZ(-6deg) scale(1.48) translateY(-1%);
-  transform-origin: 50% 48%;
-  filter: saturate(1.05) contrast(1.04);
+  transform: none;
+  filter: saturate(1.03) contrast(1.03);
 }
 
 .autonomy-repository-preview.is-map::after {
@@ -22763,13 +22761,13 @@ body {
   inset: 0;
   width: 100%;
   height: 100%;
-  object-position: 50% 28%;
-  transform: scale(1.22);
+  object-position: center;
+  transform: none;
 }
 
 .autonomy-repository-preview.is-map[data-preview-key="campus-site"] > img,
 .autonomy-repository-preview.is-map[data-preview-key="open-test-arena"] > img {
-  transform: perspective(760px) rotateX(40deg) rotateZ(-5deg) scale(1.62) translateY(-1%);
+  transform: none;
 }
 
 .autonomy-repository-preview.is-imported::after {
@@ -22782,9 +22780,12 @@ body {
 
 .autonomy-repository-copy {
   min-width: 0;
-  display: grid;
+  display: flex;
+  min-height: 3rem;
+  align-items: center;
   gap: 0.2rem;
-  padding: 0.8rem 2.8rem 0.85rem 0.9rem;
+  padding: 0.55rem 2.8rem 0.55rem 0.9rem;
+  box-sizing: border-box;
 }
 
 .autonomy-repository-copy strong,
@@ -22801,7 +22802,7 @@ body {
 .autonomy-repository-delete {
   position: absolute;
   right: 0.65rem;
-  bottom: 0.7rem;
+  bottom: 0.6rem;
   display: grid;
   width: 1.8rem;
   height: 1.8rem;

@@ -66,18 +66,18 @@ try {
   // current, reachable map repository here; geometric scene contracts remain
   // covered by the school-map unit and mission-validation suites.
   await openProductPage(page, "/console/autonomy/maps", ".autonomy-repository-page");
-  const schoolMap = page.locator(".autonomy-repository-grid article").filter({ hasText: "School Map" });
-  if (await schoolMap.count() !== 1) throw new Error("Map repository must expose exactly one School Map card.");
-  if (await schoolMap.getAttribute("data-selected") !== "true") throw new Error("School Map must be the default selected map.");
+  const schoolMap = page.locator(".autonomy-repository-grid article").filter({ hasText: "School Grounds" });
+  if (await schoolMap.count() !== 1) throw new Error("Map repository must expose exactly one School Grounds card.");
+  if (await schoolMap.getAttribute("data-selected") !== "false") throw new Error("Map repository must begin without a selected map.");
   if (await page.locator(".autonomy-asset-toolbar button").count() !== 0) throw new Error("Map repository must not expose an in-product map creator.");
   if (await page.getByRole("button", { name: "Import map", exact: true }).count() !== 1) throw new Error("Map repository is missing its external import action.");
   const mapScreenshot = path.join(outputRoot, `${screenshotPrefix}school-map-repository-1600x1000.png`);
   await page.screenshot({ path: mapScreenshot, fullPage: false });
 
   await openProductPage(page, "/console/autonomy/aircraft", ".autonomy-repository-page");
-  const myDrone = page.locator(".autonomy-repository-grid article").filter({ hasText: "My Drone" });
-  if (await myDrone.count() !== 1) throw new Error("Aircraft repository must expose exactly one My Drone card.");
-  if (await myDrone.getAttribute("data-selected") !== "true") throw new Error("My Drone must be the default selected aircraft.");
+  const myDrone = page.locator(".autonomy-repository-grid article").filter({ hasText: "X500 Depth" });
+  if (await myDrone.count() !== 1) throw new Error("Aircraft repository must expose exactly one X500 Depth card.");
+  if (await myDrone.getAttribute("data-selected") !== "false") throw new Error("Aircraft repository must begin without a selected aircraft.");
   if (await page.locator(".autonomy-asset-toolbar button").count() !== 0) throw new Error("Aircraft repository must not expose an in-product model creator.");
   if (await page.getByRole("button", { name: "Import aircraft", exact: true }).count() !== 1) throw new Error("Aircraft repository is missing its external import action.");
   const aircraftScreenshot = path.join(outputRoot, `${screenshotPrefix}my-drone-repository-1600x1000.png`);
@@ -87,8 +87,30 @@ try {
   await page.locator(".assistant-add-button").click();
   const contextPopover = page.locator(".autonomy-context-popover");
   await contextPopover.waitFor({ state: "visible" });
-  if (await contextPopover.getByText("My Drone", { exact: true }).count() !== 1) throw new Error("Mission Context must expose exactly one My Drone entry.");
-  if (await contextPopover.getByText("School Map", { exact: true }).count() !== 1) throw new Error("Mission Context must expose exactly one School Map entry.");
+  if (await contextPopover.getByText("Select aircraft", { exact: true }).count() !== 1) throw new Error("Mission Context must begin without a selected aircraft.");
+  if (await contextPopover.getByText("Select map", { exact: true }).count() !== 1) throw new Error("Mission Context must begin without a selected map.");
+  const selectMap = contextPopover.getByRole("menuitem", { name: "Select map", exact: true });
+  await selectMap.hover();
+  const mapSubmenu = contextPopover.locator(".autonomy-context-submenu");
+  await mapSubmenu.waitFor({ state: "visible" });
+  const [mapRowBox, submenuBox] = await Promise.all([selectMap.boundingBox(), mapSubmenu.boundingBox()]);
+  if (!mapRowBox || !submenuBox) throw new Error("Map submenu geometry could not be measured.");
+  if (submenuBox.y >= mapRowBox.y) throw new Error("Map submenu must expand upward when the composer is near the viewport bottom.");
+  if (submenuBox.y < 0 || submenuBox.y + submenuBox.height > 1000) throw new Error("Map submenu must stay inside the viewport.");
+  const submenuMetrics = await mapSubmenu.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      scrollbarWidth: style.scrollbarWidth,
+    };
+  });
+  if (submenuMetrics.scrollHeight <= submenuMetrics.clientHeight) throw new Error("Map submenu must cap visible choices and remain wheel-scrollable.");
+  if (submenuMetrics.scrollbarWidth !== "none") throw new Error("Map submenu scrollbar must remain visually hidden.");
+  await mapSubmenu.hover();
+  await page.mouse.wheel(0, 500);
+  await page.waitForTimeout(100);
+  if (await mapSubmenu.evaluate((element) => element.scrollTop) <= 0) throw new Error("Map submenu did not respond to mouse-wheel scrolling.");
   const contextScreenshot = path.join(outputRoot, `${screenshotPrefix}autonomy-mission-context-1600x1000.png`);
   await page.screenshot({ path: contextScreenshot, fullPage: false });
 

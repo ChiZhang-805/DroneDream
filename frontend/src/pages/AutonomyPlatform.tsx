@@ -2270,20 +2270,43 @@ function RepositoryAssetPreview({
   );
 }
 
+function useHiddenCatalogResources(kind: CatalogAssetKind): [Set<string>, (key: string) => void] {
+  const storageKey = `dronedream:autonomy-hidden-catalog:v1:${kind}`;
+  const [hidden, setHidden] = useState<Set<string>>(() => {
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(storageKey) ?? "[]") as unknown;
+      return new Set(Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string").slice(0, 100) : []);
+    } catch {
+      return new Set();
+    }
+  });
+  const hide = (key: string) => setHidden((current) => {
+    const next = new Set(current);
+    next.add(key);
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify([...next].slice(0, 100)));
+    } catch {
+      // The catalog remains hidden for this session when storage is disabled.
+    }
+    return next;
+  });
+  return [hidden, hide];
+}
+
 export function AutonomyAircraft() {
   const {
     edition,
     chinese,
-    workspace,
     assetLibrary,
     selectAircraft,
     registerExternalAsset,
     removeAsset,
   } = useAutonomyWorkspace();
   const [details, setDetails] = useState<{ title: string; rows: Array<[string, string]> } | null>(null);
+  const [selectedRepositoryAircraftId, setSelectedRepositoryAircraftId] = useState<string | null>(null);
+  const [hiddenCatalogResources, hideCatalogResource] = useHiddenCatalogResources("vehicle");
   const [defaultResources, setDefaultResources] = useState<AgentCoreVehicleResource[]>([]);
   const [resourceStates, setResourceStates] = useState<Record<string, "idle" | "working" | "qualification" | "ready" | "error">>({});
-  const defaultAircraftId = defaultAutonomyWorkspace().aircraft.id;
   const catalogDefinitions = catalogAssetDefinitions("vehicle");
   const customAircraft = assetLibrary.aircraft.filter((aircraft) => !catalogAssetKey(
     "vehicle",
@@ -2372,7 +2395,7 @@ export function AutonomyAircraft() {
         <AutonomyAssetConnectorPanel kind="vehicle" chinese={chinese} compact />
       </div>
       <div className="autonomy-repository-grid" aria-label={chinese ? "无人机仓库" : "Aircraft repository"}>
-        {catalogDefinitions.map((definition) => {
+        {catalogDefinitions.filter((definition) => !hiddenCatalogResources.has(definition.key)).map((definition) => {
           const aircraft = assetLibrary.aircraft.find((candidate) => catalogAssetKey(
             "vehicle",
             candidate.agentCoreAssetId?.trim() || candidate.id,
@@ -2387,12 +2410,17 @@ export function AutonomyAircraft() {
           return <article
             key={definition.key}
             data-catalog-resource="true"
-            data-selected={Boolean(aircraft && workspace.aircraft.id === aircraft.id)}
+            data-selected={Boolean(aircraft && selectedRepositoryAircraftId === aircraft.id)}
           >
             <button
               type="button"
               className="autonomy-repository-card-surface"
-              onClick={() => { if (aircraft) selectAircraft(aircraft.id); }}
+              onClick={() => {
+                if (aircraft) {
+                  setSelectedRepositoryAircraftId(aircraft.id);
+                  selectAircraft(aircraft.id);
+                }
+              }}
               onDoubleClick={() => {
                 if (aircraft) openAircraftDetails(aircraft);
                 else if (resource) openResourceDetails(resource);
@@ -2413,25 +2441,30 @@ export function AutonomyAircraft() {
               title={chinese ? "准备这个无人机资源" : "Prepare this aircraft resource"}
               onClick={() => void prepareDefaultResource(resource)}
             ><Upload aria-hidden="true" /></button> : null}
-            {aircraft && aircraft.id !== defaultAircraftId ? (
-              <button
-                type="button"
-                className="autonomy-repository-delete"
-                aria-label={chinese ? `删除 ${aircraft.name}` : `Delete ${aircraft.name}`}
-                onClick={() => removeAsset("aircraft", aircraft.id)}
-              ><Trash2 aria-hidden="true" /></button>
-            ) : null}
+            <button
+              type="button"
+              className="autonomy-repository-delete"
+              aria-label={chinese ? "删除无人机" : "Delete aircraft"}
+              title={chinese ? `删除 ${presentation.name}` : `Delete ${presentation.name}`}
+              onClick={() => {
+                hideCatalogResource(definition.key);
+                if (aircraft?.id === selectedRepositoryAircraftId) setSelectedRepositoryAircraftId(null);
+              }}
+            ><Trash2 aria-hidden="true" /></button>
           </article>;
         })}
         {customAircraft.map((aircraft) => {
           const presentation = catalogAssetPresentation("vehicle", aircraft.agentCoreAssetId?.trim() || aircraft.id, aircraft.name, chinese);
-          return <article key={aircraft.id} data-selected={workspace.aircraft.id === aircraft.id}>
-            <button type="button" className="autonomy-repository-card-surface" onClick={() => selectAircraft(aircraft.id)} onDoubleClick={() => openAircraftDetails(aircraft)}>
+          return <article key={aircraft.id} data-selected={selectedRepositoryAircraftId === aircraft.id}>
+            <button type="button" className="autonomy-repository-card-surface" onClick={() => {
+              setSelectedRepositoryAircraftId(aircraft.id);
+              selectAircraft(aircraft.id);
+            }} onDoubleClick={() => openAircraftDetails(aircraft)}>
               <RepositoryAssetPreview kind="vehicle" previewUrl={presentation.previewUrl} previewKey={presentation.key} name={presentation.name} />
               <span className="autonomy-repository-copy"><strong title={presentation.name}>{presentation.name}</strong></span>
             </button>
             <AssetInterpretButton edition={edition} chinese={chinese} kind="vehicle" assetId={aircraft.agentCoreAssetId ?? null} contentSha256={aircraft.agentCoreContentSha256 ?? null} name={aircraft.name} />
-            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${aircraft.name}` : `Delete ${aircraft.name}`} onClick={() => removeAsset("aircraft", aircraft.id)}><Trash2 aria-hidden="true" /></button>
+            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? "删除无人机" : "Delete aircraft"} title={chinese ? `删除 ${aircraft.name}` : `Delete ${aircraft.name}`} onClick={() => removeAsset("aircraft", aircraft.id)}><Trash2 aria-hidden="true" /></button>
           </article>;
         })}
         {externalAircraft.map((asset) => (
@@ -2452,7 +2485,7 @@ export function AutonomyAircraft() {
               <span className="autonomy-repository-copy"><strong title={asset.name}>{asset.name}</strong></span>
             </button>
             <AssetInterpretButton edition={edition} chinese={chinese} kind="vehicle" assetId={asset.id} contentSha256={asset.contentSha256} name={asset.name} />
-            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${asset.name}` : `Delete ${asset.name}`} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
+            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? "删除无人机" : "Delete aircraft"} title={chinese ? `删除 ${asset.name}` : `Delete ${asset.name}`} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
           </article>
         ))}
       </div>
@@ -2472,10 +2505,11 @@ export function AutonomyMaps() {
     removeAsset,
   } = useAutonomyWorkspace();
   const [details, setDetails] = useState<{ title: string; rows: Array<[string, string]> } | null>(null);
+  const [selectedRepositoryMapId, setSelectedRepositoryMapId] = useState<string | null>(null);
+  const [hiddenCatalogResources, hideCatalogResource] = useHiddenCatalogResources("map");
   const [expandedMapKey, setExpandedMapKey] = useState<string | null>(null);
   const [defaultResources, setDefaultResources] = useState<AgentCoreMapResource[]>([]);
   const [resourceStates, setResourceStates] = useState<Record<string, "idle" | "working" | "conversion" | "ready" | "error">>({});
-  const defaultMapId = defaultAutonomyWorkspace().mapPack.id;
   const catalogDefinitions = catalogAssetDefinitions("map");
   const customMaps = assetLibrary.maps.filter((mapPack) => !catalogAssetKey(
     "map",
@@ -2571,7 +2605,7 @@ export function AutonomyMaps() {
         <AutonomyAssetConnectorPanel kind="map" chinese={chinese} compact />
       </div>
       <div className="autonomy-repository-grid" aria-label={chinese ? "地图仓库" : "Map repository"}>
-        {catalogDefinitions.map((definition) => {
+        {catalogDefinitions.filter((definition) => !hiddenCatalogResources.has(definition.key)).map((definition) => {
           const mapPack = assetLibrary.maps.find((candidate) => catalogAssetKey(
             "map",
             candidate.agentCoreAssetId?.trim() || candidate.id,
@@ -2594,7 +2628,7 @@ export function AutonomyMaps() {
           return <article
             key={definition.key}
             data-catalog-resource="true"
-            data-selected={Boolean(mapPack && workspace.mapPack.id === mapPack.id)}
+            data-selected={Boolean(mapPack && selectedRepositoryMapId === mapPack.id)}
             data-airspace-expanded={canShowAirspace}
           >
             <button
@@ -2602,7 +2636,10 @@ export function AutonomyMaps() {
               className="autonomy-repository-card-surface"
               onClick={() => {
                 setExpandedMapKey((current) => current === definition.key ? null : definition.key);
-                if (mapPack) selectMap(mapPack.id);
+                if (mapPack) {
+                  setSelectedRepositoryMapId(mapPack.id);
+                  selectMap(mapPack.id);
+                }
               }}
               onDoubleClick={() => {
                 if (mapPack) openMapDetails(mapPack);
@@ -2622,7 +2659,16 @@ export function AutonomyMaps() {
               title={chinese ? "准备这个地图资源" : "Prepare this map resource"}
               onClick={() => void prepareDefaultResource(resource)}
             ><Upload aria-hidden="true" /></button> : null}
-            {mapPack && mapPack.id !== defaultMapId ? <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${mapPack.name}` : `Delete ${mapPack.name}`} onClick={() => removeAsset("map", mapPack.id)}><Trash2 aria-hidden="true" /></button> : null}
+            <button
+              type="button"
+              className="autonomy-repository-delete"
+              aria-label={chinese ? "删除地图" : "Delete map"}
+              title={chinese ? `删除 ${presentation.name}` : `Delete ${presentation.name}`}
+              onClick={() => {
+                hideCatalogResource(definition.key);
+                if (mapPack?.id === selectedRepositoryMapId) setSelectedRepositoryMapId(null);
+              }}
+            ><Trash2 aria-hidden="true" /></button>
             {canShowAirspace ? <div className="autonomy-repository-airspace-detail">
               <PreferredAirspaceView
                 chinese={chinese}
@@ -2647,16 +2693,17 @@ export function AutonomyMaps() {
             && spaceVehicle.agentCoreAssetId
             && spaceVehicle.agentCoreContentSha256,
           );
-          return <article key={mapPack.id} data-selected={workspace.mapPack.id === mapPack.id} data-airspace-expanded={canShowAirspace}>
+          return <article key={mapPack.id} data-selected={selectedRepositoryMapId === mapPack.id} data-airspace-expanded={canShowAirspace}>
             <button type="button" className="autonomy-repository-card-surface" onClick={() => {
               setExpandedMapKey((current) => current === key ? null : key);
+              setSelectedRepositoryMapId(mapPack.id);
               selectMap(mapPack.id);
             }} onDoubleClick={() => openMapDetails(mapPack)}>
               <RepositoryAssetPreview kind="map" previewUrl={presentation.previewUrl} previewKey={presentation.key} name={presentation.name} />
               <span className="autonomy-repository-copy"><strong title={presentation.name}>{presentation.name}</strong></span>
             </button>
             <AssetInterpretButton edition={edition} chinese={chinese} kind="map" assetId={mapPack.agentCoreAssetId ?? null} contentSha256={mapPack.agentCoreContentSha256 ?? null} name={mapPack.name} />
-            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${mapPack.name}` : `Delete ${mapPack.name}`} onClick={() => removeAsset("map", mapPack.id)}><Trash2 aria-hidden="true" /></button>
+            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? "删除地图" : "Delete map"} title={chinese ? `删除 ${mapPack.name}` : `Delete ${mapPack.name}`} onClick={() => removeAsset("map", mapPack.id)}><Trash2 aria-hidden="true" /></button>
             {canShowAirspace ? <div className="autonomy-repository-airspace-detail">
               <PreferredAirspaceView
                 chinese={chinese}
@@ -2678,7 +2725,7 @@ export function AutonomyMaps() {
               <span className="autonomy-repository-copy"><strong title={asset.name}>{asset.name}</strong></span>
             </button>
             <AssetInterpretButton edition={edition} chinese={chinese} kind="map" assetId={asset.id} contentSha256={asset.contentSha256} name={asset.name} />
-            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${asset.name}` : `Delete ${asset.name}`} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
+            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? "删除地图" : "Delete map"} title={chinese ? `删除 ${asset.name}` : `Delete ${asset.name}`} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
           </article>
         ))}
       </div>
