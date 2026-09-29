@@ -52,10 +52,10 @@ describe("asset card presentation", () => {
   it("uses concise bilingual names and bundled previews", () => {
     expect(catalogAssetPresentation("map", "open-rmf-battle-royale", "battle-royale", true)).toEqual({
       key: "open-test-arena",
-      name: "开放测试场",
+      name: "开放试验场",
       previewUrl: "/asset-previews/maps/open-test-arena.webp",
     });
-    expect(catalogAssetPresentation("vehicle", "px4-x500-lidar-front", "x500", false).name).toBe("X500 Forward LiDAR");
+    expect(catalogAssetPresentation("vehicle", "px4-x500-lidar-front", "x500", false).name).toBe("X500 Front LiDAR");
   });
 
   it("preserves genuinely user-imported assets", () => {

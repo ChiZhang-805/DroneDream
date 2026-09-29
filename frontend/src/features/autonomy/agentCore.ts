@@ -806,6 +806,7 @@ export interface AgentCoreAssetPairCatalogEntry {
   status: AgentCoreAssetPairStatus;
   compatible: boolean;
   qualification_id: string | null;
+  qualified_map_asset_id: string | null;
   qualified_vehicle_asset_id: string | null;
   qualification_scope: string | null;
   reasons: string[];

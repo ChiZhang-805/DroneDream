@@ -2,7 +2,8 @@ import { webcrypto } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as core from "../features/autonomy/agentCore";
 import { inspectAgentCoreAssetBindings, resolveAgentCoreAssetPair } from "../features/autonomy/agentCorePlanning";
-import { bindVerifiedAssetPair, reconcileAgentCoreWorkspace } from "../features/autonomy/assetPairBinding";
+import { bindCatalogAssetPair, bindVerifiedAssetPair, reconcileAgentCoreWorkspace } from "../features/autonomy/assetPairBinding";
+import { FALLBACK_ASSET_PAIR_CATALOG, selectedPair } from "../features/autonomy/assetPairSelection";
 import { autonomyHarnessRequest } from "../features/autonomy/missionHarness";
 import { defaultAutonomyWorkspace, normalizeAutonomyWorkspace } from "../features/autonomy/workspaceStore";
 import { loadAutonomyAssetLibrary } from "../features/autonomy/assetLibraryStore";
@@ -23,6 +24,20 @@ beforeEach(() => {
 });
 
 describe("qualified map and vehicle bindings", () => {
+  it("resolves a catalog resource selection to its installed package IDs", async () => {
+    const original = defaultAutonomyWorkspace();
+    const pair = selectedPair(FALLBACK_ASSET_PAIR_CATALOG, "dronedream-school-map", "px4-x500-depth");
+    expect(pair?.qualified_map_asset_id).toBe("dronedream.school-map.v1");
+    const bound = await bindCatalogAssetPair(
+      original,
+      loadAutonomyAssetLibrary("catalog", "autonomy", original),
+      pair!,
+    );
+    expect(bound.mapPack.agentCoreAssetId).toBe(fixture.job.map_asset_id);
+    expect(bound.aircraft.agentCoreAssetId).toBe(fixture.job.vehicle_asset_id);
+    expect(bound.mapPack.qualificationReceiptId).toBe(fixture.job.qualification_id);
+  });
+
   it("restores an unbound selected pair, then passes real harness inspection", async () => {
     const original = defaultAutonomyWorkspace();
     const bound = await reconcileAgentCoreWorkspace(original, loadAutonomyAssetLibrary("test", "autonomy", original));

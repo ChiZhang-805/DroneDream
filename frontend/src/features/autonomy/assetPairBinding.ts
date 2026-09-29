@@ -1,4 +1,4 @@
-import type { AgentCoreAssetPairRuntimeContracts, AgentCoreAssetQualificationJob, AgentCoreAssetVersion } from "./agentCore";
+import type { AgentCoreAssetPairCatalogEntry, AgentCoreAssetPairRuntimeContracts, AgentCoreAssetQualificationJob, AgentCoreAssetVersion } from "./agentCore";
 import type { AutonomyAssetLibrary, AutonomyExternalAssetReference } from "./assetLibraryStore";
 import { autonomyAssetPairQualified } from "./autonomyPlanning";
 import { resolveAgentCoreAssetPair } from "./agentCorePlanning";
@@ -254,6 +254,59 @@ export function bindVerifiedAssetPair(workspace: AutonomyWorkspaceState, assetLi
 export async function reconcileAgentCoreWorkspace(workspace: AutonomyWorkspaceState, assetLibrary: AutonomyAssetLibrary) {
   const pair = await resolveAgentCoreAssetPair(workspace);
   const binding = bindVerifiedAssetPair(workspace, assetLibrary, pair.job, pair.mapVersion, pair.vehicleVersion, pair.evidence.runtime_contracts);
+  if (!binding) throw new Error("AGENT_CORE_ASSET_PAIR_BINDING_REQUIRED");
+  return binding.workspace;
+}
+
+// Resolve a catalog selection to the concrete packages installed by Agent Core.
+// Catalog resource IDs are presentation identities and are not always package
+// asset IDs (for example, open-rmf-office is installed as the asset "office").
+export async function bindCatalogAssetPair(
+  workspace: AutonomyWorkspaceState,
+  assetLibrary: AutonomyAssetLibrary,
+  pair: AgentCoreAssetPairCatalogEntry,
+) {
+  if (
+    pair.status !== "qualified_builtin"
+    || !pair.compatible
+    || !/^asset-qualification-[0-9a-f]{24}$/u.test(pair.qualification_id ?? "")
+    || !pair.qualified_map_asset_id?.trim()
+    || !pair.qualified_vehicle_asset_id?.trim()
+  ) throw new Error("AGENT_CORE_ASSET_PAIR_BINDING_REQUIRED");
+
+  const selectedWorkspace: AutonomyWorkspaceState = {
+    ...workspace,
+    aircraft: {
+      ...workspace.aircraft,
+      name: pair.vehicle_display_name["en-US"],
+      agentCoreAssetId: pair.qualified_vehicle_asset_id,
+      agentCoreContentSha256: null,
+      qualificationReceiptId: null,
+      qualificationContentHash: null,
+      agentCoreRuntimeContract: null,
+    },
+    mapPack: {
+      ...workspace.mapPack,
+      name: pair.map_display_name["en-US"],
+      agentCoreAssetId: pair.qualified_map_asset_id,
+      agentCoreContentSha256: null,
+      qualificationReceiptId: null,
+      contentHash: null,
+      agentCoreRuntimeContract: null,
+    },
+  };
+  const resolved = await resolveAgentCoreAssetPair(selectedWorkspace);
+  if (resolved.job.qualification_id !== pair.qualification_id) {
+    throw new Error("AGENT_CORE_ASSET_PAIR_QUALIFICATION_ID_MISMATCH");
+  }
+  const binding = bindVerifiedAssetPair(
+    selectedWorkspace,
+    assetLibrary,
+    resolved.job,
+    resolved.mapVersion,
+    resolved.vehicleVersion,
+    resolved.evidence.runtime_contracts,
+  );
   if (!binding) throw new Error("AGENT_CORE_ASSET_PAIR_BINDING_REQUIRED");
   return binding.workspace;
 }

@@ -7,7 +7,7 @@ import { autonomyConversationPath, listAutonomyConversations, loadAutonomyConver
 import { defaultAutonomyWorkspace, saveAutonomyWorkspace } from "../features/autonomy/workspaceStore";
 import { AutonomyLive, AutonomyMaps, AutonomyOverview, AutonomyPlatform } from "../pages/AutonomyPlatform";
 
-const mocks = vi.hoisted(() => ({ plan: vi.fn(), reconcile: vi.fn(), boundThread: vi.fn(), runtime: vi.fn(), execute: vi.fn(), sources: vi.fn(), frame: vi.fn(), owner: null as null | { id: string } }));
+const mocks = vi.hoisted(() => ({ plan: vi.fn(), reconcile: vi.fn(), bindCatalog: vi.fn(), boundThread: vi.fn(), runtime: vi.fn(), execute: vi.fn(), sources: vi.fn(), frame: vi.fn(), owner: null as null | { id: string } }));
 vi.mock("../features/auth/AuthContext", () => ({ useOptionalAuth: () => ({ account: mocks.owner }) }));
 vi.mock("../theme/EditionThemeProvider", () => ({ useEditionTheme: () => ({ id: "autonomy" }) }));
 vi.mock("../features/settings/ModelAccessContext", () => ({ useModelAccess: () => ({
@@ -49,6 +49,7 @@ vi.mock("../features/autonomy/agentCorePlanning", async (original) => ({
 }));
 vi.mock("../features/autonomy/assetPairBinding", async (original) => ({
   ...await original<typeof import("../features/autonomy/assetPairBinding")>(),
+  bindCatalogAssetPair: mocks.bindCatalog,
   reconcileAgentCoreWorkspace: mocks.reconcile,
 }));
 vi.mock("../features/autonomy/autonomyPlanning", async (original) => ({
@@ -108,6 +109,7 @@ beforeEach(() => {
   mocks.owner = null;
   mocks.plan.mockReset().mockResolvedValue({ compiledPlan: null, planningBrief: "你指的是哪个取件处？", planningRunId: "test-plan" });
   mocks.reconcile.mockReset().mockImplementation(async (workspace) => workspace);
+  mocks.bindCatalog.mockReset().mockImplementation(async (workspace) => workspace);
   mocks.boundThread.mockReset().mockResolvedValue({ thread_id: "core-test", state: "awaiting_confirmation", messages: [] });
   mocks.runtime.mockReset().mockResolvedValue({ runtime_available: true, resources_ready: true, provisioned: true, issue: null });
   mocks.execute.mockReset().mockResolvedValue({ state: "executing", execution_id: "execution-test" });
@@ -123,11 +125,11 @@ describe("autonomy conversation persistence", () => {
     saveAutonomyWorkspace("local", "autonomy", workspace);
     renderWorkspace("/autonomy/maps");
 
-    expect(await screen.findByRole("button", { name: /School Map/u })).toBeVisible();
+    expect(await screen.findByRole("button", { name: /School Grounds/u })).toBeVisible();
     expect(screen.queryByText("Map and aircraft pair qualification")).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "3D UAV Corridor" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /School Map/u }));
+    fireEvent.click(screen.getByRole("button", { name: /School Grounds/u }));
     const corridor = await screen.findByRole("region", { name: "3D UAV Corridor" });
     expect(corridor).toBeVisible();
     expect(corridor.closest("article")).toHaveAttribute("data-airspace-expanded", "true");
@@ -178,6 +180,30 @@ describe("autonomy conversation persistence", () => {
 });
 
 describe("Chatbot to independent conversation", () => {
+  it("uses one-line cascading mission context menus without duplicate asset links", async () => {
+    renderWorkspace();
+    fireEvent.click(await screen.findByRole("button", { name: "Mission context" }));
+    const menu = screen.getByRole("menu", { name: "Mission context" });
+    expect(within(menu).getByRole("menuitem", { name: "Attach mission files" })).toBeVisible();
+    expect(within(menu).queryByText("Up to 8 files, 25 MB each.")).toBeNull();
+    const aircraft = within(menu).getByRole("menuitem", { name: "Select aircraft" });
+    expect(within(menu).getAllByText("Select aircraft")).toHaveLength(1);
+    fireEvent.pointerEnter(aircraft.parentElement!);
+    const aircraftMenu = screen.getByRole("menu", { name: "Select aircraft" });
+    expect(within(aircraftMenu).getByRole("menuitemradio", { name: "X500 Depth" })).toBeVisible();
+    expect(within(aircraftMenu).queryByText(/compatible pair/u)).toBeNull();
+    fireEvent.click(within(aircraftMenu).getByRole("menuitemradio", { name: "X500 Depth" }));
+    expect(within(menu).getByRole("menuitem", { name: "X500 Depth" })).toBeVisible();
+
+    const map = within(menu).getByRole("menuitem", { name: "Select map" });
+    fireEvent.pointerEnter(map.parentElement!);
+    const mapMenu = screen.getByRole("menu", { name: "Select map" });
+    fireEvent.click(within(mapMenu).getByRole("menuitemradio", { name: "Office Interior" }));
+    expect(within(menu).getByRole("menuitem", { name: "Office Interior" })).toBeVisible();
+    expect(within(menu).queryByRole("link", { name: "Select aircraft" })).toBeNull();
+    expect(within(menu).queryByRole("link", { name: "Select map" })).toBeNull();
+  });
+
   it.each(["failed", "completed"])("terminal %s state overrides an accepted start receipt", async (state) => {
     saveAutonomyConversation("local", "autonomy", preparedConversation("terminal"));
     renderWorkspace("/autonomy/conversations/terminal");

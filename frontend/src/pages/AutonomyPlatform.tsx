@@ -4,7 +4,6 @@ import {
   Blocks,
   Cable,
   Camera,
-  ChevronLeft,
   ChevronRight,
   CircleUserRound,
   Cpu,
@@ -14,7 +13,6 @@ import {
   MapPin,
   Mic,
   Paperclip,
-  Navigation2,
   Orbit,
   Plus,
   Route,
@@ -36,6 +34,7 @@ import {
   type Dispatch,
   type FormEvent,
   type SetStateAction,
+  type SVGProps,
 } from "react";
 import {
   Link,
@@ -63,7 +62,7 @@ import {
   unrepresentedExternalAssets,
   type CatalogAssetKind,
 } from "../features/autonomy/assetPresentation";
-import { bindVerifiedAssetPair, externalAssetReferenceFromVersion, reconcileAgentCoreWorkspace } from "../features/autonomy/assetPairBinding";
+import { bindCatalogAssetPair, bindVerifiedAssetPair, externalAssetReferenceFromVersion, reconcileAgentCoreWorkspace } from "../features/autonomy/assetPairBinding";
 import { AssistantModelPicker } from "../components/AssistantModelPicker";
 import {
   defaultAutonomyWorkspace,
@@ -184,11 +183,22 @@ type WorkspaceContext = {
 
 const IGNORE_EXTERNAL_ASSET: WorkspaceContext["registerExternalAsset"] = () => null;
 
+function QuadcopterIcon(props: SVGProps<SVGSVGElement>) {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <circle cx="12" cy="12" r="2.4" />
+    <path d="M10.3 10.3 7.4 7.4M13.7 10.3l2.9-2.9M10.3 13.7l-2.9 2.9M13.7 13.7l2.9 2.9" />
+    <ellipse cx="5.5" cy="5.5" rx="3" ry="1.6" />
+    <ellipse cx="18.5" cy="5.5" rx="3" ry="1.6" />
+    <ellipse cx="5.5" cy="18.5" rx="3" ry="1.6" />
+    <ellipse cx="18.5" cy="18.5" rx="3" ry="1.6" />
+  </svg>;
+}
+
 type AutonomySectionId = "overview" | "aircraft" | "maps" | "plugins" | "live";
 
 const SECTION_ICONS = {
   overview: Orbit,
-  aircraft: Navigation2,
+  aircraft: QuadcopterIcon,
   maps: Layers3,
   plugins: Blocks,
   live: Airplay,
@@ -1761,30 +1771,11 @@ export function AutonomyOverview() {
         const pair = selectedPair(assetPairCatalog, selectedContextMapId, selectedContextAircraftId);
         if (!pair?.compatible) throw new Error(copy.chooseBoth);
         if (pair.status !== "qualified_builtin" || !pair.qualification_id) throw new Error(copy.pairNeedsQualification);
-        const selectedMapKey = catalogAssetKey("map", selectedContextMapId, pair.map_display_name["en-US"]);
-        const selectedAircraftKey = catalogAssetKey("vehicle", selectedContextAircraftId, pair.vehicle_display_name["en-US"]);
-        const mapPack = assetLibrary.maps.find((candidate) => (
-          autonomyMapPackQualified(candidate)
-          && candidate.qualificationReceiptId === pair.qualification_id
-          && catalogAssetKey("map", candidate.agentCoreAssetId?.trim() || candidate.id, candidate.name) === selectedMapKey
-        ));
-        const aircraft = assetLibrary.aircraft.find((candidate) => (
-          isAutonomyAircraftAssetQualified(candidate)
-          && candidate.qualificationReceiptId === pair.qualification_id
-          && catalogAssetKey("vehicle", candidate.agentCoreAssetId?.trim() || candidate.id, candidate.name) === selectedAircraftKey
-        ));
-        if (!mapPack || !aircraft) throw new Error(copy.selectedPairUnavailable);
-        selectedWorkspace = normalizeAutonomyWorkspace(updatedWorkspace(workspace, {
-          aircraft,
-          mapPack,
-          mission: {
-            ...workspace.mission,
-            aircraftProfileId: aircraft.id,
-            mapPackId: mapPack.id,
-            compiledPlan: null,
-            updatedAt: new Date().toISOString(),
-          },
-        }));
+        try {
+          selectedWorkspace = await bindCatalogAssetPair(workspace, assetLibrary, pair);
+        } catch {
+          throw new Error(copy.selectedPairUnavailable);
+        }
       }
       const turnId = crypto.randomUUID();
       const replyChinese = taskUsesChinese(intent, conversationUsesChinese(selectedWorkspace));
@@ -2090,72 +2081,64 @@ export function AutonomyOverview() {
                 <Plus aria-hidden="true" strokeWidth={1.8} />
               </button>
               {contextMenuOpen ? (
-                <div className="assistant-add-popover autonomy-context-popover" role="dialog" aria-label={copy.context}>
-                  {contextSubmenu ? (
-                    <>
-                      <button type="button" className="autonomy-context-back" onClick={() => setContextSubmenu(null)}><ChevronLeft aria-hidden="true" />{copy.back}</button>
-                      <strong className="assistant-task-popover-title">{contextSubmenu === "aircraft" ? copy.aircraft : copy.map}</strong>
-                      <small className="autonomy-context-filter-note">
-                        {contextSubmenu === "aircraft"
-                          ? selectedContextMapId ? copy.filteredAircraft : copy.allAircraft
-                          : selectedContextAircraftId ? copy.filteredMaps : copy.allMaps}
-                      </small>
-                      <div className="autonomy-context-choice-list" role="radiogroup" aria-label={contextSubmenu === "aircraft" ? copy.aircraft : copy.map}>
+                <div className="assistant-add-popover autonomy-context-popover" role="menu" aria-label={copy.context}>
+                  <strong className="assistant-task-popover-title">{copy.context}</strong>
+                  {edition === "autonomy" ? <button type="button" role="menuitem" className="autonomy-context-menu-row autonomy-context-file-action" onClick={() => {
+                    setContextMenuOpen(false);
+                    setContextSubmenu(null);
+                    fileInputRef.current?.click();
+                  }}><Paperclip aria-hidden="true" /><b>{copy.addFiles}</b></button> : null}
+                  {(["aircraft", "map"] as const).map((kind) => {
+                    const open = contextSubmenu === kind;
+                    const isAircraft = kind === "aircraft";
+                    const choices = isAircraft ? aircraftChoices : mapChoices;
+                    const selectedId = isAircraft ? selectedContextAircraftId : selectedContextMapId;
+                    const selectedChoice = isAircraft ? selectedAircraftChoice : selectedMapChoice;
+                    const title = selectedChoice ? localizedChoiceName(selectedChoice) : isAircraft ? copy.aircraft : copy.map;
+                    return <div className="autonomy-context-cascade" key={kind} onPointerEnter={() => setContextSubmenu(kind)}>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="autonomy-context-menu-row"
+                        aria-haspopup="menu"
+                        aria-expanded={open}
+                        onFocus={() => setContextSubmenu(kind)}
+                        onClick={() => setContextSubmenu(kind)}
+                      >
+                        {isAircraft ? <QuadcopterIcon aria-hidden="true" /> : <Layers3 aria-hidden="true" />}
+                        <b>{title}</b>
+                        <ChevronRight aria-hidden="true" />
+                      </button>
+                      {open ? <div className="autonomy-context-submenu" role="menu" aria-label={isAircraft ? copy.aircraft : copy.map}>
                         <button
                           type="button"
+                          role="menuitemradio"
+                          aria-checked={!selectedId}
                           className="autonomy-context-choice is-clear"
-                          role="radio"
-                          aria-checked={contextSubmenu === "aircraft" ? !selectedContextAircraftId : !selectedContextMapId}
                           onClick={() => {
-                            if (contextSubmenu === "aircraft") setSelectedContextAircraftId(null);
+                            if (isAircraft) setSelectedContextAircraftId(null);
                             else setSelectedContextMapId(null);
                             setContextSubmenu(null);
                           }}
-                        ><span><b>{copy.clearSelection}</b><small>{copy.notSelected}</small></span></button>
-                        {(contextSubmenu === "aircraft" ? aircraftChoices : mapChoices).map((choice) => {
-                          const selected = contextSubmenu === "aircraft"
-                            ? selectedContextAircraftId === choice.resourceId
-                            : selectedContextMapId === choice.resourceId;
+                        ><b>{copy.clearSelection}</b>{!selectedId ? <span aria-hidden="true">✓</span> : null}</button>
+                        {choices.map((choice) => {
+                          const selected = selectedId === choice.resourceId;
                           return <button
                             type="button"
                             className="autonomy-context-choice"
-                            role="radio"
+                            role="menuitemradio"
                             aria-checked={selected}
                             key={choice.resourceId}
                             onClick={() => {
-                              if (contextSubmenu === "aircraft") setSelectedContextAircraftId(choice.resourceId);
+                              if (isAircraft) setSelectedContextAircraftId(choice.resourceId);
                               else setSelectedContextMapId(choice.resourceId);
                               setContextSubmenu(null);
                             }}
-                          >
-                            <span><b>{choice.name[chinese ? "zh-CN" : "en-US"]}</b><small>{chinese
-                              ? `${choice.compatiblePairCount} 个可匹配组合${choice.qualifiedPairCount ? ` · ${choice.qualifiedPairCount} 个已验收` : ""}`
-                              : `${choice.compatiblePairCount} compatible pair${choice.compatiblePairCount === 1 ? "" : "s"}${choice.qualifiedPairCount ? ` · ${choice.qualifiedPairCount} qualified` : ""}`}</small></span>
-                            {selected ? <em>{copy.selected}</em> : null}
-                          </button>;
+                          ><b>{choice.name[chinese ? "zh-CN" : "en-US"]}</b>{selected ? <span aria-hidden="true">✓</span> : null}</button>;
                         })}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <strong className="assistant-task-popover-title">{copy.context}</strong>
-                      {edition === "autonomy" ? <button type="button" className="autonomy-context-file-action" onClick={() => {
-                        setContextMenuOpen(false);
-                        setContextSubmenu(null);
-                        fileInputRef.current?.click();
-                      }}><Paperclip aria-hidden="true" /><span><b>{copy.addFiles}</b><small>{copy.fileLimit}</small></span></button> : null}
-                      <button type="button" className="autonomy-context-menu-row" onClick={() => setContextSubmenu("aircraft")}>
-                        <Navigation2 aria-hidden="true" /><span><b>{copy.aircraft}</b><small>{localizedChoiceName(selectedAircraftChoice)}</small></span><ChevronRight aria-hidden="true" />
-                      </button>
-                      <button type="button" className="autonomy-context-menu-row" onClick={() => setContextSubmenu("map")}>
-                        <Layers3 aria-hidden="true" /><span><b>{copy.map}</b><small>{localizedChoiceName(selectedMapChoice)}</small></span><ChevronRight aria-hidden="true" />
-                      </button>
-                      <nav className="autonomy-context-manage-links" aria-label={copy.edit}>
-                        <Link to="/autonomy/aircraft" onClick={() => setContextMenuOpen(false)}>{copy.aircraft}</Link>
-                        <Link to="/autonomy/maps" onClick={() => setContextMenuOpen(false)}>{copy.map}</Link>
-                      </nav>
-                    </>
-                  )}
+                      </div> : null}
+                    </div>;
+                  })}
                 </div>
               ) : null}
             </div>
@@ -2266,7 +2249,7 @@ function RepositoryAssetPreview({
   previewKey: string | null;
   name: string;
 }) {
-  const FallbackIcon = kind === "map" ? Layers3 : Navigation2;
+  const FallbackIcon = kind === "map" ? Layers3 : QuadcopterIcon;
   return (
     <span
       className={`autonomy-repository-preview is-${kind === "map" ? "map" : "aircraft"}`}
@@ -2921,7 +2904,7 @@ export function AgentCoreLiveMission({
       </header>
       <div className="agent-core-live-bindings">
         <span><Layers3 aria-hidden="true" /><small>{chinese ? "地图哈希" : "Map hash"}</small><strong>{workspace.mapPack.agentCoreContentSha256?.slice(0, 16) ?? "—"}</strong></span>
-        <span><Navigation2 aria-hidden="true" /><small>{chinese ? "无人机哈希" : "Aircraft hash"}</small><strong>{workspace.aircraft.agentCoreContentSha256?.slice(0, 16) ?? "—"}</strong></span>
+        <span><QuadcopterIcon aria-hidden="true" /><small>{chinese ? "无人机哈希" : "Aircraft hash"}</small><strong>{workspace.aircraft.agentCoreContentSha256?.slice(0, 16) ?? "—"}</strong></span>
         <span><Cpu aria-hidden="true" /><small>{chinese ? "模型" : "Model"}</small><strong>{planningModel.provider} · {planningModel.model}</strong></span>
       </div>
       {runtimeReady === false ? <p className="agent-core-live-warning"><ShieldCheck aria-hidden="true" />{localizedAutonomyError(runtimeIssue, chinese, { zh: "运行环境尚未就绪，请从首屏完成环境安装。", en: "The runtime is not ready. Complete setup from the launch screen." })}</p> : null}
