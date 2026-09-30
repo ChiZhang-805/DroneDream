@@ -694,6 +694,18 @@ export interface AgentCoreRuntimeStatus {
   issue: string | null;
 }
 
+export interface AgentCoreRuntimeSetupProgress {
+  schema_version: "dronedream.autonomy.runtime-setup.v1";
+  operation_id: string;
+  phase: string;
+  progress: number;
+  active: boolean;
+  error: string | null;
+  failed_phase: string | null;
+  started_at: string;
+  updated_at: string;
+}
+
 export type AgentCoreLiveSourceKind = "simulation" | "camera" | "gps";
 
 export interface AgentCoreLiveSource {
@@ -1342,6 +1354,12 @@ export function submitAgentCoreRuntimeMessage(
 
 export function getAgentCoreRuntimeStatus(): Promise<AgentCoreRuntimeStatus> {
   return requestJson("/v1/runtime/status");
+}
+
+// Provision the signed runtime bundle through Agent Core's managed installer.
+// The endpoint is idempotent while setup is active, so callers may safely recover after navigation.
+export function startAgentCoreRuntimeSetup(): Promise<AgentCoreRuntimeSetupProgress> {
+  return requestJson("/v1/runtime/setup", { method: "POST" });
 }
 
 export function executeAgentCoreMission(

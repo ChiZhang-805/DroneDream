@@ -7,7 +7,7 @@ import { autonomyConversationPath, listAutonomyConversations, loadAutonomyConver
 import { defaultAutonomyWorkspace, saveAutonomyWorkspace } from "../features/autonomy/workspaceStore";
 import { AutonomyLive, AutonomyMaps, AutonomyOverview, AutonomyPlatform } from "../pages/AutonomyPlatform";
 
-const mocks = vi.hoisted(() => ({ plan: vi.fn(), reconcile: vi.fn(), bindCatalog: vi.fn(), boundThread: vi.fn(), runtime: vi.fn(), execute: vi.fn(), sources: vi.fn(), frame: vi.fn(), owner: null as null | { id: string } }));
+const mocks = vi.hoisted(() => ({ plan: vi.fn(), reconcile: vi.fn(), bindCatalog: vi.fn(), boundThread: vi.fn(), runtime: vi.fn(), setup: vi.fn(), execute: vi.fn(), sources: vi.fn(), frame: vi.fn(), owner: null as null | { id: string } }));
 vi.mock("../features/auth/AuthContext", () => ({ useOptionalAuth: () => ({ account: mocks.owner }) }));
 vi.mock("../theme/EditionThemeProvider", () => ({ useEditionTheme: () => ({ id: "autonomy" }) }));
 vi.mock("../features/settings/ModelAccessContext", () => ({ useModelAccess: () => ({
@@ -28,6 +28,7 @@ vi.mock("../features/autonomy/agentCore", async (original) => ({
   getAgentCoreStatus: async () => ({ available: true }),
   getAgentCoreBootstrap: async () => ({ plugins: [] }),
   getAgentCoreRuntimeStatus: mocks.runtime,
+  startAgentCoreRuntimeSetup: mocks.setup,
   getAgentCoreLiveSources: mocks.sources,
   getAgentCoreLiveFrame: mocks.frame,
   listAgentCoreMapResources: async () => ({ resources: [] }),
@@ -112,6 +113,7 @@ beforeEach(() => {
   mocks.bindCatalog.mockReset().mockImplementation(async (workspace) => workspace);
   mocks.boundThread.mockReset().mockResolvedValue({ thread_id: "core-test", state: "awaiting_confirmation", messages: [] });
   mocks.runtime.mockReset().mockResolvedValue({ runtime_available: true, resources_ready: true, provisioned: true, issue: null });
+  mocks.setup.mockReset().mockResolvedValue({ schema_version: "dronedream.autonomy.runtime-setup.v1", operation_id: "setup-test", phase: "queued", progress: 0, active: true, error: null, failed_phase: null, started_at: "now", updated_at: "now" });
   mocks.execute.mockReset().mockResolvedValue({ state: "executing", execution_id: "execution-test" });
   mocks.sources.mockReset().mockResolvedValue({ sources: [] });
   mocks.frame.mockReset().mockResolvedValue(new Blob(["test frame"], { type: "image/png" }));
@@ -274,6 +276,19 @@ describe("Chatbot to independent conversation", () => {
     expect(start).toBeDisabled();
     fireEvent.click(start);
     expect(mocks.execute).not.toHaveBeenCalled();
+  });
+
+  it("automatically provisions a signed runtime update and enables simulation when ready", async () => {
+    const workspace = preparedConversation("auto-provision");
+    saveAutonomyConversation("local", "autonomy", workspace);
+    mocks.runtime
+      .mockResolvedValueOnce({ runtime_available: true, resources_ready: true, provisioned: false, issue: "RUNTIME_PROVISION_REQUIRED" })
+      .mockResolvedValue({ runtime_available: true, resources_ready: true, provisioned: true, issue: null });
+    renderWorkspace("/autonomy/conversations/auto-provision");
+    const start = await screen.findByRole("button", { name: "开始仿真" });
+    expect(start).toBeDisabled();
+    await waitFor(() => expect(mocks.setup).toHaveBeenCalledOnce());
+    await waitFor(() => expect(start).toBeEnabled(), { timeout: 3500 });
   });
 
   it("does not announce acceptance after execution rejection", async () => {

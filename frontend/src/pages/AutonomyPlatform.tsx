@@ -111,6 +111,7 @@ import {
   getAgentCoreLiveSources,
   getAgentCoreLiveTelemetry,
   getAgentCoreRuntimeStatus,
+  startAgentCoreRuntimeSetup,
   listAgentCoreAssetImportJobs,
   listAgentCoreMapResources,
   listAgentCoreVehicleResources,
@@ -2925,6 +2926,7 @@ export function AgentCoreLiveMission({
   const callbacks = useRef({ onAccepted, onViewState });
   callbacks.current = { onAccepted, onViewState };
   const startLock = useRef(false);
+  const runtimeSetupLock = useRef(false);
   const [accepted, setAccepted] = useState(false);
   const conversationId = workspace.mission.conversationId;
   const binding = useMemo(() => ({
@@ -2951,8 +2953,26 @@ export function AgentCoreLiveMission({
         ]);
         if (cancelled) return;
         setThread(nextThread);
-        setRuntimeReady(runtime.runtime_available && runtime.resources_ready && runtime.provisioned);
+        const nextRuntimeReady = runtime.runtime_available && runtime.resources_ready && runtime.provisioned;
+        setRuntimeReady(nextRuntimeReady);
         setRuntimeIssue(runtime.issue);
+        if (nextRuntimeReady) runtimeSetupLock.current = false;
+        if (
+          !nextRuntimeReady
+          && runtime.runtime_available
+          && runtime.resources_ready
+          && !runtime.provisioned
+          && runtime.issue === "RUNTIME_PROVISION_REQUIRED"
+          && !runtimeSetupLock.current
+        ) {
+          runtimeSetupLock.current = true;
+          try {
+            await startAgentCoreRuntimeSetup();
+          } catch (reason) {
+            runtimeSetupLock.current = false;
+            throw reason;
+          }
+        }
         if (compact && callbacks.current.onViewState) {
           let sourceId: string | null = null;
           if (nextThread && ["executing", "holding", "landing"].includes(nextThread.state)) {
@@ -3077,7 +3097,7 @@ export function AgentCoreLiveMission({
     <button className="btn btn-primary" type="button" disabled={accepted || working || runtimeReady !== true || thread?.state !== "awaiting_confirmation" || !workspace.mission.planningRunId} onClick={() => void start()}><Play aria-hidden="true" />{thread?.state === "failed" ? (chinese ? "运行失败" : "Run failed") : thread?.state === "completed" ? (chinese ? "已完成" : "Completed") : working ? (chinese ? "正在启动" : "Starting") : accepted || ["executing", "holding", "landing"].includes(thread?.state ?? "") ? (chinese ? "正在运行" : "Running") : (chinese ? "开始仿真" : "Start simulation")}</button>
     {thread?.state === "failed" ? <p role="alert">{statusMessages.filter((message) => message.kind === "error").at(-1)?.content || (chinese ? "本次运行已结束，未取得成功完成的证据。请保留对话和运行日志以便排查。" : "This run ended without successful completion evidence. Keep the conversation and logs for diagnosis.")}</p> : null}
     {runtimeReady === null ? <small>{chinese ? "正在检查运行环境" : "Checking runtime"}</small> : null}
-    {runtimeReady === false ? <small>{localizedAutonomyError(runtimeIssue, chinese, { zh: "运行环境尚未就绪", en: "Runtime not ready" })}</small> : null}
+    {runtimeReady === false ? <small>{runtimeIssue === "RUNTIME_PROVISION_REQUIRED" ? (chinese ? "正在自动准备运行环境" : "Preparing the runtime automatically") : localizedAutonomyError(runtimeIssue, chinese, { zh: "运行环境尚未就绪", en: "Runtime not ready" })}</small> : null}
     {thread && thread.state !== "awaiting_confirmation" ? <small>{stateLabel}</small> : null}
     {error ? <p role="alert">{error}</p> : null}
   </div>;
@@ -3093,7 +3113,7 @@ export function AgentCoreLiveMission({
         <span><QuadcopterIcon aria-hidden="true" /><small>{chinese ? "无人机哈希" : "Aircraft hash"}</small><strong>{workspace.aircraft.agentCoreContentSha256?.slice(0, 16) ?? "—"}</strong></span>
         <span><Cpu aria-hidden="true" /><small>{chinese ? "模型" : "Model"}</small><strong>{planningModel.provider} · {planningModel.model}</strong></span>
       </div>
-      {runtimeReady === false ? <p className="agent-core-live-warning"><ShieldCheck aria-hidden="true" />{localizedAutonomyError(runtimeIssue, chinese, { zh: "运行环境尚未就绪，请从首屏完成环境安装。", en: "The runtime is not ready. Complete setup from the launch screen." })}</p> : null}
+      {runtimeReady === false ? <p className="agent-core-live-warning"><ShieldCheck aria-hidden="true" />{runtimeIssue === "RUNTIME_PROVISION_REQUIRED" ? (chinese ? "正在自动准备运行环境，完成后即可开始仿真。" : "Preparing the runtime automatically. Simulation will be available when it finishes.") : localizedAutonomyError(runtimeIssue, chinese, { zh: "运行环境尚未就绪，请检查运行环境。", en: "The runtime is not ready. Check the runtime environment." })}</p> : null}
       {error ? <p className="agent-core-live-error">{error}</p> : null}
       {thread?.state === "awaiting_confirmation" ? (
         <div className="agent-core-live-confirmation">
