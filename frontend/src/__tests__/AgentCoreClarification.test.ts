@@ -32,7 +32,7 @@ it("returns a conversation question without a fake plan and preserves the full f
     requestPurpose: "initial_plan",
   });
   expect(planning.planWithAgentCore).toHaveBeenCalledWith(expect.objectContaining({ instruction: "拿下快递\n补充指令：东门那个" }));
-  expect(result.planningBrief).toContain("要送回办公室，还是送到其他位置？");
+  expect(result.planningBrief).toBe("还需要确认一项任务信息。");
   expect(result.compiledPlan).toBeNull();
   expect(result.plannerArtifact).toBeNull();
   expect(result.compileResult).toBeNull();

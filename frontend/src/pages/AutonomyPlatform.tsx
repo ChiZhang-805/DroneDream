@@ -56,6 +56,13 @@ import { PreparationProgress } from "../features/autonomy/PreparationProgress";
 import { MissionPlanCard } from "../features/autonomy/MissionPlanCard";
 import { conversationUsesChinese, taskUsesChinese } from "../features/autonomy/missionPresentation";
 import {
+  clarificationBrief,
+  clarificationOptionAnswer,
+  clarificationOtherAnswer,
+  presentAutonomyClarification,
+} from "../features/autonomy/clarificationPresentation";
+import { RepositoryAsset3DView } from "../features/autonomy/RepositoryAsset3DView";
+import {
   catalogAssetDefinitions,
   catalogAssetKey,
   catalogAssetPresentation,
@@ -330,10 +337,20 @@ function localizedAutonomyError(
       : (chinese ? "任务处理出现内部错误，诊断记录已保存。" : "Mission processing encountered an internal error. Diagnostic evidence was saved.");
     return message + suffix;
   }
+  if (code === "ROUTE_ALTERNATIVE_NO_FEASIBLE_CANDIDATE" || raw.includes("ROUTE_ALTERNATIVE_NO_FEASIBLE_CANDIDATE")) {
+    return chinese
+      ? "当前地点暂时没有满足机体净空的可执行路线。任务已保留，请选择另一个地点或更换地图与无人机后重新规划。"
+      : "No route to this place currently satisfies the aircraft clearance. The task is preserved; choose another place or change the map and aircraft, then replan.";
+  }
+  if (code === "REQUIRED_TOOL_FAILED" || code === "TOOL_EXECUTION_FAILED") {
+    return chinese
+      ? "路线工具未能完成本轮计算。任务与选择均已保留，请重新规划；若当前地点不可达，系统会改为给出可选地点，而不会显示内部错误。"
+      : "A route tool could not finish this calculation. The task and selections were preserved; replan to receive reachable alternatives instead of an internal error.";
+  }
   if (["AGENT_CORE_ASSET_PAIR_BINDING_REQUIRED", "AGENT_CORE_ASSET_PAIR_QUALIFICATION_ID_MISMATCH",
     "AGENT_CORE_ASSET_PAIR_QUALIFICATION_JOB_NOT_FOUND"].includes(code)) {
-    return chinese ? "所选地图与无人机尚未绑定到同一份有效认证。请在地图页检查组合认证后重试。"
-      : "The selected map and aircraft do not share a verified qualification. Check pair qualification on the Maps page, then retry.";
+    return chinese ? "软件尚未完成所选地图与无人机的自动适配检查。请重新选择组合；系统会在解析地图时自动判断可用机型。"
+      : "The app has not completed automatic compatibility analysis for the selected map and aircraft. Select the pair again; compatible aircraft are determined while the map is parsed.";
   }
   return localeSafeError(value, chinese ? "zh-CN" : "en", fallback);
 }
@@ -1967,46 +1984,50 @@ export function AutonomyOverview() {
                     <span className="autonomy-conversation-avatar" aria-hidden="true"><Sparkles /></span>
                   ) : null}
                   <div className="autonomy-conversation-body">
-                    {/* 模型回复是会话内容，不是错误文案；跨语言澄清问题必须原样保留。 */}
-                    <p role={message.kind === "error" ? "alert" : undefined}>{message.content}</p>
+                    {/* Preserve the conversation while presenting internal clarification fields in the user's language. */}
+                    <p role={message.kind === "error" ? "alert" : undefined}>{message.clarification
+                      ? clarificationBrief([], presentAutonomyClarification(message.clarification, conversationUsesChinese(workspace)), conversationUsesChinese(workspace))
+                      : message.content}</p>
                     {message.clarification?.questions.map((question) => {
+                      const presentedClarification = presentAutonomyClarification({ questions: [question] }, conversationUsesChinese(workspace));
+                      const presentedQuestion = presentedClarification?.questions[0] ?? question;
                       const key = `${message.id}:${question.questionId}`;
                       const active = conversationMessages.at(-1)?.id === message.id && !generating;
                       const otherOpen = openOtherQuestion === key;
-                      return <section className="autonomy-clarification" key={key} aria-label={question.prompt}>
-                        <strong>{question.prompt}</strong>
-                        {question.options.length ? <div className="autonomy-clarification-options">
-                          {question.options.map((option) => <button
+                      return <section className="autonomy-clarification" key={key} aria-label={presentedQuestion.prompt}>
+                        <strong>{presentedQuestion.prompt}</strong>
+                        {presentedQuestion.options.length ? <div className="autonomy-clarification-options">
+                          {presentedQuestion.options.map((option) => <button
                             type="button"
                             key={option.optionId}
                             disabled={!active}
-                            onClick={() => void submitMission(undefined, option.response)}
+                            onClick={() => void submitMission(undefined, clarificationOptionAnswer(presentedQuestion, option, conversationUsesChinese(workspace)))}
                           ><span>{option.optionId}</span><b>{option.label}</b></button>)}
-                          {question.allowOther ? <button
+                          {presentedQuestion.allowOther ? <button
                             type="button"
                             disabled={!active}
                             aria-expanded={otherOpen}
                             onClick={() => setOpenOtherQuestion((current) => current === key ? null : key)}
-                          ><span>{String.fromCharCode(65 + question.options.length)}</span><b>{question.otherLabel}</b></button> : null}
+                          ><span>{String.fromCharCode(65 + presentedQuestion.options.length)}</span><b>{presentedQuestion.otherLabel}</b></button> : null}
                         </div> : null}
-                        {question.allowOther && otherOpen ? <div className="autonomy-clarification-other">
+                        {presentedQuestion.allowOther && otherOpen ? <div className="autonomy-clarification-other">
                           <input
                             value={clarificationOther[key] ?? ""}
                             maxLength={240}
                             autoFocus
-                            aria-label={question.otherLabel}
+                            aria-label={presentedQuestion.otherLabel}
                             onChange={(event) => setClarificationOther((current) => ({ ...current, [key]: event.target.value }))}
                             onKeyDown={(event) => {
                               if (event.key === "Enter" && !event.nativeEvent.isComposing) {
                                 event.preventDefault();
                                 const answer = (clarificationOther[key] ?? "").trim();
-                                if (answer) void submitMission(undefined, answer);
+                                if (answer) void submitMission(undefined, clarificationOtherAnswer(presentedQuestion, answer, conversationUsesChinese(workspace)));
                               }
                             }}
                           />
                           <button type="button" disabled={!(clarificationOther[key] ?? "").trim() || !active} onClick={() => {
                             const answer = (clarificationOther[key] ?? "").trim();
-                            if (answer) void submitMission(undefined, answer);
+                            if (answer) void submitMission(undefined, clarificationOtherAnswer(presentedQuestion, answer, conversationUsesChinese(workspace)));
                           }}>{chinese ? "提交" : "Submit"}</button>
                         </div> : null}
                       </section>;
@@ -2361,6 +2382,13 @@ function RepositoryAssetPreview({
   );
 }
 
+type RepositoryDetails = {
+  title: string;
+  rows: Array<[string, string]>;
+  kind: CatalogAssetKind;
+  previewKey: string | null;
+};
+
 function useHiddenCatalogResources(kind: CatalogAssetKind): [Set<string>, (key: string) => void] {
   const storageKey = `dronedream:autonomy-hidden-catalog:v1:${kind}`;
   const [hidden, setHidden] = useState<Set<string>>(() => {
@@ -2393,7 +2421,7 @@ export function AutonomyAircraft() {
     registerExternalAsset,
     removeAsset,
   } = useAutonomyWorkspace();
-  const [details, setDetails] = useState<{ title: string; rows: Array<[string, string]> } | null>(null);
+  const [details, setDetails] = useState<RepositoryDetails | null>(null);
   const [selectedRepositoryAircraftId, setSelectedRepositoryAircraftId] = useState<string | null>(null);
   const [hiddenCatalogResources, hideCatalogResource] = useHiddenCatalogResources("vehicle");
   const [defaultResources, setDefaultResources] = useState<AgentCoreVehicleResource[]>([]);
@@ -2414,6 +2442,8 @@ export function AutonomyAircraft() {
   );
   const openAircraftDetails = (aircraft: AutonomyWorkspaceState["aircraft"]) => setDetails({
     title: aircraft.name,
+    kind: "vehicle",
+    previewKey: catalogAssetKey("vehicle", aircraft.agentCoreAssetId?.trim() || aircraft.id, aircraft.name),
     rows: [
       [chinese ? "制造商" : "Manufacturer", aircraft.manufacturer || "—"],
       [chinese ? "机架" : "Airframe", aircraft.airframe || "—"],
@@ -2433,6 +2463,8 @@ export function AutonomyAircraft() {
   const resourceName = (resource: AgentCoreVehicleResource) => resource.display_name[chinese ? "zh-CN" : "en-US"];
   const openResourceDetails = (resource: AgentCoreVehicleResource) => setDetails({
     title: resourceName(resource),
+    kind: "vehicle",
+    previewKey: catalogAssetKey("vehicle", resource.resource_id, resourceName(resource)),
     rows: [
       [chinese ? "来源" : "Source", `PX4 Gazebo Models @ ${resource.analysis.source_commit.slice(0, 12)}`],
       [chinese ? "许可证" : "License", resource.license.spdx_id],
@@ -2515,7 +2547,7 @@ export function AutonomyAircraft() {
               onDoubleClick={() => {
                 if (aircraft) openAircraftDetails(aircraft);
                 else if (resource) openResourceDetails(resource);
-                else setDetails({ title: presentation.name, rows: [[chinese ? "状态" : "Status", chinese ? "资源目录可见，运行服务启动后加载详情" : "Catalogued; details load when the runtime is ready"]] });
+                else setDetails({ title: presentation.name, kind: "vehicle", previewKey: presentation.key, rows: [[chinese ? "状态" : "Status", chinese ? "资源目录可见，运行服务启动后加载详情" : "Catalogued; details load when the runtime is ready"]] });
               }}
             >
               <RepositoryAssetPreview kind="vehicle" previewUrl={presentation.previewUrl} previewKey={presentation.key} name={presentation.name} />
@@ -2565,6 +2597,8 @@ export function AutonomyAircraft() {
               className="autonomy-repository-card-surface"
               onDoubleClick={() => setDetails({
                 title: asset.name,
+                kind: "vehicle",
+                previewKey: catalogAssetKey("vehicle", asset.id, asset.name),
                 rows: [
                   [chinese ? "来源" : "Source", asset.sourceApplication || "—"],
                   [chinese ? "格式" : "Format", asset.sourceFormat.toUpperCase()],
@@ -2595,7 +2629,7 @@ export function AutonomyMaps() {
     registerExternalAsset,
     removeAsset,
   } = useAutonomyWorkspace();
-  const [details, setDetails] = useState<{ title: string; rows: Array<[string, string]> } | null>(null);
+  const [details, setDetails] = useState<RepositoryDetails | null>(null);
   const [selectedRepositoryMapId, setSelectedRepositoryMapId] = useState<string | null>(null);
   const [hiddenCatalogResources, hideCatalogResource] = useHiddenCatalogResources("map");
   const [expandedMapKey, setExpandedMapKey] = useState<string | null>(null);
@@ -2623,6 +2657,8 @@ export function AutonomyMaps() {
     && plan.routeVehicleSha256 === spaceVehicle.agentCoreContentSha256 ? plan.routePositionsM : undefined;
   const openMapDetails = (mapPack: AutonomyMapPack) => setDetails({
     title: mapPack.name,
+    kind: "map",
+    previewKey: catalogAssetKey("map", mapPack.agentCoreAssetId?.trim() || mapPack.id, mapPack.name),
     rows: [
       [chinese ? "类型" : "Type", mapRepresentationLabel(mapPack.representation, chinese)],
       [chinese ? "坐标系" : "Coordinate frame", mapPack.coordinateFrame],
@@ -2642,6 +2678,8 @@ export function AutonomyMaps() {
   const resourceName = (resource: AgentCoreMapResource) => resource.display_name[chinese ? "zh-CN" : "en-US"];
   const openResourceDetails = (resource: AgentCoreMapResource) => setDetails({
     title: resourceName(resource),
+    kind: "map",
+    previewKey: catalogAssetKey("map", resource.resource_id, resourceName(resource)),
     rows: [
       [chinese ? "来源" : "Source", `Open-RMF @ ${resource.analysis.source_commit.slice(0, 12)}`],
       [chinese ? "许可证" : "License", resource.license.spdx_id],
@@ -2735,7 +2773,7 @@ export function AutonomyMaps() {
               onDoubleClick={() => {
                 if (mapPack) openMapDetails(mapPack);
                 else if (resource) openResourceDetails(resource);
-                else setDetails({ title: presentation.name, rows: [[chinese ? "状态" : "Status", chinese ? "资源目录可见，运行服务启动后加载详情" : "Catalogued; details load when the runtime is ready"]] });
+                else setDetails({ title: presentation.name, kind: "map", previewKey: presentation.key, rows: [[chinese ? "状态" : "Status", chinese ? "资源目录可见，运行服务启动后加载详情" : "Catalogued; details load when the runtime is ready"]] });
               }}
             >
               <RepositoryAssetPreview kind="map" previewUrl={presentation.previewUrl} previewKey={presentation.key} name={presentation.name} />
@@ -2811,7 +2849,7 @@ export function AutonomyMaps() {
         })}
         {externalMaps.map((asset) => (
           <article key={`${asset.id}:${asset.contentSha256}`}>
-            <button type="button" className="autonomy-repository-card-surface" onDoubleClick={() => setDetails({ title: asset.name, rows: [[chinese ? "来源" : "Source", asset.sourceApplication || "—"], [chinese ? "格式" : "Format", asset.sourceFormat.toUpperCase()], [chinese ? "状态" : "Status", asset.maturity.replaceAll("_", " ")]] })}>
+            <button type="button" className="autonomy-repository-card-surface" onDoubleClick={() => setDetails({ title: asset.name, kind: "map", previewKey: catalogAssetKey("map", asset.id, asset.name), rows: [[chinese ? "来源" : "Source", asset.sourceApplication || "—"], [chinese ? "格式" : "Format", asset.sourceFormat.toUpperCase()], [chinese ? "状态" : "Status", asset.maturity.replaceAll("_", " ")]] })}>
               <RepositoryAssetPreview kind="map" previewUrl={null} previewKey={null} name={asset.name} />
               <span className="autonomy-repository-copy"><strong title={asset.name}>{asset.name}</strong></span>
             </button>
@@ -2831,7 +2869,7 @@ function RepositoryDetailsDialog({
   onClose,
 }: {
   chinese: boolean;
-  details: { title: string; rows: Array<[string, string]> };
+  details: RepositoryDetails;
   onClose: () => void;
 }) {
   return (
@@ -2840,7 +2878,10 @@ function RepositoryDetailsDialog({
     }}>
       <section className="autonomy-repository-dialog" role="dialog" aria-modal="true" aria-label={details.title}>
         <header><h2>{details.title}</h2><button type="button" onClick={onClose} aria-label={chinese ? "关闭" : "Close"}><X aria-hidden="true" /></button></header>
-        <dl>{details.rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+        <div className="autonomy-repository-dialog-body">
+          <dl>{details.rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+          <RepositoryAsset3DView kind={details.kind} previewKey={details.previewKey} name={details.title} chinese={chinese} />
+        </div>
       </section>
     </div>
   );
