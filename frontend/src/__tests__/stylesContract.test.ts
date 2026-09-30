@@ -40,4 +40,29 @@ describe("console stylesheet contract", () => {
       [...referenced].filter((name) => !defined.has(name)).sort(),
     ).toEqual([]);
   });
+
+  it("keeps the autonomy conversation and composer on one responsive width contract", () => {
+    const source = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
+    const root = postcss.parse(source);
+    const declarations = new Map<string, Map<string, string>>();
+
+    root.walkRules((rule) => {
+      const selectorDeclarations = declarations.get(rule.selector) ?? new Map<string, string>();
+      rule.walkDecls((declaration) => {
+        selectorDeclarations.set(declaration.prop, declaration.value);
+      });
+      declarations.set(rule.selector, selectorDeclarations);
+    });
+
+    expect(declarations.get(".autonomy-command-page")?.get("--autonomy-chat-column-width")).toBe("76rem");
+    expect(declarations.get(".autonomy-command-stage")?.get("width")).toBe(
+      "min(100%, var(--autonomy-chat-column-width))",
+    );
+    expect(declarations.get(".autonomy-conversation-thread")?.get("width")).toBe(
+      "min(100%, var(--autonomy-chat-column-width))",
+    );
+    expect(declarations.get(".autonomy-command-page .autonomy-command-composer")?.get("width")).toBe(
+      "min(100%, var(--autonomy-chat-column-width))",
+    );
+  });
 });

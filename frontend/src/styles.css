@@ -831,6 +831,7 @@ body:has(.autonomy-platform-page),
 }
 
 .autonomy-command-page {
+  --autonomy-chat-column-width: 76rem;
   place-content: center;
   place-items: center;
   padding: clamp(0.75rem, 2vh, 1.5rem) clamp(0.25rem, 2vw, 1.5rem);
@@ -838,7 +839,7 @@ body:has(.autonomy-platform-page),
 
 .autonomy-command-stage {
   display: flex;
-  width: min(100%, 72rem);
+  width: min(100%, var(--autonomy-chat-column-width));
   align-items: center;
   flex-direction: column;
 }
@@ -865,7 +866,7 @@ body:has(.autonomy-platform-page),
 }
 
 .autonomy-command-page .autonomy-command-composer {
-  width: min(100%, 64rem);
+  width: min(100%, var(--autonomy-chat-column-width));
   margin: 0 auto;
 }
 
@@ -1157,8 +1158,8 @@ body:has(.autonomy-platform-page),
 
 .autonomy-conversation-thread {
   display: flex;
-  width: min(100%, 68rem);
-  max-width: 68rem;
+  width: min(100%, var(--autonomy-chat-column-width));
+  max-width: var(--autonomy-chat-column-width);
   flex-direction: column;
   gap: 1rem;
   margin: 0 auto;
@@ -1324,7 +1325,7 @@ body:has(.autonomy-platform-page),
 
 .autonomy-inline-plan {
   display: grid;
-  width: min(100%, 68rem);
+  width: min(100%, var(--autonomy-chat-column-width));
   gap: 0.8rem;
   margin-top: 1.15rem;
   padding: 1rem;
@@ -22658,7 +22659,7 @@ body {
 }
 
 .autonomy-command-page .autonomy-command-composer {
-  width: min(100%, 68rem);
+  width: min(100%, var(--autonomy-chat-column-width));
 }
 
 .autonomy-section-switch {
