@@ -831,7 +831,8 @@ body:has(.autonomy-platform-page),
 }
 
 .autonomy-command-page {
-  --autonomy-chat-column-width: 76rem;
+  --autonomy-chat-column-width: 52rem;
+  grid-template-columns: minmax(0, min(100%, var(--autonomy-chat-column-width)));
   place-content: center;
   place-items: center;
   padding: clamp(0.75rem, 2vh, 1.5rem) clamp(0.25rem, 2vw, 1.5rem);
@@ -839,9 +840,10 @@ body:has(.autonomy-platform-page),
 
 .autonomy-command-stage {
   display: flex;
-  width: min(100%, var(--autonomy-chat-column-width));
+  width: 100%;
   align-items: center;
   flex-direction: column;
+  justify-self: stretch;
 }
 
 .autonomy-command-page .autonomy-command-hero-icon {
