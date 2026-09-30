@@ -340,14 +340,34 @@ export interface AutonomyMissionDraft {
 export interface AutonomyConversationMessage {
   id: string;
   role: "user" | "assistant";
+  kind?: "text" | "error";
   content: string;
   createdAt: string;
   planContractId: string | null;
+  clarification?: AutonomyClarification;
   attachments?: Array<{
     name: string;
     contentType: string;
     byteSize: number;
   }>;
+}
+
+export interface AutonomyClarificationOption {
+  optionId: "A" | "B" | "C";
+  label: string;
+  response: string;
+}
+
+export interface AutonomyClarificationQuestion {
+  questionId: string;
+  prompt: string;
+  options: AutonomyClarificationOption[];
+  allowOther: boolean;
+  otherLabel: string;
+}
+
+export interface AutonomyClarification {
+  questions: AutonomyClarificationQuestion[];
 }
 
 export interface AutonomyMissionPlanSnapshot {
@@ -1212,11 +1232,42 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
         )).slice(-100).map((message) => ({
           id: boundedText(message.id, crypto.randomUUID(), 160),
           role: message.role,
+          kind: message.kind === "error" ? "error" : "text",
           content: boundedText(message.content, "Empty message", 6_000),
           createdAt: boundedText(message.createdAt, updatedAt, 40),
           planContractId: typeof message.planContractId === "string"
             ? boundedText(message.planContractId, "", 160) || null
             : null,
+          clarification: message.clarification
+            && typeof message.clarification === "object"
+            && Array.isArray(message.clarification.questions)
+            ? {
+                questions: message.clarification.questions.slice(0, 4).flatMap((question) => {
+                  if (!question || typeof question !== "object"
+                    || typeof question.questionId !== "string"
+                    || typeof question.prompt !== "string"
+                    || !Array.isArray(question.options)) return [];
+                  const options = question.options.slice(0, 3).flatMap((option, index) => {
+                    if (!option || typeof option !== "object"
+                      || option.optionId !== (["A", "B", "C"] as const)[index]
+                      || typeof option.label !== "string"
+                      || typeof option.response !== "string") return [];
+                    return [{
+                      optionId: option.optionId,
+                      label: boundedText(option.label, option.optionId, 120),
+                      response: boundedText(option.response, option.label, 240),
+                    }];
+                  });
+                  return [{
+                    questionId: boundedText(question.questionId, `question-${crypto.randomUUID()}`, 64),
+                    prompt: boundedText(question.prompt, message.content, 240),
+                    options,
+                    allowOther: question.allowOther !== false,
+                    otherLabel: boundedText(question.otherLabel, "其他", 40),
+                  }];
+                }),
+              }
+            : undefined,
           attachments: Array.isArray(message.attachments)
             ? message.attachments.filter((attachment) => Boolean(
               attachment

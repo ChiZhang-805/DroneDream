@@ -38,6 +38,7 @@ import {
 } from "./agentCorePlanning";
 import { AgentCoreRequestError, type AgentCoreMissionPrepareSummary } from "./agentCore";
 import { taskUsesChinese } from "./missionPresentation";
+import type { AutonomyClarification } from "./workspaceStore";
 
 export type AutonomyPlanningModel =
   | {
@@ -82,6 +83,7 @@ export interface AutonomyPlanningResult {
   compileRequest: AutonomyCompileRequest | null;
   compileResult: AutonomyCompileResponse | null;
   compiledPlan: AutonomyMissionPlanSnapshot | null;
+  clarification?: AutonomyClarification | null;
 }
 
 export function requiresAgentCoreRuntime(
@@ -428,6 +430,7 @@ export async function planAutonomyMission(
           planningBrief: `${input.chinese ? "请确认：" : "Please clarify:"}\n${reason.clarificationFields.map((field) => `• ${field}`).join("\n")}`,
           planningRunId: null, planningArtifactSha256: null, plannerArtifact: null,
           harnessInspection, compileRequest: null, compileResult: null, compiledPlan: null,
+          clarification: reason.clarification,
         };
       }
       // The installed AGENT edition has exactly one planning and execution

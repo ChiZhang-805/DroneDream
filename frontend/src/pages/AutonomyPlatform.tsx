@@ -1472,6 +1472,8 @@ export function AutonomyOverview() {
   );
   const [managedModelsReady, setManagedModelsReady] = useState(!auth?.account);
   const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
+  const [clarificationOther, setClarificationOther] = useState<Record<string, string>>({});
+  const [openOtherQuestion, setOpenOtherQuestion] = useState<string | null>(null);
   const [inputProvenance, setInputProvenance] = useState<"text" | "web-speech" | "audio-attachment">("text");
   useEffect(() => {
     setError(null);
@@ -1481,6 +1483,8 @@ export function AutonomyOverview() {
     setContextSubmenu(null);
     setSelectedContextAircraftId(null);
     setSelectedContextMapId(null);
+    setClarificationOther({});
+    setOpenOtherQuestion(null);
   }, [ownerId, edition, workspace.mission.conversationId]);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1751,10 +1755,10 @@ export function AutonomyOverview() {
     };
   }, [contextMenuOpen, contextSubmenu]);
 
-  const submitMission = async (event: FormEvent) => {
-    event.preventDefault();
+  const submitMission = async (event?: FormEvent, intentOverride?: string) => {
+    event?.preventDefault();
     if (submitting.current) return;
-    const intent = composer.trim();
+    const intent = (intentOverride ?? composer).trim();
     if (!intent) return;
     if (intent.length > 2_000) {
       setError(copy.tooLong);
@@ -1773,7 +1777,9 @@ export function AutonomyOverview() {
     setError(null);
     let submittedWorkspace: AutonomyWorkspaceState | null = null;
     try {
-      const submittedAttachments = pendingAttachments.slice(0, 8);
+      const submittedAttachments = intentOverride === undefined
+        ? pendingAttachments.slice(0, 8)
+        : [];
       let selectedWorkspace: AutonomyWorkspaceState;
       if (!selectedContextAircraftId && !selectedContextMapId) {
         selectedWorkspace = resolveMissionAssets(workspace, assetLibrary, intent);
@@ -1860,6 +1866,7 @@ export function AutonomyOverview() {
           content: planning.planningBrief,
           createdAt: updatedAt,
           planContractId: null,
+          clarification: planning.clarification ?? undefined,
         };
         persist(updatedWorkspace(missionWorkspace, {
           mission: {
@@ -1910,7 +1917,28 @@ export function AutonomyOverview() {
       });
       if (submittedWorkspace) {
         try {
-          persist(updatedWorkspace(submittedWorkspace, { mission: { ...submittedWorkspace.mission, planningError: message, compiledPlan: null, updatedAt: new Date().toISOString() } }));
+          const failedAt = new Date().toISOString();
+          const recovery = reason instanceof AgentCoreRequestError
+            && reason.message === "ROUTE_ALTERNATIVE_NO_FEASIBLE_CANDIDATE"
+            ? (chinese
+                ? "当前地图中的命名地点没有找到满足机体净空的可执行三维航迹。系统已保留任务；请检查所选地图与无人机，或更换目标地点后重新规划。"
+                : "No clearance-valid 3D route was found between the named places for this aircraft. The task is preserved; review the selected map and aircraft or choose another destination, then replan.")
+            : message;
+          const failureMessage: AutonomyConversationMessage = {
+            id: `assistant-error-${crypto.randomUUID()}`,
+            role: "assistant",
+            kind: "error",
+            content: recovery,
+            createdAt: failedAt,
+            planContractId: null,
+          };
+          persist(updatedWorkspace(submittedWorkspace, { mission: {
+            ...submittedWorkspace.mission,
+            messages: [...submittedWorkspace.mission.messages, failureMessage].slice(-100),
+            planningError: null,
+            compiledPlan: null,
+            updatedAt: failedAt,
+          } }));
         } catch { setError(chinese ? "会话保存失败，请检查本机存储。" : "Conversation could not be saved. Check local storage."); }
       } else setError(message);
     } finally {
@@ -1940,7 +1968,49 @@ export function AutonomyOverview() {
                   ) : null}
                   <div className="autonomy-conversation-body">
                     {/* 模型回复是会话内容，不是错误文案；跨语言澄清问题必须原样保留。 */}
-                    <p>{message.content}</p>
+                    <p role={message.kind === "error" ? "alert" : undefined}>{message.content}</p>
+                    {message.clarification?.questions.map((question) => {
+                      const key = `${message.id}:${question.questionId}`;
+                      const active = conversationMessages.at(-1)?.id === message.id && !generating;
+                      const otherOpen = openOtherQuestion === key;
+                      return <section className="autonomy-clarification" key={key} aria-label={question.prompt}>
+                        <strong>{question.prompt}</strong>
+                        {question.options.length ? <div className="autonomy-clarification-options">
+                          {question.options.map((option) => <button
+                            type="button"
+                            key={option.optionId}
+                            disabled={!active}
+                            onClick={() => void submitMission(undefined, option.response)}
+                          ><span>{option.optionId}</span><b>{option.label}</b></button>)}
+                          {question.allowOther ? <button
+                            type="button"
+                            disabled={!active}
+                            aria-expanded={otherOpen}
+                            onClick={() => setOpenOtherQuestion((current) => current === key ? null : key)}
+                          ><span>{String.fromCharCode(65 + question.options.length)}</span><b>{question.otherLabel}</b></button> : null}
+                        </div> : null}
+                        {question.allowOther && otherOpen ? <div className="autonomy-clarification-other">
+                          <input
+                            value={clarificationOther[key] ?? ""}
+                            maxLength={240}
+                            autoFocus
+                            aria-label={question.otherLabel}
+                            onChange={(event) => setClarificationOther((current) => ({ ...current, [key]: event.target.value }))}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+                                event.preventDefault();
+                                const answer = (clarificationOther[key] ?? "").trim();
+                                if (answer) void submitMission(undefined, answer);
+                              }
+                            }}
+                          />
+                          <button type="button" disabled={!(clarificationOther[key] ?? "").trim() || !active} onClick={() => {
+                            const answer = (clarificationOther[key] ?? "").trim();
+                            if (answer) void submitMission(undefined, answer);
+                          }}>{chinese ? "提交" : "Submit"}</button>
+                        </div> : null}
+                      </section>;
+                    })}
                     {message.attachments?.length ? (
                       <div className="autonomy-message-attachments">
                         {message.attachments.map((attachment) => (
@@ -2156,6 +2226,16 @@ export function AutonomyOverview() {
               ) : null}
             </div>
             <span className="assistant-task-chip is-explicit"><Route aria-hidden="true" />{copy.workflow}</span>
+            {selectedAircraftChoice || conversationActive ? <span className="assistant-asset-chip is-aircraft">
+              <QuadcopterIcon aria-hidden="true" />{selectedAircraftChoice
+                ? localizedChoiceName(selectedAircraftChoice)
+                : workspace.aircraft.name}
+            </span> : null}
+            {selectedMapChoice || conversationActive ? <span className="assistant-asset-chip is-map">
+              <Layers3 aria-hidden="true" />{selectedMapChoice
+                ? localizedChoiceName(selectedMapChoice)
+                : workspace.mapPack.name}
+            </span> : null}
             <span className="assistant-composer-spacer" />
             <AssistantModelPicker
               ariaLabel={copy.model}

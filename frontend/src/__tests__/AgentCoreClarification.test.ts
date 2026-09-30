@@ -12,7 +12,18 @@ beforeEach(() => {
 
 it("returns a conversation question without a fake plan and preserves the full follow-up intent", async () => {
   vi.spyOn(planning, "planWithAgentCore").mockRejectedValue(new AgentCoreRequestError(409,
-    "MISSION_CLARIFICATION_REQUIRED", ["要送回办公室，还是送到其他位置？"]));
+    "MISSION_CLARIFICATION_REQUIRED", ["要送回办公室，还是送到其他位置？"], {
+      questions: [{
+        questionId: "delivery.destination",
+        prompt: "要送回办公室，还是送到其他位置？",
+        options: [
+          { optionId: "A", label: "送回办公室", response: "送回办公室。" },
+          { optionId: "B", label: "送到大厅", response: "送到大厅。" },
+        ],
+        allowOther: true,
+        otherLabel: "其他",
+      }],
+    }));
   const result = await planAutonomyMission({
     edition: "autonomy", accountId: "account-test", publicDemo: false,
     workspace: defaultAutonomyWorkspace(), conversationId: "conversation-test", turnId: "turn-test",
@@ -25,4 +36,5 @@ it("returns a conversation question without a fake plan and preserves the full f
   expect(result.compiledPlan).toBeNull();
   expect(result.plannerArtifact).toBeNull();
   expect(result.compileResult).toBeNull();
+  expect(result.clarification?.questions[0]?.options[0]?.response).toBe("送回办公室。");
 });

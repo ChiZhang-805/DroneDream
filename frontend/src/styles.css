@@ -879,6 +879,27 @@ body:has(.autonomy-platform-page),
   height: 0.95rem;
 }
 
+.assistant-asset-chip {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 11rem;
+  min-height: 2.2rem;
+  align-items: center;
+  gap: 0.38rem;
+  padding: 0.42rem 0.72rem;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assistant-asset-chip svg { width: 0.95rem; height: 0.95rem; flex: 0 0 auto; }
+.assistant-asset-chip.is-aircraft { color: #0a6d73; border-color: #b8dfe1; background: #edfafa; }
+.assistant-asset-chip.is-map { color: #a04d17; border-color: #efd1b8; background: #fff6ed; }
+
 .assistant-add-popover.autonomy-context-popover {
   width: min(16rem, calc(100vw - 2rem));
   overflow: visible;
@@ -1227,6 +1248,40 @@ body:has(.autonomy-platform-page),
   max-width: 100%;
   border-bottom-left-radius: 5px;
 }
+
+.autonomy-clarification {
+  width: min(100%, 46rem);
+  margin-top: 0.65rem;
+  padding: 0.85rem;
+  border: 1px solid #eadfeb;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 24px rgba(65, 43, 75, 0.06);
+}
+
+.autonomy-clarification > strong { display: block; color: #392e3d; font-size: 0.82rem; line-height: 1.5; }
+.autonomy-clarification-options { display: grid; gap: 0.42rem; margin-top: 0.65rem; }
+.autonomy-clarification-options button {
+  display: grid;
+  min-height: 2.45rem;
+  align-items: center;
+  grid-template-columns: 1.65rem minmax(0, 1fr);
+  gap: 0.5rem;
+  padding: 0.46rem 0.65rem;
+  border: 1px solid #eadfea;
+  border-radius: 10px;
+  color: #392e3d;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+.autonomy-clarification-options button:hover:not(:disabled) { border-color: var(--dd-brand-middle); background: var(--dd-brand-light-surface); }
+.autonomy-clarification-options button:disabled { cursor: default; opacity: 0.55; }
+.autonomy-clarification-options button span { display: grid; width: 1.5rem; height: 1.5rem; place-items: center; border-radius: 7px; color: #fff; background: var(--dd-brand-middle); font-size: 0.72rem; font-weight: 800; }
+.autonomy-clarification-options button b { min-width: 0; font-size: 0.8rem; font-weight: 650; }
+.autonomy-clarification-other { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.5rem; margin-top: 0.55rem; }
+.autonomy-clarification-other input { min-width: 0; height: 2.55rem; padding: 0 0.72rem; border: 1px solid #dfd2e2; border-radius: 10px; font: inherit; }
+.autonomy-clarification-other button { padding: 0 0.9rem; border: 0; border-radius: 10px; color: #fff; background: var(--dd-brand-middle); font-weight: 750; }
 
 .autonomy-conversation-message .autonomy-inline-plan {
   width: min(100%, 46rem);

@@ -180,6 +180,37 @@ describe("autonomy conversation persistence", () => {
 });
 
 describe("Chatbot to independent conversation", () => {
+  it("renders ordered clarification choices, supports Other, and submits a clicked answer", async () => {
+    mocks.plan.mockResolvedValueOnce({
+      compiledPlan: null,
+      planningBrief: "请确认取餐点。",
+      planningRunId: null,
+      clarification: { questions: [{
+        questionId: "pickup.location",
+        prompt: "你希望去哪个取餐点？",
+        options: [
+          { optionId: "A", label: "食品储藏室", response: "去食品储藏室取餐。" },
+          { optionId: "B", label: "补给站", response: "去补给站取餐。" },
+        ],
+        allowOther: true,
+        otherLabel: "其他",
+      }] },
+    }).mockResolvedValueOnce({ compiledPlan: null, planningBrief: "已收到选择。", planningRunId: null });
+    renderWorkspace();
+    fireEvent.change(await screen.findByRole("textbox"), { target: { value: "帮我取一下外卖" } });
+    fireEvent.click(screen.getByRole("button", { name: "Build mission contract" }));
+
+    expect(await screen.findByRole("button", { name: "A食品储藏室" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "C其他" }));
+    expect(screen.getByRole("textbox", { name: "其他" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "A食品储藏室" }));
+
+    await waitFor(() => expect(mocks.plan).toHaveBeenCalledTimes(2));
+    expect(mocks.plan.mock.calls[1][0]).toEqual(expect.objectContaining({
+      instruction: "去食品储藏室取餐。",
+    }));
+  });
+
   it("uses one-line cascading mission context menus without duplicate asset links", async () => {
     renderWorkspace();
     fireEvent.click(await screen.findByRole("button", { name: "Mission context" }));
@@ -335,7 +366,11 @@ describe("Chatbot to independent conversation", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("ASSET_NOT_READY");
     expect(mocks.plan).not.toHaveBeenCalled();
     const id = listAutonomyConversations("local", "autonomy")[0].id;
-    expect(loadAutonomyConversation("local", "autonomy", id)?.mission.planningError).toContain("ASSET_NOT_READY");
+    const stored = loadAutonomyConversation("local", "autonomy", id);
+    expect(stored?.mission.planningError).toBeNull();
+    expect(stored?.mission.messages.at(-1)).toEqual(expect.objectContaining({
+      role: "assistant", kind: "error", content: expect.stringContaining("ASSET_NOT_READY"),
+    }));
   });
 
   it("opens a blank Chatbot while a reply is pending and keeps that reply in its original conversation", async () => {

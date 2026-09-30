@@ -2,6 +2,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import type { BrandEditionId } from "../../brand/edition-brand.generated";
 import { getAuthAccessToken } from "../auth/authTokenStore";
 import type { AutonomyPlannerArtifact } from "./missionHarness";
+import type { AutonomyClarification } from "./workspaceStore";
 
 export type AgentCoreActivationMode = "single" | "multiple" | "pipeline";
 
@@ -960,12 +961,19 @@ export class AgentCoreUnavailableError extends Error {
 export class AgentCoreRequestError extends Error {
   readonly status: number;
   readonly clarificationFields: string[];
+  readonly clarification: AutonomyClarification | null;
 
-  constructor(status: number, detail: string, clarificationFields: string[] = []) {
+  constructor(
+    status: number,
+    detail: string,
+    clarificationFields: string[] = [],
+    clarification: AutonomyClarification | null = null,
+  ) {
     super(detail);
     this.name = "AgentCoreRequestError";
     this.status = status;
     this.clarificationFields = clarificationFields;
+    this.clarification = clarification;
   }
 }
 
@@ -1047,15 +1055,51 @@ async function requestBytes(
   if (value.status < 200 || value.status >= 300) {
     // 只有受限的追问合同可以转为对话回复；普通接口失败仍然抛出原错误。
     let fields: string[] = [];
+    let clarification: AutonomyClarification | null = null;
     try {
       const detail = JSON.parse(new TextDecoder().decode(body)).detail;
       if (value.status === 409 && detail?.code === "MISSION_CLARIFICATION_REQUIRED"
         && Array.isArray(detail.fields) && detail.fields.length > 0 && detail.fields.length <= 16
         && detail.fields.every((item: unknown) => typeof item === "string" && item.trim().length > 0 && item.length <= 240)) {
         fields = detail.fields;
+        if (Array.isArray(detail.questions) && detail.questions.length <= 4) {
+          const questions = detail.questions.flatMap((question: unknown) => {
+            if (!question || typeof question !== "object") return [];
+            const candidate = question as Record<string, unknown>;
+            if (typeof candidate.question_id !== "string"
+              || !/^[a-z][a-z0-9._-]{1,63}$/u.test(candidate.question_id)
+              || typeof candidate.prompt !== "string" || candidate.prompt.length < 3
+              || candidate.prompt.length > 240 || !Array.isArray(candidate.options)
+              || candidate.options.length > 3) return [];
+            const options = candidate.options.flatMap((option: unknown, index: number) => {
+              if (!option || typeof option !== "object") return [];
+              const item = option as Record<string, unknown>;
+              const expected = (["A", "B", "C"] as const)[index];
+              if (item.option_id !== expected || typeof item.label !== "string"
+                || typeof item.response !== "string" || item.label.length > 120
+                || item.response.length > 240) return [];
+              return [{ optionId: expected, label: item.label, response: item.response }];
+            });
+            if (candidate.options.length && options.length !== candidate.options.length) return [];
+            return [{
+              questionId: candidate.question_id,
+              prompt: candidate.prompt,
+              options,
+              allowOther: candidate.allow_other !== false,
+              otherLabel: typeof candidate.other_label === "string"
+                && candidate.other_label.length <= 40 ? candidate.other_label : "其他",
+            }];
+          });
+          if (questions.length) clarification = { questions };
+        }
       }
     } catch { /* 非 JSON 响应交给通用诊断，不解释为模型追问。 */ }
-    if (fields.length) throw new AgentCoreRequestError(value.status, "MISSION_CLARIFICATION_REQUIRED", fields);
+    if (fields.length) throw new AgentCoreRequestError(
+      value.status,
+      "MISSION_CLARIFICATION_REQUIRED",
+      fields,
+      clarification,
+    );
     throw new AgentCoreRequestError(value.status, detailFromBody(body));
   }
   return body;
