@@ -310,7 +310,18 @@ function localizedAutonomyError(
   chinese: boolean,
   fallback: { zh: string; en: string },
 ): string {
-  const code = value instanceof Error ? value.message.split(":", 1)[0] : "";
+  const raw = value instanceof Error ? value.message : String(value ?? "");
+  const code = raw.split(":", 1)[0];
+  if (
+    code === "MODEL_REQUEST_TOO_LARGE"
+    || code === "MODEL_CONSENSUS_INSUFFICIENT_RESPONSES"
+    || code === "MODEL_INVOCATION_FAILED"
+    || /APIStatusError:status=413/u.test(raw)
+  ) {
+    return chinese
+      ? "规划模型暂时无法处理当前上下文。软件会保留对话，请重试本轮指令。"
+      : "The planning model could not process the current context. Your conversation is preserved; retry this turn.";
+  }
   if (["HARNESS_CONFIGURATION_UPGRADE_REQUIRED", "AGENT_CORE_INTERNAL_ERROR"].includes(code)) {
     const id = value instanceof Error ? value.message.split(":")[1] : "";
     const suffix = id && /^[a-f0-9]{32}$/u.test(id) ? ` (${id})` : "";
