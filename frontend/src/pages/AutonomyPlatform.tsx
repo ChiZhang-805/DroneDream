@@ -342,6 +342,11 @@ function localizedAutonomyError(
       ? "当前地点暂时没有满足机体净空的可执行路线。任务已保留，请选择另一个地点或更换地图与无人机后重新规划。"
       : "No route to this place currently satisfies the aircraft clearance. The task is preserved; choose another place or change the map and aircraft, then replan.";
   }
+  if (code === "INTENT_REVIEW_EXHAUSTED" || raw.includes("INTENT_REVIEW_EXHAUSTED")) {
+    return chinese
+      ? "任务意图复核未能完成。对话和已选资源均已保留，请重试本轮指令。"
+      : "Mission intent review could not be completed. The conversation and selected resources were preserved; retry this turn.";
+  }
   if (code === "REQUIRED_TOOL_FAILED" || code === "TOOL_EXECUTION_FAILED") {
     return chinese
       ? "路线工具未能完成本轮计算。任务与选择均已保留，请重新规划；若当前地点不可达，系统会改为给出可选地点，而不会显示内部错误。"
