@@ -1,6 +1,6 @@
 # DroneDream 本地操作流程（默认开启 Gazebo GUI、地面赛道 marker、Trajectory replay、PDF）
 
-> 适用场景：在本地 Linux 工作站或本地服务器运行 DroneDream。默认开启 Gazebo GUI 窗口、地面 reference-track marker、前端 Trajectory replay、Artifacts、PDF 报告下载。  
+> 适用场景：在本地 Linux 工作站或本地服务器运行 DroneDream。默认开启 Gazebo GUI 窗口、地面 reference-track marker、前端 Trajectory replay、Artifacts、PDF 报告下载。
 > 如果本地机器有图形桌面，直接使用本机 `DISPLAY`；如果是无头服务器，可采用 Xvfb + noVNC，流程与 Runpod 类似。
 
 ---
@@ -426,7 +426,7 @@ npm run dev -- --host 0.0.0.0
 http://localhost:5173
 ```
 
-本地原生桌面模式下，`VITE_GAZEBO_VIEWER_URL` 可以为空；你会在系统桌面直接看到 Gazebo GUI 窗口。  
+本地原生桌面模式下，`VITE_GAZEBO_VIEWER_URL` 可以为空；你会在系统桌面直接看到 Gazebo GUI 窗口。
 如果使用本地 noVNC，则设置：
 
 ```bash

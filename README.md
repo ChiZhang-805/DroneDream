@@ -84,8 +84,9 @@ campaigns remain future experimental gates.
 
 ## 📖 Read the report
 
-- Open the
-  [DroneDream AURORA Technical Report](technical-report/output/DroneDream_AURORA_Technical_Report.pdf).
+- Build or read the
+  [DroneDream AURORA Technical Report sources](technical-report/main.tex); generated PDFs are
+  intentionally excluded from source control.
 - Review [report provenance and validation](technical-report/README.md).
 - Inspect the
   [claim-evidence ledger](technical-report/claim-evidence-ledger.json) and
