@@ -802,6 +802,9 @@ function Get-FiveEditionBuildBindings {
             [string]$receipt.productName -ceq [string]$planByEdition[$editionId].productName -and
             -not [string]::IsNullOrWhiteSpace([string]$receipt.version)
         ) "$editionId build receipt product or version is inconsistent."
+        Assert-Condition (
+            [bool]$receipt.desktopVisualQa
+        ) "$editionId build is not a visual-QA binary. Rebuild all five editions with VITE_DESKTOP_VISUAL_QA=true before running installed visual parity."
         $generatedAt = [DateTimeOffset]::MinValue
         Assert-Condition (
             [DateTimeOffset]::TryParse([string]$receipt.generatedAt, [ref]$generatedAt)
