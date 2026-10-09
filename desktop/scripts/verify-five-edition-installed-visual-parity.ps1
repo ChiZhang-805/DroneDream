@@ -154,6 +154,19 @@ public static class DroneDreamInstalledVisualNative
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool BringWindowToTop(IntPtr hWnd);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool AttachThreadInput(uint sourceThreadId, uint targetThreadId, bool attach);
+
+    [DllImport("kernel32.dll")]
+    public static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr SetActiveWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr SetFocus(IntPtr hWnd);
+
     [DllImport("user32.dll")]
     public static extern IntPtr GetForegroundWindow();
 
@@ -177,6 +190,40 @@ public static class DroneDreamInstalledVisualNative
 
     [DllImport("dwmapi.dll")]
     public static extern int DwmFlush();
+
+    public static bool ForceForegroundWindow(IntPtr hWnd)
+    {
+        IntPtr foreground = GetForegroundWindow();
+        uint ignoredProcessId;
+        uint targetThread = GetWindowThreadProcessId(hWnd, out ignoredProcessId);
+        uint currentThread = GetCurrentThreadId();
+        uint foregroundThread = foreground == IntPtr.Zero
+            ? 0
+            : GetWindowThreadProcessId(foreground, out ignoredProcessId);
+        bool currentAttached = false;
+        bool foregroundAttached = false;
+        try
+        {
+            if (currentThread != targetThread)
+            {
+                currentAttached = AttachThreadInput(currentThread, targetThread, true);
+            }
+            if (foregroundThread != 0 && foregroundThread != targetThread && foregroundThread != currentThread)
+            {
+                foregroundAttached = AttachThreadInput(foregroundThread, targetThread, true);
+            }
+            BringWindowToTop(hWnd);
+            SetActiveWindow(hWnd);
+            SetFocus(hWnd);
+            SetForegroundWindow(hWnd);
+            return GetForegroundWindow() == hWnd;
+        }
+        finally
+        {
+            if (foregroundAttached) AttachThreadInput(foregroundThread, targetThread, false);
+            if (currentAttached) AttachThreadInput(currentThread, targetThread, false);
+        }
+    }
 
     public static IntPtr[] GetVisibleTopLevelWindows(uint processId)
     {
@@ -436,13 +483,11 @@ function Set-CaptureForeground {
             [DroneDreamInstalledVisualNative]::SWP_NOSIZE -bor
             [DroneDreamInstalledVisualNative]::SWP_SHOWWINDOW
     ) | Out-Null
-    [DroneDreamInstalledVisualNative]::BringWindowToTop($Handle) | Out-Null
-    [DroneDreamInstalledVisualNative]::SetForegroundWindow($Handle) | Out-Null
+    [DroneDreamInstalledVisualNative]::ForceForegroundWindow($Handle) | Out-Null
     $deadline = [DateTime]::UtcNow.AddSeconds(3)
     while ([DroneDreamInstalledVisualNative]::GetForegroundWindow() -ne $Handle -and
         [DateTime]::UtcNow -lt $deadline) {
-        [DroneDreamInstalledVisualNative]::BringWindowToTop($Handle) | Out-Null
-        [DroneDreamInstalledVisualNative]::SetForegroundWindow($Handle) | Out-Null
+        [DroneDreamInstalledVisualNative]::ForceForegroundWindow($Handle) | Out-Null
         Start-Sleep -Milliseconds 100
     }
     Assert-Condition (
@@ -1443,6 +1488,19 @@ try {
                                 semanticReceipt = (Resolve-Path -LiteralPath $semanticPath).Path
                             })
                             continue
+                        }
+                        # A route can legitimately update native window chrome while
+                        # it initializes. Re-assert the requested capture geometry
+                        # after the surface is ready so every screenshot is bound to
+                        # the same client size and monitor work area.
+                        if ($state -ceq "default") {
+                            $defaultWindowMetrics = Set-CanonicalDefaultWindow `
+                                -Handle $handle `
+                                -ClientWidthDip $plan.defaultClientDip.width `
+                                -ClientHeightDip $plan.defaultClientDip.height `
+                                -TimeoutSeconds $WindowTimeoutSeconds
+                        } else {
+                            Set-MaximizedWindow -Handle $handle -TimeoutSeconds $WindowTimeoutSeconds
                         }
                         $fingerprint = Convert-SemanticParityFingerprint -Metrics $semantic.metrics
                         $baselineKey = "$($plan.editionId)|$locale|$($surface.id)"
