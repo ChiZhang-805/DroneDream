@@ -8301,9 +8301,9 @@ a {
   }
 }
 
-/* Final layout guarantees for the shared Settings surfaces.  Keep these at
-   the end of the cascade because the legacy launcher theme contains older
-   responsive rules for the same components. */
+/* Final layout guarantees for the shared Settings surfaces. Keep these at the
+   end of the cascade because earlier edition-specific layout rules target the
+   same components. */
 .app-shell .settings-workspace-content .settings-model-mode-row {
   display: flex;
   align-items: center;
@@ -15495,7 +15495,7 @@ a {
 }
 
 /* --------------------------------------------------------------------------
-   Operational workspace: calm light theme
+   Operational workspace: canonical edition surfaces
 
    The immersive launcher intentionally keeps its dark starfield treatment.
    Everything after entering the product uses a high-legibility light canvas
@@ -21609,9 +21609,8 @@ body {
   }
 }
 
-/* Settings follows the selected appearance independently from the operational
-   workspace's intentionally light default. This block stays last because the
-   legacy edition rules above still contain fixed light colors. */
+/* Keep the fixed Settings palette at the end of the cascade so earlier
+   edition-specific layout rules cannot override its canonical surfaces. */
 .app-shell .quick-settings-backdrop {
   animation: none;
 }
