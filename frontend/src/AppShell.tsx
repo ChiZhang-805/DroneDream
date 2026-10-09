@@ -34,7 +34,6 @@ import {
   MailCheck,
   MapPinned,
   Menu,
-  Moon,
   MonitorCog,
   Navigation2,
   RadioTower,
@@ -46,7 +45,6 @@ import {
   Sparkles,
   TicketCheck,
   Trophy,
-  Sun,
   Trash2,
   X,
   type LucideIcon,
@@ -177,7 +175,7 @@ import {
   type ModelHarnessMemoryNamespace,
 } from "./features/settings/consolePreferences";
 import { ECE498BH_COURSE_URL } from "./externalLinks";
-import { EditionThemeProvider, useEditionTheme } from "./theme/EditionThemeProvider";
+import { EditionThemeProvider } from "./theme/EditionThemeProvider";
 import {
   BUILD_EDITION,
   EDITION_IS_FIXED,
@@ -521,9 +519,7 @@ type SettingsCopy = Readonly<{
   title: string;
   tabs: readonly [string, string, string, string];
   language: string;
-  interface: string;
   notifications: string;
-  appearance: readonly [string, string, string, string];
   notificationLabels: readonly [string, string, string, string, string, string, string, string];
   memoryTitle: string;
   memoryEnabled: readonly [string, string];
@@ -550,9 +546,7 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     title: "Settings",
     tabs: ["General", "Memory", "Model", "Runtime"],
     language: "Language",
-    interface: "Interface",
     notifications: "Notifications",
-    appearance: ["Dark", "Light", "System", "Customize"],
     notificationLabels: ["Allow notifications", "Experiment and task completed", "AI response completed", "Product updates", "Approval required", "Allowance or card expiring", "Security and sign-in", "Device or runtime status"],
     memoryTitle: "Memory",
     memoryEnabled: ["Memory off", "Memory on"],
@@ -567,9 +561,7 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     title: "设置",
     tabs: ["常规", "记忆", "模型", "运行环境"],
     language: "语言",
-    interface: "界面",
     notifications: "通知",
-    appearance: ["深色", "浅色", "跟随系统", "自定义"],
     notificationLabels: ["允许通知", "实验与任务完成", "AI 回复完成", "产品更新", "需要审批", "额度或重置卡即将到期", "安全与登录提醒", "设备或运行环境状态"],
     memoryTitle: "记忆",
     memoryEnabled: ["记忆已关闭", "记忆已开启"],
@@ -1001,9 +993,6 @@ function SettingsDialog({
   const { locale, interfaceLocale, setLocale, t } = useI18n();
   const navigate = useNavigate();
   const settingsCopy = SETTINGS_COPY[interfaceLocale];
-  const editionTheme = useEditionTheme();
-  const setAppearancePreference = editionTheme.setAppearance;
-  const setCustomAccentPreference = editionTheme.setCustomAccent;
   const auth = useAuth();
   const {
     settings: modelAccess,
@@ -1033,7 +1022,6 @@ function SettingsDialog({
   const [allowanceResetState, setAllowanceResetState] =
     useState<"idle" | "redeeming" | "success" | "error">("idle");
   const [allowanceResetMessage, setAllowanceResetMessage] = useState<string | null>(null);
-  const customColorInputRef = useRef<HTMLInputElement>(null);
   const [experiencePreferenceDraft, setExperiencePreferenceDraft] =
     useState<ExperiencePreferenceDraft>(
       initialPreferenceDraft ?? EMPTY_EXPERIENCE_PREFERENCE_DRAFT,
@@ -1078,8 +1066,8 @@ function SettingsDialog({
   }, [auth.account, docsPreview, edition]);
   const consolePreferenceRecord = useCallback((): ConsolePreferenceRecord => ({
     interface_locale: interfaceLocale,
-    appearance_mode: editionTheme.appearancePreference,
-    custom_accent: editionTheme.customAccent,
+    appearance_mode: "dark",
+    custom_accent: "#8d72ee",
     notifications: notificationPreferences,
     memory_enabled: experiencePreferenceDraft.memory_enabled,
     memory_scopes: experiencePreferenceDraft.memory_scopes,
@@ -1094,8 +1082,6 @@ function SettingsDialog({
       report_format: experiencePreferenceDraft.default_report_format,
     },
   }), [
-    editionTheme.appearancePreference,
-    editionTheme.customAccent,
     experiencePreferenceDraft,
     interfaceLocale,
     notificationPreferences,
@@ -1253,8 +1239,6 @@ function SettingsDialog({
               ...preferences.notifications,
             });
             setLocale(preferences.interface_locale);
-            setAppearancePreference(preferences.appearance_mode);
-            setCustomAccentPreference(preferences.custom_accent);
           }
         }
         preferenceHydratedRef.current = true;
@@ -1273,8 +1257,6 @@ function SettingsDialog({
     initialPreferenceDraft,
     localDesktopPreferences,
     preferenceBoundary,
-    setAppearancePreference,
-    setCustomAccentPreference,
     setLocale,
   ]);
   useEffect(() => {
@@ -1699,30 +1681,20 @@ function SettingsDialog({
       ? {
           title: "设置",
           language: "语言",
-          appearance: "外观",
           accountMemory: "账户记忆",
           editionMemory: "本软件记忆",
           model: "默认平台模型",
           runtime: "Runtime",
           allSettings: "全部设置",
-          dark: "深色",
-          light: "浅色",
-          system: "跟随系统",
-          custom: "自定义",
         }
       : {
           title: "Settings",
           language: "Language",
-          appearance: "Appearance",
           accountMemory: "Account memory",
           editionMemory: "This edition's memory",
           model: "Default platform model",
           runtime: "Runtime",
           allSettings: "All settings",
-          dark: "Dark",
-          light: "Light",
-          system: "System",
-          custom: "Custom",
         };
     const availableModels = managedModels.filter(managedModelAvailableForAssistant);
     const selectedModel = `${modelAccess.managedProvider}:${modelAccess.managedModel}`;
@@ -1766,34 +1738,6 @@ function SettingsDialog({
               ))}
             </div>
           </div>
-          <label className="quick-settings-item" htmlFor="quick-settings-appearance">
-            <span>{quickCopy.appearance}</span>
-            <select
-              id="quick-settings-appearance"
-              value={editionTheme.appearancePreference}
-              onChange={(event) => {
-                const value = event.target.value as typeof editionTheme.appearancePreference;
-                editionTheme.setAppearance(value);
-                if (value === "custom") {
-                  window.requestAnimationFrame(() => customColorInputRef.current?.click());
-                }
-              }}
-            >
-              <option value="dark">{quickCopy.dark}</option>
-              <option value="light">{quickCopy.light}</option>
-              <option value="system">{quickCopy.system}</option>
-              <option value="custom">{quickCopy.custom}</option>
-            </select>
-            <input
-              ref={customColorInputRef}
-              className="settings-custom-color-input"
-              type="color"
-              tabIndex={-1}
-              aria-label={interfaceLocale === "zh-CN" ? "选择自定义主题色" : "Choose a custom theme color"}
-              value={editionTheme.customAccent}
-              onChange={(event) => editionTheme.setCustomAccent(event.target.value)}
-            />
-          </label>
           {auth.account || docsPreview ? (
             <>
               <div className="quick-settings-item quick-settings-memory">
@@ -1928,70 +1872,6 @@ function SettingsDialog({
                 </button>
               ))}
             </fieldset>
-          </div>
-          <div className="settings-general-card settings-interface-card">
-            <div className="settings-card-heading">
-              <span><SlidersHorizontal aria-hidden="true" />{settingsCopy.interface}</span>
-            </div>
-            <div
-              className="settings-appearance-options"
-              role="group"
-              aria-label={t("settings.general.appearance")}
-            >
-              <button
-                type="button"
-                className={editionTheme.appearancePreference === "dark" ? "selected" : undefined}
-                aria-pressed={editionTheme.appearancePreference === "dark"}
-                onClick={() => editionTheme.setAppearance("dark")}
-              >
-                <Moon aria-hidden="true" />
-                <strong>{settingsCopy.appearance[0]}</strong>
-                <i aria-hidden="true">✓</i>
-              </button>
-              <button
-                type="button"
-                className={editionTheme.appearancePreference === "light" ? "selected" : undefined}
-                aria-pressed={editionTheme.appearancePreference === "light"}
-                onClick={() => editionTheme.setAppearance("light")}
-              >
-                <Sun aria-hidden="true" />
-                <strong>{settingsCopy.appearance[1]}</strong>
-                <i aria-hidden="true">✓</i>
-              </button>
-              <button
-                type="button"
-                className={editionTheme.appearancePreference === "system" ? "selected" : undefined}
-                aria-pressed={editionTheme.appearancePreference === "system"}
-                onClick={() => editionTheme.setAppearance("system")}
-              >
-                <MonitorCog aria-hidden="true" />
-                <strong>{settingsCopy.appearance[2]}</strong>
-                <i aria-hidden="true">✓</i>
-              </button>
-              <button
-                type="button"
-                className={editionTheme.appearancePreference === "custom" ? "selected" : undefined}
-                aria-pressed={editionTheme.appearancePreference === "custom"}
-                onClick={() => {
-                  editionTheme.setAppearance("custom");
-                  window.requestAnimationFrame(() => customColorInputRef.current?.click());
-                }}
-              >
-                <Sparkles aria-hidden="true" />
-                <strong>{settingsCopy.appearance[3]}</strong>
-                <i aria-hidden="true">✓</i>
-              </button>
-            </div>
-            <input
-              ref={customColorInputRef}
-              id="settings_custom_accent"
-              className="settings-custom-color-input"
-              type="color"
-              tabIndex={-1}
-              aria-label={locale === "zh-CN" ? "选择自定义主题色" : "Choose a custom theme color"}
-              value={editionTheme.customAccent}
-              onChange={(event) => editionTheme.setCustomAccent(event.target.value)}
-            />
           </div>
           <div className="settings-general-card settings-notification-card">
             <div className="settings-card-heading">

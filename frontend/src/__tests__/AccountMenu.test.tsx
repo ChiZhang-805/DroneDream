@@ -220,7 +220,7 @@ describe("sidebar account menu", () => {
 
     const quickSettings = screen.getByRole("dialog", { name: "Settings" });
     expect(within(quickSettings).getByText("Language")).toBeVisible();
-    expect(within(quickSettings).getByText("Appearance")).toBeVisible();
+    expect(within(quickSettings).queryByText("Appearance")).not.toBeInTheDocument();
     expect(within(quickSettings).getByText("Account memory")).toBeVisible();
     expect(within(quickSettings).getByText("This edition's memory")).toBeVisible();
     expect(within(quickSettings).getByRole("combobox", {

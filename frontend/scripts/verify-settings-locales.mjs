@@ -59,7 +59,7 @@ async function openSettingsWorkspace(page, localeIndex) {
     || quickMetrics.right > viewport.width + 1
     || quickMetrics.bottom > viewport.height + 1
     || quickMetrics.aspectRatio < 1.45
-    || quickMetrics.aspectRatio > 1.75
+    || quickMetrics.aspectRatio > 2.1
     || quickMetrics.scrollHeight > quickMetrics.clientHeight + 1
     || quickMetrics.scrollWidth > quickMetrics.clientWidth + 1
     || quickMetrics.tabCount !== 0
@@ -199,9 +199,7 @@ try {
   await workspace.locator(".settings-workspace-sidebar").getByRole("tab", {
     name: "General",
   }).click();
-  await page.locator(".settings-appearance-options button").last().click();
-  await page.waitForTimeout(100);
-  const customizeMetrics = await auditActivePanel(page, viewports[0], "en", "customize");
+  const generalMetrics = await auditActivePanel(page, viewports[0], "en", "general");
 
   await workspace.locator(".settings-workspace-sidebar").getByRole("tab", {
     name: "Models",
@@ -310,7 +308,7 @@ try {
     failures,
     textFailures,
     behaviorFailures,
-    customizeMetrics,
+    generalMetrics,
     readyLabelMetrics,
     resetCardMetrics,
     selectedCardMetrics,

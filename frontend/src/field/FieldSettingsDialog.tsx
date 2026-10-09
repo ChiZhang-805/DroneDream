@@ -6,17 +6,15 @@ import {
   ChevronRight,
   MapPinned,
   MonitorCog,
-  Moon,
   Plane,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
   Settings,
-  Sun,
   Workflow,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useState, type RefObject } from "react";
 
 import { BrandLockup } from "../components/BrandLockup";
 import { CustomModelSettingsPanel } from "../components/CustomModelSettingsPanel";
@@ -35,7 +33,6 @@ import {
 import { isDesktopRuntime, startRuntimeUpgrade } from "../desktop/bridge";
 import { useModelAccess } from "../features/settings/ModelAccessContext";
 import { localeSafeError, type InterfaceLocale } from "../i18n/I18nProvider";
-import { useEditionTheme } from "../theme/EditionThemeProvider";
 import type { FieldLocale } from "./catalog";
 
 const ECE498BH_COURSE_URL =
@@ -90,9 +87,7 @@ const COPY = {
     allSettings: "All settings",
     tabs: ["General", "Memory", "Models", "Runtime"] as const,
     language: "Language",
-    interface: "Interface",
     notifications: "Notifications",
-    appearance: ["Dark", "Light", "System", "Customize"] as const,
     notificationLabels: [
       "Allow notifications",
       "Experiment and task completed",
@@ -150,9 +145,7 @@ const COPY = {
     allSettings: "全部设置",
     tabs: ["常规", "记忆", "模型", "Runtime"] as const,
     language: "语言",
-    interface: "界面",
     notifications: "通知",
-    appearance: ["深色", "浅色", "跟随系统", "自定义"] as const,
     notificationLabels: [
       "允许通知",
       "实验与任务完成",
@@ -286,9 +279,7 @@ export function FieldSettingsDialog({
     tone: "success" | "error";
     text: string;
   } | null>(null);
-  const customColorInputRef = useRef<HTMLInputElement>(null);
   const modelAccess = useModelAccess();
-  const editionTheme = useEditionTheme();
   const copy = COPY[interfaceLocale === "zh-CN" ? "zh-CN" : "en"];
   const modelSummary = modelAccess.settings.accessMode === "platform"
     ? modelAccess.settings.managedModel
@@ -430,34 +421,6 @@ export function FieldSettingsDialog({
               ))}
             </div>
           </div>
-          <label className="quick-settings-item" htmlFor="field-quick-settings-appearance">
-            <span>{copy.interface}</span>
-            <select
-              id="field-quick-settings-appearance"
-              value={editionTheme.appearancePreference}
-              onChange={(event) => {
-                const value = event.target.value as typeof editionTheme.appearancePreference;
-                editionTheme.setAppearance(value);
-                if (value === "custom") {
-                  window.requestAnimationFrame(() => customColorInputRef.current?.click());
-                }
-              }}
-            >
-              <option value="dark">{copy.appearance[0]}</option>
-              <option value="light">{copy.appearance[1]}</option>
-              <option value="system">{copy.appearance[2]}</option>
-              <option value="custom">{copy.appearance[3]}</option>
-            </select>
-            <input
-              ref={customColorInputRef}
-              className="settings-custom-color-input"
-              type="color"
-              tabIndex={-1}
-              aria-label={copy.appearance[3]}
-              value={editionTheme.customAccent}
-              onChange={(event) => editionTheme.setCustomAccent(event.target.value)}
-            />
-          </label>
           <div className="quick-settings-item quick-settings-memory">
             <SettingsToggle
               checked={accountMemoryEnabled}
@@ -552,45 +515,6 @@ export function FieldSettingsDialog({
                 </button>
               ))}
             </fieldset>
-          </div>
-          <div className="settings-general-card settings-interface-card">
-            <div className="settings-card-heading">
-              <span><SlidersHorizontal aria-hidden="true" />{copy.interface}</span>
-            </div>
-            <div className="settings-appearance-options" role="group" aria-label={copy.interface}>
-              {([
-                ["dark", Moon],
-                ["light", Sun],
-                ["system", MonitorCog],
-                ["custom", Sparkles],
-              ] as const).map(([appearance, Icon], index) => (
-                <button
-                  key={appearance}
-                  type="button"
-                  className={editionTheme.appearancePreference === appearance ? "selected" : undefined}
-                  aria-pressed={editionTheme.appearancePreference === appearance}
-                  onClick={() => {
-                    editionTheme.setAppearance(appearance);
-                    if (appearance === "custom") {
-                      window.requestAnimationFrame(() => customColorInputRef.current?.click());
-                    }
-                  }}
-                >
-                  <Icon aria-hidden="true" />
-                  <strong>{copy.appearance[index]}</strong>
-                  <i aria-hidden="true">✓</i>
-                </button>
-              ))}
-            </div>
-            <input
-              ref={customColorInputRef}
-              className="settings-custom-color-input"
-              type="color"
-              tabIndex={-1}
-              aria-label={copy.appearance[3]}
-              value={editionTheme.customAccent}
-              onChange={(event) => editionTheme.setCustomAccent(event.target.value)}
-            />
           </div>
           <div className="settings-general-card settings-notification-card">
             <div className="settings-card-heading">

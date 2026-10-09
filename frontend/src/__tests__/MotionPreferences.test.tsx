@@ -1,4 +1,4 @@
-/** Device appearance must remain usable even when browser persistence is denied. */
+/** Fixed edition styling and motion preferences must tolerate denied browser persistence. */
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { appReducedMotionEnabled, setAppReducedMotionEnabled } from "../desktop/uiMotionPreferences";
@@ -20,16 +20,14 @@ describe("motion preferences", () => {
     expect(() => persistUniversalMode("sim")).not.toThrow();
   });
 
-  it("keeps theme controls usable with no persistent storage", () => {
+  it("keeps the edition palette fixed with no persistent storage", () => {
     vi.spyOn(window, "localStorage", "get").mockImplementation(() => { throw new DOMException("blocked", "SecurityError"); });
     const { result } = renderHook(() => useEditionTheme(), {
       wrapper: ({ children }) => <EditionThemeProvider edition="sim">{children}</EditionThemeProvider>,
     });
-    expect(result.current.appearancePreference).toBe("dark");
-    act(() => result.current.setAppearance("light"));
-    expect(result.current.appearancePreference).toBe("light");
-    act(() => result.current.setCustomAccent("#AABBCC"));
-    expect(result.current.customAccent).toBe("#aabbcc");
+    expect(result.current.id).toBe("sim");
+    expect(result.current.appearance).toBe("dark");
+    expect(document.documentElement.dataset.ddAppearance).toBe("dark");
   });
   it("keeps a denied storage read from crashing the UI", () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new DOMException("blocked", "SecurityError"); });
