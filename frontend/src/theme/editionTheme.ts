@@ -20,7 +20,7 @@ export type EditionTheme = Readonly<{
   gradientStops: readonly [string, string, string];
   lightSurface: string;
   darkSurface: string;
-  appearance: "dark";
+  appearance: "light";
   presentationOnly: true;
   grantsHardwareAuthority: false;
   three: EditionTheme3D;
@@ -45,7 +45,7 @@ function createTheme(id: BrandEditionId): EditionTheme {
     gradientStops: Object.freeze([...token.gradientStops] as [string, string, string]),
     lightSurface: token.lightSurface,
     darkSurface: token.darkSurface,
-    appearance: "dark",
+    appearance: "light",
     presentationOnly: BRAND_PRESENTATION_ONLY,
     grantsHardwareAuthority: BRAND_GRANTS_HARDWARE_AUTHORITY,
     three: Object.freeze({
@@ -67,7 +67,7 @@ export const EDITION_THEMES = Object.freeze({
   autonomy: createTheme("autonomy"),
 }) satisfies Readonly<Record<BrandEditionId, EditionTheme>>;
 
-/** Return a cached dark palette; it contains no model, subscription, or hardware permissions. */
+/** Return the cached light palette; it contains no model, subscription, or hardware permissions. */
 export function editionTheme(id: BrandEditionId): EditionTheme {
   return EDITION_THEMES[id];
 }

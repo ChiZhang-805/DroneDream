@@ -26,8 +26,9 @@ describe("motion preferences", () => {
       wrapper: ({ children }) => <EditionThemeProvider edition="sim">{children}</EditionThemeProvider>,
     });
     expect(result.current.id).toBe("sim");
-    expect(result.current.appearance).toBe("dark");
-    expect(document.documentElement.dataset.ddAppearance).toBe("dark");
+    expect(result.current.appearance).toBe("light");
+    expect(document.documentElement.dataset.ddAppearance).toBe("light");
+    expect(document.documentElement.style.colorScheme).toBe("light");
   });
   it("keeps a denied storage read from crashing the UI", () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new DOMException("blocked", "SecurityError"); });

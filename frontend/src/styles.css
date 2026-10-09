@@ -1,7 +1,7 @@
 @import "./brand/edition-brand.generated.css";
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
     sans-serif;
   line-height: 1.5;

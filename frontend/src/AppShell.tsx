@@ -1066,7 +1066,7 @@ function SettingsDialog({
   }, [auth.account, docsPreview, edition]);
   const consolePreferenceRecord = useCallback((): ConsolePreferenceRecord => ({
     interface_locale: interfaceLocale,
-    appearance_mode: "dark",
+    appearance_mode: "light",
     custom_accent: "#8d72ee",
     notifications: notificationPreferences,
     memory_enabled: experiencePreferenceDraft.memory_enabled,
