@@ -591,6 +591,7 @@ async function verifySettings(page, testCase) {
       );
     }
     await modelPicker.click();
+    await page.locator(".assistant-model-menu-portal").waitFor({ state: "detached" });
   }
   assert(metrics.usageValuesFit, `${testCase.id}: Usage values were visually truncated`);
   for (const foreground of [
@@ -614,6 +615,10 @@ async function verifySettings(page, testCase) {
     return trigger instanceof HTMLButtonElement && !trigger.disabled;
   });
   await manage.focus();
+  assert(
+    await manage.evaluate((element) => element === document.activeElement),
+    `${testCase.id}: manage-subscription link did not accept keyboard focus`,
+  );
   await page.keyboard.press("Tab");
   const activeAfterManage = await page.evaluate(() => {
     const active = document.activeElement;

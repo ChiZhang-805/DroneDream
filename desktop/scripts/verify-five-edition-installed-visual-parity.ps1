@@ -877,7 +877,7 @@ function Assert-SurfaceMatrix {
         "assistant", "jobs-new", "dashboard", "history", "scenarios", "compare",
         "autonomy-overview", "autonomy-aircraft",
         "autonomy-maps", "autonomy-plugins", "autonomy-harness", "autonomy-live",
-        "autonomy-evidence", "launcher", "quick-settings", "settings-general",
+        "launcher", "quick-settings", "settings-general",
         "settings-memory", "settings-model", "settings-course", "settings-runtime",
         "account-menu"
     )

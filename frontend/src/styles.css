@@ -822,8 +822,7 @@ body:has(.autonomy-platform-page),
   }
 }
 
-.autonomy-command-page,
-.autonomy-evidence-page {
+.autonomy-command-page {
   display: grid;
   min-height: 100%;
   align-content: start;
@@ -2074,9 +2073,7 @@ body:has(.autonomy-platform-page),
 }
 
 .autonomy-config-card,
-.autonomy-config-summary,
-.autonomy-evidence-bindings,
-.autonomy-evidence-empty {
+.autonomy-config-summary {
   border: 1px solid #e1dae5;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.96);
@@ -2523,79 +2520,6 @@ fieldset.autonomy-form-grid {
   font-weight: 750;
 }
 
-.autonomy-evidence-bindings {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.7rem;
-  padding: 0.8rem;
-}
-
-.autonomy-evidence-bindings article {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 0.65rem;
-  padding: 0.7rem;
-  border-radius: 12px;
-  background: #f8f6f9;
-}
-
-.autonomy-evidence-bindings article > svg { width: 1.1rem; color: var(--dd-brand-middle); }
-.autonomy-evidence-bindings article span { display: grid; min-width: 0; }
-.autonomy-evidence-bindings article small { color: #8a7e8e; font-size: 0.58rem; }
-.autonomy-evidence-bindings article strong { overflow: hidden; font-size: 0.73rem; text-overflow: ellipsis; white-space: nowrap; }
-.autonomy-evidence-bindings article time { grid-column: 2; color: #958a98; font-size: 0.55rem; }
-
-.autonomy-evidence-empty {
-  display: grid;
-  min-height: clamp(360px, 52vh, 600px);
-  place-content: center;
-  justify-items: center;
-  gap: 1rem;
-  padding: 1.5rem;
-  text-align: center;
-}
-
-.autonomy-evidence-empty > svg { width: 3rem; height: 3rem; color: var(--dd-brand-middle); }
-.autonomy-evidence-empty h2 { margin: 0; font-size: 1.2rem; }
-.autonomy-evidence-empty > div { display: flex; align-items: center; gap: 0.55rem; color: #817486; font-size: 0.65rem; }
-.autonomy-evidence-empty > div svg { width: 0.8rem; }
-
-.autonomy-evidence-runs {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
-}
-
-.autonomy-evidence-runs article {
-  display: grid;
-  min-width: 0;
-  gap: 0.7rem;
-  padding: 1rem;
-  border: 1px solid #e1dae5;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 12px 30px rgba(61, 41, 69, 0.055);
-}
-
-.autonomy-evidence-runs article header {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.48rem;
-}
-
-.autonomy-evidence-runs article header svg { width: 1rem; color: var(--dd-brand-middle); }
-.autonomy-evidence-runs article header strong { overflow: hidden; font-size: 0.76rem; text-overflow: ellipsis; white-space: nowrap; }
-.autonomy-evidence-runs article header em { margin-left: auto; padding: 0.22rem 0.42rem; border-radius: 999px; color: #0a8067; background: #e8f8f3; font-size: 0.52rem; font-style: normal; font-weight: 900; }
-.autonomy-evidence-runs article p { margin: 0; color: #403446; font-size: 0.76rem; line-height: 1.48; }
-.autonomy-evidence-runs article dl { display: grid; margin: 0; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.42rem; }
-.autonomy-evidence-runs article dl > div { display: grid; min-width: 0; gap: 0.18rem; padding: 0.52rem; border-radius: 10px; background: #f8f6f9; }
-.autonomy-evidence-runs article dt { color: #887c8c; font-size: 0.55rem; }
-.autonomy-evidence-runs article dd { margin: 0; overflow: hidden; font-size: 0.67rem; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
-.autonomy-evidence-runs article time { color: #918594; font-size: 0.56rem; }
-
 .autonomy-live-target-switch {
   flex: 0 0 auto;
 }
@@ -2702,9 +2626,7 @@ fieldset.autonomy-form-grid {
   .autonomy-overview-grid,
   .autonomy-form-grid.is-three,
   .autonomy-form-grid.is-four,
-  .autonomy-readiness-strip,
-  .autonomy-evidence-bindings { grid-template-columns: 1fr; }
-  .autonomy-evidence-runs { grid-template-columns: 1fr; }
+  .autonomy-readiness-strip { grid-template-columns: 1fr; }
   .autonomy-choice-grid,
   .autonomy-choice-grid.is-semantic { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .autonomy-inline-plan-bindings { grid-template-columns: 1fr; }
@@ -2716,8 +2638,6 @@ fieldset.autonomy-form-grid {
   .autonomy-check-control { grid-column: auto; }
   .autonomy-map-upload { align-items: flex-start; flex-direction: column; }
   .autonomy-map-upload > span { margin-left: 0; }
-  .autonomy-evidence-empty > div { align-items: stretch; flex-direction: column; }
-  .autonomy-evidence-empty > div svg { align-self: center; transform: rotate(90deg); }
   .autonomy-sensor-mounts > article { grid-template-columns: 1fr; }
   .autonomy-sensor-mounts article > div { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .autonomy-sensor-mounts article > label.is-id input { min-height: 4.4rem; }
