@@ -8907,7 +8907,7 @@ a {
    `display: contents` did not reliably pass flex growth through the wrapper in
    the desktop webview, which let the account block sit directly below the
    navigation instead of at the bottom of the sidebar. */
-@media (min-width: 521px) {
+@media (min-width: 901px) {
   .app-shell:not(.app-shell-launcher) .app-sidebar {
     min-height: 100vh;
   }

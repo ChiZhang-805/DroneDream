@@ -33,6 +33,7 @@ const mobileMenuOnly = Boolean(args.get("--mobile-menu-only"));
 const fixedScenariosOnly = Boolean(args.get("--fixed-scenarios-only"));
 const settingsOnly = Boolean(args.get("--settings-only"));
 const fixedAgent = Boolean(args.get("--fixed-agent"));
+const requestedCase = args.get("--case");
 
 process.env.VITE_API_BASE_URL = `${origin}/api/v1`;
 process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
@@ -60,7 +61,8 @@ const fixedAgentCases = [
 ];
 const cases = (fixedAgent ? fixedAgentCases : universalCases)
   .filter((testCase) => !mobileMenuOnly || testCase.viewport.width <= 520)
-  .filter((testCase) => !settingsOnly || testCase.viewport.width >= 1000);
+  .filter((testCase) => !settingsOnly || testCase.viewport.width >= 1000)
+  .filter((testCase) => !requestedCase || testCase.id === requestedCase);
 const canonicalThemeColors = Object.freeze({
   universal: ["#FF5574", "#6A4CFF", "#E657D1"],
   sim: ["#00D9FF", "#2671FF", "#744CFF"],
@@ -292,10 +294,14 @@ async function verifySettings(page, testCase) {
   assert.deepEqual(themeBinding.colors, canonicalThemeColors[expectedActiveEdition]);
   let assistantModelImage;
   {
-    const assistantModel = page.locator(".assistant-model-button");
+    // Responsive layouts can keep an inactive picker mounted while another
+    // picker is the user-facing control. Exercise the enabled, visible trigger
+    // instead of relying on DOM order.
+    const assistantModel = page.locator(".assistant-model-button:visible:not(:disabled)").first();
     await assistantModel.waitFor();
-    await assistantModel.click({ force: true });
-    const modelMenu = page.locator(".assistant-model-menu");
+    await assistantModel.scrollIntoViewIfNeeded();
+    await assistantModel.click();
+    const modelMenu = page.locator(".assistant-model-menu:visible").first();
     await modelMenu.waitFor();
     const defaultModelOptions = modelMenu.locator('[role="option"][data-model-type="default"]');
     const assistantModelLabels = await defaultModelOptions.allTextContents();
@@ -600,9 +606,25 @@ async function verifySettings(page, testCase) {
   const resetCards = usage.locator(".settings-reset-card-trigger");
   const useResetCard = usage.locator(".settings-model-reset-action");
   const refresh = usage.locator(".settings-model-refresh");
+  // Usage and reset-card fixtures are fetched independently. Wait for the
+  // reset-card control to become keyboard-operable before asserting tab order.
+  await resetCards.waitFor({ state: "visible" });
+  await page.waitForFunction(() => {
+    const trigger = document.querySelector(".settings-reset-card-trigger");
+    return trigger instanceof HTMLButtonElement && !trigger.disabled;
+  });
   await manage.focus();
   await page.keyboard.press("Tab");
-  assert(await resetCards.evaluate((element) => element === document.activeElement));
+  const activeAfterManage = await page.evaluate(() => {
+    const active = document.activeElement;
+    return active instanceof HTMLElement
+      ? { tag: active.tagName, className: active.className, text: active.textContent?.trim() }
+      : null;
+  });
+  assert(
+    await resetCards.evaluate((element) => element === document.activeElement),
+    `${testCase.id}: expected reset-card trigger after plan link, received ${JSON.stringify(activeAfterManage)}`,
+  );
   await page.keyboard.press("Tab");
   assert(await useResetCard.evaluate((element) => element === document.activeElement));
   await page.keyboard.press("Tab");

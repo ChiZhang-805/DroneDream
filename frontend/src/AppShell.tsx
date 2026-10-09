@@ -3152,7 +3152,12 @@ function AccountMenuPopover({
 
   return (
     <div ref={menuRef} className="account-menu-popover" role="menu" aria-label={copy.account}>
-      <button type="button" className="account-menu-row" role="menuitem" onClick={onEditProfile}>
+      <button
+        type="button"
+        className="account-menu-row account-menu-profile"
+        role="menuitem"
+        onClick={onEditProfile}
+      >
         <CircleUserRound aria-hidden="true" strokeWidth={1.8} />
         <span>{copy.editProfile}</span>
       </button>
