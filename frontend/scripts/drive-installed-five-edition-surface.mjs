@@ -543,9 +543,19 @@ async function collectMetrics(page) {
         }
       }
     }
-    const mobileNavigationVisible = [
-      ...document.querySelectorAll(".app-mobile-menu-button, .app-mobile-menu-panel"),
+    const mobileNavigationQueryMatches = window.matchMedia("(max-width: 520px)").matches;
+    const mobileMenuButtonVisible = [
+      ...document.querySelectorAll(".app-mobile-menu-button"),
     ].some(isVisible);
+    const mobileMenuPanelVisible = [
+      ...document.querySelectorAll(".app-mobile-menu-panel"),
+    ].some(isVisible);
+    // The desktop sidebar intentionally reuses app-mobile-menu-panel as its
+    // navigation container. A visible panel is therefore mobile navigation
+    // only while the mobile media query is active; the menu button, however,
+    // must never be visible in a desktop capture.
+    const mobileNavigationVisible = mobileMenuButtonVisible
+      || (mobileNavigationQueryMatches && mobileMenuPanelVisible);
 
     return {
       route: window.location.hash.replace(/^#/u, ""),
@@ -592,6 +602,7 @@ async function collectMetrics(page) {
       verticalClipping,
       overlapIssues,
       mobileNavigationVisible,
+      mobileNavigationQueryMatches,
       errorBoundary: Boolean(document.querySelector(".error-page, [data-error-boundary]")),
       appIdentity: {
         universalModeSwitchVisible: [...document.querySelectorAll(".universal-mode-switch")]
