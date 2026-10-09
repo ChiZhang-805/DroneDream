@@ -4,7 +4,7 @@ import type { Locale } from "../../i18n/I18nProvider";
 
 interface TurnstileOptions {
   sitekey: string;
-  theme: "auto";
+  theme: "light";
   language: "en" | "zh-cn";
   callback: (token: string) => void;
   "error-callback": () => void;
@@ -80,7 +80,7 @@ export function AuthCaptcha({
         if (!active || !containerRef.current) return;
         widgetId = api.render(containerRef.current, {
           sitekey: siteKey,
-          theme: "auto",
+          theme: "light",
           language: locale === "zh-CN" ? "zh-cn" : "en",
           callback: (token) => {
             if (active) onTokenChange(token);

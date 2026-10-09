@@ -1061,7 +1061,7 @@ function SettingsDialog({
     interface_locale: interfaceLocale,
     // These legacy database columns remain populated for schema compatibility;
     // the product exposes exactly one fixed palette per edition.
-    appearance_mode: "dark",
+    appearance_mode: "light",
     custom_accent: "#8d72ee",
     notifications: notificationPreferences,
     memory_enabled: experiencePreferenceDraft.memory_enabled,

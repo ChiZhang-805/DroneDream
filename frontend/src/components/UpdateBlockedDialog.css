@@ -53,10 +53,3 @@
   font-weight: 700;
   cursor: pointer;
 }
-
-@media (prefers-color-scheme: dark) {
-  .update-blocked-dialog {
-    --app-text: #fff;
-    --app-surface: #181327;
-  }
-}

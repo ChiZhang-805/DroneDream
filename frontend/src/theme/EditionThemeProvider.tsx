@@ -42,9 +42,9 @@ export function EditionThemeProvider({
   const theme = editionTheme(edition);
   useLayoutEffect(() => {
     applyUniversalMode(edition);
-    document.documentElement.dataset.ddAppearance = "dark";
+    document.documentElement.dataset.ddAppearance = "light";
     document.documentElement.dataset.ddReducedMotion = String(reducedMotion);
-    document.documentElement.style.colorScheme = "dark";
+    document.documentElement.style.colorScheme = "light";
     document.documentElement.style.removeProperty("--dd-brand-start");
     document.documentElement.style.removeProperty("--dd-brand-middle");
     document.documentElement.style.removeProperty("--dd-brand-end");
