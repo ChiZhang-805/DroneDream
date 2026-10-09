@@ -34,12 +34,12 @@ describe("DroneLaunchScene localization", () => {
     expect(scene).toHaveAttribute("data-theme-grants-hardware-authority", "false");
   });
 
-  it("keeps the night-city scene enabled in light appearance", () => {
+  it("ignores a legacy light preference and keeps the fixed night-city palette", () => {
     window.localStorage.setItem("dronedream:appearance", "light");
     const { container } = renderScene("en");
     const scene = container.querySelector(".drone-launch-scene");
 
-    expect(scene).toHaveAttribute("data-theme-appearance", "light");
+    expect(scene).toHaveAttribute("data-theme-appearance", "dark");
     expect(scene).toHaveAttribute("data-scene-stars", "true");
     expect(scene).toHaveAttribute("data-scene-particles", "true");
   });

@@ -114,6 +114,20 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
               },
             },
             {
+              path: "conversations/:conversationId",
+              lazy: async () => {
+                const { AutonomyOverview } = await import("./pages/AutonomyPlatform");
+                return { Component: AutonomyOverview };
+              },
+            },
+            {
+              path: "conversations/:conversationId/live",
+              lazy: async () => {
+                const { AutonomyLive } = await import("./pages/AutonomyPlatform");
+                return { Component: AutonomyLive };
+              },
+            },
+            {
               path: "aircraft",
               lazy: async () => {
                 const { AutonomyAircraft } = await import("./pages/AutonomyPlatform");
@@ -136,13 +150,9 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
             },
             {
               path: "plugins/harness",
-              element: <Navigate to="/autonomy/plugins" replace />,
-            },
-            {
-              path: "mission",
               lazy: async () => {
-                const { AutonomyMissionRedirect } = await import("./pages/AutonomyPlatform");
-                return { Component: AutonomyMissionRedirect };
+                const { AutonomyHarness } = await import("./pages/AutonomyHarness");
+                return { Component: AutonomyHarness };
               },
             },
             {
@@ -152,17 +162,7 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
                 return { Component: AutonomyLive };
               },
             },
-            {
-              path: "evidence",
-              element: <Navigate to="/autonomy" replace />,
-            },
           ],
-        },
-        {
-          path: "vehicle-studio",
-          // Preserve old bookmarks without loading the retired modeler. Legacy
-          // drafts remain readable through the qualified aircraft repository.
-          element: <Navigate to="/autonomy/aircraft?source=legacy-vehicle-studio" replace />,
         },
         {
           path: "admin",

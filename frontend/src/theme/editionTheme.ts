@@ -14,20 +14,19 @@ export type EditionTheme3D = Readonly<{
   gridMinor: number;
 }>;
 
-export type AppearanceMode = "dark" | "light";
-
 export type EditionTheme = Readonly<{
   id: BrandEditionId;
   productName: string;
   gradientStops: readonly [string, string, string];
   lightSurface: string;
   darkSurface: string;
-  appearance: AppearanceMode;
+  appearance: "dark";
   presentationOnly: true;
   grantsHardwareAuthority: false;
   three: EditionTheme3D;
 }>;
 
+/** Convert a validated six-digit canonical color to the integer format expected by Three.js. */
 function hexColorNumber(value: string): number {
   if (!/^#[0-9a-f]{6}$/iu.test(value)) {
     throw new Error(`Invalid canonical brand color: ${value}`);
@@ -35,19 +34,18 @@ function hexColorNumber(value: string): number {
   return Number.parseInt(value.slice(1), 16);
 }
 
-function createTheme(id: BrandEditionId, appearance: AppearanceMode = "dark"): EditionTheme {
+/** Derive one immutable display palette, keeping runtime objects separate from generated tokens. */
+function createTheme(id: BrandEditionId): EditionTheme {
   const token = EDITION_BRAND_TOKENS[id];
   const [primary, secondary, tertiary] = token.gradientStops;
-  const sceneSurface = hexColorNumber(
-    appearance === "dark" ? token.darkSurface : token.lightSurface,
-  );
+  const sceneSurface = hexColorNumber(token.darkSurface);
   return Object.freeze({
     id,
     productName: token.productName,
-    gradientStops: token.gradientStops,
+    gradientStops: Object.freeze([...token.gradientStops] as [string, string, string]),
     lightSurface: token.lightSurface,
     darkSurface: token.darkSurface,
-    appearance,
+    appearance: "dark",
     presentationOnly: BRAND_PRESENTATION_ONLY,
     grantsHardwareAuthority: BRAND_GRANTS_HARDWARE_AUTHORITY,
     three: Object.freeze({
@@ -69,13 +67,7 @@ export const EDITION_THEMES = Object.freeze({
   autonomy: createTheme("autonomy"),
 }) satisfies Readonly<Record<BrandEditionId, EditionTheme>>;
 
+/** Return a cached dark palette; it contains no model, subscription, or hardware permissions. */
 export function editionTheme(id: BrandEditionId): EditionTheme {
   return EDITION_THEMES[id];
-}
-
-export function editionThemeForAppearance(
-  id: BrandEditionId,
-  appearance: AppearanceMode,
-): EditionTheme {
-  return createTheme(id, appearance);
 }

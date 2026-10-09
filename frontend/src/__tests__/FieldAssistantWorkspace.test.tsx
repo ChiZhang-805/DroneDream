@@ -63,9 +63,10 @@ function mockCatalog() {
 describe("Field Chatting workspace", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("switches the compact chat and plan panels without changing authority", () => {
+  it("switches the compact chat and plan panels without changing authority", async () => {
     mockCatalog();
     const { container } = render(<FieldApp initialLocale="en" />);
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Model" })).toBeEnabled());
     const workspace = container.querySelector(".field-assistant-workspace");
     const chatTab = screen.getByRole("tab", { name: "Chat" });
     const planTab = screen.getByRole("tab", { name: "Experiment plan" });
@@ -96,9 +97,9 @@ describe("Field Chatting workspace", () => {
     const { container } = render(<FieldApp initialLocale="en" />);
     await waitFor(() => expect(screen.getByRole("combobox", { name: "Model" })).toBeEnabled());
     expect(screen.getByRole("heading", { name: "What real-device experiment should we prepare?" })).toBeVisible();
+    const quickPrompts = ["Stable hover", "Smoother response", "Wind recovery"];
     expect(screen.getAllByRole("button").filter((button) => (
-      ["Stable hover", "Smoother response", "Wind recovery"].includes(button.textContent?.trim() ?? "")
-      || button.querySelector("strong")
+      quickPrompts.some((prompt) => button.textContent?.startsWith(prompt))
     ))).toHaveLength(3);
     expect(container.querySelector(".field-assistant-plan-card")).toBeNull();
 

@@ -34,13 +34,13 @@ afterEach(() => {
 });
 
 describe("fixed scenario library", () => {
-  it("paginates pairs of versioned scenarios without creating a job", async () => {
+  it("paginates pairs of scenarios without creating a job", async () => {
     const createSpy = vi.spyOn(apiClient, "createJob");
     const { router } = renderPage();
 
     expect(screen.getByRole("heading", { name: "Fixed Scenario Lab" })).toBeVisible();
-    expect(screen.getAllByText("Simple")).toHaveLength(2);
-    expect(screen.queryByText("Medium")).not.toBeInTheDocument();
+    expect(document.querySelectorAll(".fixed-scenario-simple")).toHaveLength(2);
+    expect(document.querySelectorAll(".fixed-scenario-medium")).toHaveLength(0);
     expect(document.querySelectorAll("[data-template-key]")).toHaveLength(2);
     expect(screen.getAllByText("Local track preview")).toHaveLength(2);
     for (const card of document.querySelectorAll<HTMLElement>("[data-template-key]")) {

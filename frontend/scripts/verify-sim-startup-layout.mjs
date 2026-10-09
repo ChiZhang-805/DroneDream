@@ -63,16 +63,13 @@ const viewports = desktopOnly
       { id: "mobile", width: 390, height: 700 },
     ];
 const cases = ["en", "zh-CN"].flatMap((locale) =>
-  ["dark", "light"].flatMap((appearance) =>
-    viewports.flatMap((viewport) =>
-      ["missing", "ready"].map((scenario) => ({
-        id: `${viewport.id}-${locale === "en" ? "en" : "zh"}-${appearance}-${scenario}`,
-        locale,
-        appearance,
-        scenario,
-        viewport,
-      })),
-    ),
+  viewports.flatMap((viewport) =>
+    ["missing", "ready"].map((scenario) => ({
+      id: `${viewport.id}-${locale === "en" ? "en" : "zh"}-${scenario}`,
+      locale,
+      scenario,
+      viewport,
+    })),
   ),
 );
 
@@ -127,9 +124,8 @@ function desktopFixture(scenario) {
 }
 
 async function installDesktopFixture(context, testCase) {
-  await context.addInitScript(({ locale, appearance, fixture }) => {
+  await context.addInitScript(({ locale, fixture }) => {
     window.localStorage.setItem("drone-dream:locale", locale);
-    window.localStorage.setItem("dronedream:appearance", appearance);
     const calls = [];
     window.__SIM_VISUAL_CALLS__ = calls;
     const readinessTransitions = [];
@@ -270,7 +266,6 @@ async function installDesktopFixture(context, testCase) {
     };
   }, {
     locale: testCase.locale,
-    appearance: testCase.appearance,
     fixture: desktopFixture(testCase.scenario),
   });
 }
@@ -393,28 +388,15 @@ async function verifyCase(browser, testCase) {
           }),
         };
       })(),
-      lightContrast: (() => {
-        const runtimeIndicator = document.querySelector(".launcher-runtime-indicator");
-        const settingsButton = document.querySelector(".launcher-settings-button");
-        const leftHud = document.querySelector(".drone-launch-hud-left");
-        const leftHudStrong = leftHud?.querySelector("strong");
-        if (!runtimeIndicator || !settingsButton || !leftHud || !leftHudStrong) return null;
-        return {
-          runtimeIndicatorColor: getComputedStyle(runtimeIndicator).color,
-          settingsButtonColor: getComputedStyle(settingsButton).color,
-          hudColor: getComputedStyle(leftHud).color,
-          hudStrongColor: getComputedStyle(leftHudStrong).color,
-          hudBackground: getComputedStyle(leftHud).backgroundImage,
-        };
-      })(),
     }));
     assert.equal(dimensions.scrollWidth, dimensions.documentWidth);
     assert(dimensions.scrollHeight <= dimensions.documentHeight + 1);
-    assert.equal(dimensions.appearance, testCase.appearance);
+    assert.equal(dimensions.appearance, "dark");
     assert.equal(dimensions.brandEdition, edition);
     assert.equal(dimensions.grantsHardwareAuthority, "false");
-    assert.equal(dimensions.sceneStars, testCase.appearance === "light" ? "false" : "true");
-    assert.equal(dimensions.sceneParticles, testCase.appearance === "light" ? "false" : "true");
+    // The one supported palette retains the branded night-scene content.
+    assert.equal(dimensions.sceneStars, "true");
+    assert.equal(dimensions.sceneParticles, "true");
     assert(dimensions.tagline, `${testCase.id}: launcher tagline is missing`);
     const expectedTaglineLines = testCase.locale === "en" ? 2 : 1;
     assert.equal(
@@ -431,19 +413,6 @@ async function verifyCase(browser, testCase) {
       )),
       `${testCase.id}: launcher tagline is clipped`,
     );
-    if (testCase.appearance === "light") {
-      assert(dimensions.lightContrast, `${testCase.id}: light contrast metrics are missing`);
-      if (edition === "sim") {
-        assert.equal(
-          dimensions.lightContrast.runtimeIndicatorColor,
-          testCase.scenario === "ready" ? "rgb(16, 40, 59)" : "rgb(23, 51, 75)",
-        );
-        assert.equal(dimensions.lightContrast.settingsButtonColor, "rgb(23, 51, 75)");
-      }
-      assert.equal(dimensions.lightContrast.hudColor, "rgba(255, 255, 255, 0.82)");
-      assert.equal(dimensions.lightContrast.hudStrongColor, "rgb(255, 255, 255)");
-      assert.match(dimensions.lightContrast.hudBackground, /rgba\(7, 42, 86, 0\.96\)/u);
-    }
     const imagePath = path.join(outputRoot, `${testCase.id}.png`);
     await page.screenshot({ path: imagePath, fullPage: false });
     const canvasScreenshot = await page.locator(".drone-launch-canvas").screenshot({ type: "png" });
@@ -484,10 +453,8 @@ async function verifyCase(browser, testCase) {
     };
     assert(canvasPixels.width > 100 && canvasPixels.height > 100);
     assert(canvasPixels.distinctSamples >= 6, `${testCase.id}: 3D canvas appears blank`);
-    if (testCase.appearance === "light") {
-      assert(canvasPixels.upperBrightRatio >= 0.6,
-        `${testCase.id}: light scene is not predominantly white: ${canvasPixels.upperBrightRatio}`);
-    }
+    assert(canvasPixels.upperBrightRatio < 0.1,
+      `${testCase.id}: branded night scene was unexpectedly washed out: ${canvasPixels.upperBrightRatio}`);
     if (testCase.scenario === "ready") {
       assert.equal(
         dimensions.calls.filter((command) => command === "start_runtime").length,

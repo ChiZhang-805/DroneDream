@@ -4095,7 +4095,7 @@ body:has(.field-app),
 }
 
 .field-sidebar-account-copy small {
-  color: var(--text-muted);
+  color: var(--field-muted);
   font-size: 0.7rem;
   font-weight: 600;
 }
@@ -4111,8 +4111,8 @@ body:has(.field-app),
   border: 0;
   border-radius: 50%;
   color: #fff;
-  background: linear-gradient(135deg, var(--field-accent), var(--field-accent-strong));
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--field-accent) 28%, transparent);
+  background: linear-gradient(135deg, var(--dd-brand-start), var(--dd-brand-end));
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--dd-brand-start) 28%, transparent);
   place-items: center;
   cursor: pointer;
 }

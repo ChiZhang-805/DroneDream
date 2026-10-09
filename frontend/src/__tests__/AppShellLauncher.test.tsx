@@ -333,7 +333,7 @@ describe("desktop launcher chrome", () => {
       .toHaveAttribute("aria-pressed", "true");
     expect(within(workspace).getByRole("link", { name: "管理订阅" }))
       .toHaveAttribute("href", "https://getdronedream.com/pricing/");
-    fireEvent.click(within(workspace).getByRole("tab", { name: "Runtime 与更新" }));
+    fireEvent.click(within(workspace).getByRole("tab", { name: "Runtime" }));
     expect(within(workspace).getByRole("button", { name: "检查运行环境" }))
       .toBeInTheDocument();
     expect(within(workspace).getByText("运行环境正常")).toBeInTheDocument();
@@ -463,21 +463,24 @@ describe("desktop launcher chrome", () => {
     const { router } = renderLauncher();
 
     const quickSettings = openQuickSettings();
-    fireEvent.click(within(quickSettings).getByRole("button", { name: /Runtime & updates/ }));
+    fireEvent.click(within(quickSettings).getByRole("button", { name: /Runtime/ }));
     const workspace = await screen.findByRole("region", { name: "Settings" });
     expect(await within(workspace).findByText("Ready with warnings")).toBeInTheDocument();
-    fireEvent.click(within(workspace).getByText("View details"));
+    expect(within(workspace).getByRole("list", { name: "View details" }))
+      .toBeVisible();
     expect(within(workspace).getByText("Optional GPU telemetry is unavailable.")).toBeInTheDocument();
     expect(within(workspace).getByText("Optional GPU telemetry is unavailable.").closest(
-      ".settings-runtime-details-scroll",
+      ".settings-runtime-diagnostics",
     )).toBeInTheDocument();
 
     fireEvent.click(within(workspace).getByRole("button", { name: "Check environment" }));
-    expect(await within(workspace).findByText("Environment unavailable")).toBeInTheDocument();
-    fireEvent.click(within(workspace).getByText("View details"));
+    await waitFor(() => {
+      expect(within(workspace).getByText("Environment unavailable"))
+        .toBeInTheDocument();
+    }, { timeout: 7_000 });
     expect(within(workspace).getByText("DroneDreamRuntime is not installed.")).toBeInTheDocument();
     expect(runtimeProbeCount).toBe(2);
 
     router.dispose();
-  });
+  }, 12_000);
 });

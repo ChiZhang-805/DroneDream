@@ -113,7 +113,7 @@ describe("FieldRoot", () => {
     expect(container).not.toHaveTextContent(/PX4|Gazebo|SITL|HITL/i);
 
     fireEvent.click(screen.getByRole("button", { name: "Open settings" }));
-    const quickSettings = screen.getByRole("dialog", { name: "Quick settings" });
+    const quickSettings = screen.getByRole("dialog", { name: "Settings" });
     expect(quickSettings).toHaveAttribute("data-settings-consumer", "field");
     expect(quickSettings.querySelectorAll('[role="tab"]')).toHaveLength(0);
     expect(container.querySelector(".launcher-chrome")).toHaveAttribute("aria-hidden", "true");

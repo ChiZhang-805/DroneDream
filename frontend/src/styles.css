@@ -2754,38 +2754,8 @@ fieldset.autonomy-form-grid {
   .autonomy-sensor-mounts article > label.is-id input { min-height: 4.4rem; }
 }
 
-/* Build-edition appearance is persisted by EditionThemeProvider. These
-   high-specificity rules keep launch, setup, settings, and the 3D scene on one
-   coherent light contract. */
-:root[data-dd-appearance="light"] {
-  color-scheme: light;
-  --bg: #f1faff;
-  --bg-elev: #ffffff;
-  --bg-elev-2: #e5f4fc;
-  --border: #bdd7e6;
-  --border-strong: #8fbfd8;
-  --text: #12334b;
-  --text-muted: #526f83;
-  --text-dim: #294f68;
-}
-
 :root[data-dd-appearance="dark"] {
   color-scheme: dark;
-}
-
-:root[data-dd-appearance="light"] body,
-:root[data-dd-appearance="light"] .app-shell,
-:root[data-dd-appearance="light"] .app-body,
-:root[data-dd-appearance="light"] .app-shell-launcher,
-:root[data-dd-appearance="light"] .launcher-chrome,
-:root[data-dd-appearance="light"] .launcher-stage {
-  color: var(--text);
-  background: #ffffff;
-}
-
-:root[data-dd-appearance="light"] .launcher-chrome {
-  border-color: var(--border);
-  box-shadow: 0 8px 26px rgba(22, 56, 77, 0.12);
 }
 
 .settings-general-section {
@@ -2794,80 +2764,6 @@ fieldset.autonomy-form-grid {
   margin-top: 0.85rem;
 }
 
-.settings-appearance-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.55rem;
-}
-
-.settings-appearance-options button {
-  display: flex;
-  min-height: 48px;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-}
-
-.settings-appearance-options button svg {
-  width: 18px;
-  height: 18px;
-}
-
-.settings-appearance-options button.selected {
-  border-color: var(--dd-brand-start);
-  color: #ffffff;
-  background: color-mix(in srgb, var(--dd-brand-middle) 44%, var(--dd-brand-dark-surface));
-}
-
-:root[data-dd-appearance="light"] .launcher-runtime-indicator {
-  color: #17334b;
-  border-color: rgba(38, 113, 255, 0.22);
-  background: rgba(255, 255, 255, 0.86);
-}
-
-:root[data-dd-appearance="light"] .launcher-runtime-indicator.is-checked {
-  color: #10283b;
-  border-color: rgba(19, 139, 98, 0.34);
-  background: rgba(210, 247, 233, 0.9);
-}
-
-:root[data-dd-appearance="light"] .launcher-settings-button,
-:root[data-dd-appearance="light"] .launcher-settings-close {
-  color: #17334b;
-  border-color: rgba(38, 113, 255, 0.24);
-  background: rgba(255, 255, 255, 0.88);
-}
-
-:root[data-dd-appearance="light"] .drone-launch-hud {
-  color: rgba(255, 255, 255, 0.82);
-  border-left-color: rgba(0, 217, 255, 0.72);
-  background: linear-gradient(90deg, rgba(7, 42, 86, 0.96), rgba(38, 113, 255, 0.78));
-  box-shadow: 0 8px 24px rgba(18, 72, 145, 0.18);
-  text-shadow: none;
-}
-
-:root[data-dd-appearance="light"] .drone-launch-hud strong {
-  color: #ffffff;
-}
-
-:root[data-dd-appearance="light"] .drone-launch-hud-right {
-  border-right-color: rgba(116, 76, 255, 0.72);
-  border-left: 0;
-  background: linear-gradient(270deg, rgba(45, 29, 112, 0.96), rgba(38, 113, 255, 0.78));
-}
-
-:root[data-dd-appearance="light"] .launcher-settings-dialog {
-  color-scheme: light;
-  color: var(--text);
-  border-color: var(--border-strong);
-  background: var(--dd-brand-light-surface);
-}
-
-:root[data-dd-appearance="light"] .launcher-settings-dialog .settings-appearance-options button.selected {
-  color: #12334b;
-  border-color: var(--dd-brand-middle);
-  background: color-mix(in srgb, var(--dd-brand-start) 18%, #ffffff);
-}
 
 * {
   box-sizing: border-box;
@@ -8320,9 +8216,9 @@ a {
   }
 }
 
-/* Final layout guarantees for the shared Settings surfaces.  Keep these at
-   the end of the cascade because the legacy launcher theme contains older
-   responsive rules for the same components. */
+/* Final layout guarantees for the shared Settings surfaces. Keep these at the
+   end of the cascade because earlier edition-specific layout rules target the
+   same components. */
 .app-shell .settings-workspace-content .settings-model-mode-row {
   display: flex;
   align-items: center;
@@ -8571,17 +8467,6 @@ a {
   white-space: nowrap;
 }
 
-/* Gift-card copy was previously forced to white in every appearance. */
-:root[data-dd-appearance="light"] .app-shell .settings-reset-card-trigger.has-card,
-:root[data-dd-appearance="light"] .app-shell .settings-model-reset-row .settings-reset-card-trigger-copy strong {
-  color: #211923;
-}
-
-:root[data-dd-appearance="light"] .app-shell .settings-model-reset-row .settings-reset-card-trigger-copy small,
-:root[data-dd-appearance="light"] .app-shell .settings-reset-card-trigger-arrow {
-  color: #625668;
-}
-
 :root[data-dd-appearance="dark"] .app-shell .settings-reset-card-trigger.has-card,
 :root[data-dd-appearance="dark"] .app-shell .settings-model-reset-row .settings-reset-card-trigger-copy strong,
 :root[data-dd-appearance="dark"] .app-shell .settings-reset-card-trigger-arrow {
@@ -8706,14 +8591,6 @@ a {
 .settings-runtime-status-checking,
 :root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-status-checking {
   color: #4da3ff;
-}
-
-:root[data-dd-appearance="light"] .app-shell .settings-workspace-host .settings-runtime-status-pending {
-  color: #966600;
-}
-
-:root[data-dd-appearance="light"] .app-shell .settings-workspace-host .settings-runtime-status-checking {
-  color: #146ac4;
 }
 
 .settings-runtime-status-pending small,
@@ -11468,27 +11345,12 @@ a {
   stroke-width: 1.45;
 }
 
-/* The launcher chrome is a transparent overlay inside the night-city scene.
-   Appearance changes may affect dialogs, but never turn this layer white. */
-:root[data-dd-appearance="light"] .app-shell-launcher .launcher-chrome,
+/* The launcher chrome is a transparent overlay inside the night-city scene. */
 :root[data-dd-appearance="dark"] .app-shell-launcher .launcher-chrome {
   color: #f8f4ff;
   border-bottom: 0;
   background: linear-gradient(180deg, rgba(4, 5, 16, 0.72), rgba(4, 5, 16, 0.22) 74%, transparent);
   box-shadow: none;
-}
-
-:root[data-dd-appearance="light"] .app-shell-launcher .launcher-runtime-indicator,
-:root[data-dd-appearance="light"] .app-shell-launcher .launcher-runtime-indicator.is-checked {
-  color: #effcff;
-  border-color: rgba(185, 236, 255, 0.3);
-  background: rgba(5, 9, 24, 0.5);
-}
-
-:root[data-dd-appearance="light"] .app-shell-launcher .launcher-settings-button {
-  color: #f2efff;
-  border-color: rgba(202, 214, 255, 0.3);
-  background: rgba(5, 9, 24, 0.5);
 }
 
 .launcher-settings-backdrop {
@@ -12159,19 +12021,13 @@ a {
   height: auto;
 }
 
-.settings-workspace-content .settings-language-card,
-.settings-workspace-content .settings-interface-card {
+.settings-workspace-content .settings-language-card {
   grid-template-rows: auto auto;
   align-self: start;
 }
 
 .settings-workspace-content .settings-language-card .launcher-language-options {
   grid-template-rows: repeat(2, auto);
-  height: auto;
-}
-
-.settings-workspace-content .settings-interface-card .settings-appearance-options {
-  grid-template-rows: repeat(4, auto) !important;
   height: auto;
 }
 
@@ -12956,31 +12812,23 @@ a {
   color: var(--dd-brand-middle);
 }
 
-.settings-language-card,
-.settings-interface-card {
+.settings-language-card {
   grid-template-rows: auto minmax(0, 1fr);
 }
 
-.settings-language-card .launcher-language-options,
-.settings-interface-card .settings-appearance-options {
+.settings-language-card .launcher-language-options {
   grid-template-columns: minmax(0, 1fr) !important;
   grid-template-rows: repeat(6, minmax(0, 1fr));
   height: 100%;
 }
 
-.settings-interface-card .settings-appearance-options {
-  grid-template-rows: repeat(4, minmax(0, 1fr)) !important;
-}
-
-.settings-language-card .launcher-language-options button,
-.settings-interface-card .settings-appearance-options button {
+.settings-language-card .launcher-language-options button {
   min-height: 0;
   gap: 0.38rem;
   padding: 0.4rem 0.45rem;
 }
 
-.settings-language-card .launcher-language-options button,
-.settings-interface-card .settings-appearance-options button {
+.settings-language-card .launcher-language-options button {
   grid-template-columns: 24px minmax(0, 1fr) auto;
 }
 
@@ -12989,32 +12837,11 @@ a {
   height: 24px;
 }
 
-.settings-language-card .launcher-language-options button strong,
-.settings-interface-card .settings-appearance-options button strong {
+.settings-language-card .launcher-language-options button strong {
   overflow: hidden;
   font-size: 0.7rem;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.settings-interface-card .settings-appearance-options button {
-  position: relative;
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
-  justify-content: initial;
-  padding: 0.5rem 0.65rem;
-  border: 1px solid rgba(206, 174, 255, 0.14);
-  border-radius: 13px;
-  text-align: left;
-}
-
-.settings-interface-card .settings-appearance-options button i {
-  color: transparent;
-  font-style: normal;
-}
-
-.settings-interface-card .settings-appearance-options button.selected i {
-  color: var(--dd-brand-start);
 }
 
 .settings-notification-card {
@@ -13022,15 +12849,6 @@ a {
   grid-template-columns: 1fr;
   grid-template-rows: auto repeat(7, minmax(0, 1fr));
   gap: 0.5rem;
-}
-
-.settings-custom-color-input {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  opacity: 0;
-  pointer-events: none;
 }
 
 .settings-notification-card .settings-card-heading {
@@ -14153,8 +13971,7 @@ a {
     padding: 0.4rem;
   }
 
-  .settings-language-card .launcher-language-options,
-  .settings-interface-card .settings-appearance-options {
+  .settings-language-card .launcher-language-options {
     grid-template-columns: minmax(0, 1fr) !important;
   }
 
@@ -14162,12 +13979,7 @@ a {
     grid-template-rows: repeat(6, minmax(0, 1fr));
   }
 
-  .settings-interface-card .settings-appearance-options {
-    grid-template-rows: repeat(4, minmax(0, 1fr)) !important;
-  }
-
-  .settings-language-card .launcher-language-options button,
-  .settings-interface-card .settings-appearance-options button {
+  .settings-language-card .launcher-language-options button {
     grid-template-columns: 18px minmax(0, 1fr) auto;
     gap: 0.2rem;
     padding: 0.24rem 0.3rem;
@@ -14180,12 +13992,10 @@ a {
     font-size: 0.7rem;
   }
 
-  .settings-language-card .launcher-language-options button strong,
-  .settings-interface-card .settings-appearance-options button strong {
+  .settings-language-card .launcher-language-options button strong {
     font-size: 0.58rem;
   }
 
-  .settings-interface-card .settings-appearance-options button svg,
   .settings-card-heading svg {
     width: 0.82rem;
     height: 0.82rem;
@@ -15625,7 +15435,7 @@ a {
 }
 
 /* --------------------------------------------------------------------------
-   Operational workspace: calm light theme
+   Operational workspace: canonical edition surfaces
 
    The immersive launcher intentionally keeps its dark starfield treatment.
    Everything after entering the product uses a high-legibility light canvas
@@ -21422,22 +21232,6 @@ body {
   background: #ffead8;
 }
 
-.launcher-settings-dialog[data-brand-edition="field"] .settings-interface-card .settings-appearance-options button {
-  color: #40251b;
-  border-color: #ebc5a8;
-  background: #fff8f0;
-}
-
-.launcher-settings-dialog[data-brand-edition="field"] .settings-interface-card .settings-appearance-options button.selected {
-  color: #fff8f1;
-  border-color: #9b4024;
-  background: linear-gradient(135deg, #9c472d, #6f2e20);
-}
-
-.launcher-settings-dialog[data-brand-edition="field"] .settings-interface-card .settings-appearance-options button.selected i {
-  color: #ffd064;
-}
-
 .launcher-settings-dialog[data-brand-edition="field"] .settings-memory-grid input,
 .launcher-settings-dialog[data-brand-edition="field"] .settings-memory-grid select,
 .launcher-settings-dialog[data-brand-edition="field"] .settings-model-reset-row select {
@@ -21710,9 +21504,7 @@ body {
   }
 }
 
-/* Settings follows the selected appearance independently from the operational
-   workspace's intentionally light default. This block stays last because the
-   legacy edition rules above still contain fixed light colors. */
+/* Settings and the operational workspace share the edition's fixed palette. */
 .app-shell .quick-settings-backdrop {
   animation: none;
 }
@@ -22043,8 +21835,7 @@ body {
   background: transparent;
 }
 
-.settings-workspace-content .settings-language-card .launcher-language-options,
-.settings-workspace-content .settings-interface-card .settings-appearance-options {
+.settings-workspace-content .settings-language-card .launcher-language-options {
   min-height: 2.65rem;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
@@ -22052,12 +21843,7 @@ body {
   gap: 0.5rem;
 }
 
-.settings-workspace-content .settings-interface-card .settings-appearance-options {
-  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-}
-
-.settings-workspace-content .settings-language-card .launcher-language-options button,
-.settings-workspace-content .settings-interface-card .settings-appearance-options button {
+.settings-workspace-content .settings-language-card .launcher-language-options button {
   min-height: 2.65rem;
   padding: 0.38rem 0.55rem;
   border: 0;
@@ -22068,8 +21854,7 @@ body {
   color: var(--text-dim);
 }
 
-.settings-workspace-content .settings-language-card .launcher-language-options button.selected,
-.settings-workspace-content .settings-interface-card .settings-appearance-options button.selected {
+.settings-workspace-content .settings-language-card .launcher-language-options button.selected {
   border-bottom-color: var(--dd-brand-start);
   background: color-mix(in srgb, var(--dd-brand-start) 7%, transparent);
   box-shadow: none;
@@ -22404,9 +22189,6 @@ body {
     grid-template-columns: minmax(140px, 180px) minmax(0, 1fr);
   }
 
-  .settings-workspace-content .settings-interface-card .settings-appearance-options {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  }
 }
 
 .assistant-examples,
@@ -23257,33 +23039,6 @@ body {
   margin-top: 0.35rem;
 }
 
-/* Light and dark appearances use the current edition's surface tokens rather
-   than collapsing every product into the same blue settings canvas. */
-:root[data-dd-appearance="light"] .app-shell .settings-workspace-host,
-:root[data-dd-appearance="light"] .app-shell .settings-workspace-surface,
-:root[data-dd-appearance="light"] .app-shell .settings-workspace-content {
-  color: #1f1824;
-  background: color-mix(in srgb, var(--dd-brand-light-surface) 76%, #ffffff);
-}
-
-:root[data-dd-appearance="light"] .app-shell .settings-workspace-sidebar {
-  color: #1f1824;
-  border-color: color-mix(in srgb, var(--dd-brand-middle) 17%, #e5dfe8);
-  background: color-mix(in srgb, var(--dd-brand-light-surface) 92%, #ffffff);
-}
-
-:root[data-dd-appearance="light"] .account-menu-popover {
-  color: #201724;
-  border-color: color-mix(in srgb, var(--dd-brand-middle) 18%, #e8e2ea);
-  background: color-mix(in srgb, var(--dd-brand-light-surface) 88%, #ffffff);
-}
-
-:root[data-dd-appearance="light"] .account-menu-popover button,
-:root[data-dd-appearance="light"] .account-menu-popover .account-menu-row > strong,
-:root[data-dd-appearance="light"] .account-menu-popover svg {
-  color: #201724;
-}
-
 :root[data-dd-appearance="dark"] .app-shell .settings-workspace-host {
   --bg: color-mix(in srgb, var(--dd-brand-dark-surface) 82%, #05070d);
   --bg-elev: color-mix(in srgb, var(--dd-brand-dark-surface) 72%, #0d1222);
@@ -23403,23 +23158,6 @@ body {
   background: transparent;
 }
 
-:root[data-dd-appearance="light"] .app-shell .settings-workspace-host .settings-runtime-check,
-:root[data-dd-appearance="light"] .app-shell .settings-workspace-host .settings-update-action {
-  color: #241a28;
-  border-color: color-mix(in srgb, var(--dd-brand-middle) 28%, #d6ced9);
-  background: color-mix(in srgb, var(--dd-brand-light-surface) 72%, #ffffff);
-}
-
-:root[data-dd-appearance="light"] .app-shell .settings-workspace-host .settings-runtime-status-healthy {
-  color: #126246;
-  border-color: #a8dfcb;
-  background: #effaf6;
-}
-
-:root[data-dd-appearance="light"] .app-shell .settings-workspace-host .settings-runtime-status-healthy small {
-  color: #426f60;
-}
-
 :root[data-dd-appearance="dark"] .account-menu-popover {
   color: #ffffff;
   border-color: color-mix(in srgb, var(--dd-brand-middle) 36%, #3a3146);
@@ -23433,9 +23171,7 @@ body {
   color: #ffffff;
 }
 
-/* The appearance preference applies to the product workspace too. Each
-   edition keeps its own deep surface instead of reverting to the shared light
-   canvas after Settings closes. */
+/* Each edition keeps its own deep product surface after Settings closes. */
 :root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) {
   color-scheme: dark;
   --bg: color-mix(in srgb, var(--dd-brand-dark-surface) 82%, #05070d);
@@ -23469,8 +23205,7 @@ body {
 }
 
 .app-shell:not(.app-shell-launcher) .launcher-settings-button,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .launcher-settings-button,
-:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .launcher-settings-button {
+:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .launcher-settings-button {
   color: var(--text);
   border: 0;
   border-radius: 0;
@@ -23529,56 +23264,6 @@ body {
 :root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .assistant-example-heading small,
 :root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-account-copy small {
   color: #c5cde0;
-}
-
-/* Every product keeps its own surface in light mode as well: Universal pink,
-   SIM blue, LAB green, FIELD amber/orange, and AGENT red. Text remains dark
-   while accents use the edition's stronger canonical color. */
-:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) {
-  color-scheme: light;
-  --bg: color-mix(in srgb, var(--dd-brand-light-surface) 82%, #ffffff);
-  --bg-elev: #ffffff;
-  --bg-elev-2: color-mix(in srgb, var(--dd-brand-light-surface) 70%, #ffffff);
-  --bg-subtle: color-mix(in srgb, var(--dd-brand-light-surface) 88%, #f4f4f6);
-  --border: color-mix(in srgb, var(--dd-brand-middle) 18%, #d9d9df);
-  --border-strong: color-mix(in srgb, var(--dd-brand-middle) 32%, #c6c6ce);
-  --text: #1d1a22;
-  --text-muted: #66616d;
-  --text-dim: #39343f;
-  color: var(--text);
-  background:
-    radial-gradient(circle at 90% 4%, color-mix(in srgb, var(--dd-brand-start) 12%, transparent), transparent 32rem),
-    radial-gradient(circle at 8% 94%, color-mix(in srgb, var(--dd-brand-middle) 8%, transparent), transparent 34rem),
-    var(--bg);
-}
-
-:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .app-sidebar {
-  color: var(--text);
-  border-right-color: var(--border);
-  background: color-mix(in srgb, var(--dd-brand-light-surface) 90%, #ffffff);
-  box-shadow: 12px 0 30px rgba(25, 20, 31, 0.06);
-}
-
-:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .app-header {
-  color: var(--text);
-  border-bottom-color: var(--border);
-  background: color-mix(in srgb, var(--dd-brand-light-surface) 68%, #ffffff);
-  box-shadow: 0 8px 22px rgba(25, 20, 31, 0.05);
-}
-
-:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .app-main,
-:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .app-main:has(.experiment-assistant-page),
-:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .app-main:has(.autonomy-platform-page) {
-  color: var(--text);
-  background:
-    radial-gradient(circle at 76% 10%, color-mix(in srgb, var(--dd-brand-middle) 9%, transparent), transparent 30rem),
-    var(--bg);
-}
-
-:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .app-nav a:hover,
-:root[data-dd-appearance="light"] .app-shell:not(.app-shell-launcher) .app-nav a.active {
-  color: color-mix(in srgb, var(--dd-brand-end) 76%, #17131a);
-  background: color-mix(in srgb, var(--dd-brand-start) 13%, #ffffff);
 }
 
 @media (max-width: 980px) {

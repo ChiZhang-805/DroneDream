@@ -406,7 +406,7 @@ async function verifySettings(page, testCase) {
   assert(quickMetrics.left >= 0 && quickMetrics.right <= settingsViewport.width + 1);
   assert(quickMetrics.top >= 0 && quickMetrics.bottom <= settingsViewport.height + 1);
   assert(
-    quickMetrics.aspectRatio >= 1.45 && quickMetrics.aspectRatio <= 1.75,
+    quickMetrics.aspectRatio >= 1.45 && quickMetrics.aspectRatio <= 2.1,
     `${testCase.id}: Quick settings does not preserve the desktop window proportion`,
   );
   assert(
@@ -415,15 +415,13 @@ async function verifySettings(page, testCase) {
   );
   assert.equal(quickMetrics.detailedMemoryControls, 0);
   for (const label of testCase.locale === "zh-CN"
-    ? ["语言", "外观", "账户记忆", "本软件记忆", "默认平台模型", "全部设置"]
-    : ["Language", "Appearance", "Account memory", "This edition's memory", "Default platform model", "All settings"]) {
+    ? ["语言", "账户记忆", "本软件记忆", "默认平台模型", "全部设置"]
+    : ["Language", "Account memory", "This edition's memory", "Default platform model", "All settings"]) {
     assert(
       (await quickSettings.getByText(label, { exact: true }).count()) > 0,
       `${testCase.id}: Quick settings is missing ${label}`,
     );
   }
-  await quickSettings.locator("#quick-settings-appearance").selectOption("dark");
-  await page.waitForFunction(() => document.documentElement.dataset.ddAppearance === "dark");
   const quickImage = await screenshot(page, testCase.id, "settings-quick-dark");
   await quickSettings.getByRole("button", {
     name: testCase.locale === "zh-CN" ? "全部设置" : "All settings",

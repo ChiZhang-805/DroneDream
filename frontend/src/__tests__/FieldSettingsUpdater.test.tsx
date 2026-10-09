@@ -91,10 +91,11 @@ describe("Field settings update center", () => {
     };
     renderSettings();
 
-    fireEvent.click(screen.getByRole("tab", { name: "Runtime & updates" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
     expect(screen.getByRole("heading", { name: "Software updates" })).toBeVisible();
-    expect(screen.getByText("Version 1.0.1 is available. Click to update."))
-      .toBeVisible();
+    expect(screen.getByRole("status", {
+      name: "software version state: old-version · v1.0.1",
+    })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Install update" }));
 
     expect(updaterState.current.installAvailableUpdate).toHaveBeenCalledOnce();
@@ -112,7 +113,7 @@ describe("Field settings update center", () => {
     };
     renderSettings("zh-CN");
 
-    fireEvent.click(screen.getByRole("tab", { name: "Runtime 与更新" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
     expect(screen.getByRole("heading", { name: "软件更新" })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "升级 Runtime Base" }));
 

@@ -10,6 +10,7 @@ import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 
 type SettingsUpdateTone = "current" | "busy" | "attention" | "error";
 
+/** Present updater progress visually and through one stable localized live-region label. */
 export function SettingsUpdateCenter({
   onOpenRuntimeBase,
   runtimeBaseActionDisabled = false,
@@ -31,9 +32,39 @@ export function SettingsUpdateCenter({
         en: "The update could not be completed.",
       })
     : null;
+  const stateCopy = locale === "zh-CN"
+    ? {
+        label: "软件版本状态：",
+        current: "已是最新版本",
+        checking: "正在检查",
+        oldVersion: "旧版本",
+        downloading: "正在下载",
+        installing: "正在安装",
+        reconciling: "正在同步组件",
+        deferred: "等待重试",
+        failed: "检查失败",
+        engineFailed: "运行组件检查失败",
+        componentFailed: "组件更新检查失败",
+        runtimeRequired: "Runtime Base 需要更新",
+      }
+    : {
+        label: "software version state:",
+        current: "up-to-date",
+        checking: "checking",
+        oldVersion: "old-version",
+        downloading: "downloading",
+        installing: "installing",
+        reconciling: "reconciling components",
+        deferred: "retry required",
+        failed: "check failed",
+        engineFailed: "Engine Pack check failed",
+        componentFailed: "component update check failed",
+        runtimeRequired: "Runtime Base update required",
+      };
 
   let headline = t("updater.current");
   let detail = t("settings.updates.currentHint");
+  let stateValue = stateCopy.current;
   let tone: SettingsUpdateTone = "current";
   let StatusIcon: LucideIcon = ShieldCheck;
   let actionLabel: string | null = t("settings.updates.checkNow");
@@ -46,6 +77,7 @@ export function SettingsUpdateCenter({
   }> = [];
 
   if (updater.status === "checking") {
+    stateValue = stateCopy.checking;
     headline = t("updater.checking");
     detail = t("settings.updates.checkingHint");
     tone = "busy";
@@ -54,6 +86,7 @@ export function SettingsUpdateCenter({
     action = null;
     actionDisabled = true;
   } else if (updater.status === "available") {
+    stateValue = `${stateCopy.oldVersion}${updater.availableVersion ? ` · v${updater.availableVersion}` : ""}`;
     headline = t("updater.available", { version: updater.availableVersion ?? "" });
     detail = t(updater.updateRequired
       ? "settings.updates.requiredHint"
@@ -72,6 +105,7 @@ export function SettingsUpdateCenter({
     action = () => { void updater.installAvailableUpdate(); };
     actionPrimary = updater.updateRequired;
   } else if (updater.status === "downloading") {
+    stateValue = `${stateCopy.downloading}${progress === null ? "" : ` · ${progress}%`}`;
     headline = t("settings.updates.downloading");
     detail = t("settings.updates.inProgressHint");
     tone = "busy";
@@ -79,6 +113,7 @@ export function SettingsUpdateCenter({
     actionLabel = null;
     action = null;
   } else if (updater.status === "installing") {
+    stateValue = `${stateCopy.installing}${progress === null ? "" : ` · ${progress}%`}`;
     headline = t("updater.installing");
     detail = t("settings.updates.inProgressHint");
     tone = "busy";
@@ -86,6 +121,7 @@ export function SettingsUpdateCenter({
     actionLabel = null;
     action = null;
   } else if (updater.status === "reconcilingEngine") {
+    stateValue = stateCopy.reconciling;
     headline = t("updater.engine");
     detail = t("settings.updates.automaticHint");
     tone = "busy";
@@ -94,6 +130,7 @@ export function SettingsUpdateCenter({
     actionLabel = null;
     action = null;
   } else if (updater.status === "engineUpdateDeferred") {
+    stateValue = stateCopy.deferred;
     headline = t("updater.engineDeferred");
     detail = t("settings.updates.deferredHint");
     tone = "attention";
@@ -102,6 +139,7 @@ export function SettingsUpdateCenter({
     actionLabel = t("settings.updates.retry");
     action = () => { void updater.reconcileEnginePack(); };
   } else if (updater.status === "engineError") {
+    stateValue = stateCopy.engineFailed;
     headline = t("settings.updates.engineError");
     detail = t("settings.updates.retryHint");
     tone = "error";
@@ -115,6 +153,8 @@ export function SettingsUpdateCenter({
       : candidates.some((candidate) => candidate.urgency === "recommended")
         ? "recommended"
         : "optional";
+    const versions = [...new Set(candidates.map((candidate) => `v${candidate.version}`))];
+    stateValue = `${stateCopy.oldVersion}${versions.length > 0 ? ` · ${versions.join(" / ")}` : ""}`;
     headline = t("settings.updates.packsAvailable");
     detail = t(urgency === "required"
       ? "settings.updates.requiredHint"
@@ -131,6 +171,7 @@ export function SettingsUpdateCenter({
     action = () => { void updater.installComponentUpdates(); };
     actionPrimary = urgency === "required";
   } else if (updater.status === "installingComponents") {
+    stateValue = `${stateCopy.installing}${progress === null ? "" : ` · ${progress}%`}`;
     headline = t("updater.components");
     detail = t("settings.updates.inProgressHint");
     tone = "busy";
@@ -141,6 +182,7 @@ export function SettingsUpdateCenter({
     actionLabel = null;
     action = null;
   } else if (updater.status === "componentUpdateDeferred") {
+    stateValue = stateCopy.deferred;
     headline = t("settings.updates.packsDeferred");
     detail = t("settings.updates.deferredHint");
     tone = "attention";
@@ -148,6 +190,7 @@ export function SettingsUpdateCenter({
     actionLabel = t("settings.updates.retry");
     action = () => { void updater.checkForUpdates(); };
   } else if (updater.status === "componentError") {
+    stateValue = stateCopy.componentFailed;
     headline = t("settings.updates.packsError");
     detail = t("settings.updates.retryHint");
     tone = "error";
@@ -155,6 +198,7 @@ export function SettingsUpdateCenter({
     actionLabel = t("settings.updates.retry");
     action = () => { void updater.checkForUpdates(); };
   } else if (updater.status === "runtimeBaseRequired") {
+    stateValue = stateCopy.runtimeRequired;
     headline = t("updater.runtimeBaseRequired");
     detail = t("settings.updates.runtimeBaseHint");
     tone = "error";
@@ -165,6 +209,7 @@ export function SettingsUpdateCenter({
     actionPrimary = true;
     actionDisabled = runtimeBaseActionDisabled;
   } else if (updater.status === "error") {
+    stateValue = stateCopy.failed;
     headline = t("updater.error");
     detail = t("settings.updates.retryHint");
     tone = "error";
@@ -194,6 +239,7 @@ export function SettingsUpdateCenter({
       <div
         className={`settings-update-state settings-update-state-${tone}`}
         role="status"
+        aria-label={`${stateCopy.label} ${stateValue}`}
         aria-live="polite"
         aria-busy={tone === "busy"}
       >

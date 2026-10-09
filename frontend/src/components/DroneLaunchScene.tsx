@@ -1100,7 +1100,6 @@ export function DroneLaunchSceneCore({
   const reducedMotion = usePrefersReducedMotion();
   const editionTheme = useEditionTheme();
   const sceneTheme = themeOverride ?? editionTheme.three;
-  const lightAppearance = editionTheme.appearance === "light";
 
   useEffect(() => {
     activeRef.current = active;
@@ -1680,7 +1679,7 @@ export function DroneLaunchSceneCore({
       renderer.forceContextLoss();
       renderer.domElement.remove();
     };
-  }, [editionTheme.id, lightAppearance, reducedMotion, sceneTheme, starflightControllerRef, visualOffsetX]);
+  }, [editionTheme.id, reducedMotion, sceneTheme, starflightControllerRef, visualOffsetX]);
 
   const taglineLines = launchTaglineLines(labels);
 
