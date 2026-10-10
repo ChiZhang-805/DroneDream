@@ -391,10 +391,10 @@ async function verifyCase(browser, testCase) {
     }));
     assert.equal(dimensions.scrollWidth, dimensions.documentWidth);
     assert(dimensions.scrollHeight <= dimensions.documentHeight + 1);
-    assert.equal(dimensions.appearance, "dark");
+    assert.equal(dimensions.appearance, "light");
     assert.equal(dimensions.brandEdition, edition);
     assert.equal(dimensions.grantsHardwareAuthority, "false");
-    // The one supported palette retains the branded night-scene content.
+    // The fixed light palette may retain decorative scene content without changing the surface theme.
     assert.equal(dimensions.sceneStars, "true");
     assert.equal(dimensions.sceneParticles, "true");
     assert(dimensions.tagline, `${testCase.id}: launcher tagline is missing`);

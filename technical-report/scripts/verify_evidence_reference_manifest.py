@@ -1725,8 +1725,8 @@ def main() -> int:
         == actuator_probe["implementation_commit"]
         and actuator_preflight.get("exit_code") == 66
         and actuator_preflight.get("phase") == "preflight_before_px4_launch"
-        and "WSL git could not resolve the Windows worktree .git pointer"
-        == actuator_preflight.get("reason")
+        and actuator_preflight.get("reason")
+        == "WSL git could not resolve the Windows worktree .git pointer"
         and actuator_preflight.get("px4_or_gazebo_started") is False
         and actuator_preflight.get("residual_process_count") == 0
         and actuator_preflight.get("openai_api_key_used") is False,

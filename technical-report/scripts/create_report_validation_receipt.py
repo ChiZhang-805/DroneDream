@@ -275,25 +275,30 @@ def main() -> None:
                 {
                     "page": 1,
                     "issue": (
-                        "The DroneDream lockup was centered instead of aligned to the upper-left report margin."
+                        "The DroneDream lockup was centered instead of aligned to the "
+                        "upper-left report margin."
                     ),
                     "resolution": (
-                        "Left-aligned the lockup, enlarged the title and Abstract heading, and rechecked the full page."
+                        "Left-aligned the lockup, enlarged the title and Abstract heading, "
+                        "and rechecked the full page."
                     ),
                 },
                 {
                     "page": 7,
                     "issue": (
-                        "Table 3 split across pages and Figure 3 labels were vertically crowded near the zero bar."
+                        "Table 3 split across pages and Figure 3 labels were vertically "
+                        "crowded near the zero bar."
                     ),
                     "resolution": (
-                        "Made Table 3 indivisible, increased Figure 3 height and row spacing, and offset the zero label."
+                        "Made Table 3 indivisible, increased Figure 3 height and row spacing, "
+                        "and offset the zero label."
                     ),
                 },
                 {
                     "page": 25,
                     "issue": (
-                        "References used two columns and retained an explanatory paragraph below the heading."
+                        "References used two columns and retained an explanatory paragraph "
+                        "below the heading."
                     ),
                     "resolution": (
                         "Removed the paragraph and rendered all references in one readable column."

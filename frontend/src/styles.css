@@ -2651,10 +2651,6 @@ fieldset.autonomy-form-grid {
   .autonomy-sensor-mounts article > label.is-id input { min-height: 4.4rem; }
 }
 
-:root[data-dd-appearance="dark"] {
-  color-scheme: dark;
-}
-
 .settings-general-section {
   display: grid;
   gap: 0.55rem;
@@ -8263,30 +8259,12 @@ a {
   display: none;
 }
 
-:root[data-dd-appearance="dark"] .settings-workspace-content .settings-model-section {
-  background: color-mix(in srgb, var(--dd-brand-dark-surface) 36%, var(--bg-elev));
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
-}
-
-:root[data-dd-appearance="dark"] .settings-workspace-content .settings-model-access-mode > button.selected {
-  color: #f7f8ff;
-  background: color-mix(in srgb, var(--dd-brand-middle) 22%, var(--bg-elev));
-}
-
 .settings-workspace-content .custom-model-section .btn:not(.btn-primary),
 .settings-workspace-content .settings-model-current-plan-section .btn,
 .settings-workspace-content .settings-model-history-footer .btn {
   color: var(--text);
   border-color: color-mix(in srgb, var(--border) 92%, transparent);
   background: color-mix(in srgb, var(--panel) 96%, transparent);
-}
-
-:root[data-dd-appearance="dark"] .settings-workspace-content .custom-model-section .btn:not(.btn-primary),
-:root[data-dd-appearance="dark"] .settings-workspace-content .settings-model-current-plan-section .btn,
-:root[data-dd-appearance="dark"] .settings-workspace-content .settings-model-history-footer .btn {
-  color: #f7f8ff;
-  border-color: color-mix(in srgb, var(--dd-brand-middle) 42%, var(--border));
-  background: color-mix(in srgb, var(--dd-brand-dark-surface) 62%, var(--bg-elev));
 }
 
 @media (max-width: 760px) {
@@ -8561,16 +8539,6 @@ a {
   white-space: nowrap;
 }
 
-:root[data-dd-appearance="dark"] .app-shell .settings-reset-card-trigger.has-card,
-:root[data-dd-appearance="dark"] .app-shell .settings-model-reset-row .settings-reset-card-trigger-copy strong,
-:root[data-dd-appearance="dark"] .app-shell .settings-reset-card-trigger-arrow {
-  color: #ffffff;
-}
-
-:root[data-dd-appearance="dark"] .app-shell .settings-model-reset-row .settings-reset-card-trigger-copy small {
-  color: #dce2ef;
-}
-
 /* ECE498BH is a single five-row table: equal logo, description and action
    columns, consistent lockup sizing, and vertically centered content. */
 .settings-workspace-content .settings-course-panel {
@@ -8676,14 +8644,12 @@ a {
 /* Runtime: queued rows are yellow, the active probe is blue, and only
    completed rows become green. The overall row follows the same phases. */
 .settings-runtime-check-steps > li[data-state="pending"],
-.settings-runtime-status-pending,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-status-pending {
+.settings-runtime-status-pending {
   color: #f2bc35;
 }
 
 .settings-runtime-check-steps > li[data-state="checking"],
-.settings-runtime-status-checking,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-status-checking {
+.settings-runtime-status-checking {
   color: #4da3ff;
 }
 
@@ -11436,12 +11402,6 @@ a {
 }
 
 /* The launcher chrome is a transparent overlay inside the fixed night-city scene. */
-:root[data-dd-appearance="dark"] .app-shell-launcher .launcher-chrome {
-  color: #f8f4ff;
-  border-bottom: 0;
-  background: linear-gradient(180deg, rgba(4, 5, 16, 0.72), rgba(4, 5, 16, 0.22) 74%, transparent);
-  box-shadow: none;
-}
 
 .launcher-settings-backdrop {
   position: fixed;
@@ -21646,99 +21606,6 @@ body {
   background: color-mix(in srgb, var(--dd-brand-start) 14%, var(--bg-elev-2));
 }
 
-:root[data-dd-appearance="dark"] .app-shell .quick-settings-dialog,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host {
-  color-scheme: dark;
-  --bg: #0b1020;
-  --bg-elev: #101735;
-  --bg-elev-2: #151d42;
-  --border: #2a3763;
-  --border-strong: #3a4b82;
-  --text: #f2f4fb;
-  --text-muted: #aab4d0;
-  --text-dim: #d0d6e7;
-  color: var(--text);
-}
-
-:root[data-dd-appearance="dark"] .app-shell .quick-settings-dialog {
-  border-color: color-mix(in srgb, var(--dd-brand-middle) 42%, var(--border));
-  background:
-    radial-gradient(
-      circle at 96% 0,
-      color-mix(in srgb, var(--dd-brand-middle) 14%, transparent),
-      transparent 36%
-    ),
-    var(--bg-elev);
-  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.56);
-}
-
-:root[data-dd-appearance="dark"] .app-shell .quick-settings-dialog .launcher-settings-close {
-  color: var(--text-dim);
-  border-color: var(--border);
-  background: var(--bg-elev-2);
-}
-
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host {
-  background: var(--bg);
-}
-
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-workspace-surface,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-workspace-content {
-  color: var(--text);
-  background: var(--bg-elev);
-}
-
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-workspace-sidebar {
-  color: var(--text);
-  border-color: var(--border);
-  background: color-mix(in srgb, var(--dd-brand-dark-surface) 62%, var(--bg-elev-2));
-}
-
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-workspace-content > .launcher-settings-heading,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-model-panel {
-  border-color: var(--border);
-}
-
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-general-card,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-memory-switches,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-memory-grid,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-model-reset-row,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-model-access-mode > button,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-model-usage,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-course-panel,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-course-editions article,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-details,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-update-state,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-update-components > li {
-  color: var(--text);
-  border-color: var(--border);
-  background: color-mix(in srgb, var(--dd-brand-dark-surface) 34%, var(--bg-elev-2));
-}
-
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host input,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host select,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host textarea,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-general-card .settings-toggle-row,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-memory-grid input,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-memory-grid select,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-model-reset-row select {
-  color: var(--text);
-  border-color: var(--border);
-  background: var(--bg-elev);
-}
-
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-memory-grid label > span,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-model-grid label > span,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-model-profile-row label > span,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-course-overview p,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-course-editions p,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-update-heading p,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-update-copy small,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-update-components small,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-update-progress span {
-  color: var(--text-muted);
-}
-
 /* 2026 compact product surfaces: one responsive layout shared by all editions. */
 .app-shell:not(.app-shell-launcher) .app-main {
   max-width: none;
@@ -21910,8 +21777,7 @@ body {
   border-radius: 7px;
 }
 
-.quick-settings-dialog .launcher-settings-close,
-:root[data-dd-appearance="dark"] .app-shell .quick-settings-dialog .launcher-settings-close {
+.quick-settings-dialog .launcher-settings-close {
   width: 2rem;
   height: 2rem;
   padding: 0;
@@ -23420,13 +23286,6 @@ body {
   opacity: 0.9;
 }
 
-:root[data-dd-appearance="dark"] .settings-workspace-content .settings-memory-panel .settings-toggle-row:has(input:disabled),
-:root[data-dd-appearance="dark"] .settings-workspace-content .settings-memory-panel .settings-toggle-row:has(input:disabled) span,
-:root[data-dd-appearance="dark"] .settings-workspace-content .settings-memory-panel input:disabled,
-:root[data-dd-appearance="dark"] .settings-workspace-content .settings-memory-panel select:disabled {
-  color: #dce3f2;
-}
-
 .settings-workspace-content .settings-course-editions p {
   min-height: 0;
   max-height: none;
@@ -23565,46 +23424,6 @@ body {
   margin-top: 0.35rem;
 }
 
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host {
-  --bg: color-mix(in srgb, var(--dd-brand-dark-surface) 82%, #05070d);
-  --bg-elev: color-mix(in srgb, var(--dd-brand-dark-surface) 72%, #0d1222);
-  --bg-elev-2: color-mix(in srgb, var(--dd-brand-dark-surface) 62%, #151b30);
-  --border: color-mix(in srgb, var(--dd-brand-middle) 24%, #2b344b);
-  --border-strong: color-mix(in srgb, var(--dd-brand-middle) 38%, #35415e);
-  --text: #ffffff;
-  --text-dim: #edf1fb;
-  --text-muted: #c5cde0;
-}
-
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-surface,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-content {
-  color: #ffffff;
-  background: var(--bg);
-}
-
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-sidebar {
-  color: #ffffff;
-  background: color-mix(in srgb, var(--dd-brand-dark-surface) 82%, #0b1020);
-}
-
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host h2,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host h3,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host h4,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host strong,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host label,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host button,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host dt,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host dd {
-  color: #ffffff;
-}
-
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host small,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host p,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host label > span {
-  color: #cbd3e6;
-}
-
 /* The maximized settings canvas must use its height instead of leaving an
    artificial blank lower half. Compact windows keep the same minimum row
    heights and scroll naturally; taller windows distribute the free space. */
@@ -23637,65 +23456,10 @@ body {
 
 /* Provider marks are meaningful icons, not decoration. In dark mode they
    remain bright and readable without adding a tile or circular backdrop. */
-:root[data-dd-appearance="dark"] .app-shell .assistant-model-button {
-  color: #ffffff;
-}
-
-:root[data-dd-appearance="dark"] .app-shell .assistant-model-button:hover,
-:root[data-dd-appearance="dark"] .app-shell .assistant-model-button:focus-visible {
-  color: #ffffff;
-  background: color-mix(in srgb, var(--dd-brand-start) 9%, transparent);
-}
-
-:root[data-dd-appearance="dark"] .app-shell .model-provider-logo-openai {
-  --model-provider-color: #ffffff !important;
-}
 
 /* Runtime actions and health summaries must stay legible inside the themed
    settings canvas. Earlier light-theme component rules were more specific
    and could leave a white button/card behind in dark mode. */
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-check,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-update-action {
-  color: #ffffff;
-  border-color: color-mix(in srgb, var(--dd-brand-middle) 42%, #4b5268);
-  background: color-mix(in srgb, var(--dd-brand-dark-surface) 58%, var(--bg-elev-2));
-}
-
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-check:hover,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-update-action:hover {
-  color: #ffffff;
-  border-color: color-mix(in srgb, var(--dd-brand-start) 62%, #ffffff);
-  background: color-mix(in srgb, var(--dd-brand-middle) 24%, var(--bg-elev-2));
-}
-
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-status,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-status-healthy {
-  color: #45efa0;
-  border-color: color-mix(in srgb, #45efa0 34%, var(--border));
-  background: color-mix(in srgb, #45efa0 8%, var(--bg-elev));
-}
-
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-status-healthy small {
-  color: #b8efd4;
-}
-
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-status-healthy .settings-runtime-status-icon {
-  color: #45efa0;
-  background: transparent;
-}
-
-:root[data-dd-appearance="dark"] .account-menu-popover {
-  color: #241b2a;
-  border-color: #e5dce7;
-  background: #ffffff;
-}
-
-:root[data-dd-appearance="dark"] .account-menu-popover button,
-:root[data-dd-appearance="dark"] .account-menu-popover .account-menu-row,
-:root[data-dd-appearance="dark"] .account-menu-popover .account-menu-row > strong,
-:root[data-dd-appearance="dark"] .account-menu-popover svg {
-  color: #5f5265;
-}
 
 /* Autonomy pages remain wheel/touch scrollable without exposing native rails. */
 .app-main:has(.autonomy-platform-page),
@@ -23716,98 +23480,13 @@ body {
 /* The appearance preference applies to the product workspace too. Each
    edition keeps its own deep surface instead of reverting to the shared light
    canvas after Settings closes. */
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) {
-  color-scheme: dark;
-  --bg: color-mix(in srgb, var(--dd-brand-dark-surface) 82%, #05070d);
-  --bg-elev: color-mix(in srgb, var(--dd-brand-dark-surface) 70%, #101522);
-  --bg-elev-2: color-mix(in srgb, var(--dd-brand-dark-surface) 58%, #181e2d);
-  --bg-subtle: color-mix(in srgb, var(--dd-brand-dark-surface) 50%, #202638);
-  --border: color-mix(in srgb, var(--dd-brand-middle) 22%, #31384c);
-  --border-strong: color-mix(in srgb, var(--dd-brand-middle) 36%, #424b63);
-  --text: #ffffff;
-  --text-muted: #c5cde0;
-  --text-dim: #edf1fa;
-  color: #ffffff;
-  background:
-    radial-gradient(circle at 90% 4%, color-mix(in srgb, var(--dd-brand-start) 18%, transparent), transparent 32rem),
-    radial-gradient(circle at 8% 94%, color-mix(in srgb, var(--dd-brand-middle) 12%, transparent), transparent 34rem),
-    var(--bg);
-}
 
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-sidebar {
-  color: #ffffff;
-  border-right-color: var(--border);
-  background: color-mix(in srgb, var(--dd-brand-dark-surface) 86%, #0b0e18);
-  box-shadow: 12px 0 32px rgba(0, 0, 0, 0.16);
-}
-
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-header {
-  color: #ffffff;
-  border-bottom-color: var(--border);
-  background: color-mix(in srgb, var(--dd-brand-dark-surface) 78%, #111521);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
-}
-
-.app-shell:not(.app-shell-launcher) .launcher-settings-button,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .launcher-settings-button {
+.app-shell:not(.app-shell-launcher) .launcher-settings-button {
   color: var(--text);
   border: 0;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-}
-
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-main,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-main:has(.experiment-assistant-page),
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-main:has(.autonomy-platform-page) {
-  color: #ffffff;
-  background:
-    radial-gradient(circle at 76% 10%, color-mix(in srgb, var(--dd-brand-middle) 16%, transparent), transparent 30rem),
-    var(--bg);
-}
-
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-nav a,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-nav button,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-nav-section-label,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-account-button,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-header-title,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .assistant-empty-state h1,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .autonomy-platform-page {
-  color: #ffffff;
-}
-
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-nav a:hover,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-nav a.active {
-  color: #ffffff;
-  background: color-mix(in srgb, var(--dd-brand-middle) 24%, var(--bg-elev-2));
-}
-
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .assistant-examples,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .assistant-examples button,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .assistant-composer,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .autonomy-command-composer,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .section-card,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .metric-card,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .artifact-card,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .data-table-wrapper {
-  color: #ffffff;
-  border-color: var(--border);
-  background: color-mix(in srgb, var(--dd-brand-dark-surface) 42%, var(--bg-elev));
-}
-
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) input,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) textarea,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) select {
-  color: #ffffff;
-  border-color: var(--border);
-  background: var(--bg-elev);
-}
-
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) input::placeholder,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) textarea::placeholder,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .assistant-example-heading small,
-:root[data-dd-appearance="dark"] .app-shell:not(.app-shell-launcher) .app-account-copy small {
-  color: #c5cde0;
 }
 
 @media (max-width: 980px) {
@@ -23908,8 +23587,7 @@ body {
   justify-content: space-between;
 }
 
-.settings-runtime-module .settings-update-state,
-:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host .settings-runtime-module .settings-update-state {
+.settings-runtime-module .settings-update-state {
   min-height: 3.8rem;
   display: grid;
   grid-template-columns: 1.65rem minmax(0, 1fr);
@@ -23986,32 +23664,6 @@ body {
 
 .settings-runtime-module .settings-update-state-error .settings-update-copy strong {
   color: #c83d50;
-}
-
-:root[data-dd-appearance="dark"] .settings-runtime-module {
-  background: color-mix(in srgb, var(--dd-brand-dark-surface) 38%, var(--bg-elev));
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
-}
-
-:root[data-dd-appearance="dark"] .settings-runtime-module .settings-update-copy,
-:root[data-dd-appearance="dark"] .settings-runtime-module .settings-update-copy span {
-  color: #edf1fb;
-}
-
-:root[data-dd-appearance="dark"] .settings-runtime-module .settings-update-state-current .settings-update-copy strong {
-  color: #45efa0;
-}
-
-:root[data-dd-appearance="dark"] .settings-runtime-module .settings-update-state-busy .settings-update-copy strong {
-  color: #63b6ff;
-}
-
-:root[data-dd-appearance="dark"] .settings-runtime-module .settings-update-state-attention .settings-update-copy strong {
-  color: #ffd05a;
-}
-
-:root[data-dd-appearance="dark"] .settings-runtime-module .settings-update-state-error .settings-update-copy strong {
-  color: #ff7f8d;
 }
 
 @media (max-width: 980px) {
