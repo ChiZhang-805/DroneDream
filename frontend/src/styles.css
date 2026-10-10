@@ -326,7 +326,15 @@ body:has(.autonomy-platform-page),
   min-width: 0;
   min-height: 0;
   overflow: auto;
-  scrollbar-gutter: stable;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scrollbar-gutter: auto;
+}
+
+.autonomy-platform-content::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .autonomy-platform-content:has(.autonomy-lab-page.is-embedded) {
@@ -3032,7 +3040,8 @@ body:has(.app-shell-public-demo),
   padding: 0.42rem;
   border: 1px solid var(--border);
   border-radius: 1rem;
-  background: color-mix(in srgb, var(--panel) 98%, transparent);
+  color: #241b2a;
+  background: #ffffff;
   box-shadow: 0 18px 44px rgba(40, 22, 44, 0.18);
   backdrop-filter: blur(18px);
 }
@@ -23676,16 +23685,32 @@ body {
 }
 
 :root[data-dd-appearance="dark"] .account-menu-popover {
-  color: #ffffff;
-  border-color: color-mix(in srgb, var(--dd-brand-middle) 36%, #3a3146);
-  background: color-mix(in srgb, var(--dd-brand-dark-surface) 86%, #110d18);
+  color: #241b2a;
+  border-color: #e5dce7;
+  background: #ffffff;
 }
 
 :root[data-dd-appearance="dark"] .account-menu-popover button,
 :root[data-dd-appearance="dark"] .account-menu-popover .account-menu-row,
 :root[data-dd-appearance="dark"] .account-menu-popover .account-menu-row > strong,
 :root[data-dd-appearance="dark"] .account-menu-popover svg {
-  color: #ffffff;
+  color: #5f5265;
+}
+
+/* Autonomy pages remain wheel/touch scrollable without exposing native rails. */
+.app-main:has(.autonomy-platform-page),
+.autonomy-platform-content,
+.autonomy-conversation-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.app-main:has(.autonomy-platform-page)::-webkit-scrollbar,
+.autonomy-platform-content::-webkit-scrollbar,
+.autonomy-conversation-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 /* The appearance preference applies to the product workspace too. Each

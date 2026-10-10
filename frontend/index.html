@@ -3,6 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // The product intentionally ships one light palette. Apply it before the
+      // first stylesheet paint and retire preferences left by older releases.
+      document.documentElement.dataset.ddAppearance = "light";
+      document.documentElement.style.colorScheme = "light";
+      try {
+        localStorage.removeItem("dronedream:appearance");
+        localStorage.removeItem("dronedream:custom-accent");
+      } catch {
+        // Storage access is optional; the fixed document palette still applies.
+      }
+    </script>
     <link rel="icon" type="image/png" href="/drone-favicon.png?v=39f1c9e1" />
     <title>DroneDream</title>
   </head>
