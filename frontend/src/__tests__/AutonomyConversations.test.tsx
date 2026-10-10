@@ -127,11 +127,11 @@ describe("autonomy conversation persistence", () => {
     saveAutonomyWorkspace("local", "autonomy", workspace);
     renderWorkspace("/autonomy/maps");
 
-    expect(await screen.findByRole("button", { name: /School Grounds/u })).toBeVisible();
+    expect(await screen.findByRole("button", { name: /Kumpula Campus/u })).toBeVisible();
     expect(screen.queryByText("Map and aircraft pair qualification")).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "3D UAV Corridor" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /School Grounds/u }));
+    fireEvent.click(screen.getByRole("button", { name: /Kumpula Campus/u }));
     const corridor = await screen.findByRole("region", { name: "3D UAV Corridor" });
     expect(corridor).toBeVisible();
     expect(corridor.closest("article")).toHaveAttribute("data-airspace-expanded", "true");
@@ -231,8 +231,8 @@ describe("Chatbot to independent conversation", () => {
     const map = within(menu).getByRole("menuitem", { name: "Select map" });
     fireEvent.pointerEnter(map.parentElement!);
     const mapMenu = screen.getByRole("menu", { name: "Select map" });
-    fireEvent.click(within(mapMenu).getByRole("menuitemradio", { name: "Office Interior" }));
-    expect(within(menu).getByRole("menuitem", { name: "Office Interior" })).toBeVisible();
+    fireEvent.click(within(mapMenu).getByRole("menuitemradio", { name: "Kumpula Campus" }));
+    expect(within(menu).getByRole("menuitem", { name: "Kumpula Campus" })).toBeVisible();
     expect(within(menu).queryByRole("link", { name: "Select aircraft" })).toBeNull();
     expect(within(menu).queryByRole("link", { name: "Select map" })).toBeNull();
   });

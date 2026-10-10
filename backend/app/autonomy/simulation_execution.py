@@ -1,4 +1,4 @@
-"""Owner-scoped launcher for the audited School Map PX4/Gazebo mission.
+"""Owner-scoped launcher for the audited Kumpula Campus PX4/Gazebo mission.
 
 Only the canonical School Map mission runner can be launched.  User input is
 never interpolated into a shell command, and a model-bound deterministic
@@ -231,7 +231,7 @@ class SimulationExecutionRegistry:
             "schema_version": "dronedream.autonomy.simulation-execution-capabilities.v1",
             "available": available,
             "adapter": "school-map-px4-gazebo-mavsdk-v1",
-            "world": "School Map",
+            "world": "Kumpula Campus",
             "vehicle": "My Drone",
             "mission_profile": "school-map-office-takeout-roundtrip-v1",
             "physical_transport_bound": available,
@@ -350,7 +350,7 @@ class SimulationExecutionRegistry:
         ):
             raise AutonomyRuntimeError(
                 "SIMULATION_ASSET_PROFILE_MISMATCH",
-                "The physical adapter requires the official My Drone and School Map assets.",
+                "The physical adapter requires the official My Drone and Kumpula Campus assets.",
             )
         if not _matches_canonical_route_graph(planner.task_graph):
             raise AutonomyRuntimeError(
@@ -359,26 +359,26 @@ class SimulationExecutionRegistry:
             )
         planner_goal_mission = mission.model_copy(update={"natural_language": planner.goal})
         if (
-            school_mission_profile(mission, mission.scene_id or "school-campus-v1") != "coffee"
+            school_mission_profile(mission, mission.scene_id or "school-campus-v1") != "delivery"
             or school_mission_profile(
                 planner_goal_mission,
                 planner_goal_mission.scene_id or "school-campus-v1",
             )
-            != "coffee"
+            != "delivery"
         ):
             raise AutonomyRuntimeError(
                 "SIMULATION_ROUTE_PROFILE_MISMATCH",
-                "The compiled mission profile is not the office-to-takeout roundtrip.",
+                "The compiled mission profile is not the qualified Kumpula delivery roundtrip.",
             )
         if mission.scene_id != "school-campus-v1":
             raise AutonomyRuntimeError(
                 "SIMULATION_SCENE_UNSUPPORTED",
-                "The physical adapter currently accepts only School Map.",
+                "The physical adapter currently accepts only Kumpula Campus.",
             )
         if abs(mission.vehicle.pickup_payload_kg - TAKEOUT_PAYLOAD_MASS_KG) > 1e-9:
             raise AutonomyRuntimeError(
                 "SIMULATION_PAYLOAD_CONTRACT_MISMATCH",
-                "The School Map adapter requires the qualified 0.04 kg payload.",
+                "The Kumpula Campus adapter requires the qualified 0.04 kg payload.",
             )
         capabilities = self.capabilities()
         if capabilities["available"] is not True:

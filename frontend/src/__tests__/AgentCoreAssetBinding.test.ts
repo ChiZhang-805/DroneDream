@@ -9,7 +9,7 @@ import { defaultAutonomyWorkspace, normalizeAutonomyWorkspace } from "../feature
 import { loadAutonomyAssetLibrary } from "../features/autonomy/assetLibraryStore";
 import sample from "./fixtures/qualifiedAssetPair.json";
 
-// 来源为本机 Core 返回的历史认证合同，仅用于复现协议错误，不是本次飞行验收。
+// 来源为当前内置 Kumpula 地图与 My Drone 的认证合同，用于验证前后端绑定协议。
 let fixture: typeof sample;
 beforeEach(() => {
   fixture = structuredClone(sample);

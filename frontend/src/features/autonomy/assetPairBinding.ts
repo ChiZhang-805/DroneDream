@@ -260,7 +260,7 @@ export async function reconcileAgentCoreWorkspace(workspace: AutonomyWorkspaceSt
 
 // Resolve a catalog selection to the concrete packages installed by Agent Core.
 // Catalog resource IDs are presentation identities and are not always package
-// asset IDs (for example, open-rmf-office is installed as the asset "office").
+// Catalog resource IDs may differ from the normalized package asset ID.
 export async function bindCatalogAssetPair(
   workspace: AutonomyWorkspaceState,
   assetLibrary: AutonomyAssetLibrary,

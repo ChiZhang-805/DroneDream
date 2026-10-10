@@ -285,8 +285,19 @@ export interface AutonomyMapPack {
     | "roads"
     | "vegetation"
     | "street-furniture"
+    | "building-footprints"
+    | "orthophoto"
+    | "named-campus-buildings"
   >;
-  planningLayers: Array<"collision-geometry" | "occupancy" | "esdf" | "dynamic-overlay" | "confidence">;
+  planningLayers: Array<
+    | "collision-geometry"
+    | "occupancy"
+    | "esdf"
+    | "dynamic-overlay"
+    | "confidence"
+    | "navigation-graph"
+    | "route-corridor"
+  >;
   origin: { latitude: number | null; longitude: number | null; altitudeM: number | null };
   boundsM: AutonomyVector3;
   confidencePercent: number;
@@ -432,9 +443,13 @@ const CANONICAL_SCHOOL_SCENE_ID: AutonomyCompiledSceneId = "school-campus-v1";
 const SENSOR_SET = new Set<AutonomySensorKind>(["rgb", "depth", "stereo", "thermal", "lidar", "gps", "vio"]);
 const SEMANTIC_SET = new Set<AutonomyMapPack["semanticLayers"][number]>([
   "free-space", "stairs", "doors", "gates", "people", "pickup-zones", "launch-zones",
-  "rooms", "corridors", "roads", "vegetation", "street-furniture",
+  "rooms", "corridors", "roads", "vegetation", "street-furniture", "building-footprints",
+  "orthophoto", "named-campus-buildings",
 ]);
-const PLANNING_LAYER_SET = new Set<AutonomyMapPack["planningLayers"][number]>(["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"]);
+const PLANNING_LAYER_SET = new Set<AutonomyMapPack["planningLayers"][number]>([
+  "collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence",
+  "navigation-graph", "route-corridor",
+]);
 
 function boundedNumber(value: unknown, fallback: number, minimum: number, maximum: number): number {
   return typeof value === "number" && Number.isFinite(value)
@@ -836,21 +851,21 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       agentCoreAssetId: "dronedream.school-map.v1",
       agentCoreContentSha256: null,
       agentCoreRuntimeContract: null,
-      name: "School Map",
+      name: "Kumpula Campus",
       representation: "hybrid-3d",
       coordinateFrame: "ENU",
-      resolutionM: 0.05,
-      floorCount: 3,
+      resolutionM: 0.18,
+      floorCount: 1,
       liveUpdates: "fixed",
       calibrated: true,
       compilerSceneId: "school-campus-v1",
       semanticLayers: [
-        "free-space", "stairs", "doors", "gates", "people", "pickup-zones", "launch-zones",
-        "rooms", "corridors", "roads", "vegetation", "street-furniture",
+        "free-space", "building-footprints", "orthophoto", "pickup-zones",
+        "launch-zones", "named-campus-buildings",
       ],
-      planningLayers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
-      origin: { latitude: null, longitude: null, altitudeM: null },
-      boundsM: { x: 120, y: 90, z: 12.6 },
+      planningLayers: ["collision-geometry", "navigation-graph", "route-corridor"],
+      origin: { latitude: 60.2038, longitude: 24.9629, altitudeM: 0 },
+      boundsM: { x: 500, y: 500, z: 35 },
       confidencePercent: 100,
       sourceFiles: [],
       updatedAt,

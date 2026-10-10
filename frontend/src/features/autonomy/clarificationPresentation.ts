@@ -104,7 +104,7 @@ function mapEntityToken(option: AutonomyClarificationOption): string | null {
     ?? null;
   if (!token) return null;
 
-  // Open-RMF floor entities use `l1-*`, `l2-*`, ... . An older
+  // Imported multilevel maps may use `l1-*`, `l2-*`, ... . An older
   // clarification formatter dropped the leading `l` and emitted `1-*`, which
   // made a valid mapped destination fail later in the route tool as an unknown
   // entity. Repair that bounded legacy spelling before it reaches planning.

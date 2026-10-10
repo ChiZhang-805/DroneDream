@@ -167,7 +167,8 @@ def _map_issues(
     planning_layers = asset.capabilities.get("planning_layers")
     if not isinstance(planning_layers, list) or not {
         "collision-geometry",
-        "occupancy",
+        "navigation-graph",
+        "route-corridor",
     }.issubset(set(planning_layers)):
         issues.append("map.collision-layers.missing")
     if not asset.capabilities.get("compiler_scene_id"):

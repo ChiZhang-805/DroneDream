@@ -66,13 +66,25 @@ try {
   // current, reachable map repository here; geometric scene contracts remain
   // covered by the school-map unit and mission-validation suites.
   await openProductPage(page, "/console/autonomy/maps", ".autonomy-repository-page");
-  const schoolMap = page.locator(".autonomy-repository-grid article").filter({ hasText: "School Grounds" });
-  if (await schoolMap.count() !== 1) throw new Error("Map repository must expose exactly one School Grounds card.");
+  const schoolMap = page.locator(".autonomy-repository-grid article").filter({ hasText: "Kumpula Campus" });
+  if (await schoolMap.count() !== 1) throw new Error("Map repository must expose exactly one Kumpula Campus card.");
   if (await schoolMap.getAttribute("data-selected") !== "false") throw new Error("Map repository must begin without a selected map.");
   if (await page.locator(".autonomy-asset-toolbar button").count() !== 0) throw new Error("Map repository must not expose an in-product map creator.");
   if (await page.getByRole("button", { name: "Import map", exact: true }).count() !== 1) throw new Error("Map repository is missing its external import action.");
   const mapScreenshot = path.join(outputRoot, `${screenshotPrefix}school-map-repository-1600x1000.png`);
   await page.screenshot({ path: mapScreenshot, fullPage: false });
+  await schoolMap.locator(".autonomy-repository-card-surface").dblclick();
+  const mapDialog = page.getByRole("dialog", { name: "Kumpula Campus" });
+  await mapDialog.waitFor({ state: "visible" });
+  const mapCanvas = mapDialog.locator(".autonomy-repository-3d-view canvas");
+  await mapCanvas.waitFor({ state: "visible" });
+  await page.waitForTimeout(500);
+  if (await mapDialog.getByText("No verified 3D geometry is available", { exact: false }).count()) {
+    throw new Error("Kumpula Campus failed to load its verified 3D geometry.");
+  }
+  const mapDetailScreenshot = path.join(outputRoot, `${screenshotPrefix}kumpula-campus-3d-detail-1600x1000.png`);
+  await page.screenshot({ path: mapDetailScreenshot, fullPage: false });
+  await mapDialog.getByRole("button", { name: "Close" }).click();
 
   await openProductPage(page, "/console/autonomy/aircraft", ".autonomy-repository-page");
   const myDrone = page.locator(".autonomy-repository-grid article").filter({ hasText: "X500 Depth" });
@@ -93,6 +105,9 @@ try {
   await selectMap.hover();
   const mapSubmenu = contextPopover.locator(".autonomy-context-submenu");
   await mapSubmenu.waitFor({ state: "visible" });
+  if (await mapSubmenu.getByRole("menuitemradio", { name: "Kumpula Campus", exact: true }).count() !== 1) {
+    throw new Error("Map submenu must expose the sole Kumpula Campus selection.");
+  }
   const [mapRowBox, submenuBox] = await Promise.all([selectMap.boundingBox(), mapSubmenu.boundingBox()]);
   if (!mapRowBox || !submenuBox) throw new Error("Map submenu geometry could not be measured.");
   if (submenuBox.y >= mapRowBox.y) throw new Error("Map submenu must expand upward when the composer is near the viewport bottom.");
@@ -105,18 +120,14 @@ try {
       scrollbarWidth: style.scrollbarWidth,
     };
   });
-  if (submenuMetrics.scrollHeight <= submenuMetrics.clientHeight) throw new Error("Map submenu must cap visible choices and remain wheel-scrollable.");
+  if (submenuMetrics.scrollHeight > submenuMetrics.clientHeight) throw new Error("A one-map submenu must not create unnecessary scrolling.");
   if (submenuMetrics.scrollbarWidth !== "none") throw new Error("Map submenu scrollbar must remain visually hidden.");
-  await mapSubmenu.hover();
-  await page.mouse.wheel(0, 500);
-  await page.waitForTimeout(100);
-  if (await mapSubmenu.evaluate((element) => element.scrollTop) <= 0) throw new Error("Map submenu did not respond to mouse-wheel scrolling.");
   const contextScreenshot = path.join(outputRoot, `${screenshotPrefix}autonomy-mission-context-1600x1000.png`);
   await page.screenshot({ path: contextScreenshot, fullPage: false });
 
   process.stdout.write(`${JSON.stringify({
     status: "pass",
-    screenshots: [mapScreenshot, aircraftScreenshot, contextScreenshot],
+    screenshots: [mapScreenshot, mapDetailScreenshot, aircraftScreenshot, contextScreenshot],
   }, null, 2)}\n`);
   await context.close();
 } finally {

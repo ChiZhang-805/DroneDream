@@ -17,14 +17,19 @@ export type CatalogAssetPresentation = {
 };
 
 const MAPS: CatalogAssetDefinition[] = [
-  { key: "school-map", resourceId: "dronedream-school-map", zh: "学校园区", en: "School Grounds", aliases: ["school map", "school-map", "dronedream.school-map"] },
-  { key: "airport-terminal", resourceId: "open-rmf-airport-terminal", zh: "机场大厅", en: "Airport Hall", aliases: ["airport terminal", "airport-terminal", "airport_terminal"] },
-  { key: "open-test-arena", resourceId: "open-rmf-battle-royale", zh: "开放试验场", en: "Open Test Yard", aliases: ["open test arena", "battle royale", "battle-royale", "battle_royale"] },
-  { key: "campus-site", resourceId: "open-rmf-campus", zh: "校园场地", en: "Campus Grounds", aliases: ["campus site", "campus-site", "campus"] },
-  { key: "two-level-clinic", resourceId: "open-rmf-clinic", zh: "双层诊所", en: "Two-level Clinic", aliases: ["two-level clinic", "two level clinic", "clinic"] },
-  { key: "three-level-hotel", resourceId: "open-rmf-hotel", zh: "三层酒店", en: "Three-level Hotel", aliases: ["three-level hotel", "three level hotel", "hotel"] },
-  { key: "office", resourceId: "open-rmf-office", zh: "办公室内", en: "Office Interior", aliases: ["office"] },
-  { key: "triple-h-corridor", resourceId: "open-rmf-triple-h", zh: "三联走廊", en: "Triple-H Hall", aliases: ["triple-h corridor", "triple h corridor", "triple-h", "triple_h"] },
+  {
+    key: "kumpula-campus",
+    resourceId: "dronedream-school-map",
+    zh: "Kumpula 科学校园",
+    en: "Kumpula Campus",
+    aliases: [
+      "kumpula campus",
+      "kumpula-campus",
+      "school map",
+      "school-map",
+      "dronedream.school-map",
+    ],
+  },
 ];
 
 const VEHICLES: CatalogAssetDefinition[] = [

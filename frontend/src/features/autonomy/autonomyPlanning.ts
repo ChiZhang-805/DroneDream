@@ -176,8 +176,7 @@ export function compileRequestForWorkspace(
 }
 
 function missionIdForScene(sceneId: string, intent = ""): AutonomyMissionId {
-  if (sceneId === "forest-gate-inspection") return "gates";
-  if (sceneId === "service-corridor-dock") return "narrow";
+  void sceneId;
   const normalized = intent.toLocaleLowerCase();
   if (/gate|圆门|圆环|穿门/u.test(normalized)) return "gates";
   if (/narrow|dock|走廊|corridor|停靠|狭窄|楼梯/u.test(normalized)) return "narrow";

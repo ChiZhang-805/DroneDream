@@ -1,15 +1,11 @@
 {
   "schema_version": "dronedream.resource-card-previews.v1",
-  "generator": "scripts/generate-map-previews.py",
+  "generator": "scripts/build-kumpula-campus-map.py",
   "sources": {
     "maps": {
-      "project": "open-rmf/rmf_demos",
-      "commit": "7851a5792d19a037833292a3e2a823b0f9e0c111",
-      "license": "Apache-2.0"
-    },
-    "school_map": {
-      "project": "DroneDream",
-      "license": "MIT"
+      "project": "City of Helsinki Open Data / OpenStreetMap contributors",
+      "retrieved_at": "2026-10-10",
+      "license": "CC-BY-4.0 AND ODbL-1.0"
     },
     "vehicles": {
       "project": "PX4/PX4-gazebo-models",
@@ -19,44 +15,14 @@
   },
   "files": [
     {
-      "path": "maps/airport-terminal.webp",
-      "bytes": 17540,
-      "sha256": "313d2c61b0929bd2ca31817dec803c2ee03f1c548e2a0e2135c5bf25d8ffd736"
+      "path": "maps/kumpula-campus.webp",
+      "bytes": 128706,
+      "sha256": "281ac64bc67c69ed1379f943f8e0eefef499c135aee19f20f245146c12efba02"
     },
     {
-      "path": "maps/campus-site.webp",
-      "bytes": 12060,
-      "sha256": "afb436b6a6c1d11b6f4cac1a3530d6bf93bb3f5246e6d4b4e6f5806e52ff8468"
-    },
-    {
-      "path": "maps/office.webp",
-      "bytes": 11418,
-      "sha256": "800bacca8851fad1bf473d87cada12b9b63a411737f693db967fcced8ba85406"
-    },
-    {
-      "path": "maps/open-test-arena.webp",
-      "bytes": 9560,
-      "sha256": "0334cc33d2cc4824689e87e795ac036dd38d756e5702726211f534b20aa62d84"
-    },
-    {
-      "path": "maps/school-map.webp",
-      "bytes": 18456,
-      "sha256": "6feb35560986028eda1e0cd88760a148bf3c192f24d8bcbf30ff22424217d313"
-    },
-    {
-      "path": "maps/three-level-hotel.webp",
-      "bytes": 14242,
-      "sha256": "433c0181b454f6fe761786d0c63ad28763d5c47a3e434d4b03b347d4813aa3d1"
-    },
-    {
-      "path": "maps/triple-h-corridor.webp",
-      "bytes": 11892,
-      "sha256": "e40942e564fcda4dc01514dff94c75dbd6ede08cd1e8bb5f05d9437d5834b0d7"
-    },
-    {
-      "path": "maps/two-level-clinic.webp",
-      "bytes": 20940,
-      "sha256": "6b5ba947ad47273577a795e32eab902a8cc19efdf776a038c444db9a1ea27e35"
+      "path": "maps/kumpula-campus-source.jpg",
+      "bytes": 991877,
+      "sha256": "fd0b265197509350ab423a3f199e2079f302b2dbf98b220478b61bccd5d5db7b"
     },
     {
       "path": "vehicles/quadtailsitter.webp",

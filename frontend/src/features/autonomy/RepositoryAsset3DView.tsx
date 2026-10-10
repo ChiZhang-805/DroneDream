@@ -4,7 +4,6 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import type { CatalogAssetKind } from "./assetPresentation";
 import { createMyDroneModel } from "./myDroneModel";
-import { buildSchoolMapScene } from "./schoolMapScene";
 
 type Props = {
   kind: CatalogAssetKind;
@@ -40,6 +39,7 @@ type CatalogMapGeometry = {
   primitives: CatalogCollisionPrimitive[];
   nodes: CatalogGraphNode[];
   edges: CatalogGraphEdge[];
+  texture_url?: string;
 };
 
 function disposeScene(scene: THREE.Scene): void {
@@ -47,7 +47,10 @@ function disposeScene(scene: THREE.Scene): void {
     if (!(object instanceof THREE.Mesh) && !(object instanceof THREE.Line) && !(object instanceof THREE.Sprite)) return;
     if (object instanceof THREE.Mesh || object instanceof THREE.Line) object.geometry.dispose();
     const materials = Array.isArray(object.material) ? object.material : [object.material];
-    materials.forEach((material) => material.dispose());
+    materials.forEach((material) => {
+      if ("map" in material && material.map instanceof THREE.Texture) material.map.dispose();
+      material.dispose();
+    });
   });
 }
 
@@ -70,39 +73,6 @@ function block(
   return mesh;
 }
 
-function proceduralMap(key: string | null): THREE.Group {
-  const root = new THREE.Group();
-  const floor = block(34, 0.45, 24, 0, -0.45, 0, 0x59626f);
-  root.add(floor);
-  const normalized = key ?? "custom-map";
-  if (normalized.includes("airport")) {
-    root.add(block(31, 2.8, 6, 0, 0, 0, 0xa9b1bf));
-    for (let x = -12; x <= 12; x += 6) root.add(block(2.2, 2.1, 14, x, 0, 0, 0x8d96a5));
-  } else if (normalized.includes("triple-h")) {
-    [-8, 0, 8].forEach((x) => root.add(block(4.2, 2.8, 20, x, 0, 0, 0xa3a9b6)));
-    root.add(block(20, 2.8, 4.2, 0, 0, 0, 0x8993a3));
-  } else if (normalized.includes("clinic") || normalized.includes("hotel")) {
-    const floors = normalized.includes("hotel") ? 3 : 2;
-    for (let level = 0; level < floors; level += 1) {
-      root.add(block(28, 0.35, 18, 0, level * 3.3, 0, 0x6f7988));
-      for (let x = -11; x <= 11; x += 5.5) {
-        root.add(block(0.35, 2.8, 16, x, level * 3.3, 0, 0xb6bdc9));
-      }
-    }
-  } else if (normalized.includes("campus") || normalized.includes("school")) {
-    root.add(block(13, 5.5, 7, -8, 0, -5, 0xa7afba));
-    root.add(block(10, 3.6, 8, 8, 0, 5, 0x8d98a7));
-    root.add(block(5, 7.4, 5, 3, 0, -6, 0xb8bec9));
-  } else if (normalized.includes("arena")) {
-    [-10, 10].forEach((x) => root.add(block(3, 4.5, 17, x, 0, 0, 0x9fa7b4)));
-    [-7, 0, 7].forEach((z) => root.add(block(17, 2.3, 1.4, 0, 0, z, 0x7e8999)));
-  } else {
-    for (let x = -12; x <= 12; x += 6) root.add(block(0.45, 2.8, 18, x, 0, 0, 0xb0b7c2));
-    for (let z = -7; z <= 7; z += 7) root.add(block(27, 2.8, 0.45, 0, 0, z, 0x929cab));
-  }
-  return root;
-}
-
 function catalogMapUrl(previewKey: string): string {
   const base = import.meta.env.BASE_URL.endsWith("/") ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
   return `${base}asset-geometry/maps/${encodeURIComponent(previewKey)}.json`;
@@ -110,7 +80,21 @@ function catalogMapUrl(previewKey: string): string {
 
 function catalogMapModel(geometry: CatalogMapGeometry): THREE.Group {
   const root = new THREE.Group();
-  const terrainMaterial = new THREE.MeshStandardMaterial({ color: 0x4e5967, roughness: 0.92, metalness: 0 });
+  const base = import.meta.env.BASE_URL.endsWith("/") ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+  const terrainTexture = geometry.texture_url
+    ? new THREE.TextureLoader().load(`${base}${geometry.texture_url}`)
+    : null;
+  if (terrainTexture) {
+    terrainTexture.colorSpace = THREE.SRGBColorSpace;
+    terrainTexture.wrapS = THREE.ClampToEdgeWrapping;
+    terrainTexture.wrapT = THREE.ClampToEdgeWrapping;
+  }
+  const terrainMaterial = new THREE.MeshStandardMaterial({
+    color: terrainTexture ? 0xffffff : 0x4e5967,
+    map: terrainTexture,
+    roughness: 0.92,
+    metalness: 0,
+  });
   const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xb7bdc9, roughness: 0.78, metalness: 0.03 });
   const obstacleMaterial = new THREE.MeshStandardMaterial({ color: 0x8d96a5, roughness: 0.8, metalness: 0.04 });
   for (const primitive of geometry.primitives) {
@@ -250,10 +234,6 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese }: Props
       model.scale.setScalar(2.4);
       modelRoot.add(model);
       fitCameraToModel(camera, controls, modelRoot);
-    } else if (previewKey === "school-map") {
-      buildSchoolMapScene(modelRoot, { xRay: false, floor: "all" });
-      camera.position.set(72, 56, -82);
-      controls.target.set(-4, 3.2, 1);
     } else if (previewKey) {
       setLoading(true);
       void fetch(catalogMapUrl(previewKey))
@@ -270,13 +250,11 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese }: Props
         })
         .catch(() => {
           if (cancelled) return;
-          modelRoot.add(proceduralMap(previewKey));
-          fitCameraToModel(camera, controls, modelRoot);
           setLoading(false);
+          setUnavailable(true);
         });
     } else {
-      modelRoot.add(proceduralMap(previewKey));
-      fitCameraToModel(camera, controls, modelRoot);
+      setUnavailable(true);
     }
 
     const resize = () => {
@@ -315,7 +293,9 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese }: Props
       role="img"
       aria-label={chinese ? `${name} 的交互式三维视图` : `Interactive 3D view of ${name}`}
     >
-      {unavailable ? <p>{chinese ? "当前设备无法创建三维视图。" : "3D view is unavailable on this device."}</p> : null}
+      {unavailable ? <p>{kind === "map"
+        ? (chinese ? "没有可验证的三维几何，未生成替代模型。" : "No verified 3D geometry is available; no substitute model was generated.")
+        : (chinese ? "当前设备无法创建三维视图。" : "3D view is unavailable on this device.")}</p> : null}
       {loading ? <p className="autonomy-repository-3d-loading">{chinese ? "正在加载三维场景…" : "Loading 3D scene…"}</p> : null}
     </div>
   );

@@ -2687,18 +2687,25 @@ export function AutonomyMaps() {
     kind: "map",
     previewKey: catalogAssetKey("map", resource.resource_id, resourceName(resource)),
     rows: [
-      [chinese ? "来源" : "Source", `Open-RMF @ ${resource.analysis.source_commit.slice(0, 12)}`],
+      [chinese ? "来源" : "Source", resource.source.source_type === "bundled_ddpkg"
+        ? (chinese ? "赫尔辛基市开放数据 + OpenStreetMap" : "City of Helsinki open data + OpenStreetMap")
+        : (resource.analysis.source_commit ? `Git @ ${resource.analysis.source_commit.slice(0, 12)}` : resource.source.location)],
       [chinese ? "许可证" : "License", resource.license.spdx_id],
-      [chinese ? "楼层" : "Levels", `${resource.analysis.level_count} (${resource.analysis.level_names.join(", ")})`],
-      [chinese ? "门 / 电梯" : "Doors / lifts", `${resource.analysis.door_count} / ${resource.analysis.lift_count}`],
-      [chinese ? "墙体 / 模型" : "Walls / models", `${resource.analysis.wall_count} / ${resource.analysis.model_count}`],
-      [chinese ? "预解析" : "Pre-analysis", chinese ? "已完成结构解析" : "Structural analysis complete"],
-      [chinese ? "仿真状态" : "Simulation", chinese ? "需要隔离转换和依赖检查" : "Isolated conversion and dependency check required"],
-      [chinese ? "飞行状态" : "Flight", chinese ? "尚未与无人机配对验收" : "Not yet aircraft-pair qualified"],
+      [chinese ? "建筑" : "Buildings", String(resource.analysis.building_count ?? resource.analysis.model_count ?? 0)],
+      [chinese ? "碰撞体" : "Collision geometry", String(resource.analysis.collision_primitive_count ?? 0)],
+      [chinese ? "坐标系" : "Coordinate frame", resource.analysis.coordinate_frame ?? "—"],
+      [chinese ? "仿真状态" : "Simulation", resource.readiness.simulation === "ready"
+        ? (chinese ? "已就绪" : "Ready") : (chinese ? "需要转换" : "Conversion required")],
+      [chinese ? "飞行状态" : "Flight", resource.readiness.flight === "qualified"
+        ? (chinese ? "已完成全程验收" : "End-to-end qualified") : (chinese ? "尚未验收" : "Not qualified")],
     ],
   });
   const prepareDefaultResource = async (resource: AgentCoreMapResource) => {
     if (resourceStates[resource.resource_id] === "working") return;
+    if (resource.source.source_type === "bundled_ddpkg") {
+      setResourceStates((current) => ({ ...current, [resource.resource_id]: "ready" }));
+      return;
+    }
     setResourceStates((current) => ({ ...current, [resource.resource_id]: "working" }));
     try {
       const created = await createAgentCoreRemoteAssetImportJob({
@@ -2785,7 +2792,7 @@ export function AutonomyMaps() {
               <RepositoryAssetPreview kind="map" previewUrl={presentation.previewUrl} previewKey={presentation.key} name={presentation.name} />
               <span className="autonomy-repository-copy"><strong title={presentation.name}>{presentation.name}</strong></span>
             </button>
-            {resource && !mapPack ? <button
+            {resource && resource.install_mode === "on_demand" && !mapPack ? <button
               type="button"
               className="autonomy-repository-interpret"
               data-state={state === "working" ? "busy" : state === "ready" ? "done" : state === "error" ? "error" : undefined}

@@ -12,11 +12,7 @@ from app.autonomy.models import (
     Vector3,
 )
 from app.autonomy.runtime import AutonomyRuntimeError, RuntimeSessionRegistry
-from app.autonomy.school_map_artifact import (
-    TEACHING_OPEN_DOOR_PAIR_CENTER_X,
-    school_map_stair_route_points,
-)
-from app.autonomy.service import compile_autonomy_mission
+from app.autonomy.service import AutonomyCompileError, compile_autonomy_mission
 
 
 def mission(target: str = "simulation") -> AutonomyCompileRequest:
@@ -24,8 +20,8 @@ def mission(target: str = "simulation") -> AutonomyCompileRequest:
         {
             "edition": "lab" if target != "simulation" else "sim",
             "execution_target": target,
-            "natural_language": "Fly through three gates and land at the goal.",
-            "scene_id": "forest-gate-inspection",
+            "natural_language": "Inspect the route to Chemicum and return to Exactum.",
+            "scene_id": "school-campus-v1",
             "perception_mode": "fusion",
             "asset_context": {
                 "schema_version": "dronedream.autonomy.compile-assets.v1",
@@ -57,7 +53,7 @@ def mission(target: str = "simulation") -> AutonomyCompileRequest:
                     "provider": "test",
                     "model": "test-model",
                     "artifact_sha256": "d" * 64,
-                    "goal": "Fly through three gates and land at the goal.",
+                    "goal": "Inspect the route to Chemicum and return to Exactum.",
                     "aircraft_id": "aircraft-test-x500",
                     "aircraft_version": 1,
                     "map_id": "map-test",
@@ -73,10 +69,17 @@ def mission(target: str = "simulation") -> AutonomyCompileRequest:
                                 "success_evidence": ["airborne telemetry"],
                             },
                             {
+                                "node_id": "return",
+                                "action": "return",
+                                "target": "launch point",
+                                "depends_on": ["takeoff"],
+                                "success_evidence": ["return telemetry"],
+                            },
+                            {
                                 "node_id": "land",
                                 "action": "land",
                                 "target": "mission endpoint",
-                                "depends_on": ["takeoff"],
+                                "depends_on": ["return"],
                                 "success_evidence": ["landed telemetry"],
                             },
                         ]
@@ -147,9 +150,14 @@ def test_compiler_expands_each_motion_into_perception_plan_qualification_and_evi
     identifiers = {node.task_id for node in graph.nodes}
 
     assert graph.active_node_ids == ["preflight-pack-identity"]
-    assert len(graph.nodes) == 23
+    assert len(graph.nodes) == 28
     assert len(identifiers) == len(graph.nodes)
-    for order, action in ((1, "takeoff"), (2, "pass-gate"), (3, "land")):
+    for order, action in (
+        (1, "takeoff"),
+        (2, "transit"),
+        (3, "return"),
+        (4, "land"),
+    ):
         prefix = f"mission-{order:02d}-{action}"
         for stage in ("observe", "plan", "qualify", "execute", "verify"):
             assert f"{prefix}-{stage}" in identifiers
@@ -161,13 +169,13 @@ def test_pickup_requalifies_the_loaded_vehicle_before_return_planning() -> None:
     coffee = mission().model_copy(
         update={
             "natural_language": "Fly from the office, pick up coffee, and return.",
-            "scene_id": "stairwell-coffee-return",
+            "scene_id": "school-campus-v1",
         }
     )
     graph = compile_autonomy_mission(coffee).contract.task_graph
     nodes = {node.task_id: node for node in graph.nodes}
-    payload_check = nodes["mission-04-pickup-recompute-envelope"]
-    return_observation = nodes["mission-05-return-observe"]
+    payload_check = nodes["mission-03-pickup-recompute-envelope"]
+    return_observation = nodes["mission-04-return-observe"]
 
     assert payload_check.risk == "critical"
     assert payload_check.fallback == "land"
@@ -179,11 +187,11 @@ def test_model_bound_pickup_request_rejects_a_semantically_incomplete_planner_gr
     payload = mission().model_dump(mode="json")
     payload["natural_language"] = "Pick up the takeout order and return to the office."
 
-    with pytest.raises(ValueError, match="pickup, return"):
+    with pytest.raises(ValueError, match="pickup"):
         AutonomyCompileRequest.model_validate(payload)
 
 
-def test_school_map_gate_intent_compiles_gate_steps_and_visual_route() -> None:
+def test_retired_gate_wording_uses_the_verified_kumpula_route() -> None:
     gate_mission = mission().model_copy(
         update={
             "natural_language": "Fly through all three circular gates and land at the goal.",
@@ -194,16 +202,17 @@ def test_school_map_gate_intent_compiles_gate_steps_and_visual_route() -> None:
 
     assert [step.action for step in compiled.contract.steps] == [
         "takeoff",
-        "pass_gate",
+        "transit",
+        "return",
         "land",
     ]
-    assert [point.phase for point in compiled.trajectory].count("gate") == 3
-    assert compiled.trajectory[0].x == pytest.approx(-24.8)
-    assert compiled.trajectory[-1].x == pytest.approx(48.0)
+    assert [point.phase for point in compiled.trajectory].count("gate") == 0
+    assert compiled.trajectory[0].x == pytest.approx(-41.0)
+    assert compiled.trajectory[-1].x == pytest.approx(-41.0)
     assert not any(step.action == "pickup" for step in compiled.contract.steps)
 
 
-def test_school_map_concrete_route_wins_over_generic_return_language() -> None:
+def test_kumpula_route_is_stable_for_legacy_natural_language() -> None:
     gate_mission = mission().model_copy(
         update={
             "natural_language": "Pass all three circular gates and return to launch.",
@@ -222,17 +231,19 @@ def test_school_map_concrete_route_wins_over_generic_return_language() -> None:
 
     assert [step.action for step in gate_compiled.contract.steps] == [
         "takeoff",
-        "pass_gate",
+        "transit",
+        "return",
         "land",
     ]
     assert [step.action for step in stair_compiled.contract.steps] == [
         "takeoff",
-        "traverse_stairs",
+        "transit",
+        "return",
         "land",
     ]
 
 
-def test_school_map_narrow_intent_compiles_switchback_stair_route() -> None:
+def test_retired_stair_wording_cannot_restore_synthetic_geometry() -> None:
     narrow_mission = mission().model_copy(
         update={
             "natural_language": "Descend the narrow switchback stairs and land outside.",
@@ -243,20 +254,17 @@ def test_school_map_narrow_intent_compiles_switchback_stair_route() -> None:
 
     assert [step.action for step in compiled.contract.steps] == [
         "takeoff",
-        "traverse_stairs",
+        "transit",
+        "return",
         "land",
     ]
-    assert [point.phase for point in compiled.trajectory].count("stairs") == len(
-        school_map_stair_route_points("descending")
-    )
-    assert compiled.trajectory[0].z == pytest.approx(8.15)
-    assert max(point.z for point in compiled.trajectory) == pytest.approx(8.27)
-    assert compiled.trajectory[-1].z == pytest.approx(1.4)
-    assert compiled.trajectory[-2].x == pytest.approx(TEACHING_OPEN_DOOR_PAIR_CENTER_X)
-    assert compiled.trajectory[-1].x == pytest.approx(TEACHING_OPEN_DOOR_PAIR_CENTER_X)
+    assert all(point.phase != "stairs" for point in compiled.trajectory)
+    assert compiled.trajectory[0].z == pytest.approx(1.5)
+    assert max(point.z for point in compiled.trajectory) == pytest.approx(35.0)
+    assert compiled.trajectory[-1].z == pytest.approx(1.5)
 
 
-def test_legacy_service_corridor_keeps_its_transit_contract() -> None:
+def test_retired_service_corridor_is_rejected() -> None:
     corridor_mission = mission().model_copy(
         update={
             "natural_language": "Follow the narrow service corridor and dock.",
@@ -264,14 +272,8 @@ def test_legacy_service_corridor_keeps_its_transit_contract() -> None:
         }
     )
 
-    compiled = compile_autonomy_mission(corridor_mission)
-
-    assert [step.action for step in compiled.contract.steps] == [
-        "takeoff",
-        "transit",
-        "land",
-    ]
-    assert all(point.phase != "stairs" for point in compiled.trajectory)
+    with pytest.raises(Exception, match="requested terrain scene"):
+        compile_autonomy_mission(corridor_mission)
 
 
 def test_runtime_session_is_idempotent_owner_scoped_and_replay_safe() -> None:
@@ -424,7 +426,7 @@ def test_runtime_replan_rejects_stale_or_cross_scene_changes() -> None:
         )
     assert stale.value.code == "AUTONOMY_REPLAN_STALE_REVISION"
 
-    with pytest.raises(AutonomyRuntimeError) as scene_changed:
+    with pytest.raises(AutonomyCompileError) as scene_changed:
         registry.apply_replan(
             "user-a",
             created.session_id,
@@ -436,7 +438,7 @@ def test_runtime_replan_rejects_stale_or_cross_scene_changes() -> None:
                 mission=revised.model_copy(update={"scene_id": "service-corridor-dock"}),
             ),
         )
-    assert scene_changed.value.code == "AUTONOMY_REPLAN_SCENE_CHANGED"
+    assert scene_changed.value.code == "UNKNOWN_AUTONOMY_SCENE"
 
 
 def test_runtime_replan_atomically_replaces_the_held_graph() -> None:

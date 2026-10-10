@@ -1,0 +1,48 @@
+{
+  "schema_version": "dronedream.kumpula-campus-qualification-evidence.v1",
+  "status": "verified",
+  "verified_at": "2026-10-10",
+  "source_evidence_sha256": "c1302f63e532e8e2fd1f58b03ac7610fea679e354630860fbb8c2d18232d1cf1",
+  "runtime": {
+    "simulator": "gazebo-harmonic",
+    "autopilot": "px4",
+    "vehicle": "my_drone",
+    "executor_return_code": 0
+  },
+  "flight_bound_files": {
+    "world.sdf": "b5a365b9dd44c7586ebc4d9ff886fd77faecf7ddf9eddda268c2e4cee03402b4",
+    "model.sdf": "cbc7a349b92360dc5a3d2cc5758d0f2a743e7ba79c9bbf3ac07d429bf4dcb284",
+    "collision-primitives.json": "3bc74d241f131385bdf4d28390456fe39e0fef4e392f1121eef7ee1022c8fd64"
+  },
+  "postflight_validated_files": {
+    "semantic.json": "24c0b329085a055d4236ccf989f49b6a281be070d80a566b1c417c5d6d74c594"
+  },
+  "gates": {
+    "executor_completed": true,
+    "landed_on_office_pad": true,
+    "loaded_thrust_to_weight_qualified": true,
+    "offboard_timing_complete": true,
+    "office_return_reached": true,
+    "physical_payload_attached": true,
+    "physical_payload_retained": true,
+    "physical_payload_spawned": true,
+    "pickup_reached": true,
+    "px4_landing_confirmed": true,
+    "takeoff_gate_achieved": true,
+    "zero_unsafe_dynamic_penetrations": true
+  },
+  "measurements": {
+    "pose_sample_count": 31660,
+    "dynamic_clearance_sample_count": 19283,
+    "unsafe_collision_count": 0,
+    "maximum_reference_polyline_error_m": 1.205956417360772,
+    "minimum_pickup_distance_m": 0.4848271507270912,
+    "minimum_return_distance_m": 0.0575323871632831,
+    "final_horizontal_error_m": 0.045520609052883736,
+    "maximum_payload_attachment_error_m": 0.00935557551368216
+  },
+  "ulog": {
+    "sha256": "a96f7436e815a68bf4db4ea77f2fb68a09be83f72679ce4d540125ee2a215a1f",
+    "size_bytes": 183724869
+  }
+}

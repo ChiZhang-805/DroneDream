@@ -371,26 +371,28 @@ export interface AgentCoreMapResource {
   resource_id: string;
   display_name: Record<"zh-CN" | "en-US", string>;
   description: Record<"zh-CN" | "en-US", string>;
-  category: "indoor_and_site_map";
+  category: "indoor_and_site_map" | "real_outdoor_3d_campus";
   default_resource: true;
-  install_mode: "on_demand";
+  install_mode: "on_demand" | "bundled";
   review: {
     status: "approved";
     reviewed_at: string;
     source_commit_pinned: boolean;
+    source_data_hashes_pinned?: boolean;
     license_reviewed: boolean;
     executable_content_required: boolean;
   };
   license: {
     spdx_id: string;
     name: string;
-    url: string;
+    url?: string;
     commercial_use: boolean;
     redistribution: boolean;
     automated_analysis: boolean;
+    attribution_required?: boolean;
   };
   source: {
-    source_type: "direct_url" | "git";
+    source_type: "direct_url" | "git" | "bundled_ddpkg";
     location: string;
     expected_sha256: string;
     git_ref?: string;
@@ -398,27 +400,34 @@ export interface AgentCoreMapResource {
     source_path_at_commit?: string;
     source_format: string;
     expected_kind: "map";
+    real_world_crs?: string;
   };
   analysis: {
-    status: "preparsed";
+    status: "preparsed" | "qualified";
     parser: string;
-    source_commit: string;
-    level_names: string[];
-    level_count: number;
-    door_count: number;
-    lift_count: number;
-    model_count: number;
-    navigation_lane_count: number;
-    vertex_count: number;
-    wall_count: number;
-    floor_polygon_count: number;
+    source_commit?: string;
+    level_names?: string[];
+    level_count?: number;
+    door_count?: number;
+    lift_count?: number;
+    model_count?: number;
+    navigation_lane_count?: number;
+    vertex_count?: number;
+    wall_count?: number;
+    floor_polygon_count?: number;
+    building_count?: number;
+    collision_primitive_count?: number;
+    visual_primitive_count?: number;
+    named_buildings?: string[];
+    coordinate_frame?: string;
     notes: string[];
   };
   readiness: {
     catalog: "ready";
-    planning: "preparsed";
+    planning: "preparsed" | "ready";
     simulation: "conversion_required" | "ready";
     flight: "unqualified" | "qualified";
+    qualification_id?: string;
     required_inputs: string[];
   };
 }

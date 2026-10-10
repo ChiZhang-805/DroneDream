@@ -1,0 +1,61 @@
+{
+  "asset_id": "dronedream.school-map.v1",
+  "bounds_m": {
+    "x": 500.0,
+    "y": 500.0,
+    "z": 35.0
+  },
+  "building_count": 42,
+  "collision_primitive_count": 44,
+  "format": "sdf",
+  "gazebo_asset_contract_generated": true,
+  "gazebo_cli_validation_required": true,
+  "gazebo_runtime_verified": true,
+  "model_sdf_sha256": "cbc7a349b92360dc5a3d2cc5758d0f2a743e7ba79c9bbf3ac07d429bf4dcb284",
+  "name": "Kumpula Campus",
+  "named_buildings": [
+    "Chemicum",
+    "Dynamicum",
+    "Exactum",
+    "Physicum"
+  ],
+  "package_file_count": 13,
+  "package_file_sha256": {
+    "README.md": "51d347e332d3ea3d01c8c74b8f76398e8596b49ac409b861cc8fd37ace6ff9a8",
+    "collision-primitives.json": "3bc74d241f131385bdf4d28390456fe39e0fef4e392f1121eef7ee1022c8fd64",
+    "materials/textures/kumpula-orthophoto.jpg": "b55169b513d4a132a31bd6720cab464797498bcc5a1ec9eb9abf0efba25a1cb6",
+    "meshes/kumpula-buildings.mtl": "91af00a92c70a190931ccc040360a998208fcdc3c0814cf8782ad78a6810d587",
+    "meshes/kumpula-buildings.obj": "98771916ff8e45fc9a2b80c9a48514591125fd22123f0a33474e8dc79f0cdbc0",
+    "meshes/kumpula-ground.obj": "73d662cfc5856bc00ee4322243e88c4cb65f9913c3c7e7edad5aa385ada0aed9",
+    "model.config": "4997997c51ad645c9404e977349faf92925b2345c3e1cae1ce85b8ef3e66201a",
+    "model.sdf": "cbc7a349b92360dc5a3d2cc5758d0f2a743e7ba79c9bbf3ac07d429bf4dcb284",
+    "qualification-evidence.json": "847d9ae092fee30e22e3b5b30ff2c3d32a6a7bd1246584e2abd0ac4c9bf76bf6",
+    "semantic.json": "24c0b329085a055d4236ccf989f49b6a281be070d80a566b1c417c5d6d74c594",
+    "world.perception.sdf": "b5a365b9dd44c7586ebc4d9ff886fd77faecf7ddf9eddda268c2e4cee03402b4",
+    "world.physics.sdf": "da090c6fae3a293035cba95930296bd7ea80f40e171b0eac9bb79d009444b74c",
+    "world.sdf": "b5a365b9dd44c7586ebc4d9ff886fd77faecf7ddf9eddda268c2e4cee03402b4"
+  },
+  "package_manifest_sha256": "1bfd68184bf13d62e892909f5cac5d2f3dbc43d57eb3c1ae7b518c1e59dde3a0",
+  "perception_world_sdf_sha256": "b5a365b9dd44c7586ebc4d9ff886fd77faecf7ddf9eddda268c2e4cee03402b4",
+  "physics_world_sdf_sha256": "da090c6fae3a293035cba95930296bd7ea80f40e171b0eac9bb79d009444b74c",
+  "px4_mission_smoke_verified": true,
+  "qualification_evidence_sha256": "847d9ae092fee30e22e3b5b30ff2c3d32a6a7bd1246584e2abd0ac4c9bf76bf6",
+  "schema_version": "dronedream.kumpula-campus-summary.v1",
+  "sdf_version": "1.9",
+  "semantic_sha256": "24c0b329085a055d4236ccf989f49b6a281be070d80a566b1c417c5d6d74c594",
+  "simulation_execution_ready": true,
+  "source_kind": "real-geospatial-data",
+  "sources": {
+    "city_buildings_sha256": "32a90382204a7f7c34ff2b05049b7651f67565366213f36c17990b3eb22812ae",
+    "city_buildings_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wfs",
+    "city_data_license": "CC-BY-4.0",
+    "named_buildings_sha256": "33bb89bd8f65b7f99abcd07d24c27bdade091bac82a19dc31a7583925a4fea16",
+    "named_buildings_url": "https://www.openstreetmap.org/",
+    "openstreetmap_license": "ODbL-1.0",
+    "orthophoto_sha256": "1220f0c0cededd8bc06bec68260a6e79bcf27b734b442fcdf7f110eb5cbbf1de",
+    "orthophoto_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wms",
+    "retrieved_at": "2026-10-10"
+  },
+  "visual_primitive_count": 43,
+  "world_sdf_sha256": "b5a365b9dd44c7586ebc4d9ff886fd77faecf7ddf9eddda268c2e4cee03402b4"
+}

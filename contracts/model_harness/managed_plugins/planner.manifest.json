@@ -8,7 +8,7 @@
     "entrypoint": "compile_autonomy_mission",
     "module": "app.autonomy.service",
     "source_path": "backend/app/autonomy/service.py",
-    "source_sha256": "95e8fff29b6384eac0345ac808fe452110bb7b4a6702f2b968a8741f19b6d7a9"
+    "source_sha256": "49f185fb7ba83f3a7005b7a7700d567162c8afddd52bb5baa44b9fbb8973fd7f"
   },
   "plugin_id": "dronedream.managed.planner",
   "schema_version": "dronedream.managed-plugin-manifest.v1",

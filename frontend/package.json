@@ -10,7 +10,6 @@
     "field:build": "tsc -b && vite build --config vite.field.config.ts",
     "field:preview": "vite preview --config vite.field.config.ts",
     "audit:dependencies": "node scripts/audit-dependencies.mjs",
-    "generate:catalog-map-geometry": "node scripts/generate-catalog-map-geometry.mjs",
     "typecheck": "tsc -b --noEmit",
     "lint": "eslint .",
     "preview": "vite preview",
