@@ -289,13 +289,15 @@ $assetSource = Join-Path $sourceResources "default-assets"
 $assetTarget = Join-Path $targetResourceRoot "default-assets"
 $assetIndexPath = Join-Path $assetSource "index.json"
 $assetIndex = Get-Content -LiteralPath $assetIndexPath -Raw | ConvertFrom-Json
-$assetPairs = if ($assetIndex.schema_version -ceq "dronedream.bundled-assets.v3") {
-    @($assetIndex.qualified_pairs)
-} elseif ($assetIndex.schema_version -ceq "dronedream.bundled-assets.v2") {
-    @($assetIndex.qualified_pair)
-} else {
-    throw "The AGENT Core default-asset index schema is unsupported."
-}
+$assetPairs = @(
+    if ($assetIndex.schema_version -ceq "dronedream.bundled-assets.v3") {
+        $assetIndex.qualified_pairs
+    } elseif ($assetIndex.schema_version -ceq "dronedream.bundled-assets.v2") {
+        $assetIndex.qualified_pair
+    } else {
+        throw "The AGENT Core default-asset index schema is unsupported."
+    }
+)
 if ($assetPairs.Count -lt 1) {
     throw "The AGENT Core default-asset index contains no qualified pair."
 }
