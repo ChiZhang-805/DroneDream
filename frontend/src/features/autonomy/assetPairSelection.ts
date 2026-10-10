@@ -12,7 +12,7 @@ export type PairCatalogChoice = {
 const MAPS: Array<{ resourceId: string; name: LocalizedName }> = [
   {
     resourceId: "dronedream-school-map",
-    name: { "zh-CN": "Kumpula 科学校园", "en-US": "Kumpula Campus" },
+    name: { "zh-CN": "赫尔辛基大学昆普拉校区", "en-US": "Kumpula Campus" },
   },
 ];
 
@@ -72,7 +72,7 @@ const FALLBACK_PAIRS = MAPS.flatMap((map) => VEHICLES.map((vehicle) => fallbackP
 
 export const FALLBACK_ASSET_PAIR_CATALOG: AgentCoreAssetPairCatalog = {
   schema_version: "dronedream.asset-pair-catalog.v1",
-  catalog_revision: "frontend-fallback-2026-10-10.1",
+  catalog_revision: "frontend-fallback-2026-10-11.1",
   map_count: MAPS.length,
   vehicle_count: VEHICLES.length,
   pair_count: FALLBACK_PAIRS.length,

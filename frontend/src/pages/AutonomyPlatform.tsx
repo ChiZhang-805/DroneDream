@@ -2358,6 +2358,66 @@ function mapRepresentationLabel(value: AutonomyMapPack["representation"], chines
   return chinese ? MAP_REPRESENTATION_LABELS[value].zh : MAP_REPRESENTATION_LABELS[value].en;
 }
 
+const VEHICLE_DETAIL_LABELS: Record<string, string> = {
+  air_pressure: "气压计",
+  air_speed: "空速计",
+  altitude_hold: "定高飞行",
+  basic_control: "基础控制",
+  camera: "相机",
+  camera_imu: "相机惯性测量单元",
+  camera_perception_without_camera_dependency: "未安装相机时的视觉感知",
+  camera_pointing: "定向拍摄",
+  corridor_navigation: "走廊导航",
+  custom_optical_flow: "光流",
+  depth_avoidance: "深度避障",
+  depth_avoidance_without_additional_sensor: "未增加深度传感器时的深度避障",
+  depth_camera: "深度相机",
+  depth_only_vertical_clearance: "仅依赖深度相机的垂直净空判断",
+  doorways: "门口通行",
+  external_vision: "外部视觉定位",
+  forward_avoidance: "前向避障",
+  forward_obstacle_avoidance_without_additional_sensor: "未增加前视传感器时的前向避障",
+  full_surround_avoidance_without_additional_sensor: "未增加环视传感器时的全向避障",
+  gps_denied_hover: "无卫星定位悬停",
+  gpu_lidar: "激光雷达",
+  ground_clearance: "离地净空",
+  horizontal_clearance: "水平净空",
+  hover: "悬停",
+  imu: "惯性测量单元",
+  indoor_autonomy_without_perception: "无感知设备的室内自主飞行",
+  indoor_corridors: "室内走廊",
+  indoor_navigation: "室内导航",
+  indoor_position_hold: "室内定点",
+  inspection: "巡检",
+  landmark_navigation: "视觉路标导航",
+  long_range_fixed_wing: "固定翼长航程",
+  magnetometer: "磁力计",
+  marker_detection: "标记识别",
+  metric_depth_without_additional_sensor: "未增加测距传感器时的绝对深度估计",
+  navsat: "卫星定位",
+  near_field_avoidance: "近场避障",
+  odometry_publisher: "视觉里程计",
+  open_area: "开放场地",
+  outdoor_long_range: "室外长航程",
+  outdoor_research: "室外研究",
+  precision_landing: "精确降落",
+  site_transit: "场地间转运",
+  stairs: "楼梯间",
+  state_fusion: "状态融合",
+  target_tracking: "目标跟踪",
+  tight_doorways: "狭窄门口",
+  transition_flight: "转换飞行",
+  vertical_takeoff: "垂直起降",
+  visual_detection: "视觉检测",
+  visual_odometry: "视觉里程计",
+  vtol_research: "垂直起降研究",
+};
+
+function localizedVehicleDetails(values: string[], chinese: boolean): string {
+  if (values.length === 0) return "—";
+  return values.map((value) => chinese ? (VEHICLE_DETAIL_LABELS[value] ?? value) : value).join(" · ");
+}
+
 function RepositoryAssetPreview({
   kind,
   previewUrl,
@@ -2472,13 +2532,16 @@ export function AutonomyAircraft() {
     kind: "vehicle",
     previewKey: catalogAssetKey("vehicle", resource.resource_id, resourceName(resource)),
     rows: [
+      [chinese ? "说明" : "Description", resource.description[chinese ? "zh-CN" : "en-US"]],
       [chinese ? "来源" : "Source", `PX4 Gazebo Models @ ${resource.analysis.source_commit.slice(0, 12)}`],
       [chinese ? "许可证" : "License", resource.license.spdx_id],
-      [chinese ? "机型" : "Vehicle class", resource.vehicle_class],
-      [chinese ? "传感器" : "Sensors", resource.analysis.resolved_sensor_types.join(" · ") || "—"],
+      [chinese ? "机型" : "Vehicle class", chinese
+        ? (resource.vehicle_class === "multicopter" ? "多旋翼" : resource.vehicle_class === "vtol" ? "垂直起降固定翼" : resource.vehicle_class)
+        : resource.vehicle_class],
+      [chinese ? "传感器" : "Sensors", localizedVehicleDetails(resource.analysis.resolved_sensor_types, chinese)],
       [chinese ? "模型依赖" : "Model dependencies", resource.analysis.dependency_models.join(" · ") || (chinese ? "无外部模型依赖" : "No external model dependency")],
-      [chinese ? "适合任务" : "Recommended for", resource.analysis.recommended_for.join(" · ")],
-      [chinese ? "不适合任务" : "Excluded from", resource.analysis.excluded_from.join(" · ")],
+      [chinese ? "适合任务" : "Recommended for", localizedVehicleDetails(resource.analysis.recommended_for, chinese)],
+      [chinese ? "不适合任务" : "Excluded from", localizedVehicleDetails(resource.analysis.excluded_from, chinese)],
       [chinese ? "预解析" : "Pre-analysis", chinese ? "已完成 SDF、传感器、插件和依赖解析" : "SDF, sensor, plugin, and dependency analysis complete"],
       [chinese ? "飞行状态" : "Flight", chinese ? "需解析依赖并与具体地图配对验收" : "Requires dependencies and aircraft-map qualification"],
     ],
@@ -2687,11 +2750,15 @@ export function AutonomyMaps() {
     kind: "map",
     previewKey: catalogAssetKey("map", resource.resource_id, resourceName(resource)),
     rows: [
+      [chinese ? "说明" : "Description", resource.description[chinese ? "zh-CN" : "en-US"]],
       [chinese ? "来源" : "Source", resource.source.source_type === "bundled_ddpkg"
         ? (chinese ? "赫尔辛基市开放数据 + OpenStreetMap" : "City of Helsinki open data + OpenStreetMap")
         : (resource.analysis.source_commit ? `Git @ ${resource.analysis.source_commit.slice(0, 12)}` : resource.source.location)],
       [chinese ? "许可证" : "License", resource.license.spdx_id],
       [chinese ? "建筑" : "Buildings", String(resource.analysis.building_count ?? resource.analysis.model_count ?? 0)],
+      [chinese ? "主要建筑" : "Named buildings", (
+        chinese ? resource.analysis.named_buildings_zh : resource.analysis.named_buildings
+      )?.join(" · ") || "—"],
       [chinese ? "碰撞体" : "Collision geometry", String(resource.analysis.collision_primitive_count ?? 0)],
       [chinese ? "坐标系" : "Coordinate frame", resource.analysis.coordinate_frame ?? "—"],
       [chinese ? "仿真状态" : "Simulation", resource.readiness.simulation === "ready"

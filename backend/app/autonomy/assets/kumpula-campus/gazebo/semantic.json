@@ -1,4 +1,12 @@
 {
+  "aliases": [
+    "Kumpula Campus",
+    "Kumpula Science Campus",
+    "Kumpulan kampus",
+    "昆普拉校区",
+    "昆普拉科学园区",
+    "赫尔辛基大学昆普拉校区"
+  ],
   "asset_id": "dronedream.school-map.v1",
   "bounds_m": {
     "x": 500.0,
@@ -492,72 +500,146 @@
     }
   ],
   "coordinate_frame": "ENU",
+  "display_name": {
+    "en-US": "Kumpula Campus",
+    "zh-CN": "赫尔辛基大学昆普拉校区"
+  },
   "entities": [
     {
+      "aliases": [
+        "Kumpula south launch pad",
+        "campus south launch pad",
+        "office launch pad",
+        "launch pad",
+        "start point",
+        "home point",
+        "return point",
+        "昆普拉校区南侧起降点",
+        "校园南侧起降点",
+        "办公室起降点",
+        "办公室",
+        "起点",
+        "出发点",
+        "返航点",
+        "降落点"
+      ],
       "entity_id": "office-launch-pad",
       "kind": "launch",
       "name": "Kumpula south launch pad",
-      "name_zh": "Kumpula 校园南侧起降点",
+      "name_zh": "昆普拉校区南侧起降点",
       "position_m": {
         "x": -41.0,
         "y": -83.0,
         "z": 0.0
-      }
+      },
+      "semantic": "launch"
     },
     {
+      "aliases": [
+        "Chemicum south handoff point",
+        "Chemicum",
+        "takeout pickup",
+        "takeout pickup pad",
+        "pickup point",
+        "handoff point",
+        "化学楼南侧交接点",
+        "化学楼取餐点",
+        "化学楼",
+        "取餐点",
+        "外卖取餐点",
+        "外卖点",
+        "取件点",
+        "交接点"
+      ],
       "entity_id": "takeout-pickup-pad",
       "kind": "pickup",
       "name": "Chemicum south handoff point",
-      "name_zh": "Chemicum 南侧交接点",
+      "name_zh": "化学楼南侧交接点",
       "position_m": {
         "x": 43.0,
         "y": 55.0,
         "z": 0.0
-      }
+      },
+      "semantic": "pickup"
     },
     {
+      "aliases": [
+        "Dynamicum",
+        "Dynamicum building",
+        "气象楼",
+        "气象研究所大楼"
+      ],
       "entity_id": "dynamicum",
       "floors": 5,
       "kind": "building",
       "name": "Dynamicum",
+      "name_zh": "气象楼",
       "position_m": {
         "x": -91.84242077880553,
         "y": -101.8078407967349,
         "z": 8.5
-      }
+      },
+      "semantic": "building"
     },
     {
+      "aliases": [
+        "Chemicum",
+        "Chemicum building",
+        "化学楼",
+        "化学楼建筑",
+        "化学系大楼"
+      ],
       "entity_id": "chemicum",
       "floors": 4,
       "kind": "building",
       "name": "Chemicum",
+      "name_zh": "化学楼",
       "position_m": {
         "x": 74.21732340522888,
         "y": 91.60110962828811,
         "z": 6.8
-      }
+      },
+      "semantic": "building"
     },
     {
+      "aliases": [
+        "Exactum",
+        "Exactum building",
+        "信息科学楼",
+        "计算机科学楼",
+        "数学与统计楼"
+      ],
       "entity_id": "exactum",
       "floors": 4,
       "kind": "building",
       "name": "Exactum",
+      "name_zh": "信息科学楼",
       "position_m": {
         "x": -4.251474588919871,
         "y": 1.0500962219991217,
         "z": 6.8
-      }
+      },
+      "semantic": "building"
     },
     {
+      "aliases": [
+        "Physicum",
+        "Physicum building",
+        "物理楼",
+        "物理科学楼",
+        "地球科学楼"
+      ],
       "entity_id": "physicum",
       "floors": 4,
       "kind": "building",
       "name": "Physicum",
+      "name_zh": "物理楼",
       "position_m": {
         "x": -4.251474588919871,
         "y": 1.0500962219991217,
         "z": 6.8
-      }
+      },
+      "semantic": "building"
     }
   ],
   "name": "Kumpula Campus",
@@ -582,6 +664,7 @@
       "z": 0.067
     }
   },
+  "scene_id": "kumpula-campus",
   "schema_version": "dronedream.map-semantic.v1",
   "sources": {
     "city_buildings_sha256": "32a90382204a7f7c34ff2b05049b7651f67565366213f36c17990b3eb22812ae",

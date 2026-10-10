@@ -15,7 +15,11 @@
     "collision-primitives.json": "3bc74d241f131385bdf4d28390456fe39e0fef4e392f1121eef7ee1022c8fd64"
   },
   "postflight_validated_files": {
-    "semantic.json": "24c0b329085a055d4236ccf989f49b6a281be070d80a566b1c417c5d6d74c594"
+    "semantic.json": "641e1f73f44c9397d24e65060793f7a54865d023f768dd00ae22b23eed32a2c2"
+  },
+  "metadata_revalidation": {
+    "basis": "Localized labels, aliases, parser-facing semantic roles, and scene identity only; flight geometry and runtime inputs are unchanged.",
+    "qualified_semantic_sha256": "160d50b6539a0daf406fd274d6357940f955dd04a53d2d62baab78279d8fd870"
   },
   "gates": {
     "executor_completed": true,

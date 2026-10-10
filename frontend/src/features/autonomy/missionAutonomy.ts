@@ -29,7 +29,7 @@ const SCENE_META: Record<AutonomyMissionId, {
     name: "Kumpula campus delivery",
     nameZh: "Kumpula 校园取送任务",
     summary: "Launch from the campus south pad, fly to the Chemicum south handoff point, collect the payload and return.",
-    summaryZh: "从校园南侧起降点出发，飞到 Chemicum 南侧交接点取件，然后返回原处。",
+    summaryZh: "从校园南侧起降点出发，飞到化学楼南侧交接点取件，然后返回原处。",
     floors: 1,
     clearance: 1.2,
     tags: ["real-campus", "outdoor", "buildings", "payload", "return"],
@@ -42,7 +42,7 @@ const SCENE_META: Record<AutonomyMissionId, {
     name: "Kumpula campus inspection",
     nameZh: "Kumpula 校园巡检任务",
     summary: "Inspect the outdoor corridor from the campus south pad to Chemicum and return to the launch point.",
-    summaryZh: "从校园南侧起降点出发，巡检通往 Chemicum 的室外航线并返回。",
+    summaryZh: "从校园南侧起降点出发，巡检通往化学楼的室外航线并返回。",
     floors: 1,
     clearance: 0.92,
     tags: ["real-campus", "vision", "outdoor", "buildings", "return"],
@@ -55,7 +55,7 @@ const SCENE_META: Record<AutonomyMissionId, {
     name: "Kumpula campus transfer",
     nameZh: "Kumpula 校园转运任务",
     summary: "Transfer a small item from the campus south pad to Chemicum and return.",
-    summaryZh: "把小件物品从校园南侧起降点送到 Chemicum，然后返回。",
+    summaryZh: "把小件物品从校园南侧起降点送到化学楼，然后返回。",
     floors: 1,
     clearance: 1.2,
     tags: ["real-campus", "outdoor", "payload", "return"],
@@ -132,19 +132,19 @@ function steps(
 ) {
   if (missionId === "coffee") return [
     { order: 1, action: "takeoff", label: localized(locale, "Launch from the campus south outdoor pad", "从校园南侧室外起降点起飞"), payload_delta_kg: 0 },
-    { order: 2, action: "transit", label: localized(locale, "Climb above the registered buildings and fly to Chemicum", "爬升至已登记建筑上方并飞往 Chemicum"), payload_delta_kg: 0 },
-    { order: 3, action: "pickup", label: localized(locale, "Descend to the Chemicum south handoff point and collect the item", "下降至 Chemicum 南侧交接点并取件"), payload_delta_kg: pickupPayloadKg },
+    { order: 2, action: "transit", label: localized(locale, "Climb above the registered buildings and fly to Chemicum", "爬升至已登记建筑上方并飞往化学楼"), payload_delta_kg: 0 },
+    { order: 3, action: "pickup", label: localized(locale, "Descend to the Chemicum south handoff point and collect the item", "下降至化学楼南侧交接点并取件"), payload_delta_kg: pickupPayloadKg },
     { order: 4, action: "return", label: localized(locale, "Climb again and follow the return corridor to the campus south pad", "再次爬升并沿返航走廊飞回校园南侧起降点"), payload_delta_kg: 0 },
     { order: 5, action: "land", label: localized(locale, "Land on the original outdoor pad", "在原室外起降点降落"), payload_delta_kg: 0 },
   ];
   if (missionId === "gates") return [
     { order: 1, action: "takeoff", label: localized(locale, "Launch from the campus south pad", "从校园南侧起降点起飞"), payload_delta_kg: 0 },
-    { order: 2, action: "transit", label: localized(locale, "Inspect the outdoor corridor to Chemicum", "巡检通往 Chemicum 的室外航线"), payload_delta_kg: 0 },
+    { order: 2, action: "transit", label: localized(locale, "Inspect the outdoor corridor to Chemicum", "巡检通往化学楼的室外航线"), payload_delta_kg: 0 },
     { order: 3, action: "land", label: localized(locale, "Return and land on the campus south pad", "返回校园南侧起降点降落"), payload_delta_kg: 0 },
   ];
   return [
     { order: 1, action: "takeoff", label: localized(locale, "Launch from the campus south pad", "从校园南侧起降点起飞"), payload_delta_kg: 0 },
-    { order: 2, action: "transit", label: localized(locale, "Transfer the item to the Chemicum south handoff point", "把物品送到 Chemicum 南侧交接点"), payload_delta_kg: pickupPayloadKg },
+    { order: 2, action: "transit", label: localized(locale, "Transfer the item to the Chemicum south handoff point", "把物品送到化学楼南侧交接点"), payload_delta_kg: pickupPayloadKg },
     { order: 3, action: "land", label: localized(locale, "Return and land on the campus south pad", "返回校园南侧起降点降落"), payload_delta_kg: 0 },
   ];
 }

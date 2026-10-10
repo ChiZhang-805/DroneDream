@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import type { AutonomyExternalAssetReference } from "./assetLibraryStore";
 import {
   catalogAssetDefinitions,
+  catalogAssetKey,
   catalogAssetPresentation,
   unrepresentedExternalAssets,
 } from "./assetPresentation";
@@ -44,10 +45,15 @@ describe("asset card presentation", () => {
   it("uses concise bilingual names and bundled previews", () => {
     expect(catalogAssetPresentation("map", "dronedream-school-map", "School Map", true)).toEqual({
       key: "kumpula-campus",
-      name: "Kumpula 科学校园",
+      name: "赫尔辛基大学昆普拉校区",
       previewUrl: "/asset-previews/maps/kumpula-campus.webp",
     });
     expect(catalogAssetPresentation("vehicle", "px4-x500-lidar-front", "x500", false).name).toBe("X500 Front LiDAR");
+  });
+
+  it("resolves Chinese map names without collapsing Unicode characters", () => {
+    expect(catalogAssetKey("map", "external", "赫尔辛基大学昆普拉校区")).toBe("kumpula-campus");
+    expect(catalogAssetKey("map", "external", "昆普拉科学园区")).toBe("kumpula-campus");
   });
 
   it("preserves genuinely user-imported assets", () => {

@@ -28,6 +28,7 @@ from shapely.ops import transform
 
 ASSET_ID = "dronedream.school-map.v1"
 DISPLAY_NAME = "Kumpula Campus"
+DISPLAY_NAME_ZH = "赫尔辛基大学昆普拉校区"
 WORLD_NAME = "school_map_world"
 MODEL_NAME = "kumpula_campus"
 ORIGIN_E = 25_497_920.0
@@ -46,6 +47,69 @@ ROUTE: tuple[tuple[float, float, float, str, float], ...] = (
     (-41.0, -83.0, 1.50, "land", 0.35),
 )
 NAMED_BUILDINGS = {"Exactum", "Physicum", "Chemicum", "Dynamicum"}
+
+MAP_ALIASES = (
+    "Kumpula Campus",
+    "Kumpula Science Campus",
+    "Kumpulan kampus",
+    "昆普拉校区",
+    "昆普拉科学园区",
+    "赫尔辛基大学昆普拉校区",
+)
+
+BUILDING_NAMES: dict[str, tuple[str, tuple[str, ...]]] = {
+    "Chemicum": (
+        "化学楼",
+        ("Chemicum", "Chemicum building", "化学楼", "化学楼建筑", "化学系大楼"),
+    ),
+    "Dynamicum": (
+        "气象楼",
+        ("Dynamicum", "Dynamicum building", "气象楼", "气象研究所大楼"),
+    ),
+    "Exactum": (
+        "信息科学楼",
+        ("Exactum", "Exactum building", "信息科学楼", "计算机科学楼", "数学与统计楼"),
+    ),
+    "Physicum": (
+        "物理楼",
+        ("Physicum", "Physicum building", "物理楼", "物理科学楼", "地球科学楼"),
+    ),
+}
+
+LAUNCH_ALIASES = (
+    "Kumpula south launch pad",
+    "campus south launch pad",
+    "office launch pad",
+    "launch pad",
+    "start point",
+    "home point",
+    "return point",
+    "昆普拉校区南侧起降点",
+    "校园南侧起降点",
+    "办公室起降点",
+    "办公室",
+    "起点",
+    "出发点",
+    "返航点",
+    "降落点",
+)
+
+PICKUP_ALIASES = (
+    "Chemicum south handoff point",
+    "Chemicum",
+    "takeout pickup",
+    "takeout pickup pad",
+    "pickup point",
+    "handoff point",
+    "化学楼南侧交接点",
+    "化学楼取餐点",
+    "化学楼",
+    "取餐点",
+    "外卖取餐点",
+    "外卖点",
+    "取件点",
+    "交接点",
+)
 
 
 @dataclass(frozen=True)
@@ -420,15 +484,19 @@ def _semantic(
         {
             "entity_id": "office-launch-pad",
             "name": "Kumpula south launch pad",
-            "name_zh": "Kumpula 校园南侧起降点",
+            "name_zh": "昆普拉校区南侧起降点",
+            "aliases": list(LAUNCH_ALIASES),
             "kind": "launch",
+            "semantic": "launch",
             "position_m": {"x": -41.0, "y": -83.0, "z": 0.0},
         },
         {
             "entity_id": "takeout-pickup-pad",
             "name": "Chemicum south handoff point",
-            "name_zh": "Chemicum 南侧交接点",
+            "name_zh": "化学楼南侧交接点",
+            "aliases": list(PICKUP_ALIASES),
             "kind": "pickup",
+            "semantic": "pickup",
             "position_m": {"x": 43.0, "y": 55.0, "z": 0.0},
         },
     ]
@@ -437,11 +505,15 @@ def _semantic(
             continue
         center = building.polygon.centroid
         for name in building.names:
+            name_zh, aliases = BUILDING_NAMES[name]
             entities.append(
                 {
                     "entity_id": name.casefold(),
                     "name": name,
+                    "name_zh": name_zh,
+                    "aliases": list(aliases),
                     "kind": "building",
+                    "semantic": "building",
                     "position_m": {
                         "x": center.x,
                         "y": center.y,
@@ -453,7 +525,10 @@ def _semantic(
     return {
         "schema_version": "dronedream.map-semantic.v1",
         "asset_id": ASSET_ID,
+        "scene_id": "kumpula-campus",
         "name": DISPLAY_NAME,
+        "display_name": {"en-US": DISPLAY_NAME, "zh-CN": DISPLAY_NAME_ZH},
+        "aliases": list(MAP_ALIASES),
         "coordinate_frame": "ENU",
         "real_world_crs": "EPSG:3879",
         "origin": {"easting_m": ORIGIN_E, "northing_m": ORIGIN_N, "elevation_m": 0.0},
@@ -531,10 +606,13 @@ def _navigation_graph() -> dict[str, Any]:
         "coordinate_frame": "map_enu",
         "named_entities": {
             "campus-south-launch-pad": nodes[0]["node_id"],
+            "office-launch-pad": nodes[0]["node_id"],
             "chemicum-south-handoff-point": nodes[4]["node_id"],
             "launch-pad": nodes[0]["node_id"],
             "takeout-pickup": nodes[4]["node_id"],
             "takeout-pickup-pad": nodes[4]["node_id"],
+            **{alias: nodes[0]["node_id"] for alias in LAUNCH_ALIASES},
+            **{alias: nodes[4]["node_id"] for alias in PICKUP_ALIASES},
         },
         "nodes": nodes,
         "edges": edges,

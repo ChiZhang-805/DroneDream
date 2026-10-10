@@ -87,6 +87,9 @@ try {
   await mapDialog.getByRole("button", { name: "Close" }).click();
 
   await openProductPage(page, "/console/autonomy/aircraft", ".autonomy-repository-page");
+  if (await page.locator(".autonomy-repository-grid article").count() !== 13) {
+    throw new Error("Aircraft repository must expose all thirteen reviewed PX4 models.");
+  }
   const myDrone = page.locator(".autonomy-repository-grid article").filter({ hasText: "X500 Depth" });
   if (await myDrone.count() !== 1) throw new Error("Aircraft repository must expose exactly one X500 Depth card.");
   if (await myDrone.getAttribute("data-selected") !== "false") throw new Error("Aircraft repository must begin without a selected aircraft.");

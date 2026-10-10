@@ -370,6 +370,7 @@ export interface AgentCoreMapResource {
   schema_version: "dronedream.map-resource.v1";
   resource_id: string;
   display_name: Record<"zh-CN" | "en-US", string>;
+  aliases?: Record<"zh-CN" | "en-US", string[]>;
   description: Record<"zh-CN" | "en-US", string>;
   category: "indoor_and_site_map" | "real_outdoor_3d_campus";
   default_resource: true;
@@ -419,6 +420,7 @@ export interface AgentCoreMapResource {
     collision_primitive_count?: number;
     visual_primitive_count?: number;
     named_buildings?: string[];
+    named_buildings_zh?: string[];
     coordinate_frame?: string;
     notes: string[];
   };

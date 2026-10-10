@@ -20,7 +20,7 @@ const MAPS: CatalogAssetDefinition[] = [
   {
     key: "kumpula-campus",
     resourceId: "dronedream-school-map",
-    zh: "Kumpula 科学校园",
+    zh: "赫尔辛基大学昆普拉校区",
     en: "Kumpula Campus",
     aliases: [
       "kumpula campus",
@@ -28,6 +28,10 @@ const MAPS: CatalogAssetDefinition[] = [
       "school map",
       "school-map",
       "dronedream.school-map",
+      "kumpulan kampus",
+      "昆普拉校区",
+      "昆普拉科学园区",
+      "赫尔辛基大学昆普拉校区",
     ],
   },
 ];
@@ -53,7 +57,7 @@ function normalizedIdentity(id: string, name: string): string {
     .normalize("NFKC")
     .toLocaleLowerCase("en-US")
     .replaceAll("_", "-")
-    .replace(/[^a-z0-9.\-\s]+/gu, " ")
+    .replace(/[^\p{L}\p{N}.\-\s]+/gu, " ")
     .replace(/\s+/gu, " ")
     .trim();
 }
