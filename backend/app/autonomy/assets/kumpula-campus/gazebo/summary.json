@@ -7,6 +7,14 @@
   },
   "building_count": 42,
   "collision_primitive_count": 44,
+  "fidelity": {
+    "building_collisions": "conservative-oriented-boxes",
+    "building_visuals": "city-footprint-extrusions",
+    "interior_geometry": false,
+    "qualified_routes": 1,
+    "scope": "outdoor-exterior-only",
+    "terrain": "flat-orthophoto-plane"
+  },
   "format": "sdf",
   "gazebo_asset_contract_generated": true,
   "gazebo_cli_validation_required": true,

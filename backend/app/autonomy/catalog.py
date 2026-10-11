@@ -26,8 +26,9 @@ KUMPULA_SCENE = TerrainScene(
     name="Kumpula Campus",
     summary=(
         "Real University of Helsinki Kumpula Campus map built from City of Helsinki "
-        "building footprints and orthophotography. It includes Exactum, Physicum, "
-        "Chemicum and Dynamicum plus a flight-verified outdoor delivery corridor."
+        "building footprints and orthophotography. This exterior-only simulation map "
+        "includes Exactum, Physicum, Chemicum and Dynamicum plus one flight-verified "
+        "outdoor delivery corridor; it does not represent building interiors."
     ),
     bounds_m=Vector3(x=500.0, y=500.0, z=35.0),
     floors=1,
@@ -36,6 +37,8 @@ KUMPULA_SCENE = TerrainScene(
         "real-geospatial-data",
         "university-campus",
         "outdoor",
+        "exterior-only",
+        "flat-terrain",
         "orthophoto",
         "buildings",
         "payload",

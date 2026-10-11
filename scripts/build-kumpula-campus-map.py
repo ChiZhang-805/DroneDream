@@ -3,7 +3,7 @@
 
 The builder consumes pinned City of Helsinki building footprints, a City of
 Helsinki orthophoto, and a small OpenStreetMap name overlay.  It emits one
-local-ENU simulation world with exact extruded building visuals, conservative
+local-ENU outdoor simulation world with footprint-extruded building visuals, conservative
 oriented-box collisions, semantic mission places, and a prevalidated outdoor
 round trip.  The generated output is deterministic and contains source/license
 provenance so a release never silently substitutes a synthetic map.
@@ -199,6 +199,15 @@ def _named_footprints(path: Path) -> dict[str, Polygon]:
     if missing:
         raise ValueError(f"missing named campus buildings: {sorted(missing)}")
     return result
+
+
+def _named_positions(path: Path) -> dict[str, Point]:
+    """Return authoritative named-footprint centroids in local ENU metres."""
+
+    return {
+        name: _local_polygon(footprint).centroid
+        for name, footprint in _named_footprints(path).items()
+    }
 
 
 def _load_buildings(city_path: Path, names_path: Path) -> list[Building]:
@@ -475,6 +484,7 @@ def _crop_orthophoto(source: Path, destination: Path) -> None:
 
 def _semantic(
     buildings: list[Building],
+    named_positions: dict[str, Point],
     sources: dict[str, str],
     collision_primitives: list[dict[str, Any]],
 ) -> dict[str, Any]:
@@ -500,28 +510,27 @@ def _semantic(
             "position_m": {"x": 43.0, "y": 55.0, "z": 0.0},
         },
     ]
-    for building in buildings:
-        if not building.names:
-            continue
-        center = building.polygon.centroid
-        for name in building.names:
-            name_zh, aliases = BUILDING_NAMES[name]
-            entities.append(
-                {
-                    "entity_id": name.casefold(),
-                    "name": name,
-                    "name_zh": name_zh,
-                    "aliases": list(aliases),
-                    "kind": "building",
-                    "semantic": "building",
-                    "position_m": {
-                        "x": center.x,
-                        "y": center.y,
-                        "z": building.height_m / 2,
-                    },
-                    "floors": building.floors,
-                }
-            )
+    building_by_name = {name: building for building in buildings for name in building.names}
+    for name in sorted(NAMED_BUILDINGS):
+        building = building_by_name[name]
+        center = named_positions[name]
+        name_zh, aliases = BUILDING_NAMES[name]
+        entities.append(
+            {
+                "entity_id": name.casefold(),
+                "name": name,
+                "name_zh": name_zh,
+                "aliases": list(aliases),
+                "kind": "building",
+                "semantic": "building",
+                "position_m": {
+                    "x": center.x,
+                    "y": center.y,
+                    "z": building.height_m / 2,
+                },
+                "floors": building.floors,
+            }
+        )
     return {
         "schema_version": "dronedream.map-semantic.v1",
         "asset_id": ASSET_ID,
@@ -533,6 +542,14 @@ def _semantic(
         "real_world_crs": "EPSG:3879",
         "origin": {"easting_m": ORIGIN_E, "northing_m": ORIGIN_N, "elevation_m": 0.0},
         "bounds_m": {"x": 500.0, "y": 500.0, "z": 35.0},
+        "fidelity": {
+            "scope": "outdoor-exterior-only",
+            "terrain": "flat-orthophoto-plane",
+            "building_visuals": "city-footprint-extrusions",
+            "building_collisions": "conservative-oriented-boxes",
+            "interior_geometry": False,
+            "qualified_routes": 1,
+        },
         "entities": entities,
         # The qualification planner reads the same conservative boxes that
         # Gazebo uses.  Keeping them in the semantic contract prevents a
@@ -680,7 +697,12 @@ def _frontend_geometry(buildings: list[Building]) -> dict[str, Any]:
     }
 
 
-def _preview(buildings: list[Building], orthophoto: Path, output: Path) -> None:
+def _preview(
+    buildings: list[Building],
+    named_positions: dict[str, Point],
+    orthophoto: Path,
+    output: Path,
+) -> None:
     """Render the catalog thumbnail with route and named-building labels."""
 
     image = Image.open(orthophoto).convert("RGB").resize((1600, 1600), Image.Resampling.LANCZOS)
@@ -694,16 +716,16 @@ def _preview(buildings: list[Building], orthophoto: Path, output: Path) -> None:
     for building in buildings:
         points = [pixel(x, y) for x, y in building.polygon.exterior.coords]
         draw.line(points, fill=(255, 255, 255, 180), width=2)
-        if building.names:
-            cx, cy = pixel(building.polygon.centroid.x, building.polygon.centroid.y)
-            draw.rounded_rectangle((cx - 52, cy - 14, cx + 52, cy + 14), 7, fill=(22, 24, 31, 210))
-            draw.text(
-                (cx, cy),
-                " / ".join(building.names),
-                anchor="mm",
-                fill=(255, 255, 255, 255),
-                font=ImageFont.load_default(),
-            )
+    for name, center in sorted(named_positions.items()):
+        cx, cy = pixel(center.x, center.y)
+        draw.rounded_rectangle((cx - 52, cy - 14, cx + 52, cy + 14), 7, fill=(22, 24, 31, 210))
+        draw.text(
+            (cx, cy),
+            name,
+            anchor="mm",
+            fill=(255, 255, 255, 255),
+            font=ImageFont.load_default(),
+        )
     route_points = [pixel(x, y) for x, y, _z, _phase, _speed in ROUTE]
     draw.line(route_points, fill=(255, 35, 99, 255), width=7, joint="curve")
     for index in (0, 4):
@@ -724,6 +746,7 @@ def main() -> None:
 
     args = _parse_args()
     buildings = _load_buildings(args.buildings, args.named_buildings)
+    named_positions = _named_positions(args.named_buildings)
     for x, y, _z, phase, _speed in ROUTE:
         if phase in {"launch", "pickup", "land"}:
             clearance = min(item.polygon.distance(Point(x, y)) for item in buildings)
@@ -750,7 +773,8 @@ def main() -> None:
   <version>1.0.0</version>
   <sdf version="1.9">model.sdf</sdf>
   <author><name>DroneDream; City of Helsinki; OpenStreetMap contributors</name></author>
-  <description>Real Kumpula Campus geometry, collision, semantics and imagery.</description>
+  <description>Real Kumpula Campus outdoor footprint geometry,
+  collision, semantics and imagery.</description>
 </model>
 """,
     )
@@ -792,7 +816,7 @@ def main() -> None:
             },
         ]
     )
-    semantic = _semantic(buildings, sources, primitives)
+    semantic = _semantic(buildings, named_positions, sources, primitives)
     _write_json(map_root / "semantic.json", semantic)
     graph = _navigation_graph()
     _write_json(map_root.parent / "navigation-graph.json", graph)
@@ -805,10 +829,18 @@ def main() -> None:
             "name": DISPLAY_NAME,
             "source_kind": "real-geospatial-data",
             "visual_primitive_count": len(buildings) + 1,
-            "collision_primitive_count": len(primitives) + 1,
+            "collision_primitive_count": len(primitives),
             "building_count": len(buildings),
             "named_buildings": sorted(NAMED_BUILDINGS),
             "bounds_m": {"x": 500.0, "y": 500.0, "z": 35.0},
+            "fidelity": {
+                "scope": "outdoor-exterior-only",
+                "terrain": "flat-orthophoto-plane",
+                "building_visuals": "city-footprint-extrusions",
+                "building_collisions": "conservative-oriented-boxes",
+                "interior_geometry": False,
+                "qualified_routes": 1,
+            },
             "sources": sources,
         },
     )
@@ -819,16 +851,17 @@ def main() -> None:
 This package is a local-ENU simulation derivative of current City of Helsinki
 building-register footprints and the 2025 Helsinki orthophoto (CC BY 4.0).
 Building names are cross-checked against the University of Helsinki campus list
-and OpenStreetMap contributors (ODbL 1.0). Collision boxes are conservative
-proxies around the exact visual footprint meshes; the mission route is verified
-against those proxies before qualification.
+and OpenStreetMap contributors (ODbL 1.0). This is an exterior-only map: it does
+not claim rooms, doors, furniture, trees, terrain relief, or photorealistic
+facades. Collision boxes are conservative proxies around the footprint-extruded
+visual meshes; the outdoor mission route is verified against those proxies.
 """,
     )
     _write_json(args.output_frontend_geometry, _frontend_geometry(buildings))
     frontend_source = args.output_preview.with_name("kumpula-campus-source.jpg")
     frontend_source.parent.mkdir(parents=True, exist_ok=True)
     Image.open(texture).save(frontend_source, "JPEG", quality=90, optimize=True)
-    _preview(buildings, texture, args.output_preview)
+    _preview(buildings, named_positions, texture, args.output_preview)
     print(
         json.dumps(
             {

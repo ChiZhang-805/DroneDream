@@ -175,9 +175,30 @@ def get_school_map_gazebo_summary() -> dict[str, object]:
     hashes = {name: hashlib.sha256(content).hexdigest() for name, content in files.items()}
     collision_payload = json.loads(files["collision-primitives.json"])
     collision_primitives = collision_payload.get("primitives", [])
+    semantic_payload = json.loads(files["semantic.json"])
+    semantic_physical_contract = {
+        key: semantic_payload[key]
+        for key in (
+            "asset_id",
+            "scene_id",
+            "coordinate_frame",
+            "origin",
+            "bounds_m",
+            "collision_primitives",
+            "runtime_bindings",
+        )
+    }
+    semantic_physical_contract_sha256 = hashlib.sha256(
+        json.dumps(
+            semantic_physical_contract,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
     evidence = json.loads(files["qualification-evidence.json"])
     flight_bound_files = evidence.get("flight_bound_files", {})
     postflight_validated_files = evidence.get("postflight_validated_files", {})
+    metadata_revalidation = evidence.get("metadata_revalidation", {})
     gates = evidence.get("gates", {})
     runtime = evidence.get("runtime", {})
     measurements = evidence.get("measurements", {})
@@ -194,7 +215,18 @@ def get_school_map_gazebo_summary() -> dict[str, object]:
             "model.sdf",
             "collision-primitives.json",
         }
-        and postflight_validated_files == {"semantic.json": hashes["semantic.json"]}
+        and (
+            postflight_validated_files == {"semantic.json": hashes["semantic.json"]}
+            or (
+                isinstance(metadata_revalidation, dict)
+                and metadata_revalidation.get("qualified_semantic_sha256")
+                == hashes["semantic.json"]
+                and metadata_revalidation.get("semantic_physical_contract_sha256")
+                == semantic_physical_contract_sha256
+                and isinstance(metadata_revalidation.get("basis"), str)
+                and bool(metadata_revalidation["basis"].strip())
+            )
+        )
         and bool(gates)
         and all(value is True for value in gates.values())
         and measurements.get("unsafe_collision_count") == 0

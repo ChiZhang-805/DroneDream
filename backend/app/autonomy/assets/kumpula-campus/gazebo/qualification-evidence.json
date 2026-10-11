@@ -18,8 +18,9 @@
     "semantic.json": "641e1f73f44c9397d24e65060793f7a54865d023f768dd00ae22b23eed32a2c2"
   },
   "metadata_revalidation": {
-    "basis": "Localized labels, aliases, parser-facing semantic roles, and scene identity only; flight geometry and runtime inputs are unchanged.",
-    "qualified_semantic_sha256": "160d50b6539a0daf406fd274d6357940f955dd04a53d2d62baab78279d8fd870"
+    "basis": "Named-building points were corrected to the authoritative OSM footprint centroids and explicit exterior-only fidelity metadata was added; flight geometry, collision geometry, route coordinates, and runtime inputs are unchanged.",
+    "qualified_semantic_sha256": "db46b1f1eae37f1e61df459b1a0da6ce8f9c9d37240a6f138be74cec16ca6529",
+    "semantic_physical_contract_sha256": "c4c76d0ad8f4f8f3484eee9b198df90d9881de4b8efd7d3064676b2d2ab43159"
   },
   "gates": {
     "executor_completed": true,

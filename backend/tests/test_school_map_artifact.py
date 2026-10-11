@@ -49,8 +49,15 @@ def test_kumpula_package_contains_real_3d_geometry_and_no_training_assets() -> N
 
 def test_kumpula_semantics_bind_named_buildings_and_strict_runtime_coordinates() -> None:
     semantic = json.loads(get_school_map_gazebo_artifact().semantic_json)
-    names = {entity["name"] for entity in semantic["entities"]}
+    named = {entity["name"]: entity for entity in semantic["entities"]}
+    names = set(named)
     assert {"Exactum", "Physicum", "Chemicum", "Dynamicum"}.issubset(names)
+    named_positions = {
+        tuple(entity["position_m"].values())
+        for name, entity in named.items()
+        if name in {"Exactum", "Physicum", "Chemicum", "Dynamicum"}
+    }
+    assert len(named_positions) == 4
     assert semantic["coordinate_frame"] == "ENU"
     assert semantic["bounds_m"] == {"x": 500.0, "y": 500.0, "z": 35.0}
     assert semantic["runtime_bindings"] == {
@@ -59,6 +66,14 @@ def test_kumpula_semantics_bind_named_buildings_and_strict_runtime_coordinates()
         "coordinate_frame": "ENU",
         "vehicle_spawn": {"x": -41.0, "y": -83.0, "z": 0.067},
         "mission_launch_waypoint": {"x": -41.0, "y": -83.0, "z": 1.5},
+    }
+    assert semantic["fidelity"] == {
+        "building_collisions": "conservative-oriented-boxes",
+        "building_visuals": "city-footprint-extrusions",
+        "interior_geometry": False,
+        "qualified_routes": 1,
+        "scope": "outdoor-exterior-only",
+        "terrain": "flat-orthophoto-plane",
     }
 
 
@@ -140,3 +155,25 @@ def test_summary_hashes_match_package_bytes(key: str) -> None:
     artifact = get_school_map_gazebo_artifact()
     expected = hashlib.sha256(artifact.package_files[key]).hexdigest()
     assert artifact.summary["package_file_sha256"][key] == expected
+
+
+def test_metadata_revalidation_cannot_change_the_physical_semantic_contract() -> None:
+    artifact = get_school_map_gazebo_artifact()
+    semantic = json.loads(artifact.semantic_json)
+    evidence = json.loads(artifact.package_files["qualification-evidence.json"])
+    physical = {
+        key: semantic[key]
+        for key in (
+            "asset_id",
+            "scene_id",
+            "coordinate_frame",
+            "origin",
+            "bounds_m",
+            "collision_primitives",
+            "runtime_bindings",
+        )
+    }
+    actual = hashlib.sha256(
+        json.dumps(physical, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    assert evidence["metadata_revalidation"]["semantic_physical_contract_sha256"] == actual
