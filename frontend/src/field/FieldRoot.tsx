@@ -1,7 +1,7 @@
 import { Settings } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 
-import { DroneLaunchSceneCore } from "../components/DroneLaunchScene";
+import { LauncherFlightIllustration } from "../components/LauncherFlightIllustration";
 import type { SettingsSurfaceTabId } from "../components/EditionSettingsSurface";
 import { useAuthOrLocal } from "../features/auth/AuthContext";
 import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
@@ -21,27 +21,26 @@ const COPY = {
     brand: "DroneDream · FIELD",
     loading: "Preparing the real-device tuning workspace",
     ready: "Field workspace ready",
-    system: "REAL DEVICE DOMAIN",
-    active: "SAFETY GATES ACTIVE",
-    standby: "SAFE STANDBY",
     settings: "Open settings",
-    tagline: "Let Every Flight Flow Like a Dream",
-    attitude: "ATTITUDE",
-    hold: "HOLD",
-    cruise: "STARFLIGHT",
+    illustrationTitle: "Tune real aircraft with a clear view",
+    illustrationDescription:
+      "A lightweight route animation keeps startup responsive while the device workspace is prepared.",
+    cardKicker: "FIELD STARTUP",
+    cardTitle: "Preparing the tuning workspace",
+    cardHint: "Device services and local safeguards are checked before the workspace opens.",
+    stages: ["Check this computer", "Prepare device services", "Open the workspace"],
   },
   "zh-CN": {
     brand: "DroneDream · FIELD",
     loading: "正在准备真机调优工作区",
     ready: "Field 工作区已就绪",
-    system: "真机工作域",
-    active: "安全门已启用",
-    standby: "安全待机",
     settings: "打开设置",
-    tagline: "蝶 梦 水 云 乡",
-    attitude: "飞行姿态",
-    hold: "悬停",
-    cruise: "星际巡航",
+    illustrationTitle: "清晰掌握无人机的每一次飞行",
+    illustrationDescription: "轻量航线动画保证首屏快速出现，真机工作区会在后台继续准备。",
+    cardKicker: "FIELD 启动",
+    cardTitle: "正在准备真机调优工作区",
+    cardHint: "设备服务与本地保护检查完成后，将自动进入工作区。",
+    stages: ["检查这台电脑", "准备设备服务", "进入工作区"],
   },
 } as const;
 
@@ -68,6 +67,7 @@ function FieldLaunchScreen({
 }) {
   const copy = COPY[locale];
   const ready = progress === 100;
+  const activeStage = ready ? 3 : progress < 34 ? 0 : progress < 74 ? 1 : 2;
   const launcherChromeRef = useRef<HTMLElement>(null);
   const launcherMainRef = useRef<HTMLElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
@@ -161,19 +161,11 @@ function FieldLaunchScreen({
         <div className="desktop-launcher">
           <div className="launcher-hero">
             <div className="launcher-hero-visual">
-              <DroneLaunchSceneCore
-                active={ready}
+              <LauncherFlightIllustration
+                active={!ready}
+                description={copy.illustrationDescription}
                 progress={progress}
-                labels={{
-                  locale,
-                  tagline: copy.tagline,
-                  system: copy.system,
-                  active: copy.active,
-                  standby: copy.standby,
-                  attitude: copy.attitude,
-                  hold: copy.hold,
-                  cruise: copy.cruise,
-                }}
+                title={copy.illustrationTitle}
               />
             </div>
             {ready ? (
@@ -187,6 +179,22 @@ function FieldLaunchScreen({
               </div>
             ) : null}
             <div className="launcher-progress-panel" role="status" aria-live="polite">
+              <div className="launcher-status-card-heading">
+                <span>{copy.cardKicker}</span>
+                <h2>{copy.cardTitle}</h2>
+                <p>{copy.cardHint}</p>
+              </div>
+              <ol className="launcher-stage-list" aria-label={copy.loading}>
+                {copy.stages.map((stage, index) => (
+                  <li
+                    className={index < activeStage ? "is-complete" : index === activeStage ? "is-current" : ""}
+                    key={stage}
+                  >
+                    <span aria-hidden="true">{index < activeStage ? "✓" : index + 1}</span>
+                    <strong>{stage}</strong>
+                  </li>
+                ))}
+              </ol>
               <div
                 className="launcher-progress-track"
                 role="progressbar"

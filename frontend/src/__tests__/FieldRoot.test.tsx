@@ -3,27 +3,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { FieldLocaleProvider } from "../field/FieldLocaleProvider";
 
-vi.mock("../components/DroneLaunchScene", () => ({
-  DroneLaunchSceneCore: ({
+vi.mock("../components/LauncherFlightIllustration", () => ({
+  LauncherFlightIllustration: ({
     active,
     progress,
-    labels,
+    description,
+    title,
   }: {
     active: boolean;
     progress: number;
-    labels: {
-      active: string;
-      standby: string;
-      system: string;
-    };
+    description: string;
+    title: string;
   }) => (
     <div
       data-testid="field-drone-scene"
       data-active={String(active)}
       data-progress={progress}
-      data-telemetry-active={labels.active}
-      data-telemetry-standby={labels.standby}
-      data-telemetry-system={labels.system}
+      data-title={title}
+      data-description={description}
     />
   ),
 }));
@@ -86,7 +83,7 @@ describe("FieldRoot", () => {
     vi.restoreAllMocks();
   });
 
-  it("loads the shared 3D launch scene to 100 percent before offering entry", async () => {
+  it("loads the lightweight launch screen to 100 percent before offering entry", async () => {
     vi.useFakeTimers();
     const { container } = render(
       <FieldLocaleProvider>
@@ -106,9 +103,9 @@ describe("FieldRoot", () => {
     expect(screen.getByRole("button", {
       name: "Sign in and enter the tuning platform",
     })).toBeEnabled();
-    expect(screen.getByTestId("field-drone-scene")).toHaveAttribute("data-active", "true");
+    expect(screen.getByTestId("field-drone-scene")).toHaveAttribute("data-active", "false");
     expect(screen.getByTestId("field-drone-scene"))
-      .toHaveAttribute("data-telemetry-system", "REAL DEVICE DOMAIN");
+      .toHaveAttribute("data-title", "Tune real aircraft with a clear view");
     expect(container.firstChild).toHaveAttribute("data-authority", "false");
     expect(container).not.toHaveTextContent(/PX4|Gazebo|SITL|HITL/i);
 

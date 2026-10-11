@@ -140,11 +140,11 @@ try {
   assert(pages.length >= 1, "Installed app exposed no WebView page");
   const page = pages.find((candidate) => /(?:tauri|localhost)/u.test(candidate.url())) ?? pages[0];
   await page.waitForLoadState("domcontentloaded");
-  await page.locator(".drone-launch-scene").waitFor({ state: "visible", timeout: 30_000 });
+  await page.locator(".launcher-flight-illustration").waitFor({ state: "visible", timeout: 30_000 });
 
   await page.evaluate(() => window.localStorage.setItem("drone-dream:locale", "en"));
   await page.reload({ waitUntil: "domcontentloaded" });
-  await page.locator(".drone-launch-scene").waitFor({ state: "visible", timeout: 30_000 });
+  await page.locator(".launcher-flight-illustration").waitFor({ state: "visible", timeout: 30_000 });
 
   const primary = page.locator(".launcher-primary-action:visible").first();
   await primary.waitFor({ state: "visible", timeout: 60_000 });

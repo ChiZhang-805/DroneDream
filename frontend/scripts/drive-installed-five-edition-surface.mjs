@@ -24,7 +24,7 @@ const autonomySurfaces = Object.freeze([
 const launcherSurface = Object.freeze({
   id: "launcher",
   route: "/desktop/setup",
-  expectedSelector: ".drone-launch-scene",
+  expectedSelector: ".launcher-flight-illustration",
 });
 
 const shellSurfaces = Object.freeze([
@@ -231,7 +231,7 @@ async function reloadAtSurface(page) {
 
 async function prepareSurface(page) {
   const expectedSelector = surface.expectedSelector
-    ?? (surface.id === "launcher" ? ".drone-launch-scene" : "#main-content");
+    ?? (surface.id === "launcher" ? ".launcher-flight-illustration" : "#main-content");
   await page.locator(expectedSelector).waitFor({ state: "visible", timeout: 30_000 });
 
   if (surface.id === "launcher") {

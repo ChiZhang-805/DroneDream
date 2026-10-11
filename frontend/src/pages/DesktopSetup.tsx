@@ -1,6 +1,4 @@
 import {
-  Suspense,
-  lazy,
   useCallback,
   useEffect,
   useRef,
@@ -11,6 +9,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { editionLandingPath } from "../edition";
 import { Alert } from "../components/Alert";
+import { LauncherFlightIllustration } from "../components/LauncherFlightIllustration";
 import { Loading } from "../components/States";
 import { SectionCard } from "../components/SectionCard";
 import { DistributionSetupPanel } from "../components/DistributionSetupPanel";
@@ -67,11 +66,6 @@ import {
 import { useAppUpdaterState } from "../desktop/updaterContext";
 import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 import type { TranslationKey } from "../i18n/I18nProvider";
-
-const DroneLaunchScene = lazy(async () => {
-  const module = await import("../components/DroneLaunchScene");
-  return { default: module.DroneLaunchScene };
-});
 
 interface ProbeState {
   prerequisites: SystemPrerequisiteReport | null;
@@ -2643,16 +2637,41 @@ function RuntimeLauncherHero({
       : (checking || automaticStartPending) && phase === "idle"
         ? t("launcher.status.checking")
         : t(LAUNCHER_STATUS_KEYS[phase]);
+  const activeStage = ready ? 3 : percent < 34 ? 0 : percent < 74 ? 1 : 2;
+  const stages = [
+    t("launcher.stage.system"),
+    t("launcher.stage.runtime"),
+    t("launcher.stage.workspace"),
+  ];
 
   return (
     <div className={`launcher-hero launcher-hero-${localReady ? "ready" : phase}`}>
       <div className="launcher-hero-visual">
-        <Suspense fallback={<DroneSceneLoadingFallback />}>
-          <DroneLaunchScene active={active || localReady} progress={percent} />
-        </Suspense>
+        <LauncherFlightIllustration
+          active={active || checking || localReady}
+          description={t("launcher.illustrationDescription")}
+          progress={percent}
+          title={t("launcher.illustrationTitle")}
+        />
       </div>
 
       <div className="launcher-progress-panel" role="status" aria-live="polite">
+        <div className="launcher-status-card-heading">
+          <span>{t("launcher.cardKicker")}</span>
+          <h2>{t("launcher.cardTitle")}</h2>
+          <p>{t("launcher.cardHint")}</p>
+        </div>
+        <ol className="launcher-stage-list" aria-label={t("launcher.progressLabel")}>
+          {stages.map((stage, index) => (
+            <li
+              className={index < activeStage ? "is-complete" : index === activeStage ? "is-current" : ""}
+              key={stage}
+            >
+              <span aria-hidden="true">{index < activeStage ? "✓" : index + 1}</span>
+              <strong>{stage}</strong>
+            </li>
+          ))}
+        </ol>
         <div
           className={`launcher-progress-track${percent === null && (active || checking) ? " indeterminate" : ""}`}
           role="progressbar"
@@ -2822,21 +2841,6 @@ function LauncherErrorDialog({
           </button>
         </div>
       </section>
-    </div>
-  );
-}
-
-function DroneSceneLoadingFallback() {
-  return (
-    <div className="drone-launch-scene" aria-hidden="true">
-      <div className="drone-launch-aura" />
-      <div className="drone-launch-fallback">
-        <span className="drone-launch-fallback-body" />
-        <span className="drone-launch-fallback-rotor rotor-a" />
-        <span className="drone-launch-fallback-rotor rotor-b" />
-        <span className="drone-launch-fallback-rotor rotor-c" />
-        <span className="drone-launch-fallback-rotor rotor-d" />
-      </div>
     </div>
   );
 }

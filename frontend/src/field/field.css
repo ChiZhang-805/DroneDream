@@ -81,15 +81,11 @@ input:focus-visible {
 }
 
 .field-launcher .launcher-hero-visual {
-  background:
-    linear-gradient(180deg, rgb(255 255 255 / 18%), rgb(255 248 239 / 82%)),
-    var(--dd-brand-light-surface);
+  background: transparent;
 }
 
 .field-launcher .launcher-hero-visual::before {
-  background-image:
-    linear-gradient(color-mix(in srgb, var(--dd-brand-start) 8%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--dd-brand-end) 8%, transparent) 1px, transparent 1px);
+  content: none;
 }
 
 .field-launcher .launcher-progress-track > span,
@@ -140,7 +136,7 @@ input:focus-visible {
   top: calc(100% + 8px);
   left: 50%;
   width: min(520px, calc(100vw - 32px));
-  color: var(--dd-brand-light-surface);
+  color: #6e6472;
   text-align: center;
   transform: translateX(-50%);
 }

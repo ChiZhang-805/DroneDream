@@ -7,7 +7,6 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { chromium } from "playwright";
-import { PNG } from "pngjs";
 import { createServer } from "vite";
 
 const frontendRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -365,27 +364,19 @@ async function verifyCase(browser, testCase) {
       calls: window.__SIM_VISUAL_CALLS__,
       readinessTransitions: window.__SIM_READINESS_TRANSITIONS__,
       primaryActionAppearances: window.__SIM_PRIMARY_ACTION_APPEARANCES__,
-      sceneStars: document.querySelector(".drone-launch-scene")?.getAttribute("data-scene-stars"),
-      sceneParticles: document.querySelector(".drone-launch-scene")
-        ?.getAttribute("data-scene-particles"),
-      tagline: (() => {
-        const heading = document.querySelector(".drone-launch-tagline");
-        if (!heading) return null;
+      launcher: (() => {
+        const illustration = document.querySelector(".launcher-flight-illustration");
+        const heading = illustration?.querySelector(".launcher-flight-copy h1");
+        const bounds = illustration?.getBoundingClientRect();
+        const headingBounds = heading?.getBoundingClientRect();
         return {
-          text: heading.getAttribute("aria-label") ?? heading.textContent?.trim() ?? "",
-          lineCount: Number(heading.getAttribute("data-line-count")),
-          lines: Array.from(heading.querySelectorAll(".drone-launch-tagline-line")).map((line) => {
-            const bounds = line.getBoundingClientRect();
-            return {
-              text: line.textContent?.trim() ?? "",
-              left: bounds.left,
-              right: bounds.right,
-              top: bounds.top,
-              bottom: bounds.bottom,
-              clientWidth: line.clientWidth,
-              scrollWidth: line.scrollWidth,
-            };
-          }),
+          illustrationCount: document.querySelectorAll(".launcher-flight-illustration").length,
+          svgCount: illustration?.querySelectorAll("svg.launcher-flight-map").length ?? 0,
+          canvasCount: document.querySelectorAll(".desktop-launcher canvas").length,
+          width: bounds?.width ?? 0,
+          height: bounds?.height ?? 0,
+          headingLeft: headingBounds?.left ?? -1,
+          headingRight: headingBounds?.right ?? -1,
         };
       })(),
     }));
@@ -394,67 +385,17 @@ async function verifyCase(browser, testCase) {
     assert.equal(dimensions.appearance, "light");
     assert.equal(dimensions.brandEdition, edition);
     assert.equal(dimensions.grantsHardwareAuthority, "false");
-    // The fixed light palette may retain decorative scene content without changing the surface theme.
-    assert.equal(dimensions.sceneStars, "true");
-    assert.equal(dimensions.sceneParticles, "true");
-    assert(dimensions.tagline, `${testCase.id}: launcher tagline is missing`);
-    const expectedTaglineLines = testCase.locale === "en" ? 2 : 1;
-    assert.equal(
-      dimensions.tagline.lineCount,
-      expectedTaglineLines,
-      `${testCase.id}: launcher tagline changed line count`,
-    );
-    assert.equal(dimensions.tagline.lines.length, expectedTaglineLines);
-    assert(
-      dimensions.tagline.lines.every((line) => (
-        line.left >= 0
-        && line.right <= testCase.viewport.width + 1
-        && line.scrollWidth <= line.clientWidth + 1
-      )),
-      `${testCase.id}: launcher tagline is clipped`,
-    );
+    assert.equal(dimensions.launcher.illustrationCount, 1);
+    assert.equal(dimensions.launcher.svgCount, 1);
+    assert.equal(dimensions.launcher.canvasCount, 0,
+      `${testCase.id}: desktop startup must not create a WebGL canvas`);
+    assert(dimensions.launcher.width > 100 && dimensions.launcher.height > 100,
+      `${testCase.id}: lightweight launcher illustration has no visible area`);
+    assert(dimensions.launcher.headingLeft >= 0
+      && dimensions.launcher.headingRight <= testCase.viewport.width + 1,
+    `${testCase.id}: launcher heading is clipped`);
     const imagePath = path.join(outputRoot, `${testCase.id}.png`);
     await page.screenshot({ path: imagePath, fullPage: false });
-    const canvasScreenshot = await page.locator(".drone-launch-canvas").screenshot({ type: "png" });
-    const canvasFrame = PNG.sync.read(canvasScreenshot);
-    const points = [
-      [0.03, 0.03], [0.25, 0.08], [0.5, 0.08], [0.75, 0.08], [0.97, 0.03],
-      [0.08, 0.4], [0.33, 0.4], [0.5, 0.5], [0.67, 0.4], [0.92, 0.4],
-      [0.08, 0.72], [0.33, 0.72], [0.5, 0.72], [0.67, 0.72], [0.92, 0.72],
-    ];
-    const samples = points.map(([x, y]) => {
-      const pixelX = Math.min(canvasFrame.width - 1, Math.floor(canvasFrame.width * x));
-      const pixelY = Math.min(canvasFrame.height - 1, Math.floor(canvasFrame.height * y));
-      const offset = (pixelY * canvasFrame.width + pixelX) * 4;
-      return [...canvasFrame.data.subarray(offset, offset + 4)];
-    });
-    const canvasPixels = {
-      width: canvasFrame.width,
-      height: canvasFrame.height,
-      samples,
-      distinctSamples: new Set(samples.map((sample) => sample.join(","))).size,
-      upperBrightRatio: (() => {
-        let bright = 0;
-        let total = 0;
-        const upperLimit = Math.max(1, Math.floor(canvasFrame.height * 0.3));
-        for (let y = 0; y < upperLimit; y += 12) {
-          for (let x = 0; x < canvasFrame.width; x += 12) {
-            const offset = (y * canvasFrame.width + x) * 4;
-            total += 1;
-            if (
-              canvasFrame.data[offset] >= 245
-              && canvasFrame.data[offset + 1] >= 245
-              && canvasFrame.data[offset + 2] >= 245
-            ) bright += 1;
-          }
-        }
-        return total > 0 ? bright / total : 0;
-      })(),
-    };
-    assert(canvasPixels.width > 100 && canvasPixels.height > 100);
-    assert(canvasPixels.distinctSamples >= 6, `${testCase.id}: 3D canvas appears blank`);
-    assert(canvasPixels.upperBrightRatio < 0.1,
-      `${testCase.id}: branded night scene was unexpectedly washed out: ${canvasPixels.upperBrightRatio}`);
     if (testCase.scenario === "ready") {
       assert.equal(
         dimensions.calls.filter((command) => command === "start_runtime").length,
@@ -510,7 +451,7 @@ async function verifyCase(browser, testCase) {
       status: "pass",
       expectedPercent: expectedPercent === null ? null : Number(expectedPercent),
       dimensions,
-      canvasPixels,
+      launcherRenderer: "lightweight-svg",
       image: {
         path: path.relative(repoRoot, imagePath).replaceAll("\\", "/"),
         sha256: await sha256File(imagePath),

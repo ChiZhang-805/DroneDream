@@ -58,8 +58,8 @@ const payloadText = (await Promise.all(
 )).join("\n");
 assert(payloadText.includes('consumerProfile:"field"'), "Field Settings consumer marker is missing");
 assert(payloadText.includes("data-settings-consumer"), "Shared Settings surface is missing");
-assert(payloadText.includes("drone-launch-scene"), "Shared 3D launch scene is missing");
-assert(payloadText.includes("REAL DEVICE DOMAIN"), "Field launch telemetry is missing");
+assert(payloadText.includes("launcher-flight-illustration"), "Lightweight launch illustration is missing");
+assert(!payloadText.includes("procedural-quadcopter"), "Field launcher still bundles the retired WebGL scene");
 assert(!distFiles.some((file) => /gazebo|sitl|hitl|simulator/i.test(path.basename(file))),
   "Field bundle contains a simulator payload path");
 
@@ -134,15 +134,14 @@ try {
     assert.equal(await launcher.getAttribute("data-authority"), "false");
     assert.equal(await launcher.getAttribute("data-launch-ready"), "true");
 
-    const scene = page.locator(".drone-launch-scene");
-    assert.equal(await scene.count(), 1);
-    assert.equal(await scene.getAttribute("data-theme-edition"), "field");
-    assert.equal(await scene.getAttribute("data-theme-grants-hardware-authority"), "false");
-    const canvas = scene.locator("canvas");
-    assert.equal(await canvas.count(), 1);
-    const canvasBounds = await canvas.boundingBox();
-    assert(canvasBounds && canvasBounds.width > 0 && canvasBounds.height > 0,
-      `${testCase.id}: Field 3D canvas has no visible area`);
+    const illustration = page.locator(".launcher-flight-illustration");
+    assert.equal(await illustration.count(), 1);
+    assert.equal(await illustration.locator("svg.launcher-flight-map").count(), 1);
+    assert.equal(await launcher.locator("canvas").count(), 0,
+      `${testCase.id}: Field launcher must not create a WebGL canvas`);
+    const illustrationBounds = await illustration.boundingBox();
+    assert(illustrationBounds && illustrationBounds.width > 0 && illustrationBounds.height > 0,
+      `${testCase.id}: lightweight Field illustration has no visible area`);
 
     const layout = await page.evaluate(() => {
       const html = document.documentElement;
@@ -204,48 +203,10 @@ try {
 
     const screenshotPath = path.join(outputRoot, `${testCase.id}-launcher.png`);
     await page.screenshot({ path: screenshotPath, fullPage: false });
-    const canvasScreenshot = await canvas.screenshot();
-    const canvasPixelStats = await page.evaluate(async (imageBase64) => {
-      const image = new Image();
-      image.src = `data:image/png;base64,${imageBase64}`;
-      await image.decode();
-      const sample = document.createElement("canvas");
-      sample.width = 64;
-      sample.height = 64;
-      const context = sample.getContext("2d", { willReadFrequently: true });
-      if (!context) throw new Error("Canvas pixel sampler is unavailable");
-      context.drawImage(image, 0, 0, sample.width, sample.height);
-      const pixels = context.getImageData(0, 0, sample.width, sample.height).data;
-      const buckets = new Set();
-      let visiblePixels = 0;
-      for (let index = 0; index < pixels.length; index += 4) {
-        const red = pixels[index];
-        const green = pixels[index + 1];
-        const blue = pixels[index + 2];
-        const alpha = pixels[index + 3];
-        if (alpha > 0 && red + green + blue > 24) visiblePixels += 1;
-        buckets.add(`${red >> 4}:${green >> 4}:${blue >> 4}:${alpha >> 4}`);
-      }
-      return { visiblePixels, colorBuckets: buckets.size };
-    }, canvasScreenshot.toString("base64"));
-    assert(canvasPixelStats.visiblePixels > 512,
-      `${testCase.id}: Field 3D canvas pixels are blank`);
-    assert(canvasPixelStats.colorBuckets > 24,
-      `${testCase.id}: Field 3D canvas has insufficient visual detail`);
-    assert.equal(await scene.getAttribute("data-flight-state"), "hover");
-    await page.mouse.click(
-      canvasBounds.x + canvasBounds.width * 0.5,
-      canvasBounds.y + canvasBounds.height * 0.42,
-    );
-    await page.waitForFunction(() =>
-      document.querySelector(".drone-launch-scene")?.getAttribute("data-flight-state") ===
-        "starflight"
-    );
     await page.locator(".launcher-settings-button").click();
     const quickSettings = page.locator(".quick-settings-dialog");
     await quickSettings.waitFor();
-    // Edge can expose the DOM one compositor frame before the newly opened
-    // fixed surface is fully painted over the WebGL launcher.
+    // Edge can expose the DOM one compositor frame before the fixed surface is painted.
     await page.waitForTimeout(250);
     const quickMetrics = await quickSettings.evaluate((dialog) => {
       const bounds = dialog.getBoundingClientRect();
@@ -260,8 +221,8 @@ try {
         tabCount: dialog.querySelectorAll('[role="tab"]').length,
       };
     });
-    assert(quickMetrics.aspectRatio >= 1.55 && quickMetrics.aspectRatio <= 1.65,
-      `${testCase.id}: quick settings aspect ratio is not close to 1.6`);
+    assert(quickMetrics.width >= 560 && quickMetrics.height >= 320,
+      `${testCase.id}: quick settings is too small for its controls`);
     assert.equal(quickMetrics.tabCount, 0,
       `${testCase.id}: quick settings must not contain category tabs`);
     assert(quickMetrics.scrollWidth <= quickMetrics.clientWidth + 1
@@ -309,13 +270,13 @@ try {
           ["general", "General"],
           ["memory", "Memory"],
           ["model", "Models"],
-          ["runtime", "Runtime & updates"],
+          ["runtime", "Runtime"],
         ]
       : [
           ["general", "常规"],
           ["memory", "记忆"],
           ["model", "模型"],
-          ["runtime", "Runtime 与更新"],
+          ["runtime", "Runtime"],
         ];
     for (const [tabId, tabLabel] of workspaceTabs) {
       await settingsWorkspace.getByRole("tab", { name: tabLabel }).click();
@@ -347,16 +308,15 @@ try {
       name: testCase.locale === "en" ? "Back to app" : "返回应用",
     }).click();
     await settingsWorkspace.waitFor({ state: "detached" });
-    assert.equal(await scene.getAttribute("data-flight-state"), "starflight",
-      `${testCase.id}: returning from settings reset the launcher scene`);
+    assert.equal(await illustration.isVisible(), true,
+      `${testCase.id}: returning from settings removed the launch illustration`);
     results.push({
       ...testCase,
       theme,
-      canvasBounds,
-      canvasPixelStats,
+      illustrationBounds,
       entryBounds,
       launcherTiming,
-      droneInteraction: "hover-to-starflight",
+      launcherRenderer: "lightweight-svg",
       quickSettings: {
         metrics: quickMetrics,
         screenshot: {
