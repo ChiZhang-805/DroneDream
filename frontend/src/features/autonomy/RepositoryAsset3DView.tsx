@@ -206,8 +206,8 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese }: Props
     mount.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x111522);
-    scene.add(new THREE.HemisphereLight(0xf4f7ff, 0x303544, 2.2));
+    scene.background = new THREE.Color(0xf7fafc);
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xd9e0e8, 2.2));
     const sun = new THREE.DirectionalLight(0xffffff, 3.2);
     sun.position.set(-18, 28, 16);
     sun.castShadow = true;

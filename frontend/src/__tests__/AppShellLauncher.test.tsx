@@ -227,15 +227,7 @@ describe("desktop launcher chrome", () => {
     expect(apiClient.getUserExperiencePreferences).not.toHaveBeenCalled();
     expect(memory).not.toBeChecked();
     fireEvent.click(memory);
-    fireEvent.change(within(workspace).getByLabelText("Default starter template"), {
-      target: { value: "hover-basics@1" },
-    });
-    fireEvent.change(within(workspace).getByLabelText("Default track"), {
-      target: { value: "hover" },
-    });
-    fireEvent.change(within(workspace).getByLabelText("Default altitude (m)"), {
-      target: { value: "4" },
-    });
+    expect(within(workspace).queryByLabelText("Default starter template")).not.toBeInTheDocument();
     fireEvent.click(within(workspace).getByRole("button", { name: "Save personal defaults" }));
 
     await waitFor(() => {
@@ -466,19 +458,20 @@ describe("desktop launcher chrome", () => {
     fireEvent.click(within(quickSettings).getByRole("button", { name: /Runtime/ }));
     const workspace = await screen.findByRole("region", { name: "Settings" });
     expect(await within(workspace).findByText("Ready with warnings")).toBeInTheDocument();
-    expect(within(workspace).getByRole("list", { name: "View details" }))
-      .toBeVisible();
-    expect(within(workspace).getByText("Optional GPU telemetry is unavailable.")).toBeInTheDocument();
-    expect(within(workspace).getByText("Optional GPU telemetry is unavailable.").closest(
-      ".settings-runtime-diagnostics",
-    )).toBeInTheDocument();
+    expect(within(workspace).queryByRole("list", { name: "View details" }))
+      .not.toBeInTheDocument();
+    expect(within(workspace).getByRole("status", {
+      name: "Optional GPU telemetry is unavailable.",
+    })).toHaveAttribute("title", "Optional GPU telemetry is unavailable.");
 
     fireEvent.click(within(workspace).getByRole("button", { name: "Check environment" }));
     await waitFor(() => {
       expect(within(workspace).getByText("Environment unavailable"))
         .toBeInTheDocument();
     }, { timeout: 7_000 });
-    expect(within(workspace).getByText("DroneDreamRuntime is not installed.")).toBeInTheDocument();
+    expect(within(workspace).getByRole("status", {
+      name: /DroneDreamRuntime is not installed\./,
+    })).toHaveAttribute("title", expect.stringContaining("DroneDreamRuntime is not installed."));
     expect(runtimeProbeCount).toBe(2);
 
     router.dispose();

@@ -546,6 +546,10 @@ async function verifySettings(page, testCase) {
       };
     };
     const usageBounds = element.getBoundingClientRect();
+    const surface = element.closest(".settings-workspace-surface");
+    const color = (target) => target instanceof Element
+      ? getComputedStyle(target).color
+      : null;
     return {
       manage: rect(".settings-model-plan-row .btn"),
       refresh: rect(".settings-model-refresh"),
@@ -562,16 +566,10 @@ async function verifySettings(page, testCase) {
       usageValuesFit: Array.from(
         element.querySelectorAll(".settings-model-usage-grid strong"),
       ).every((value) => value.scrollWidth <= value.clientWidth + 1),
-      foregroundColor: getComputedStyle(element).color,
-      mutedColor: getComputedStyle(
-        element.querySelector(".settings-model-period"),
-      ).color,
-      accessModeColor: getComputedStyle(
-        element.parentElement?.querySelector(".settings-model-access-mode > button"),
-      ).color,
-      headingColor: getComputedStyle(
-        element.parentElement?.querySelector(".settings-model-section-heading h3"),
-      ).color,
+      foregroundColor: color(element),
+      mutedColor: color(element.querySelector(".settings-model-period")),
+      accessModeColor: color(surface?.querySelector(".settings-model-access-mode > button")),
+      headingColor: color(element.querySelector(".settings-model-section-heading h3")),
     };
   });
   assert(metrics.manage && metrics.refresh && metrics.period && metrics.usage);
@@ -605,6 +603,7 @@ async function verifySettings(page, testCase) {
     metrics.accessModeColor,
     metrics.headingColor,
   ]) {
+    assert(foreground, `${testCase.id}: a Settings foreground target is missing`);
     assert.notEqual(foreground, "rgba(0, 0, 0, 0)");
   }
   const manage = usage.locator(".settings-model-plan-row .btn");

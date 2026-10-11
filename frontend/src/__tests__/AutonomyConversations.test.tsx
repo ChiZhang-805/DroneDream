@@ -120,7 +120,7 @@ beforeEach(() => {
 });
 
 describe("autonomy conversation persistence", () => {
-  it("keeps pair qualification off the map page and reveals 3D airspace only inside the clicked map card", async () => {
+  it("shows only Kumpula and reveals 3D airspace only in its double-click details dialog", async () => {
     const workspace = defaultAutonomyWorkspace();
     workspace.mapPack.agentCoreContentSha256 = "a".repeat(64);
     workspace.aircraft.agentCoreContentSha256 = "b".repeat(64);
@@ -131,10 +131,16 @@ describe("autonomy conversation persistence", () => {
     expect(screen.queryByText("Map and aircraft pair qualification")).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "3D UAV Corridor" })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Kumpula Campus/u }));
-    const corridor = await screen.findByRole("region", { name: "3D UAV Corridor" });
+    const mapCard = screen.getByRole("button", { name: /Kumpula Campus/u });
+    expect(screen.getByRole("region", { name: "Map repository" }).querySelectorAll("article")).toHaveLength(1);
+    fireEvent.click(mapCard);
+    expect(screen.queryByRole("region", { name: "3D UAV Corridor" })).not.toBeInTheDocument();
+
+    fireEvent.doubleClick(mapCard);
+    const dialog = await screen.findByRole("dialog", { name: "Kumpula Campus" });
+    const corridor = await within(dialog).findByRole("region", { name: "3D UAV Corridor" });
     expect(corridor).toBeVisible();
-    expect(corridor.closest("article")).toHaveAttribute("data-airspace-expanded", "true");
+    expect(screen.getByRole("region", { name: "Map repository" })).not.toContainElement(corridor);
   });
 
   it("always opens the Chatbot root as a blank new task even when an older conversation exists", async () => {

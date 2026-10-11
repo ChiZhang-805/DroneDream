@@ -1583,6 +1583,10 @@ function SettingsDialog({
   };
   const prerequisiteSnapshot = snapshot?.prerequisites ?? null;
   const runtimeSnapshot = snapshot?.runtime ?? null;
+  const runtimeComponents = runtimeSnapshot?.components ?? [];
+  const readyRuntimeComponentCount = runtimeComponents.filter(
+    (component) => component.status === "ready",
+  ).length;
   const runtimeCheckSteps = [
     {
       id: "operating-system",
@@ -1620,17 +1624,15 @@ function SettingsDialog({
       result: runtimeSnapshot ? runtimeSnapshot.installed : null,
     },
     {
-      id: "runtime-running",
+      id: "runtime-stack",
       label: runtimeCheckCopy.running,
-      detail: runtimeSnapshot?.runtimeName ?? null,
-      result: runtimeSnapshot ? runtimeSnapshot.running : null,
+      detail: runtimeSnapshot
+        ? `${runtimeSnapshot.runtimeName ?? "DroneDreamRuntime"} · ${readyRuntimeComponentCount}/${runtimeComponents.length} ${interfaceLocale === "zh-CN" ? "个组件就绪" : "components ready"}`
+        : null,
+      result: runtimeSnapshot
+        ? runtimeSnapshot.running && runtimeComponents.every((component) => component.status === "ready")
+        : null,
     },
-    ...(runtimeSnapshot?.components ?? []).map((component) => ({
-      id: `component-${component.id}`,
-      label: component.label,
-      detail: component.detail ?? component.version ?? null,
-      result: component.status === "ready",
-    })),
   ].map((step) => ({
     ...step,
     state: checkedState(step.result),
@@ -1837,7 +1839,40 @@ function SettingsDialog({
       consumerProfile={edition}
       presentation="workspace"
       backLabel={interfaceLocale === "zh-CN" ? "返回应用" : "Back to app"}
-      headerAction={activeSettingsTab === "course" ? (
+      headerAction={activeSettingsTab === "model" ? (
+        <div className="settings-model-access-mode settings-heading-model-access" role="group" aria-label={t("settings.model.accessMode")}>
+          <button
+            type="button"
+            className={modelAccess.accessMode === "platform" ? "selected" : undefined}
+            aria-pressed={modelAccess.accessMode === "platform"}
+            onClick={() => selectAccessMode("platform")}
+          >
+            <strong>{t("settings.model.includedAllowance")}</strong>
+          </button>
+          <button
+            type="button"
+            className={modelAccess.accessMode === "byok" ? "selected" : undefined}
+            aria-pressed={modelAccess.accessMode === "byok"}
+            onClick={() => selectAccessMode("byok")}
+          >
+            <strong>{t("settings.model.byok")}</strong>
+          </button>
+        </div>
+      ) : activeSettingsTab === "memory" ? (
+        <SettingsToggle
+          className="settings-heading-memory-toggle"
+          checked={experiencePreferenceDraft.account_memory_enabled && experiencePreferenceDraft.memory_enabled}
+          disabled={experiencePreferenceControlsDisabled}
+          label={settingsCopy.memoryEnabled[
+            experiencePreferenceDraft.account_memory_enabled && experiencePreferenceDraft.memory_enabled ? 1 : 0
+          ]}
+          onChange={(checked) => setExperiencePreferenceDraft((current) => ({
+            ...current,
+            account_memory_enabled: checked,
+            memory_enabled: checked,
+          }))}
+        />
+      ) : activeSettingsTab === "course" ? (
         <a
           className="settings-course-header-action"
           href={ECE498BH_COURSE_URL}
@@ -1961,21 +1996,7 @@ function SettingsDialog({
       </EditionSettingsPanel>
       <EditionSettingsPanel active={activeSettingsTab === "memory"} id="memory">
         <section className="settings-memory-panel" aria-labelledby="settings-memory-title">
-        <div className="settings-memory-heading">
-          <div>
-            <h3
-              id="settings-memory-title"
-              className={presentation === "workspace" ? "sr-only" : undefined}
-            >
-              {settingsCopy.memoryTitle}
-            </h3>
-          </div>
-          <span className={experiencePreferenceDraft.account_memory_enabled && experiencePreferenceDraft.memory_enabled ? "configured" : undefined}>
-            {settingsCopy.memoryEnabled[
-              experiencePreferenceDraft.account_memory_enabled && experiencePreferenceDraft.memory_enabled ? 1 : 0
-            ]}
-          </span>
-        </div>
+        <h3 id="settings-memory-title" className="sr-only">{settingsCopy.memoryTitle}</h3>
         <div className="settings-memory-body">
           <div className="settings-memory-switches">
             <SettingsToggle
@@ -2052,151 +2073,7 @@ function SettingsDialog({
               })}
             </div>
           </div>
-          <div className="settings-memory-defaults">
-            <div className="settings-memory-grid">
-          <label htmlFor="settings_default_template">
-            <span>{t("settings.memory.defaultTemplate")}</span>
-            <select
-              id="settings_default_template"
-              value={experiencePreferenceDraft.default_template_key ?? ""}
-              disabled={experiencePreferenceControlsDisabled}
-              onChange={(event) => setExperiencePreferenceDraft((current) => ({
-                ...current,
-                default_template_key: (
-                  event.target.value || null
-                ) as StarterExperienceTemplateKey | null,
-              }))}
-            >
-              <option value="">{t("settings.memory.noDefault")}</option>
-              <option value="hover-basics@1">{t("wizard.starter.hover.title")} · v1</option>
-              <option value="first-circle@1">{t("wizard.starter.circle.title")} · v1</option>
-              <option value="light-wind-circle@1">{t("wizard.starter.wind.title")} · v1</option>
-            </select>
-          </label>
-          <label htmlFor="settings_default_vehicle">
-            <span>{settingsCopy.memoryDefaults[0]}</span>
-            <select
-              id="settings_default_vehicle"
-              value={experiencePreferenceDraft.default_vehicle ?? ""}
-              disabled={experiencePreferenceControlsDisabled}
-              onChange={(event) => setExperiencePreferenceDraft((current) => ({
-                ...current,
-                default_vehicle: event.target.value || null,
-              }))}
-            >
-              <option value="">{t("settings.memory.noDefault")}</option>
-              <option value="x500">PX4 x500</option>
-              <option value="iris">PX4 Iris</option>
-              <option value="custom">{locale === "zh-CN" ? "自定义机型" : "Custom vehicle"}</option>
-            </select>
-          </label>
-          <label htmlFor="settings_default_track">
-            <span>{t("settings.memory.defaultTrack")}</span>
-            <select
-              id="settings_default_track"
-              value={experiencePreferenceDraft.default_track_type ?? ""}
-              disabled={experiencePreferenceControlsDisabled}
-              onChange={(event) => setExperiencePreferenceDraft((current) => ({
-                ...current,
-                default_track_type: (
-                  event.target.value || null
-                ) as UserDefaultTrackType | null,
-              }))}
-            >
-              <option value="">{t("settings.memory.noDefault")}</option>
-              <option value="hover">{t("wizard.track.hover")}</option>
-              <option value="circle">{t("wizard.track.circle")}</option>
-              <option value="u_turn">{t("wizard.track.uTurn")}</option>
-              <option value="lemniscate">{t("wizard.track.lemniscate")}</option>
-            </select>
-          </label>
-          <label htmlFor="settings_default_altitude">
-            <span>{t("settings.memory.defaultAltitude")}</span>
-            <input
-              id="settings_default_altitude"
-              type="number"
-              min="1"
-              max="20"
-              step="0.1"
-              value={experiencePreferenceDraft.default_altitude_m ?? ""}
-              disabled={experiencePreferenceControlsDisabled}
-              onChange={(event) => setExperiencePreferenceDraft((current) => ({
-                ...current,
-                default_altitude_m: event.target.value === ""
-                  ? null
-                  : Number(event.target.value),
-              }))}
-            />
-          </label>
-          <label htmlFor="settings_default_objective">
-            <span>{settingsCopy.memoryDefaults[1]}</span>
-            <select
-              id="settings_default_objective"
-              value={experiencePreferenceDraft.default_objective ?? ""}
-              disabled={experiencePreferenceControlsDisabled}
-              onChange={(event) => setExperiencePreferenceDraft((current) => ({
-                ...current,
-                default_objective: event.target.value || null,
-              }))}
-            >
-              <option value="">{t("settings.memory.noDefault")}</option>
-              <option value="tracking">{locale === "zh-CN" ? "跟踪精度" : "Tracking accuracy"}</option>
-              <option value="robustness">{locale === "zh-CN" ? "抗扰鲁棒性" : "Disturbance robustness"}</option>
-              <option value="efficiency">{locale === "zh-CN" ? "能耗效率" : "Energy efficiency"}</option>
-            </select>
-          </label>
-          <label htmlFor="settings_default_safety">
-            <span>{settingsCopy.memoryDefaults[2]}</span>
-            <select
-              id="settings_default_safety"
-              value={experiencePreferenceDraft.default_safety_profile ?? ""}
-              disabled={experiencePreferenceControlsDisabled}
-              onChange={(event) => setExperiencePreferenceDraft((current) => ({
-                ...current,
-                default_safety_profile: event.target.value || null,
-              }))}
-            >
-              <option value="">{t("settings.memory.noDefault")}</option>
-              <option value="conservative">{locale === "zh-CN" ? "保守" : "Conservative"}</option>
-              <option value="standard">{locale === "zh-CN" ? "标准" : "Standard"}</option>
-              <option value="lab-guarded">{locale === "zh-CN" ? "实验室受控" : "Lab guarded"}</option>
-            </select>
-          </label>
-          <label htmlFor="settings_default_units">
-            <span>{settingsCopy.memoryDefaults[3]}</span>
-            <select
-              id="settings_default_units"
-              value={experiencePreferenceDraft.default_units ?? ""}
-              disabled={experiencePreferenceControlsDisabled}
-              onChange={(event) => setExperiencePreferenceDraft((current) => ({
-                ...current,
-                default_units: event.target.value || null,
-              }))}
-            >
-              <option value="">{t("settings.memory.noDefault")}</option>
-              <option value="metric">{locale === "zh-CN" ? "公制" : "Metric"}</option>
-              <option value="imperial">{locale === "zh-CN" ? "英制" : "Imperial"}</option>
-            </select>
-          </label>
-          <label htmlFor="settings_default_report">
-            <span>{settingsCopy.memoryDefaults[4]}</span>
-            <select
-              id="settings_default_report"
-              value={experiencePreferenceDraft.default_report_format ?? ""}
-              disabled={experiencePreferenceControlsDisabled}
-              onChange={(event) => setExperiencePreferenceDraft((current) => ({
-                ...current,
-                default_report_format: event.target.value || null,
-              }))}
-            >
-              <option value="">{t("settings.memory.noDefault")}</option>
-              <option value="pdf">PDF</option>
-              <option value="html">HTML</option>
-              <option value="both">{locale === "zh-CN" ? "PDF 与 HTML" : "PDF and HTML"}</option>
-            </select>
-          </label>
-            </div>
-            <div className="settings-memory-actions">
+          <div className="settings-memory-actions">
           <button
             type="button"
             className="btn btn-primary"
@@ -2240,22 +2117,22 @@ function SettingsDialog({
               </button>
             </div>
           )}
-            </div>
           </div>
         </div>
-        {experiencePreferenceState === "blocked" ? (
-          <p className="settings-memory-message" role="status">
-            {t("settings.memory.runtimeRequired")}
-          </p>
-        ) : null}
-        {experiencePreferenceMessage && experiencePreferenceMessage !== EXPERIENCE_PREFERENCE_LOAD_FAILED ? (
-          <p
-            className="settings-memory-message"
-            role={experiencePreferenceState === "error" ? "alert" : "status"}
-          >
-            {experiencePreferenceMessage}
-          </p>
-        ) : null}
+        <div className="settings-memory-message-slot" aria-live="polite">
+          {experiencePreferenceState === "blocked" ? (
+            <p className="settings-memory-message" role="status">
+              {t("settings.memory.runtimeRequired")}
+            </p>
+          ) : experiencePreferenceMessage && experiencePreferenceMessage !== EXPERIENCE_PREFERENCE_LOAD_FAILED ? (
+            <p
+              className="settings-memory-message"
+              role={experiencePreferenceState === "error" ? "alert" : "status"}
+            >
+              {experiencePreferenceMessage}
+            </p>
+          ) : null}
+        </div>
         </section>
       </EditionSettingsPanel>
       <EditionSettingsPanel active={activeSettingsTab === "model"} id="model">
@@ -2263,29 +2140,6 @@ function SettingsDialog({
           className={`settings-model-panel${modelAccess.accessMode === "byok" ? " settings-model-panel-byok" : ""}`}
           aria-label={t("settings.model.title")}
         >
-        <section className="settings-model-section settings-model-mode-row" aria-labelledby="settings-model-access-title">
-          <header className="settings-model-section-heading">
-            <h3 id="settings-model-access-title">{t("settings.model.accessMode")}</h3>
-          </header>
-          <div className="settings-model-access-mode" role="group" aria-label={t("settings.model.accessMode")}>
-            <button
-              type="button"
-              className={modelAccess.accessMode === "platform" ? "selected" : undefined}
-              aria-pressed={modelAccess.accessMode === "platform"}
-              onClick={() => selectAccessMode("platform")}
-            >
-              <strong>{t("settings.model.includedAllowance")}</strong>
-            </button>
-            <button
-              type="button"
-              className={modelAccess.accessMode === "byok" ? "selected" : undefined}
-              aria-pressed={modelAccess.accessMode === "byok"}
-              onClick={() => selectAccessMode("byok")}
-            >
-              <strong>{t("settings.model.byok")}</strong>
-            </button>
-          </div>
-        </section>
         {modelAccess.accessMode === "platform" ? (
           <div className="settings-model-usage">
             <section className="settings-model-section settings-model-current-plan-section" aria-labelledby="settings-current-plan-title">
@@ -2519,6 +2373,7 @@ function SettingsDialog({
               className={`settings-runtime-status settings-runtime-status-${runtimeCheckVisualPhase ?? level}`}
               role="status"
               aria-live="polite"
+              title={uniqueDetails.join(" · ") || undefined}
             >
               <span className="settings-runtime-status-icon" aria-hidden="true">
                 {runtimeCheckVisualPhase === "checking" ? (
@@ -2565,11 +2420,6 @@ function SettingsDialog({
                 );
               })}
             </ol>
-            {!runtimeCheckActive && level !== "healthy" && uniqueDetails.length > 0 ? (
-              <ul className="settings-runtime-diagnostics" aria-label={t("settings.runtime.viewDetails")}>
-                {uniqueDetails.map((detail) => <li key={detail}>{detail}</li>)}
-              </ul>
-            ) : null}
           </section>
           <SettingsUpdateCenter
             onOpenRuntimeBase={() => {

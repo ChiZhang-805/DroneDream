@@ -79,6 +79,7 @@ import {
   saveAutonomyWorkspace,
   type AutonomyConversationMessage,
   type AutonomyMapPack,
+  type AutonomyVector3,
   type AutonomyWorkspaceState,
 } from "../features/autonomy/workspaceStore";
 import {
@@ -130,6 +131,7 @@ import {
   type AgentCoreAssetQualificationJob,
   type AgentCoreAssetSourceAdapter,
   type AgentCoreAssetVersion,
+  type AirspaceRequest,
   type AgentCoreExecutionEvidence,
   type AgentCoreLiveSource,
   type AgentCoreLiveTelemetry,
@@ -2450,9 +2452,14 @@ function RepositoryAssetPreview({
 
 type RepositoryDetails = {
   title: string;
+  description?: string;
   rows: Array<[string, string]>;
   kind: CatalogAssetKind;
   previewKey: string | null;
+  airspace?: {
+    request: AirspaceRequest;
+    route?: AutonomyVector3[];
+  };
 };
 
 function useHiddenCatalogResources(kind: CatalogAssetKind): [Set<string>, (key: string) => void] {
@@ -2690,33 +2697,21 @@ export function AutonomyAircraft() {
 
 export function AutonomyMaps() {
   const {
-    edition,
     chinese,
     workspace,
     assetLibrary,
+    persist,
     selectMap,
-    registerExternalAsset,
-    removeAsset,
   } = useAutonomyWorkspace();
   const [details, setDetails] = useState<RepositoryDetails | null>(null);
   const [selectedRepositoryMapId, setSelectedRepositoryMapId] = useState<string | null>(null);
-  const [hiddenCatalogResources, hideCatalogResource] = useHiddenCatalogResources("map");
-  const [expandedMapKey, setExpandedMapKey] = useState<string | null>(null);
   const [defaultResources, setDefaultResources] = useState<AgentCoreMapResource[]>([]);
-  const [resourceStates, setResourceStates] = useState<Record<string, "idle" | "working" | "conversion" | "ready" | "error">>({});
-  const catalogDefinitions = catalogAssetDefinitions("map");
-  const customMaps = assetLibrary.maps.filter((mapPack) => !catalogAssetKey(
-    "map",
-    mapPack.agentCoreAssetId?.trim() || mapPack.id,
-    mapPack.name,
-  ));
-  const externalMaps = unrepresentedExternalAssets(
-    "map",
-    [
-      ...catalogDefinitions.map((definition) => ({ id: definition.resourceId, name: definition.en })),
-      ...customMaps.map((mapPack) => ({ id: mapPack.agentCoreAssetId?.trim() || mapPack.id, name: mapPack.name })),
-    ],
-    assetLibrary.externalAssets,
+  const reconciliationAttempt = useRef<{
+    key: string;
+    promise: Promise<AutonomyWorkspaceState>;
+  } | null>(null);
+  const catalogDefinitions = catalogAssetDefinitions("map").filter(
+    (definition) => definition.key === "kumpula-campus",
   );
   const spaceMap = workspace.mapPack;
   const spaceVehicle = workspace.aircraft;
@@ -2724,17 +2719,102 @@ export function AutonomyMaps() {
   const route = plan?.source === "agent-core"
     && plan.routeMapSha256 === spaceMap.agentCoreContentSha256
     && plan.routeVehicleSha256 === spaceVehicle.agentCoreContentSha256 ? plan.routePositionsM : undefined;
-  const openMapDetails = (mapPack: AutonomyMapPack) => setDetails({
-    title: mapPack.name,
+  const openMapDetails = useCallback((
+    mapPack: AutonomyMapPack,
+    resource: AgentCoreMapResource | undefined,
+    title: string,
+  ) => setDetails({
+    title,
     kind: "map",
     previewKey: catalogAssetKey("map", mapPack.agentCoreAssetId?.trim() || mapPack.id, mapPack.name),
+    description: resource?.description[chinese ? "zh-CN" : "en-US"] ?? (chinese
+      ? "赫尔辛基大学昆普拉科学园区的真实地理语义地图，包含经校验的建筑轮廓、室外可飞空间、碰撞几何、命名地点和任务路线走廊，可用于校园取送、巡检与自主航迹规划。"
+      : "A real-world semantic map of the University of Helsinki Kumpula Science Campus with verified building footprints, outdoor flyable space, collision geometry, named places, and mission route corridors for campus delivery, inspection, and autonomous planning."),
     rows: [
       [chinese ? "类型" : "Type", mapRepresentationLabel(mapPack.representation, chinese)],
       [chinese ? "坐标系" : "Coordinate frame", mapPack.coordinateFrame],
       [chinese ? "分辨率" : "Resolution", `${mapPack.resolutionM} m`],
       [chinese ? "楼层" : "Floors", String(mapPack.floorCount)],
+      [chinese ? "数据来源" : "Data source", resource?.source.source_type === "bundled_ddpkg"
+        ? (chinese ? "赫尔辛基市开放数据 + OpenStreetMap" : "City of Helsinki open data + OpenStreetMap")
+        : resource?.source.location ?? (chinese ? "内置校验地图包" : "Bundled verified map package")],
+      [chinese ? "主要建筑" : "Named buildings", (
+        chinese ? resource?.analysis.named_buildings_zh : resource?.analysis.named_buildings
+      )?.join(" · ") || (chinese ? "校区建筑已写入语义层" : "Campus buildings are included in the semantic layer")],
+      [chinese ? "建筑数量" : "Buildings", String(resource?.analysis.building_count ?? resource?.analysis.model_count ?? "—")],
+      [chinese ? "碰撞几何" : "Collision geometry", resource
+        ? `${resource.analysis.collision_primitive_count ?? 0} ${chinese ? "个已解析碰撞体" : "parsed collision primitives"}`
+        : (chinese ? "已随地图包校验" : "Verified with the map package")],
+      [chinese ? "实时更新" : "Live updates", mapPack.liveUpdates.replaceAll("-", " ")],
+      [chinese ? "语义图层" : "Semantic layers", mapPack.semanticLayers.join(" · ") || "—"],
+      [chinese ? "规划图层" : "Planning layers", mapPack.planningLayers.join(" · ") || "—"],
+      [chinese ? "地图范围" : "Map bounds", `${mapPack.boundsM.x} × ${mapPack.boundsM.y} × ${mapPack.boundsM.z} m`],
+      [chinese ? "仿真状态" : "Simulation", resource?.readiness.simulation === "ready"
+        ? (chinese ? "已就绪" : "Ready") : (chinese ? "由内置运行环境加载" : "Loaded by the bundled runtime")],
+      [chinese ? "飞行状态" : "Flight", resource?.readiness.flight === "qualified"
+        ? (chinese ? "已完成全程验收" : "End-to-end qualified") : (chinese ? "使用当前无人机进行任务校验" : "Qualified with the selected aircraft at mission time")],
     ],
-  });
+    ...(mapPack.agentCoreAssetId
+      && mapPack.agentCoreContentSha256
+      && spaceVehicle.agentCoreAssetId
+      && spaceVehicle.agentCoreContentSha256
+      ? {
+          airspace: {
+            request: {
+              map_asset_id: mapPack.agentCoreAssetId,
+              map_content_sha256: mapPack.agentCoreContentSha256,
+              vehicle_asset_id: spaceVehicle.agentCoreAssetId,
+              vehicle_content_sha256: spaceVehicle.agentCoreContentSha256,
+            },
+            route: plan?.routeMapSha256 === mapPack.agentCoreContentSha256 ? route : undefined,
+          },
+        }
+      : {}),
+  }), [chinese, plan, route, spaceVehicle.agentCoreAssetId, spaceVehicle.agentCoreContentSha256]);
+
+  useEffect(() => {
+    const mapAssetId = spaceMap.agentCoreAssetId?.trim();
+    const vehicleAssetId = spaceVehicle.agentCoreAssetId?.trim();
+    if (
+      !mapAssetId
+      || !vehicleAssetId
+      || (spaceMap.agentCoreContentSha256 && spaceVehicle.agentCoreContentSha256)
+    ) return undefined;
+
+    const key = `${mapAssetId}:${vehicleAssetId}`;
+    if (!reconciliationAttempt.current || reconciliationAttempt.current.key !== key) {
+      reconciliationAttempt.current = {
+        key,
+        promise: reconcileAgentCoreWorkspace(workspace, assetLibrary),
+      };
+    }
+    const attempt = reconciliationAttempt.current;
+    let active = true;
+    void attempt.promise.then((next) => {
+      if (active) persist(next);
+    }).catch(() => {
+      if (reconciliationAttempt.current === attempt) reconciliationAttempt.current = null;
+    });
+    return () => { active = false; };
+  }, [assetLibrary, persist, spaceMap.agentCoreAssetId, spaceMap.agentCoreContentSha256, spaceVehicle.agentCoreAssetId, spaceVehicle.agentCoreContentSha256, workspace]);
+
+  useEffect(() => {
+    if (
+      !details
+      || details.kind !== "map"
+      || details.airspace
+      || !spaceMap.agentCoreContentSha256
+      || !spaceVehicle.agentCoreContentSha256
+    ) return;
+    const resource = defaultResources.find((candidate) => candidate.resource_id === "dronedream-school-map");
+    const presentation = catalogAssetPresentation(
+      "map",
+      spaceMap.agentCoreAssetId?.trim() || spaceMap.id,
+      spaceMap.name,
+      chinese,
+    );
+    openMapDetails(spaceMap, resource, presentation.name);
+  }, [chinese, defaultResources, details, openMapDetails, spaceMap, spaceVehicle.agentCoreContentSha256]);
   useEffect(() => {
     let active = true;
     void listAgentCoreMapResources().then((catalog) => {
@@ -2749,6 +2829,7 @@ export function AutonomyMaps() {
     title: resourceName(resource),
     kind: "map",
     previewKey: catalogAssetKey("map", resource.resource_id, resourceName(resource)),
+    description: resource.description[chinese ? "zh-CN" : "en-US"],
     rows: [
       [chinese ? "说明" : "Description", resource.description[chinese ? "zh-CN" : "en-US"]],
       [chinese ? "来源" : "Source", resource.source.source_type === "bundled_ddpkg"
@@ -2767,54 +2848,17 @@ export function AutonomyMaps() {
         ? (chinese ? "已完成全程验收" : "End-to-end qualified") : (chinese ? "尚未验收" : "Not qualified")],
     ],
   });
-  const prepareDefaultResource = async (resource: AgentCoreMapResource) => {
-    if (resourceStates[resource.resource_id] === "working") return;
-    if (resource.source.source_type === "bundled_ddpkg") {
-      setResourceStates((current) => ({ ...current, [resource.resource_id]: "ready" }));
-      return;
-    }
-    setResourceStates((current) => ({ ...current, [resource.resource_id]: "working" }));
-    try {
-      const created = await createAgentCoreRemoteAssetImportJob({
-        source_type: resource.source.source_type,
-        location: resource.source.location,
-        expected_kind: resource.source.expected_kind,
-        source_format: resource.source.source_format,
-        expected_sha256: resource.source.expected_sha256,
-        ...(resource.source.source_type === "git" && resource.source.git_ref
-          ? { git_ref: resource.source.git_ref } : {}),
-        ...(resource.source.source_type === "git" && resource.source.subpath
-          ? { subpath: resource.source.subpath } : {}),
-      });
-      const processed = await processAgentCoreAssetImportJob(created.job_id);
-      if (processed.asset_id) {
-        const contentSha256 = processed.qualified_content_sha256
-          ?? processed.normalized_content_sha256;
-        const bootstrap = await getAgentCoreBootstrap();
-        const version = bootstrap.asset_versions.find((candidate) => (
-          candidate.asset_id === processed.asset_id
-          && (!contentSha256 || candidate.content_sha256 === contentSha256)
-        ));
-        if (version) registerExternalAsset(version);
-      }
-      setResourceStates((current) => ({
-        ...current,
-        [resource.resource_id]: processed.state === "qualified" ? "ready"
-          : processed.state === "needs_input" ? "conversion" : "error",
-      }));
-    } catch {
-      setResourceStates((current) => ({ ...current, [resource.resource_id]: "error" }));
-    }
-  };
-
   return (
     <section className="autonomy-repository-page">
       <div className="autonomy-repository-toolbar">
         <p>{chinese ? "双击卡片查看详情" : "Double-click a card for details"}</p>
-        <AutonomyAssetConnectorPanel kind="map" chinese={chinese} compact />
       </div>
-      <div className="autonomy-repository-grid" aria-label={chinese ? "地图仓库" : "Map repository"}>
-        {catalogDefinitions.filter((definition) => !hiddenCatalogResources.has(definition.key)).map((definition) => {
+      <div
+        className="autonomy-repository-grid"
+        role="region"
+        aria-label={chinese ? "地图仓库" : "Map repository"}
+      >
+        {catalogDefinitions.map((definition) => {
           const mapPack = assetLibrary.maps.find((candidate) => catalogAssetKey(
             "map",
             candidate.agentCoreAssetId?.trim() || candidate.id,
@@ -2825,33 +2869,22 @@ export function AutonomyMaps() {
             || catalogAssetKey("map", candidate.resource_id, resourceName(candidate)) === definition.key
           ));
           const presentation = catalogAssetPresentation("map", definition.resourceId, definition.en, chinese);
-          const state = resource ? resourceStates[resource.resource_id] ?? "idle" : "idle";
-          const airspaceExpanded = expandedMapKey === definition.key;
-          const canShowAirspace = Boolean(
-            airspaceExpanded
-            && mapPack?.agentCoreAssetId
-            && mapPack.agentCoreContentSha256
-            && spaceVehicle.agentCoreAssetId
-            && spaceVehicle.agentCoreContentSha256,
-          );
           return <article
             key={definition.key}
             data-catalog-resource="true"
             data-selected={Boolean(mapPack && selectedRepositoryMapId === mapPack.id)}
-            data-airspace-expanded={canShowAirspace}
           >
             <button
               type="button"
               className="autonomy-repository-card-surface"
               onClick={() => {
-                setExpandedMapKey((current) => current === definition.key ? null : definition.key);
                 if (mapPack) {
                   setSelectedRepositoryMapId(mapPack.id);
                   selectMap(mapPack.id);
                 }
               }}
               onDoubleClick={() => {
-                if (mapPack) openMapDetails(mapPack);
+                if (mapPack) openMapDetails(mapPack, resource, presentation.name);
                 else if (resource) openResourceDetails(resource);
                 else setDetails({ title: presentation.name, kind: "map", previewKey: presentation.key, rows: [[chinese ? "状态" : "Status", chinese ? "资源目录可见，运行服务启动后加载详情" : "Catalogued; details load when the runtime is ready"]] });
               }}
@@ -2859,84 +2892,8 @@ export function AutonomyMaps() {
               <RepositoryAssetPreview kind="map" previewUrl={presentation.previewUrl} previewKey={presentation.key} name={presentation.name} />
               <span className="autonomy-repository-copy"><strong title={presentation.name}>{presentation.name}</strong></span>
             </button>
-            {resource && resource.install_mode === "on_demand" && !mapPack ? <button
-              type="button"
-              className="autonomy-repository-interpret"
-              data-state={state === "working" ? "busy" : state === "ready" ? "done" : state === "error" ? "error" : undefined}
-              disabled={state === "working" || state === "ready" || state === "conversion"}
-              aria-label={chinese ? `准备 ${presentation.name}` : `Prepare ${presentation.name}`}
-              title={chinese ? "准备这个地图资源" : "Prepare this map resource"}
-              onClick={() => void prepareDefaultResource(resource)}
-            ><Upload aria-hidden="true" /></button> : null}
-            <button
-              type="button"
-              className="autonomy-repository-delete"
-              aria-label={chinese ? "删除地图" : "Delete map"}
-              title={chinese ? `删除 ${presentation.name}` : `Delete ${presentation.name}`}
-              onClick={() => {
-                hideCatalogResource(definition.key);
-                if (mapPack?.id === selectedRepositoryMapId) setSelectedRepositoryMapId(null);
-              }}
-            ><Trash2 aria-hidden="true" /></button>
-            {canShowAirspace ? <div className="autonomy-repository-airspace-detail">
-              <PreferredAirspaceView
-                chinese={chinese}
-                route={plan?.routeMapSha256 === mapPack?.agentCoreContentSha256 ? route : undefined}
-                request={{
-                  map_asset_id: mapPack!.agentCoreAssetId!,
-                  map_content_sha256: mapPack!.agentCoreContentSha256!,
-                  vehicle_asset_id: spaceVehicle.agentCoreAssetId!,
-                  vehicle_content_sha256: spaceVehicle.agentCoreContentSha256!,
-                }}
-              />
-            </div> : null}
           </article>;
         })}
-        {customMaps.map((mapPack) => {
-          const presentation = catalogAssetPresentation("map", mapPack.agentCoreAssetId?.trim() || mapPack.id, mapPack.name, chinese);
-          const key = catalogAssetKey("map", mapPack.agentCoreAssetId?.trim() || mapPack.id, mapPack.name);
-          const canShowAirspace = Boolean(
-            expandedMapKey === key
-            && mapPack.agentCoreAssetId
-            && mapPack.agentCoreContentSha256
-            && spaceVehicle.agentCoreAssetId
-            && spaceVehicle.agentCoreContentSha256,
-          );
-          return <article key={mapPack.id} data-selected={selectedRepositoryMapId === mapPack.id} data-airspace-expanded={canShowAirspace}>
-            <button type="button" className="autonomy-repository-card-surface" onClick={() => {
-              setExpandedMapKey((current) => current === key ? null : key);
-              setSelectedRepositoryMapId(mapPack.id);
-              selectMap(mapPack.id);
-            }} onDoubleClick={() => openMapDetails(mapPack)}>
-              <RepositoryAssetPreview kind="map" previewUrl={presentation.previewUrl} previewKey={presentation.key} name={presentation.name} />
-              <span className="autonomy-repository-copy"><strong title={presentation.name}>{presentation.name}</strong></span>
-            </button>
-            <AssetInterpretButton edition={edition} chinese={chinese} kind="map" assetId={mapPack.agentCoreAssetId ?? null} contentSha256={mapPack.agentCoreContentSha256 ?? null} name={mapPack.name} />
-            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? "删除地图" : "Delete map"} title={chinese ? `删除 ${mapPack.name}` : `Delete ${mapPack.name}`} onClick={() => removeAsset("map", mapPack.id)}><Trash2 aria-hidden="true" /></button>
-            {canShowAirspace ? <div className="autonomy-repository-airspace-detail">
-              <PreferredAirspaceView
-                chinese={chinese}
-                route={plan?.routeMapSha256 === mapPack.agentCoreContentSha256 ? route : undefined}
-                request={{
-                  map_asset_id: mapPack.agentCoreAssetId!,
-                  map_content_sha256: mapPack.agentCoreContentSha256!,
-                  vehicle_asset_id: spaceVehicle.agentCoreAssetId!,
-                  vehicle_content_sha256: spaceVehicle.agentCoreContentSha256!,
-                }}
-              />
-            </div> : null}
-          </article>;
-        })}
-        {externalMaps.map((asset) => (
-          <article key={`${asset.id}:${asset.contentSha256}`}>
-            <button type="button" className="autonomy-repository-card-surface" onDoubleClick={() => setDetails({ title: asset.name, kind: "map", previewKey: catalogAssetKey("map", asset.id, asset.name), rows: [[chinese ? "来源" : "Source", asset.sourceApplication || "—"], [chinese ? "格式" : "Format", asset.sourceFormat.toUpperCase()], [chinese ? "状态" : "Status", asset.maturity.replaceAll("_", " ")]] })}>
-              <RepositoryAssetPreview kind="map" previewUrl={null} previewKey={null} name={asset.name} />
-              <span className="autonomy-repository-copy"><strong title={asset.name}>{asset.name}</strong></span>
-            </button>
-            <AssetInterpretButton edition={edition} chinese={chinese} kind="map" assetId={asset.id} contentSha256={asset.contentSha256} name={asset.name} />
-            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? "删除地图" : "Delete map"} title={chinese ? `删除 ${asset.name}` : `Delete ${asset.name}`} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
-          </article>
-        ))}
       </div>
       {details ? <RepositoryDetailsDialog chinese={chinese} details={details} onClose={() => setDetails(null)} /> : null}
     </section>
@@ -2959,8 +2916,19 @@ function RepositoryDetailsDialog({
       <section className="autonomy-repository-dialog" role="dialog" aria-modal="true" aria-label={details.title}>
         <header><h2>{details.title}</h2><button type="button" onClick={onClose} aria-label={chinese ? "关闭" : "Close"}><X aria-hidden="true" /></button></header>
         <div className="autonomy-repository-dialog-body">
-          <dl>{details.rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
-          <RepositoryAsset3DView kind={details.kind} previewKey={details.previewKey} name={details.title} chinese={chinese} />
+          <div className="autonomy-repository-dialog-copy">
+            {details.description ? <p>{details.description}</p> : null}
+            <dl>{details.rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+          </div>
+          {details.airspace ? (
+            <PreferredAirspaceView
+              chinese={chinese}
+              request={details.airspace.request}
+              route={details.airspace.route}
+            />
+          ) : (
+            <RepositoryAsset3DView kind={details.kind} previewKey={details.previewKey} name={details.title} chinese={chinese} />
+          )}
         </div>
       </section>
     </div>

@@ -50,6 +50,16 @@ it("streams lengthy clearance explanations and real counters without switching t
   expect(view.container.querySelector(".autonomy-preparation-detail")).toHaveTextContent("已检查32个位置，用时4.1秒");
 });
 
+it("shows the runtime title for execution monitoring and in-flight model work", () => {
+  render(
+    <PreparationProgress
+      events={[{ stage: "runtime", zh: "正在生成局部导航建议", en: "Generating guidance" }]}
+      chinese
+    />,
+  );
+  expect(screen.getByRole("heading")).toHaveTextContent("正在执行并调整任务");
+});
+
 it("serially polls, deduplicates receipts and stops after completion", async () => {
   const event = { sequence: 1, stage: "assets", zh: "真实读取", en: "Actual read" };
   request.mockResolvedValueOnce({ state: "running", events: [event] });

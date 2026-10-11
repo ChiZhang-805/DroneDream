@@ -578,8 +578,8 @@ afterEach(() => {
         ([command]) => command === "probe_runtime_status",
       )).toHaveLength(initialRuntimeProbeCount + 1);
     }, { timeout: 7_000 });
-    expect(within(workspace).getByText("DroneDreamRuntime is not installed."))
-      .toBeInTheDocument();
+    expect(workspace.querySelector(".settings-runtime-status"))
+      .toHaveAttribute("title", expect.stringContaining("DroneDreamRuntime is not installed."));
     fireEvent.click(within(workspace).getByRole("button", { name: "Back to app" }));
     expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
       .toHaveAttribute("aria-valuenow", "0");

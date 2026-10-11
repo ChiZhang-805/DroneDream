@@ -12,6 +12,7 @@ const TITLES: Record<string, [string, string]> = {
   decomposition: ["正在分解任务步骤", "Decomposing task steps"],
   route: ["正在规划路线", "Planning the route"],
   clearance: ["正在检查三维通行间隙", "Checking 3D route clearance"],
+  runtime: ["正在执行并调整任务", "Executing and adjusting the mission"],
   verification: ["正在校验计划", "Validating the plan"],
   ready: ["正在整理回复", "Preparing the reply"],
   failed: ["正在处理本次结果", "Handling the result"],
