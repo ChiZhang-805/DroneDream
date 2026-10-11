@@ -8,45 +8,46 @@ deleting existing conversations.
 
 1. Open **DroneDream · AGENT** and sign in. The window title must contain only
    the product name.
-2. Open **Maps**. Exactly eight bundled 3D maps must appear as scene cards, each
-   with its own oblique 3D preview and one concise name. Double-click a card to
-   inspect its information and interactive 3D view. Importing or updating a user
-   map must create a content identity; an unchanged map must reuse its existing
-   analysis, while a changed map must invalidate only the affected compatibility
-   result.
-3. Open **Aircraft**. The default resource catalog must list the reviewed PX4
-   aircraft. Selecting a resource must show its sensors, nested model
-   dependencies, recommended tasks, excluded tasks, pinned source revision,
-   license, and readiness. Preparing an on-demand model must add the resulting
-   asset version to the account library without restarting the application.
-4. Return to **Chatbot**. The initial page must contain no old messages. Use the
-   plus menu to choose an aircraft and a map. Nothing is selected by default;
-   after either item is chosen, the other menu must show only compatible items.
-   The app performs compatibility analysis automatically and must not show a
-   separate pair-qualification panel.
+2. Open **Maps**. Exactly one bundled map, **Kumpula Campus / 赫尔辛基大学昆普拉校区**,
+   must appear. No retired generic map cards or separate 3D-corridor card may be
+   visible. Double-click the Kumpula card to inspect its information and
+   interactive exterior 3D view. The scene must report its real-world coordinate
+   reference, outdoor-only scope, collision geometry, bilingual semantic places,
+   and qualified runtime binding without claiming that building interiors exist.
+3. Open **Aircraft**. The bundled catalog must expose the qualified **My Drone**
+   PX4 vehicle used by the Kumpula mission. Its details must identify the flight
+   controller, inertial and position sensors, depth camera, collision geometry,
+   payload interface, spawn binding, source revision, license, and readiness.
+4. Return to **Chatbot**. Start a new conversation and select **My Drone** and
+   **Kumpula Campus** if they are not already attached. The app performs
+   compatibility analysis automatically and must not show a separate
+   pair-qualification panel.
 
-## Office meal-pickup round trip
+## Kumpula delivery round trip
 
 1. Start a new conversation and send:
 
-   > 帮我取一下外卖。
+   > 把一件小包裹送到信息科学楼室外交付点，完成交付后返回起降点。
 
 2. While preparation is running, verify that the visible status changes between
    concrete stages and streams useful progress summaries. It must not expose a
    hidden model chain of thought, stay on an unexplained three-dot indicator, or
    fabricate completed work.
-3. If more than one pickup point is plausible, verify that the assistant asks
-   one natural Chinese question and offers A/B/C choices plus **其他**. Choosing
-   **其他** must reveal an input field. Internal field names and error codes must
-   not be shown. The application, not the user, supplies the default ten-second
-   pickup hover, no-scan behavior, return trip and plan-before-execution flow.
+3. The destination must resolve to **Exactum outdoor delivery zone / 信息科学楼室外交付点**.
+   If the destination is deliberately omitted in a second test, verify that the
+   assistant asks one natural Chinese question and offers the known Kumpula
+   delivery places plus **其他**. Choosing **其他** must reveal an input field.
+   Internal field names and error codes must not be shown. The application, not
+   the user, supplies the launch, handoff, return and plan-before-execution flow.
 4. Verify that the conversation title and plan are in Chinese. The plan card
    must contain the selected aircraft, map, route and ordered execution steps.
 5. Click **开始仿真**. The application must acknowledge the command and keep
    **查看运行** disabled until a real live frame is available.
-6. In **查看运行**, observe takeoff, corridor/door/stair transitions, outdoor
-   safe-height changes, meal-point hover, payload transition, return flight and
-   landing.
+6. In **查看运行**, observe takeoff from **昆普拉校区南侧起降点**, three-dimensional
+   outdoor routing around the qualified collision volumes, arrival and handoff
+   at **信息科学楼室外交付点**, return flight, and landing. The current qualified
+   map is exterior-only, so this acceptance run must not claim corridor, door,
+   stair, or indoor-room traversal.
 
 ## Behaviour under incomplete information
 
