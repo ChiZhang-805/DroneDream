@@ -39,6 +39,49 @@ def test_payload_spawn_and_pickup_share_the_same_precise_acceptance_radius() -> 
     assert runner.PICKUP_PAYLOAD_SPAWN_RADIUS_M == runner.PICKUP_ACCEPTANCE_RADIUS_M
 
 
+def test_vehicle_spawn_is_bound_to_the_actual_launch_pad_surface() -> None:
+    semantic = {
+        "runtime_bindings": {
+            "vehicle_spawn": {"x": -41.0, "y": -83.0, "z": 0.067},
+        },
+        "collision_primitives": [
+            {
+                "semantic": "launch-pad",
+                "center_x": -41.0,
+                "center_y": -83.0,
+                "center_z": 0.04,
+                "size_x": 2.4,
+                "size_y": 2.4,
+                "size_z": 0.08,
+            }
+        ],
+    }
+
+    assert runner._validate_vehicle_spawn_contact(semantic, 0.013) == _spawn_model_root()
+
+
+def test_vehicle_spawn_rejects_a_model_that_would_float_above_the_launch_pad() -> None:
+    semantic = {
+        "runtime_bindings": {
+            "vehicle_spawn": {"x": -41.0, "y": -83.0, "z": 0.067},
+        },
+        "collision_primitives": [
+            {
+                "semantic": "launch-pad",
+                "center_x": -41.0,
+                "center_y": -83.0,
+                "center_z": 0.04,
+                "size_x": 2.4,
+                "size_y": 2.4,
+                "size_z": 0.08,
+            }
+        ],
+    }
+
+    with pytest.raises(RuntimeError, match="landing contact disagrees"):
+        runner._validate_vehicle_spawn_contact(semantic, 0.02)
+
+
 def test_live_progress_cannot_jump_across_the_symmetric_return_route() -> None:
     route = [(float(index), 0.0, 1.0) for index in range(30)]
 

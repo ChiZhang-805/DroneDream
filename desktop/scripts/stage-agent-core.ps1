@@ -186,6 +186,18 @@ foreach ($path in $required) {
     }
 }
 
+# 发布前直接检查将被复制的两个 DDPKG。索引文字、截图或旧构建回执不能代替
+# 对当前归档字节、飞行证据、语义/导航、碰撞/视觉、传感器和许可证的核验。
+$assetVerifier = Join-Path $repoRoot 'desktop\scripts\verify-qualified-default-assets.py'
+$assetSource = Join-Path $sourceResources 'default-assets'
+$assetLicenseManifest = Join-Path $coreRoot 'runtime\default-assets-licenses.json'
+& $corePython $assetVerifier `
+    --asset-root $assetSource `
+    --license-manifest $assetLicenseManifest
+if ($LASTEXITCODE -ne 0) {
+    throw 'The bundled map/vehicle pair failed release qualification.'
+}
+
 $targetBinaryRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "desktop\src-tauri\binaries"))
 $targetResourceRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "desktop\src-tauri\agent-core-resources"))
 $allowedParent = [IO.Path]::GetFullPath((Join-Path $repoRoot "desktop\src-tauri"))
@@ -285,7 +297,6 @@ foreach ($plugin in @($pluginIndex.plugins)) {
         -ExpectedSha256 ([string]$plugin.sha256)
 }
 
-$assetSource = Join-Path $sourceResources "default-assets"
 $assetTarget = Join-Path $targetResourceRoot "default-assets"
 $assetIndexPath = Join-Path $assetSource "index.json"
 $assetIndex = Get-Content -LiteralPath $assetIndexPath -Raw | ConvertFrom-Json

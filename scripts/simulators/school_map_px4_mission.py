@@ -51,6 +51,8 @@ from app.autonomy.px4_x500_vehicle import (  # noqa: E402
     px4_x500_loaded_thrust_to_weight,
 )
 from app.autonomy.school_map_artifact import (  # noqa: E402
+    PX4_X500_COLLISION_CENTER_ABOVE_MODEL_ROOT_M,
+    PX4_X500_MODEL_ROOT_TO_CONTACT_M,
     STRUCTURAL_TOLERANCE_M,
     CollisionPrimitive,
     export_school_map_gazebo_artifact,
@@ -430,6 +432,39 @@ def _px4_x500_model_root_to_contact_m(px4_root: Path) -> float:
     if max(lowest_surfaces) - min(lowest_surfaces) > 1e-9:
         raise ValueError("PX4 X500 landing skids do not share one contact plane")
     return min(lowest_surfaces)
+
+
+def _validate_vehicle_spawn_contact(
+    semantic: dict[str, Any],
+    model_root_to_contact_m: float,
+) -> WorldPoint:
+    """Return the model-root spawn after proving its skids rest on the launch pad."""
+
+    spawn = semantic["runtime_bindings"]["vehicle_spawn"]
+    model_root_world = (float(spawn["x"]), float(spawn["y"]), float(spawn["z"]))
+    launch_pads = [
+        primitive
+        for primitive in semantic["collision_primitives"]
+        if primitive.get("semantic") == "launch-pad"
+    ]
+    if len(launch_pads) != 1:
+        raise RuntimeError("School Map must define exactly one launch-pad collision primitive")
+    launch_pad = launch_pads[0]
+    half_x = float(launch_pad["size_x"]) / 2.0
+    half_y = float(launch_pad["size_y"]) / 2.0
+    if (
+        abs(model_root_world[0] - float(launch_pad["center_x"])) > half_x
+        or abs(model_root_world[1] - float(launch_pad["center_y"])) > half_y
+    ):
+        raise RuntimeError("School Map vehicle spawn is outside the launch pad")
+    launch_surface_z = float(launch_pad["center_z"]) + float(launch_pad["size_z"]) / 2.0
+    vehicle_contact_z = model_root_world[2] + model_root_to_contact_m
+    if abs(vehicle_contact_z - launch_surface_z) > STRUCTURAL_TOLERANCE_M:
+        raise RuntimeError(
+            "PX4 X500 landing contact disagrees with the School Map launch surface: "
+            f"vehicle={vehicle_contact_z:g}, map={launch_surface_z:g}"
+        )
+    return model_root_world
 
 
 def _px4_x500_runtime_physics(px4_root: Path) -> dict[str, Any]:
@@ -1101,19 +1136,14 @@ def _prepare_run(
     vehicle_dir = run_dir / "my-drone"
     vehicle_exported = export_my_drone_gazebo_artifact(vehicle_dir)
     semantic = json.loads((map_dir / "semantic.json").read_text(encoding="utf-8"))
-    runtime_bindings = semantic["runtime_bindings"]
-    spawn = runtime_bindings["vehicle_spawn"]
-    if spawn.get("pose_reference") != "px4-x500-model-root":
-        raise RuntimeError("School Map PX4 spawn must use the PX4 X500 model-root reference")
     model_root_to_contact_m = _px4_x500_model_root_to_contact_m(px4_root)
-    runtime_physics = _px4_x500_runtime_physics(px4_root)
-    declared_root_to_contact_m = float(spawn["contact_surface_offset_z"])
-    if abs(model_root_to_contact_m - declared_root_to_contact_m) > STRUCTURAL_TOLERANCE_M:
+    if abs(model_root_to_contact_m - PX4_X500_MODEL_ROOT_TO_CONTACT_M) > STRUCTURAL_TOLERANCE_M:
         raise RuntimeError(
-            "PX4 X500 root-to-contact offset disagrees with the School Map contract: "
-            f"SDF={model_root_to_contact_m:g}, map={declared_root_to_contact_m:g}"
+            "PX4 X500 root-to-contact offset drifted from the qualified vehicle contract: "
+            f"SDF={model_root_to_contact_m:g}, contract={PX4_X500_MODEL_ROOT_TO_CONTACT_M:g}"
         )
-    model_root_world = (float(spawn["x"]), float(spawn["y"]), float(spawn["z"]))
+    runtime_physics = _px4_x500_runtime_physics(px4_root)
+    model_root_world = _validate_vehicle_spawn_contact(semantic, model_root_to_contact_m)
     route = _route_points()
     scene = get_scene("school-campus-v1")
     if scene is None or len(scene.reference_path) != len(route):
@@ -1148,7 +1178,7 @@ def _prepare_run(
                 "executor_z": "PX4 local up",
                 "model_root_world_enu_m": model_root_world,
                 "collision_center_above_model_root_m": (
-                    runtime_bindings["vehicle_collision_center_offset"]["z"]
+                    PX4_X500_COLLISION_CENTER_ABOVE_MODEL_ROOT_M
                 ),
             },
             "source_world_points": [
