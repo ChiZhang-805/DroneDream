@@ -192,13 +192,14 @@ def map_pack_payload() -> dict[str, object]:
             "building-footprints",
             "orthophoto",
             "pickup-zones",
+            "delivery-zones",
             "launch-zones",
             "named-campus-buildings",
         ],
         "planning_layers": [
             "collision-geometry",
-            "navigation-graph",
-            "route-corridor",
+            "semantic-endpoints",
+            "runtime-3d-route-planning",
         ],
         "source_asset_receipt_ids": [],
     }

@@ -58,6 +58,20 @@ def test_kumpula_semantics_bind_named_buildings_and_strict_runtime_coordinates()
         if name in {"Exactum", "Physicum", "Chemicum", "Dynamicum"}
     }
     assert len(named_positions) == 4
+    delivery_zones = {
+        entity["entity_id"]: entity
+        for entity in semantic["entities"]
+        if entity.get("semantic") == "delivery"
+    }
+    assert set(delivery_zones) == {
+        "dynamicum-delivery-zone",
+        "exactum-delivery-zone",
+        "physicum-delivery-zone",
+    }
+    assert all(entity["route_source"] == "runtime-3d-collision-planner"
+               for entity in delivery_zones.values())
+    assert all(any("交付点" in alias for alias in entity["aliases"])
+               for entity in delivery_zones.values())
     assert semantic["coordinate_frame"] == "ENU"
     assert semantic["bounds_m"] == {"x": 500.0, "y": 500.0, "z": 35.0}
     assert semantic["runtime_bindings"] == {
@@ -100,7 +114,7 @@ def test_reference_route_is_collision_free_for_the_qualified_vehicle() -> None:
     assert result.minimum_clearance_m > 1.2
 
 
-def test_navigation_graph_exposes_only_flight_verified_public_endpoints() -> None:
+def test_navigation_graph_keeps_delivery_places_unconnected_for_runtime_3d_planning() -> None:
     graph_path = (
         Path(__file__).parents[1]
         / "app"
@@ -112,6 +126,21 @@ def test_navigation_graph_exposes_only_flight_verified_public_endpoints() -> Non
     graph = json.loads(graph_path.read_text(encoding="utf-8"))
     assert graph["named_entities"]["campus-south-launch-pad"] == "verified-000"
     assert graph["named_entities"]["chemicum-south-handoff-point"] == "verified-004"
+    delivery_node_ids = {
+        "dynamicum-delivery-zone",
+        "exactum-delivery-zone",
+        "physicum-delivery-zone",
+    }
+    assert delivery_node_ids.issubset({node["node_id"] for node in graph["nodes"]})
+    connected_node_ids = {
+        node_id
+        for edge in graph["edges"]
+        for node_id in (edge["from_node"], edge["to_node"])
+    }
+    assert delivery_node_ids.isdisjoint(connected_node_ids)
+    assert graph["named_entities"]["气象楼交付点"] == "dynamicum-delivery-zone"
+    assert graph["named_entities"]["信息科学楼交付点"] == "exactum-delivery-zone"
+    assert graph["named_entities"]["物理楼交付点"] == "physicum-delivery-zone"
     assert all(edge["qualification"] == "flight-verified" for edge in graph["edges"])
     assert all(len(edge["evidence_sha256"]) == 64 for edge in graph["edges"])
 

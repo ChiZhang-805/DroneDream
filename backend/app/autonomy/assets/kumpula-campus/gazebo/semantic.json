@@ -564,6 +564,69 @@
     },
     {
       "aliases": [
+        "Dynamicum delivery zone",
+        "Dynamicum handoff point",
+        "气象楼室外交付点",
+        "气象楼交付点",
+        "气象楼收件点"
+      ],
+      "entity_id": "dynamicum-delivery-zone",
+      "kind": "delivery",
+      "name": "Dynamicum outdoor delivery zone",
+      "name_zh": "气象楼室外交付点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": -56.665,
+        "y": -83.016,
+        "z": 2.0
+      },
+      "route_source": "runtime-3d-collision-planner",
+      "semantic": "delivery"
+    },
+    {
+      "aliases": [
+        "Exactum delivery zone",
+        "Exactum handoff point",
+        "信息科学楼室外交付点",
+        "信息科学楼交付点",
+        "计算机科学楼交付点"
+      ],
+      "entity_id": "exactum-delivery-zone",
+      "kind": "delivery",
+      "name": "Exactum outdoor delivery zone",
+      "name_zh": "信息科学楼室外交付点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": -75.122,
+        "y": -43.307,
+        "z": 2.0
+      },
+      "route_source": "runtime-3d-collision-planner",
+      "semantic": "delivery"
+    },
+    {
+      "aliases": [
+        "Physicum delivery zone",
+        "Physicum handoff point",
+        "物理楼室外交付点",
+        "物理楼交付点",
+        "物理科学楼交付点"
+      ],
+      "entity_id": "physicum-delivery-zone",
+      "kind": "delivery",
+      "name": "Physicum outdoor delivery zone",
+      "name_zh": "物理楼室外交付点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 54.629,
+        "y": 35.294,
+        "z": 2.0
+      },
+      "route_source": "runtime-3d-collision-planner",
+      "semantic": "delivery"
+    },
+    {
+      "aliases": [
         "Dynamicum",
         "Dynamicum building",
         "气象楼",

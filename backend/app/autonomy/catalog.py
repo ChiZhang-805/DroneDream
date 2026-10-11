@@ -27,8 +27,9 @@ KUMPULA_SCENE = TerrainScene(
     summary=(
         "Real University of Helsinki Kumpula Campus map built from City of Helsinki "
         "building footprints and orthophotography. This exterior-only simulation map "
-        "includes Exactum, Physicum, Chemicum and Dynamicum plus one flight-verified "
-        "outdoor delivery corridor; it does not represent building interiors."
+        "includes Exactum, Physicum, Chemicum and Dynamicum, bilingual semantic places "
+        "and geometry-qualified outdoor handoff zones. Routes are generated from current "
+        "3-D collision geometry; it does not represent building interiors."
     ),
     bounds_m=Vector3(x=500.0, y=500.0, z=35.0),
     floors=1,
@@ -133,13 +134,14 @@ KUMPULA_PROFILE: BundledMapProfile = {
         "building-footprints",
         "orthophoto",
         "pickup-zones",
+        "delivery-zones",
         "launch-zones",
         "named-campus-buildings",
     ],
     "planning_layers": [
         "collision-geometry",
-        "navigation-graph",
-        "route-corridor",
+        "semantic-endpoints",
+        "runtime-3d-route-planning",
     ],
 }
 

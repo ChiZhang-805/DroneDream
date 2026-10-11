@@ -111,6 +111,48 @@ PICKUP_ALIASES = (
     "交接点",
 )
 
+# These are geometry-qualified outdoor operation poses near the named
+# buildings. They are semantic destinations, not authored routes: the runtime
+# 3-D planner must derive every path from the current collision geometry.
+DELIVERY_ZONES: dict[str, dict[str, Any]] = {
+    "dynamicum-delivery-zone": {
+        "name": "Dynamicum outdoor delivery zone",
+        "name_zh": "气象楼室外交付点",
+        "position": (-56.665, -83.016, 2.0),
+        "aliases": (
+            "Dynamicum delivery zone",
+            "Dynamicum handoff point",
+            "气象楼室外交付点",
+            "气象楼交付点",
+            "气象楼收件点",
+        ),
+    },
+    "exactum-delivery-zone": {
+        "name": "Exactum outdoor delivery zone",
+        "name_zh": "信息科学楼室外交付点",
+        "position": (-75.122, -43.307, 2.0),
+        "aliases": (
+            "Exactum delivery zone",
+            "Exactum handoff point",
+            "信息科学楼室外交付点",
+            "信息科学楼交付点",
+            "计算机科学楼交付点",
+        ),
+    },
+    "physicum-delivery-zone": {
+        "name": "Physicum outdoor delivery zone",
+        "name_zh": "物理楼室外交付点",
+        "position": (54.629, 35.294, 2.0),
+        "aliases": (
+            "Physicum delivery zone",
+            "Physicum handoff point",
+            "物理楼室外交付点",
+            "物理楼交付点",
+            "物理科学楼交付点",
+        ),
+    },
+}
+
 
 @dataclass(frozen=True)
 class Building:
@@ -510,6 +552,21 @@ def _semantic(
             "position_m": {"x": 43.0, "y": 55.0, "z": 0.0},
         },
     ]
+    for entity_id, zone in DELIVERY_ZONES.items():
+        x, y, z = zone["position"]
+        entities.append(
+            {
+                "entity_id": entity_id,
+                "name": zone["name"],
+                "name_zh": zone["name_zh"],
+                "aliases": list(zone["aliases"]),
+                "kind": "delivery",
+                "semantic": "delivery",
+                "position_m": {"x": x, "y": y, "z": z},
+                "operation": "outdoor-hover-handoff",
+                "route_source": "runtime-3d-collision-planner",
+            }
+        )
     building_by_name = {name: building for building in buildings for name in building.names}
     for name in sorted(NAMED_BUILDINGS):
         building = building_by_name[name]
@@ -572,11 +629,12 @@ def _semantic(
 
 
 def _navigation_graph() -> dict[str, Any]:
-    """Create the qualified outbound corridor as one bidirectional map graph.
+    """Create semantic endpoints plus the historical flight-evidence corridor.
 
-    The flight evidence contains the return leg explicitly.  The reusable map
-    graph stores each physical corridor only once and marks it bidirectional,
-    so route planning cannot select duplicate return-only nodes as destinations.
+    Delivery endpoints intentionally have no edges. Runtime planning must use
+    current collision geometry rather than developer-authored routes. The old
+    edge chain remains only as a content-addressed record of the flight that
+    qualified the original launch-to-Chemicum asset pair.
     """
 
     nodes = []
@@ -596,8 +654,18 @@ def _navigation_graph() -> dict[str, Any]:
                 "semantic": "outdoor" if phase == "transit" else phase,
             }
         )
+    for entity_id, zone in DELIVERY_ZONES.items():
+        x, y, z = zone["position"]
+        nodes.append(
+            {
+                "node_id": entity_id,
+                "label": zone["name"],
+                "position_m": {"x": x, "y": y, "z": z},
+                "semantic": "delivery",
+            }
+        )
     edges = []
-    for index in range(len(nodes) - 1):
+    for index in range(len(ROUTE[:5]) - 1):
         start = nodes[index]["position_m"]
         end = nodes[index + 1]["position_m"]
         distance = math.dist(
@@ -630,6 +698,11 @@ def _navigation_graph() -> dict[str, Any]:
             "takeout-pickup-pad": nodes[4]["node_id"],
             **{alias: nodes[0]["node_id"] for alias in LAUNCH_ALIASES},
             **{alias: nodes[4]["node_id"] for alias in PICKUP_ALIASES},
+            **{
+                alias: entity_id
+                for entity_id, zone in DELIVERY_ZONES.items()
+                for alias in (entity_id, zone["name"], zone["name_zh"], *zone["aliases"])
+            },
         },
         "nodes": nodes,
         "edges": edges,

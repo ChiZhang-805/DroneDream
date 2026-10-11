@@ -189,7 +189,8 @@
 .field-app-embedded-lab .field-tuning-primary,
 .field-app-embedded-lab .field-adapter-install-button {
   border-color: #087e69;
-  background: #087e69;
+  color: #0b6d58;
+  background: #e7f7f1;
 }
 
 @media (max-width: 760px) {

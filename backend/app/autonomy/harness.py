@@ -66,7 +66,10 @@ _TOOL_REGISTRY: Final = {
     "route.query_topology": {
         "version": "1.0.0",
         "read_only": True,
-        "description": "Query traversable topology between grounded semantic entities.",
+        "description": (
+            "Inspect optional authored topology without requiring it; geometry-only maps "
+            "may legitimately return no edges."
+        ),
         "eligible_when": "all referenced entities resolved",
         "input_contract": {"from_entity_id": "string", "to_entity_id": "string"},
         "receipt_contract": ["topology_edges", "unknown_regions", "minimum_clearance"],
@@ -74,9 +77,17 @@ _TOOL_REGISTRY: Final = {
     "route.plan_global_corridor": {
         "version": "1.0.0",
         "read_only": True,
-        "description": "Propose a collision-bounded global corridor for deterministic validation.",
-        "eligible_when": "topology query accepted",
-        "input_contract": {"topology_receipt_id": "string", "vehicle_radius_m": "number"},
+        "description": (
+            "Invoke a three-dimensional collision planner between model-resolved semantic "
+            "places; no developer-authored route is required."
+        ),
+        "eligible_when": "all referenced entities resolved and collision geometry available",
+        "input_contract": {
+            "from_entity_id": "string",
+            "to_entity_id": "string",
+            "vehicle_radius_m": "number",
+            "route_policy": "string",
+        },
         "receipt_contract": ["corridor_id", "geometry_hash", "clearance_profile"],
     },
     "trajectory.plan_segment": {
@@ -167,8 +178,8 @@ def _map_issues(
     planning_layers = asset.capabilities.get("planning_layers")
     if not isinstance(planning_layers, list) or not {
         "collision-geometry",
-        "navigation-graph",
-        "route-corridor",
+        "semantic-endpoints",
+        "runtime-3d-route-planning",
     }.issubset(set(planning_layers)):
         issues.append("map.collision-layers.missing")
     if not asset.capabilities.get("compiler_scene_id"):

@@ -48,6 +48,7 @@ MapSemanticLayer = Literal[
     "gates",
     "people",
     "pickup-zones",
+    "delivery-zones",
     "launch-zones",
     "rooms",
     "corridors",
@@ -58,8 +59,8 @@ MapSemanticLayer = Literal[
 MapPlanningLayer = Literal[
     "collision-geometry",
     "occupancy",
-    "navigation-graph",
-    "route-corridor",
+    "semantic-endpoints",
+    "runtime-3d-route-planning",
     "esdf",
     "dynamic-overlay",
     "confidence",
@@ -482,8 +483,8 @@ def qualify_map_pack(
         )
     required_planning_layers = {
         "collision-geometry",
-        "navigation-graph",
-        "route-corridor",
+        "semantic-endpoints",
+        "runtime-3d-route-planning",
     }
     if not required_planning_layers.issubset(set(request.planning_layers)):
         issues.append(
@@ -491,7 +492,8 @@ def qualify_map_pack(
                 code="map.collision-layers.missing",
                 severity="error",
                 message=(
-                    "Collision geometry, a navigation graph and a route corridor are required."
+                    "Collision geometry, semantic endpoints and runtime 3-D route "
+                    "planning are required."
                 ),
             )
         )

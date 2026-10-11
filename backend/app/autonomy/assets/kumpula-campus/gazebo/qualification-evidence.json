@@ -18,8 +18,8 @@
     "semantic.json": "641e1f73f44c9397d24e65060793f7a54865d023f768dd00ae22b23eed32a2c2"
   },
   "metadata_revalidation": {
-    "basis": "Named-building points were corrected to the authoritative OSM footprint centroids and explicit exterior-only fidelity metadata was added; flight geometry, collision geometry, route coordinates, and runtime inputs are unchanged.",
-    "qualified_semantic_sha256": "db46b1f1eae37f1e61df459b1a0da6ce8f9c9d37240a6f138be74cec16ca6529",
+    "basis": "Three outdoor delivery entities and bilingual aliases were added at independently collision-checked operation poses. They contain no authored route edges; flight geometry, collision geometry, original qualification route coordinates, and runtime inputs are unchanged.",
+    "qualified_semantic_sha256": "5ba8c947f09caa69dcd7efca0cd52530e30dbb11a65e3b16d76440c30d19cb8a",
     "semantic_physical_contract_sha256": "c4c76d0ad8f4f8f3484eee9b198df90d9881de4b8efd7d3064676b2d2ab43159"
   },
   "gates": {
