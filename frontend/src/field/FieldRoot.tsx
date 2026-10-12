@@ -137,10 +137,6 @@ function FieldLaunchScreen({
           <FieldBrandLockup />
         </div>
         <div className="launcher-chrome-actions">
-          <span className={`launcher-runtime-indicator${ready ? " is-checked" : ""}`}>
-            <span aria-hidden="true" />
-            {ready ? copy.ready : copy.loading}
-          </span>
           <button
             ref={settingsButtonRef}
             className="launcher-settings-button"

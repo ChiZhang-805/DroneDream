@@ -14,7 +14,7 @@ describe("LauncherFlightIllustration", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "Autonomous flight, ready when you are" }))
+    expect(screen.getByRole("region", { name: "Autonomous flight, ready when you are" }))
       .toBeInTheDocument();
     expect(container.querySelector("img.launcher-flight-image")).toBeInTheDocument();
     expect(container.querySelector("svg")).not.toBeInTheDocument();

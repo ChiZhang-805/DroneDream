@@ -3653,12 +3653,6 @@ function AppShellContent() {
       : universalMode;
   const runtimeIsBusy = runtimeAccess.status === "checking" ||
     runtimeAccess.status === "starting";
-  const launcherRuntimeChecking =
-    runtimeAccess.isChecking ||
-    runtimeIsBusy;
-  const launcherRuntimeChecked =
-    runtimeAccess.status === "ready" &&
-    !runtimeAccess.isChecking;
   const runtimeNavDescription = runtimeAccess.status === "checking"
     ? t("runtimeGate.navChecking")
     : runtimeAccess.status === "starting"
@@ -3740,10 +3734,8 @@ function AppShellContent() {
   }, [desktopRuntime, t]);
 
   useEffect(() => {
-    // The launcher owns a strict two-stage flow: environment first, browser
-    // authentication only after the user selects the sole sign-in action at
-    // 100%. The workspace gate below therefore runs only after navigation away
-    // from the launcher.
+    // The launcher owns explicit software authentication and local readiness.
+    // The workspace gate runs after navigation away from the launcher.
     if (!desktopRuntime || launcherMode) return;
     if (
       updater.status === "checking" ||
@@ -4264,14 +4256,6 @@ function AppShellContent() {
             <BrandLockup edition={activeThemeEdition} />
           </Link>
           <div className="launcher-chrome-actions">
-            <span className={`launcher-runtime-indicator${launcherRuntimeChecked ? " is-checked" : ""}`}>
-              <span aria-hidden="true" />
-              {launcherRuntimeChecking
-                ? t("runtimeGate.checkingShort")
-                : launcherRuntimeChecked
-                  ? t("runtimeGate.checkedShort")
-                  : t("runtimeGate.requiredShort")}
-            </span>
             <button
               ref={launcherSettingsButtonRef}
               type="button"

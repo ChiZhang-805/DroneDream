@@ -355,9 +355,10 @@ async function verifyCase(browser, testCase) {
       `${testCase.id}: desktop startup must not create a WebGL canvas`);
     if (testCase.viewport.width > 850) assert(dimensions.launcher.width > 100 && dimensions.launcher.height > 100,
       `${testCase.id}: lightweight launcher illustration has no visible area`);
-    if (testCase.viewport.width > 850) assert(dimensions.launcher.headingLeft >= 0
-      && dimensions.launcher.headingRight <= testCase.viewport.width + 1,
-    `${testCase.id}: launcher heading is clipped`);
+    assert.equal(await page.locator(".launcher-flight-copy, .launcher-runtime-indicator").count(), 0);
+    const inputBounds = await password.boundingBox();
+    const submitBounds = await form.locator('button[type="submit"]').boundingBox();
+    assert(submitBounds.y - inputBounds.y - inputBounds.height <= 16, "No blank error row below password");
     const imagePath = path.join(outputRoot, `${testCase.id}.png`);
     await page.screenshot({ path: imagePath, fullPage: false });
     assert.equal(pageErrors.length, 0);

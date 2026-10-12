@@ -4,8 +4,8 @@ import { AuthCaptcha } from "../features/auth/AuthCaptcha";
 import { captchaProtectionConfigured, turnstileSiteKey } from "../features/auth/supabaseClient";
 
 const COPY = {
-  en: { title: "Welcome to DroneDream", login: "Sign in", register: "Create account", email: "Email", password: "Password", code: "Email code", send: "Send code", verify: "Verify & continue", busy: "Please wait…", sent: "Check your email for a code.", failed: "Couldn't sign in. Check your details and try again.", codeFailed: "Couldn't send the code. Please try again.", verifyFailed: "Couldn't verify the code. Check it and try again.", unavailable: "Account access is unavailable.", forgot: "Forgot password?", recovery: "Reset your password", newPassword: "New password", back: "Back to sign in", reset: "Reset & sign in", passwordHint: "At least 8 characters" },
-  "zh-CN": { title: "欢迎使用 DroneDream", login: "登录", register: "注册", email: "邮箱", password: "密码", code: "邮箱验证码", send: "发送验证码", verify: "验证并继续", busy: "请稍候…", sent: "验证码已发送，请查看邮箱。", failed: "登录失败，请检查邮箱和密码后重试。", codeFailed: "验证码发送失败，请重试。", verifyFailed: "验证失败，请检查验证码后重试。", unavailable: "账户服务暂不可用。", forgot: "忘记密码？", recovery: "找回密码", newPassword: "新密码", back: "返回登录", reset: "重置并登录", passwordHint: "至少 8 位字符" },
+  en: { title: "Welcome to DroneDream", login: "Sign in", register: "Create account", email: "Email", password: "Password", code: "Email code", send: "Send code", verify: "Verify & continue", busy: "Please wait…", sent: "Check your email for a code.", failed: "Sign-in failed. Try again.", codeFailed: "Code not sent. Try again.", verifyFailed: "Check the code and try again.", unavailable: "Account access is unavailable.", forgot: "Forgot password?", recovery: "Reset your password", newPassword: "New password", back: "Back to sign in", reset: "Reset & sign in", passwordHint: "At least 8 characters" },
+  "zh-CN": { title: "欢迎使用 DroneDream", login: "登录", register: "注册", email: "邮箱", password: "密码", code: "邮箱验证码", send: "发送验证码", verify: "验证并继续", busy: "请稍候…", sent: "验证码已发送，请查看邮箱。", failed: "登录失败，请重试。", codeFailed: "发送失败，请重试。", verifyFailed: "验证码有误，请重试。", unavailable: "账户服务暂不可用。", forgot: "忘记密码？", recovery: "找回密码", newPassword: "新密码", back: "返回登录", reset: "重置并登录", passwordHint: "至少 8 位字符" },
 } as const;
 
 /** Shared by all launchers; account operations stay in the existing provider. */
@@ -55,6 +55,8 @@ export function LauncherAccountForm({ locale, onAuthenticated }: {
       setCaptchaAttempt((value) => value + 1);
     }
   };
+  const message = error || (!auth.configured ? copy.unavailable : sent ? copy.sent : "");
+  const caption = <span className="launcher-auth-message" role={error ? "alert" : "status"} aria-live="polite" title={message}>{message}</span>;
   return (
     <form className="launcher-account-form" onSubmit={(event) => void submit(event)}>
       <h2>{mode === "recovery" ? copy.recovery : copy.title}</h2>
@@ -66,16 +68,13 @@ export function LauncherAccountForm({ locale, onAuthenticated }: {
       </div>
       <label>{copy.email}<input type="email" autoComplete="username" required value={email} disabled={busy || sent}
         onChange={(event) => setEmail(event.target.value)} /></label>
-      <label hidden={sent}>{mode === "recovery" ? copy.newPassword : copy.password}<input type="password" autoComplete={mode === "login" ? "current-password" : "new-password"}
+      <label hidden={sent}><span className="launcher-auth-caption">{mode === "recovery" ? copy.newPassword : copy.password}{!sent ? caption : null}</span><input aria-label={mode === "recovery" ? copy.newPassword : copy.password} aria-invalid={Boolean(error)} type="password" autoComplete={mode === "login" ? "current-password" : "new-password"}
         required minLength={mode !== "login" ? 8 : undefined} placeholder={mode !== "login" ? copy.passwordHint : undefined}
         value={password} disabled={busy} onChange={(event) => setPassword(event.target.value)} /></label>
       <div className="launcher-auth-verification" hidden={!sent && !captchaProtectionConfigured}>
-        {sent ? <label>{copy.code}<input autoComplete="one-time-code" inputMode="numeric" required value={code}
+        {sent ? <label><span className="launcher-auth-caption">{copy.code}{caption}</span><input aria-label={copy.code} aria-invalid={Boolean(error)} autoComplete="one-time-code" inputMode="numeric" required value={code}
           onChange={(event) => setCode(event.target.value)} disabled={busy} /></label>
           : captchaProtectionConfigured ? <AuthCaptcha key={captchaAttempt} siteKey={turnstileSiteKey} locale={locale} onTokenChange={setCaptcha} /> : null}
-      </div>
-      <div className="launcher-auth-message" role={error ? "alert" : "status"} aria-live="polite">
-        {error || (!auth.configured ? copy.unavailable : sent ? copy.sent : "")}
       </div>
       <button className="btn btn-primary" type="submit" disabled={busy || !auth.configured || (captchaProtectionConfigured && !sent && !captcha)}>
         {busy ? copy.busy : mode === "login" ? copy.login : sent ? mode === "recovery" ? copy.reset : copy.verify : copy.send}

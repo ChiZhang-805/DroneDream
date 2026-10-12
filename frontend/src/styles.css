@@ -24319,3 +24319,17 @@ body {
 .launcher-progress-panel { height: 400px; }
 .launcher-account-form label[hidden] { display: none; }
 .account-software-auth { width: 100%; padding: 16px; box-shadow: none; border: 0; }
+
+/* Compact form: errors share the field caption and never reserve an empty row. */
+.launcher-account-form { gap: 14px; height: auto; }
+.launcher-account-form h2 { font-size: 24px; margin: 0; }
+.launcher-auth-tabs { font-size: 17px; margin: 0; }
+.launcher-account-form label { font-size: 15px; gap: 7px; }
+.launcher-account-form input { height: 48px; font-size: 16px; }
+.launcher-auth-caption { display: flex; align-items: baseline; gap: 10px; height: 21px; }
+.launcher-auth-message { flex: 1; min-width: 0; height: 21px; margin: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: right; font-size: 12px; line-height: 21px; }
+.launcher-account-form input[aria-invalid="true"] { border-color: #c72e51; }
+.launcher-auth-verification { height: auto; flex: none; }
+.launcher-account-form > .btn { min-height: 48px; font-size: 16px; }
+.launcher-auth-secondary { font-size: 14px; padding: 0; }
+.launcher-account-form { gap: 10px; }
