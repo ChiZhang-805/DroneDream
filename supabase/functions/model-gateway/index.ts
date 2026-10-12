@@ -610,7 +610,17 @@ function idempotencyKey(request: Request): string {
   return raw;
 }
 
-function providerConfiguration(provider: ManagedProvider, model: string) {
+export function managedOutputBudget(purpose: ModelPurpose): number {
+  // Whole-map interpretation and mission contracts must fit in one complete JSON response.
+  return positiveIntegerEnv(
+    purpose === "job" ? "PLATFORM_LLM_JOB_MAX_OUTPUT_TOKENS" : "PLATFORM_LLM_MAX_OUTPUT_TOKENS",
+    purpose === "job" ? 16_384 : 2_048,
+    64,
+    16_384,
+  );
+}
+
+function providerConfiguration(provider: ManagedProvider, model: string, purpose: ModelPurpose) {
   const prefix = `PLATFORM_${provider.toUpperCase()}`;
   const globalProvider =
     Deno.env.get("PLATFORM_LLM_PROVIDER")?.trim().toLowerCase() ||
@@ -654,12 +664,7 @@ function providerConfiguration(provider: ManagedProvider, model: string) {
     baseUrl,
     model: selectedModel,
     provider,
-    maxOutputTokens: positiveIntegerEnv(
-      "PLATFORM_LLM_MAX_OUTPUT_TOKENS",
-      2_048,
-      64,
-      16_384,
-    ),
+    maxOutputTokens: managedOutputBudget(purpose),
     outputCreditWeight: positiveIntegerEnv(
       "PLATFORM_LLM_OUTPUT_CREDIT_WEIGHT",
       4,
@@ -763,7 +768,7 @@ async function handleChatCompletions(request: Request): Promise<Response> {
   const purpose = grantRecord.scope as ModelPurpose;
   const provider = managedProvider(grantRecord.provider);
   const selectedModel = managedModelDefinition(provider, grantRecord.model).model;
-  const config = providerConfiguration(provider, selectedModel);
+  const config = providerConfiguration(provider, selectedModel, purpose);
   const serializedPromptBytes = new TextEncoder().encode(JSON.stringify({
     messages,
     response_format: responseFormat ?? null,

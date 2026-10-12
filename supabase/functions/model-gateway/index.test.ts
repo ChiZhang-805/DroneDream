@@ -2,11 +2,30 @@ import {
   buildModelCatalog,
   MANAGED_MODELS,
   managedProviderReasoningPolicy,
+  managedOutputBudget,
   publicModelGatewayBaseUrl,
   reconcileManagedUsage,
   errorResponse,
   type ModelPolicyRow,
 } from "./index.ts";
+
+Deno.test("mission JSON has room for a complete map without inflating chat limits", () => {
+  const previous = Deno.env.get("PLATFORM_LLM_JOB_MAX_OUTPUT_TOKENS");
+  const chat = Deno.env.get("PLATFORM_LLM_MAX_OUTPUT_TOKENS");
+  try {
+    Deno.env.delete("PLATFORM_LLM_JOB_MAX_OUTPUT_TOKENS");
+    Deno.env.set("PLATFORM_LLM_MAX_OUTPUT_TOKENS", "2048");
+    assert(managedOutputBudget("job") === 16384, "map JSON must not inherit the 2048-token chat ceiling");
+    assert(managedOutputBudget("assistant") === 2048, "ordinary chat allowance changed");
+    Deno.env.set("PLATFORM_LLM_JOB_MAX_OUTPUT_TOKENS", "8192");
+    assert(managedOutputBudget("job") === 8192, "explicit mission limit ignored");
+  } finally {
+    if (previous === undefined) Deno.env.delete("PLATFORM_LLM_JOB_MAX_OUTPUT_TOKENS");
+    else Deno.env.set("PLATFORM_LLM_JOB_MAX_OUTPUT_TOKENS", previous);
+    if (chat === undefined) Deno.env.delete("PLATFORM_LLM_MAX_OUTPUT_TOKENS");
+    else Deno.env.set("PLATFORM_LLM_MAX_OUTPUT_TOKENS", chat);
+  }
+});
 
 Deno.test("plain PostgREST authorization errors are not reported as HTTP 500", async () => {
   for (const error of [new Error("MODEL_GRANT_INVALID"), {
