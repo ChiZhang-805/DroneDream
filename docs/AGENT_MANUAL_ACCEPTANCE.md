@@ -14,26 +14,46 @@ deleting existing conversations.
    interactive exterior 3D view. The scene must report its real-world coordinate
    reference, outdoor-only scope, collision geometry, bilingual semantic places,
    and qualified runtime binding without claiming that building interiors exist.
-3. Open **Aircraft**. The bundled catalog must expose the qualified **My Drone**
+3. Open **Aircraft**. The bundled catalog must expose the qualified **X500 Depth**
    PX4 vehicle used by the Kumpula mission. Its details must identify the flight
    controller, inertial and position sensors, depth camera, collision geometry,
    payload interface, spawn binding, source revision, license, and readiness.
-4. Return to **Chatbot**. Start a new conversation and select **My Drone** and
+4. Return to **Chatbot**. Start a new conversation and select **X500 Depth** and
    **Kumpula Campus** if they are not already attached. The app performs
    compatibility analysis automatically and must not show a separate
    pair-qualification panel.
 
 ## Kumpula delivery round trip
 
+### Natural language is the acceptance input
+
+Begin a separate conversation with:
+
+> 帮我拿个东西。
+
+The Agent should recognize the pickup intent, use available context, and ask
+brief natural questions for essential missing facts, such as the place and item.
+It must not invent them or require aircraft IDs, map IDs, coordinates, flight
+heights, hover durations, tool names, or a complete flight script. Reply with
+ordinary words using actual places offered by the map. The Agent must carry
+those answers into the same mission and produce a confirmable plan.
+
+The following delivery case checks a natural destination with an implicit
+departure and return workflow. The user is not responsible for spelling out
+those flight phases. A precise takeoff/hover/land smoke test does not replace
+this acceptance.
+
 1. Start a new conversation and send:
 
-   > 把一件小包裹送到信息科学楼室外交付点，完成交付后返回起降点。
+   > 帮我把这个小包裹送到信息科学楼。
 
 2. While preparation is running, verify that the visible status changes between
    concrete stages and streams useful progress summaries. It must not expose a
    hidden model chain of thought, stay on an unexplained three-dot indicator, or
    fabricate completed work.
-3. The destination must resolve to **Exactum outdoor delivery zone / 信息科学楼室外交付点**.
+3. The destination must resolve through map semantics to a real usable place at
+   **Exactum / 信息科学楼**, such as its qualified outdoor delivery zone. If several
+   places are plausible, ask a concise clarification instead of hard-coding one.
    If the destination is deliberately omitted in a second test, verify that the
    assistant asks one natural Chinese question and offers the known Kumpula
    delivery places plus **其他**. Choosing **其他** must reveal an input field.
@@ -43,9 +63,10 @@ deleting existing conversations.
    must contain the selected aircraft, map, route and ordered execution steps.
 5. Click **开始仿真**. The application must acknowledge the command and keep
    **查看运行** disabled until a real live frame is available.
-6. In **查看运行**, observe takeoff from **昆普拉校区南侧起降点**, three-dimensional
+6. In **查看运行**, observe takeoff from the actual launch location in the confirmed
+   plan, three-dimensional
    outdoor routing around the qualified collision volumes, arrival and handoff
-   at **信息科学楼室外交付点**, return flight, and landing. The current qualified
+   at the agreed usable place for **信息科学楼**, return flight, and landing. The current qualified
    map is exterior-only, so this acceptance run must not claim corridor, door,
    stair, or indoor-room traversal.
 
