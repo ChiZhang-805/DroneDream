@@ -120,7 +120,7 @@ beforeEach(() => {
 });
 
 describe("autonomy conversation persistence", () => {
-  it("shows only Kumpula and reveals 3D airspace only in its double-click details dialog", async () => {
+  it("shows Kumpula and New Map and opens an uncluttered interactive map detail", async () => {
     const workspace = defaultAutonomyWorkspace();
     workspace.mapPack.agentCoreContentSha256 = "a".repeat(64);
     workspace.aircraft.agentCoreContentSha256 = "b".repeat(64);
@@ -132,13 +132,13 @@ describe("autonomy conversation persistence", () => {
     expect(screen.queryByRole("region", { name: "3D UAV Corridor" })).not.toBeInTheDocument();
 
     const mapCard = screen.getByRole("button", { name: /Kumpula Campus/u });
-    expect(screen.getByRole("region", { name: "Map repository" }).querySelectorAll("article")).toHaveLength(1);
+    expect(screen.getByRole("region", { name: "Map repository" }).querySelectorAll("article")).toHaveLength(2);
     fireEvent.click(mapCard);
     expect(screen.queryByRole("region", { name: "3D UAV Corridor" })).not.toBeInTheDocument();
 
     fireEvent.doubleClick(mapCard);
     const dialog = await screen.findByRole("dialog", { name: "Kumpula Campus" });
-    const corridor = await within(dialog).findByRole("region", { name: "3D UAV Corridor" });
+    const corridor = await within(dialog).findByRole("img", { name: "Interactive 3D view of Kumpula Campus" });
     expect(corridor).toBeVisible();
     expect(screen.getByRole("region", { name: "Map repository" })).not.toContainElement(corridor);
   });

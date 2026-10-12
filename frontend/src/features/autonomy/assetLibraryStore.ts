@@ -1,3 +1,4 @@
+import retiredMapVersions from "./retiredMapVersions.json";
 import type { BrandEditionId } from "../../brand/edition-brand.generated";
 import {
   defaultAutonomyWorkspace,
@@ -9,6 +10,7 @@ import {
 
 export interface AutonomyAssetLibrary {
   schemaVersion: 2;
+  removedMapIds?: string[];
   aircraft: AutonomyAircraftProfile[];
   maps: AutonomyMapPack[];
   externalAssets: AutonomyExternalAssetReference[];
@@ -58,17 +60,18 @@ function uniqueByKey<T>(items: T[], keyFor: (item: T) => string, maximum: number
 
 function normalizeLibrary(library: AutonomyAssetLibrary): AutonomyAssetLibrary {
   const aircraft = uniqueByKey(library.aircraft, aircraftAssetKey, MAX_AIRCRAFT);
-  const maps = uniqueByKey(library.maps, mapAssetKey, MAX_MAPS);
+  const removedMapIds = [...new Set(library.removedMapIds ?? [])];
+  const maps = uniqueByKey(library.maps.filter(map => !removedMapIds.includes(mapAssetKey(map))), mapAssetKey, MAX_MAPS);
   const representedAssetIds = new Set([
     ...aircraft.map(aircraftAssetKey),
     ...maps.map(mapAssetKey),
   ]);
   const externalAssets = uniqueByKey(
-    library.externalAssets.filter((asset) => !representedAssetIds.has(asset.id)),
+    library.externalAssets.filter((asset) => !retiredMapVersions.some(retired => retired.assetId === asset.id && retired.contentSha256 === asset.contentSha256) && !representedAssetIds.has(asset.id) && (asset.kind === "vehicle" || !removedMapIds.includes(asset.id))),
     externalAssetKey,
     MAX_EXTERNAL_ASSETS,
   );
-  return { schemaVersion: 2, aircraft, maps, externalAssets };
+  return { schemaVersion: 2, aircraft, maps, externalAssets, removedMapIds };
 }
 
 function storageKey(ownerId: string, edition: BrandEditionId): string {
@@ -161,6 +164,7 @@ export function withCurrentAutonomyAssets(
   const publicAssets = defaultAutonomyWorkspace();
   return normalizeLibrary({
     schemaVersion: 2,
+    removedMapIds: library.removedMapIds,
     aircraft: replaceById(
       replaceById(library.aircraft, publicAssets.aircraft, MAX_AIRCRAFT),
       workspace.aircraft,
@@ -192,7 +196,7 @@ export function loadAutonomyAssetLibrary(
     const externalAssets = Array.isArray(raw?.externalAssets)
       ? raw.externalAssets.map(normalizeExternalAsset).filter((item): item is AutonomyExternalAssetReference => Boolean(item))
       : [];
-    return withCurrentAutonomyAssets(normalizeLibrary({ schemaVersion: 2, aircraft, maps, externalAssets }), workspace);
+    return withCurrentAutonomyAssets(normalizeLibrary({ schemaVersion: 2, aircraft, maps, externalAssets, removedMapIds: Array.isArray(raw?.removedMapIds) ? raw.removedMapIds.filter(id => typeof id === "string") : [] }), workspace);
   } catch {
     return withCurrentAutonomyAssets({ schemaVersion: 2, aircraft: [], maps: [], externalAssets: [] }, workspace);
   }
@@ -206,6 +210,7 @@ export function saveAutonomyAssetLibrary(
 ): AutonomyAssetLibrary {
   const normalized = normalizeLibrary({
     schemaVersion: 2,
+    removedMapIds: library.removedMapIds,
     aircraft: library.aircraft.map(normalizeAircraft).filter((item): item is AutonomyAircraftProfile => Boolean(item)).slice(0, MAX_AIRCRAFT),
     maps: library.maps.map(normalizeMap).filter((item): item is AutonomyMapPack => Boolean(item)).slice(0, MAX_MAPS),
     externalAssets: library.externalAssets

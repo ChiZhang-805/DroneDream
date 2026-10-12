@@ -50,7 +50,6 @@ import { apiClient } from "../api/client";
 import { openAppSettings } from "../appSettings";
 import { MapImportDialog } from "../features/autonomy/MapImportDialog";
 import { AssetInterpretButton } from "../features/autonomy/AssetInterpretButton";
-import { PreferredAirspaceView } from "../features/autonomy/PreferredAirspaceView";
 import { AUTONOMY_CONVERSATIONS_CHANGED, autonomyConversationId, autonomyConversationPath, loadAutonomyConversation, newAutonomyConversation, preserveLegacyAutonomyConversation, saveAutonomyConversation, isAutonomyConversationDeleted, listAutonomyConversations, updateAutonomyConversation } from "../features/autonomy/conversationStore";
 import { acquireAutonomyPlanning, useAutonomyPlanning, useAutonomyProgress, publishAutonomyProgress } from "../features/autonomy/conversationActivity";
 import { PreparationProgress } from "../features/autonomy/PreparationProgress";
@@ -80,7 +79,6 @@ import {
   saveAutonomyWorkspace,
   type AutonomyConversationMessage,
   type AutonomyMapPack,
-  type AutonomyVector3,
   type AutonomyWorkspaceState,
 } from "../features/autonomy/workspaceStore";
 import {
@@ -132,7 +130,6 @@ import {
   type AgentCoreAssetQualificationJob,
   type AgentCoreAssetSourceAdapter,
   type AgentCoreAssetVersion,
-  type AirspaceRequest,
   type AgentCoreExecutionEvidence,
   type AgentCoreLiveSource,
   type AgentCoreLiveTelemetry,
@@ -179,6 +176,7 @@ type WorkspaceContext = {
   registerExternalAsset: (
     version: AgentCoreAssetVersion,
     qualificationId?: string | null,
+    restore?: boolean,
   ) => AutonomyExternalAssetReference | null;
   bindQualifiedAssetPair: (
     job: AgentCoreAssetQualificationJob,
@@ -480,10 +478,12 @@ export function AutonomyAssetConnectorPanel({
   kind,
   chinese,
   compact = false,
+  card = false,
 }: {
   kind: "map" | "vehicle";
   chinese: boolean;
   compact?: boolean;
+  card?: boolean;
 }) {
   const outletWorkspace = useOutletContext<WorkspaceContext | null>();
   const assetLibrary = outletWorkspace?.assetLibrary ?? { externalAssets: [] };
@@ -575,14 +575,18 @@ export function AutonomyAssetConnectorPanel({
       setImporting(false);
     }
   };
-  if (kind === "map") return <div className="autonomy-repository-import">
-    <button type="button" className="btn btn-primary" aria-label={chinese ? "导入地图" : "Import map"}
-      title={chinese ? "导入地图" : "Import map"} onClick={() => setMapImportOpen(true)}>
-      <Upload aria-hidden="true" />
-    </button>
+  if (kind === "map") return <>
+    {card ? <article className="autonomy-new-map-card">
+      <button type="button" className="autonomy-repository-card-surface" aria-label={chinese ? "新建地图" : "New Map"} onClick={() => setMapImportOpen(true)}>
+        <span className="autonomy-repository-preview autonomy-new-map-preview"><Upload aria-hidden="true" /></span>
+        <span className="autonomy-repository-copy"><strong>{chinese ? "新建地图" : "New Map"}</strong></span>
+      </button>
+    </article> : <div className="autonomy-repository-import">
+      <button type="button" className="btn btn-primary" aria-label={chinese ? "导入地图" : "Import map"} title={chinese ? "导入地图" : "Import map"} onClick={() => setMapImportOpen(true)}><Upload aria-hidden="true" /></button>
+    </div>}
     <MapImportDialog open={mapImportOpen} chinese={chinese} edition={outletWorkspace?.edition ?? "universal"}
-      onClose={() => setMapImportOpen(false)} onImported={registerExternalAsset} />
-  </div>;
+      onClose={() => setMapImportOpen(false)} onImported={version => registerExternalAsset(version, null, true)} />
+  </>;
   if (compact) {
     return (
       <div className="autonomy-repository-import">
@@ -1234,12 +1238,13 @@ export function AutonomyPlatform() {
   const registerExternalAsset = useCallback((
     version: AgentCoreAssetVersion,
     qualificationId: string | null = null,
+    restore = false,
   ) => {
     const reference = externalAssetReferenceFromVersion(version, qualificationId);
     setAssetLibrary((current) => saveAutonomyAssetLibrary(
       ownerId,
       edition,
-      withExternalAutonomyAsset(current, reference),
+      withExternalAutonomyAsset(restore ? { ...current, removedMapIds: current.removedMapIds?.filter(id => id !== reference.id) } : current, reference),
     ));
     return reference;
   }, [edition, ownerId]);
@@ -1317,6 +1322,13 @@ export function AutonomyPlatform() {
     id: string,
     contentSha256: string | null = null,
   ) => {
+    if (kind === "map" || (kind === "external" && assetLibrary.externalAssets.some(asset => asset.id === id && asset.kind !== "vehicle"))) {
+      setAssetLibrary(current => saveAutonomyAssetLibrary(ownerId, edition, {
+        ...current,
+        removedMapIds: [...new Set([...(current.removedMapIds ?? []), id])],
+      }));
+      return;
+    }
     if (kind === "external") {
       setAssetLibrary((current) => saveAutonomyAssetLibrary(ownerId, edition, {
         ...current,
@@ -1366,12 +1378,10 @@ export function AutonomyPlatform() {
         aircraft: kind === "aircraft"
           ? current.aircraft.filter((asset) => asset.id !== id)
           : current.aircraft,
-        maps: kind === "map"
-          ? current.maps.filter((asset) => asset.id !== id)
-          : current.maps,
+        maps: current.maps,
       }, savedWorkspace),
     ));
-  }, [edition, ownerId, workspace]);
+  }, [assetLibrary.externalAssets, edition, ownerId, workspace]);
 
   const sections: Array<{ id: AutonomySectionId; to: string }> = [
     { id: "overview", to: "/autonomy" },
@@ -1562,7 +1572,7 @@ export function AutonomyOverview() {
     clearSelection: "清除选择",
     back: "返回",
     allAircraft: "未选择地图，显示全部 13 种无人机",
-    allMaps: "未选择无人机，显示全部 8 张地图",
+    allMaps: "可用地图",
     filteredAircraft: "只显示与已选地图匹配的无人机",
     filteredMaps: "只显示与已选无人机匹配的地图",
     chooseBoth: "请同时选择一架无人机和一张匹配的地图，或将两项都清除后让系统根据任务自动选择。",
@@ -1607,7 +1617,7 @@ export function AutonomyOverview() {
     clearSelection: "Clear selection",
     back: "Back",
     allAircraft: "No map selected; showing all 13 aircraft",
-    allMaps: "No aircraft selected; showing all 8 maps",
+    allMaps: "Available maps",
     filteredAircraft: "Only aircraft compatible with the selected map are shown",
     filteredMaps: "Only maps compatible with the selected aircraft are shown",
     chooseBoth: "Select both a compatible aircraft and map, or clear both to let the mission choose automatically.",
@@ -1642,14 +1652,18 @@ export function AutonomyOverview() {
     ],
   };
   const allAircraftChoices = useMemo(() => compatibleAircraftChoices(assetPairCatalog, null), [assetPairCatalog]);
-  const allMapChoices = useMemo(() => compatibleMapChoices(assetPairCatalog, null), [assetPairCatalog]);
+  const availableMapCatalog = useMemo(() => ({ ...assetPairCatalog, pairs: assetPairCatalog.pairs.filter(pair => {
+    const assetId = pair.qualified_map_asset_id ?? (pair.map_resource_id === "dronedream-school-map" ? "dronedream.school-map.v1" : pair.map_resource_id);
+    return !(assetLibrary.removedMapIds ?? []).includes(assetId);
+  }) }), [assetPairCatalog, assetLibrary.removedMapIds]);
+  const allMapChoices = useMemo(() => compatibleMapChoices(availableMapCatalog, null), [availableMapCatalog]);
   const aircraftChoices = useMemo(
     () => compatibleAircraftChoices(assetPairCatalog, selectedContextMapId),
     [assetPairCatalog, selectedContextMapId],
   );
   const mapChoices = useMemo(
-    () => compatibleMapChoices(assetPairCatalog, selectedContextAircraftId),
-    [assetPairCatalog, selectedContextAircraftId],
+    () => compatibleMapChoices(availableMapCatalog, selectedContextAircraftId),
+    [availableMapCatalog, selectedContextAircraftId],
   );
   const selectedAircraftChoice = allAircraftChoices.find((choice) => choice.resourceId === selectedContextAircraftId) ?? null;
   const selectedMapChoice = allMapChoices.find((choice) => choice.resourceId === selectedContextMapId) ?? null;
@@ -2466,10 +2480,6 @@ type RepositoryDetails = {
   rows: Array<[string, string]>;
   kind: CatalogAssetKind;
   previewKey: string | null;
-  airspace?: {
-    request: AirspaceRequest;
-    route?: AutonomyVector3[];
-  };
 };
 
 function useHiddenCatalogResources(kind: CatalogAssetKind): [Set<string>, (key: string) => void] {
@@ -2720,27 +2730,15 @@ export function AutonomyMaps() {
     chinese,
     edition,
     removeAsset,
-    workspace,
     assetLibrary,
-    persist,
     selectMap,
   } = useAutonomyWorkspace();
   const [details, setDetails] = useState<RepositoryDetails | null>(null);
   const [selectedRepositoryMapId, setSelectedRepositoryMapId] = useState<string | null>(null);
   const [defaultResources, setDefaultResources] = useState<AgentCoreMapResource[]>([]);
-  const reconciliationAttempt = useRef<{
-    key: string;
-    promise: Promise<AutonomyWorkspaceState>;
-  } | null>(null);
   const catalogDefinitions = catalogAssetDefinitions("map").filter(
-    (definition) => definition.key === "kumpula-campus",
+    (definition) => definition.key === "kumpula-campus" && !(assetLibrary.removedMapIds ?? []).includes("dronedream.school-map.v1"),
   );
-  const spaceMap = workspace.mapPack;
-  const spaceVehicle = workspace.aircraft;
-  const plan = workspace.mission.compiledPlan;
-  const route = plan?.source === "agent-core"
-    && plan.routeMapSha256 === spaceMap.agentCoreContentSha256
-    && plan.routeVehicleSha256 === spaceVehicle.agentCoreContentSha256 ? plan.routePositionsM : undefined;
   const openMapDetails = useCallback((
     mapPack: AutonomyMapPack,
     resource: AgentCoreMapResource | undefined,
@@ -2749,94 +2747,16 @@ export function AutonomyMaps() {
     title,
     kind: "map",
     previewKey: catalogAssetKey("map", mapPack.agentCoreAssetId?.trim() || mapPack.id, mapPack.name),
-    description: resource?.description[chinese ? "zh-CN" : "en-US"] ?? (chinese
-      ? "赫尔辛基大学昆普拉科学园区的真实地理语义地图，包含经校验的建筑轮廓、室外可飞空间、碰撞几何、命名地点和任务路线走廊，可用于校园取送、巡检与自主航迹规划。"
-      : "A real-world semantic map of the University of Helsinki Kumpula Science Campus with verified building footprints, outdoor flyable space, collision geometry, named places, and mission route corridors for campus delivery, inspection, and autonomous planning."),
     rows: [
       [chinese ? "类型" : "Type", mapRepresentationLabel(mapPack.representation, chinese)],
-      [chinese ? "坐标系" : "Coordinate frame", mapPack.coordinateFrame],
+      [chinese ? "坐标系" : "Coordinates", mapPack.coordinateFrame],
       [chinese ? "分辨率" : "Resolution", `${mapPack.resolutionM} m`],
-      [chinese ? "楼层" : "Floors", String(mapPack.floorCount)],
-      [chinese ? "数据来源" : "Data source", resource?.source.source_type === "bundled_ddpkg"
-        ? (chinese ? "赫尔辛基市开放数据 + OpenStreetMap" : "City of Helsinki open data + OpenStreetMap")
-        : resource?.source.location ?? (chinese ? "内置校验地图包" : "Bundled verified map package")],
-      [chinese ? "主要建筑" : "Named buildings", (
-        chinese ? resource?.analysis.named_buildings_zh : resource?.analysis.named_buildings
-      )?.join(" · ") || (chinese ? "校区建筑已写入语义层" : "Campus buildings are included in the semantic layer")],
-      [chinese ? "建筑数量" : "Buildings", String(resource?.analysis.building_count ?? resource?.analysis.model_count ?? "—")],
-      [chinese ? "碰撞几何" : "Collision geometry", resource
-        ? `${resource.analysis.collision_primitive_count ?? 0} ${chinese ? "个已解析碰撞体" : "parsed collision primitives"}`
-        : (chinese ? "已随地图包校验" : "Verified with the map package")],
-      [chinese ? "实时更新" : "Live updates", mapPack.liveUpdates.replaceAll("-", " ")],
-      [chinese ? "语义图层" : "Semantic layers", mapPack.semanticLayers.join(" · ") || "—"],
-      [chinese ? "规划图层" : "Planning layers", mapPack.planningLayers.join(" · ") || "—"],
-      [chinese ? "地图范围" : "Map bounds", `${mapPack.boundsM.x} × ${mapPack.boundsM.y} × ${mapPack.boundsM.z} m`],
-      [chinese ? "仿真状态" : "Simulation", resource?.readiness.simulation === "ready"
-        ? (chinese ? "已就绪" : "Ready") : (chinese ? "由内置运行环境加载" : "Loaded by the bundled runtime")],
-      [chinese ? "飞行状态" : "Flight", resource?.readiness.flight === "qualified"
-        ? (chinese ? "已完成全程验收" : "End-to-end qualified") : (chinese ? "使用当前无人机进行任务校验" : "Qualified with the selected aircraft at mission time")],
+      [chinese ? "建筑" : "Buildings", String(resource?.analysis.building_count ?? resource?.analysis.model_count ?? "—")],
+      [chinese ? "范围" : "Size", `${mapPack.boundsM.x} × ${mapPack.boundsM.y} × ${mapPack.boundsM.z} m`],
+      [chinese ? "来源" : "Source", resource?.source.source_type === "bundled_ddpkg" ? "Helsinki · OpenStreetMap" : resource?.source.source_type ?? "DroneDream"],
     ],
-    ...(mapPack.agentCoreAssetId
-      && mapPack.agentCoreContentSha256
-      && spaceVehicle.agentCoreAssetId
-      && spaceVehicle.agentCoreContentSha256
-      ? {
-          airspace: {
-            request: {
-              map_asset_id: mapPack.agentCoreAssetId,
-              map_content_sha256: mapPack.agentCoreContentSha256,
-              vehicle_asset_id: spaceVehicle.agentCoreAssetId,
-              vehicle_content_sha256: spaceVehicle.agentCoreContentSha256,
-            },
-            route: plan?.routeMapSha256 === mapPack.agentCoreContentSha256 ? route : undefined,
-          },
-        }
-      : {}),
-  }), [chinese, plan, route, spaceVehicle.agentCoreAssetId, spaceVehicle.agentCoreContentSha256]);
+  }), [chinese]);
 
-  useEffect(() => {
-    const mapAssetId = spaceMap.agentCoreAssetId?.trim();
-    const vehicleAssetId = spaceVehicle.agentCoreAssetId?.trim();
-    if (
-      !mapAssetId
-      || !vehicleAssetId
-      || (spaceMap.agentCoreContentSha256 && spaceVehicle.agentCoreContentSha256)
-    ) return undefined;
-
-    const key = `${mapAssetId}:${vehicleAssetId}`;
-    if (!reconciliationAttempt.current || reconciliationAttempt.current.key !== key) {
-      reconciliationAttempt.current = {
-        key,
-        promise: reconcileAgentCoreWorkspace(workspace, assetLibrary),
-      };
-    }
-    const attempt = reconciliationAttempt.current;
-    let active = true;
-    void attempt.promise.then((next) => {
-      if (active) persist(next);
-    }).catch(() => {
-      if (reconciliationAttempt.current === attempt) reconciliationAttempt.current = null;
-    });
-    return () => { active = false; };
-  }, [assetLibrary, persist, spaceMap.agentCoreAssetId, spaceMap.agentCoreContentSha256, spaceVehicle.agentCoreAssetId, spaceVehicle.agentCoreContentSha256, workspace]);
-
-  useEffect(() => {
-    if (
-      !details
-      || details.kind !== "map"
-      || details.airspace
-      || !spaceMap.agentCoreContentSha256
-      || !spaceVehicle.agentCoreContentSha256
-    ) return;
-    const resource = defaultResources.find((candidate) => candidate.resource_id === "dronedream-school-map");
-    const presentation = catalogAssetPresentation(
-      "map",
-      spaceMap.agentCoreAssetId?.trim() || spaceMap.id,
-      spaceMap.name,
-      chinese,
-    );
-    openMapDetails(spaceMap, resource, presentation.name);
-  }, [chinese, defaultResources, details, openMapDetails, spaceMap, spaceVehicle.agentCoreContentSha256]);
   useEffect(() => {
     let active = true;
     void listAgentCoreMapResources().then((catalog) => {
@@ -2851,35 +2771,21 @@ export function AutonomyMaps() {
     title: resourceName(resource),
     kind: "map",
     previewKey: catalogAssetKey("map", resource.resource_id, resourceName(resource)),
-    description: resource.description[chinese ? "zh-CN" : "en-US"],
     rows: [
-      [chinese ? "说明" : "Description", resource.description[chinese ? "zh-CN" : "en-US"]],
-      [chinese ? "来源" : "Source", resource.source.source_type === "bundled_ddpkg"
-        ? (chinese ? "赫尔辛基市开放数据 + OpenStreetMap" : "City of Helsinki open data + OpenStreetMap")
-        : (resource.analysis.source_commit ? `Git @ ${resource.analysis.source_commit.slice(0, 12)}` : resource.source.location)],
-      [chinese ? "许可证" : "License", resource.license.spdx_id],
       [chinese ? "建筑" : "Buildings", String(resource.analysis.building_count ?? resource.analysis.model_count ?? 0)],
-      [chinese ? "主要建筑" : "Named buildings", (
-        chinese ? resource.analysis.named_buildings_zh : resource.analysis.named_buildings
-      )?.join(" · ") || "—"],
-      [chinese ? "碰撞体" : "Collision geometry", String(resource.analysis.collision_primitive_count ?? 0)],
-      [chinese ? "坐标系" : "Coordinate frame", resource.analysis.coordinate_frame ?? "—"],
-      [chinese ? "仿真状态" : "Simulation", resource.readiness.simulation === "ready"
-        ? (chinese ? "已就绪" : "Ready") : (chinese ? "需要转换" : "Conversion required")],
-      [chinese ? "飞行状态" : "Flight", resource.readiness.flight === "qualified"
-        ? (chinese ? "已完成全程验收" : "End-to-end qualified") : (chinese ? "尚未验收" : "Not qualified")],
+      [chinese ? "坐标系" : "Coordinates", resource.analysis.coordinate_frame ?? "—"],
+      [chinese ? "来源" : "Source", resource.source.source_type === "bundled_ddpkg" ? "Helsinki · OpenStreetMap" : resource.source.source_type],
+      [chinese ? "许可" : "License", resource.license.spdx_id],
     ],
   });
   return (
-    <section className="autonomy-repository-page">
-      <div className="autonomy-repository-toolbar">
-        <AutonomyAssetConnectorPanel kind="map" chinese={chinese} compact />
-      </div>
+    <section className="autonomy-repository-page autonomy-map-repository">
       <div
         className="autonomy-repository-grid"
         role="region"
         aria-label={chinese ? "地图仓库" : "Map repository"}
       >
+        <AutonomyAssetConnectorPanel kind="map" chinese={chinese} compact card />
         {catalogDefinitions.map((definition) => {
           const mapPack = assetLibrary.maps.find((candidate) => catalogAssetKey(
             "map",
@@ -2914,21 +2820,23 @@ export function AutonomyMaps() {
               <RepositoryAssetPreview kind="map" previewUrl={presentation.previewUrl} previewKey={presentation.key} name={presentation.name} />
               <span className="autonomy-repository-copy"><strong title={presentation.name}>{presentation.name}</strong></span>
             </button>
+            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? "删除地图" : "Delete map"} onClick={() => removeAsset("map", mapPack?.agentCoreAssetId || "dronedream.school-map.v1")}><Trash2 aria-hidden="true" /></button>
           </article>;
         })}
-        {unrepresentedExternalAssets("map", catalogDefinitions.map((item) => ({ id: item.resourceId, name: item.en })), assetLibrary.externalAssets).map((asset) => (
-          <article key={`${asset.id}:${asset.contentSha256}`}>
+        {unrepresentedExternalAssets("map", catalogDefinitions.map((item) => ({ id: item.resourceId, name: item.en })), assetLibrary.externalAssets).map((asset) => {
+          const name = asset.name;
+          return <article key={`${asset.id}:${asset.contentSha256}`}>
             <button type="button" className="autonomy-repository-card-surface" onDoubleClick={() => setDetails({
-              title: asset.name, kind: "map", previewKey: null,
+              title: name, kind: "map", previewKey: null,
               rows: [[chinese ? "格式" : "Format", asset.sourceFormat], [chinese ? "来源" : "Source", asset.sourceApplication]],
             })}>
-              <RepositoryAssetPreview kind="map" previewUrl={null} previewKey={null} name={asset.name} />
-              <span className="autonomy-repository-copy"><strong>{asset.name}</strong></span>
+              <RepositoryAssetPreview kind="map" previewUrl={null} previewKey={null} name={name} />
+              <span className="autonomy-repository-copy"><strong>{name}</strong></span>
             </button>
-            <AssetInterpretButton edition={edition} chinese={chinese} kind="map" assetId={asset.id} contentSha256={asset.contentSha256} name={asset.name} />
+            <AssetInterpretButton edition={edition} chinese={chinese} kind="map" assetId={asset.id} contentSha256={asset.contentSha256} name={name} />
             <button type="button" className="autonomy-repository-delete" aria-label={chinese ? "删除地图" : "Delete map"} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
-          </article>
-        ))}
+          </article>;
+        })}
       </div>
       {details ? <RepositoryDetailsDialog chinese={chinese} details={details} onClose={() => setDetails(null)} /> : null}
     </section>
@@ -2948,22 +2856,14 @@ function RepositoryDetailsDialog({
     <div className="autonomy-repository-dialog-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
     }}>
-      <section className="autonomy-repository-dialog" role="dialog" aria-modal="true" aria-label={details.title}>
+      <section className="autonomy-repository-dialog" data-kind={details.kind} role="dialog" aria-modal="true" aria-label={details.title}>
         <header><h2>{details.title}</h2><button type="button" onClick={onClose} aria-label={chinese ? "关闭" : "Close"}><X aria-hidden="true" /></button></header>
         <div className="autonomy-repository-dialog-body">
           <div className="autonomy-repository-dialog-copy">
             {details.description ? <p>{details.description}</p> : null}
             <dl>{details.rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
           </div>
-          {details.airspace ? (
-            <PreferredAirspaceView
-              chinese={chinese}
-              request={details.airspace.request}
-              route={details.airspace.route}
-            />
-          ) : (
-            <RepositoryAsset3DView kind={details.kind} previewKey={details.previewKey} name={details.title} chinese={chinese} />
-          )}
+          <RepositoryAsset3DView kind={details.kind} previewKey={details.previewKey} name={details.title} chinese={chinese} />
         </div>
       </section>
     </div>

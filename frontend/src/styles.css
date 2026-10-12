@@ -24402,3 +24402,29 @@ body {
 .map-import-ai .autonomy-repository-interpret { position: static; }
 .map-import-error { display: block; color: #c52d52; padding-top: 12px; }
 @media (max-width: 480px) { .map-import-dialog { padding: 18px; } .map-import-slot { gap: 10px; } }
+
+/* Map library: one upload card, compact captions, and full-height interactive details. */
+.autonomy-map-repository { padding-top: 4px; }
+.autonomy-map-repository .autonomy-repository-copy { min-height: 60px; height: 60px; padding: 10px 54px 10px 16px; }
+.autonomy-map-repository .autonomy-repository-copy strong { font-size: clamp(18px, 1.4vw, 22px); line-height: 1.25; }
+.autonomy-map-repository .autonomy-repository-delete { width: 32px; height: 32px; bottom: 14px; }
+.autonomy-map-repository .autonomy-repository-delete svg { width: 19px; height: 19px; }
+.autonomy-new-map-preview { color: var(--dd-brand-middle); background: color-mix(in srgb, var(--dd-brand-middle) 5%, #fff); }
+.autonomy-new-map-preview > svg { width: 56px; height: 56px; filter: none; }
+.autonomy-new-map-card:hover { border-color: var(--dd-brand-middle); }
+.autonomy-new-map-card .autonomy-repository-copy { padding-right: 16px; }
+.autonomy-repository-dialog[data-kind="map"] { width: min(1280px, calc(100vw - 40px)); box-sizing: border-box; }
+.autonomy-repository-dialog[data-kind="map"] .autonomy-repository-dialog-body { grid-template-columns: minmax(240px, .65fr) minmax(0, 1.35fr); height: min(620px, calc(100dvh - 150px)); }
+.autonomy-repository-dialog[data-kind="map"] .autonomy-repository-dialog-copy { overflow: visible; max-height: none; }
+.autonomy-repository-dialog[data-kind="map"] dl { overflow: visible; scrollbar-gutter: auto; }
+.autonomy-repository-dialog[data-kind="map"] dl > div { padding: 12px 0; grid-template-columns: minmax(85px, .65fr) minmax(0, 1fr); font-size: clamp(15px, 1.2vw, 18px); }
+.autonomy-repository-dialog[data-kind="map"] .autonomy-repository-3d-view { min-height: 0; }
+.launcher-progress-panel:not(:has(.launcher-account-form)) { height: auto; min-height: 0; overflow: visible; }
+.launcher-card-actions { max-height: none; overflow: visible; margin-top: 16px; }
+.launcher-card-actions:empty { display: none; }
+@media (max-width: 820px) {
+ .autonomy-repository-dialog[data-kind="map"] .autonomy-repository-dialog-body { grid-template-columns: 1fr; height: auto; }
+ .autonomy-repository-dialog[data-kind="map"] .autonomy-repository-3d-view { height: 280px; }
+}
+
+.autonomy-map-repository .autonomy-repository-preview.is-map::after { box-shadow: none; }

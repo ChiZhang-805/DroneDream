@@ -415,12 +415,6 @@ export function DesktopSetup() {
     runtimeAccess.status === "starting";
   const postSignInBlocked =
     authCompletedForLaunch && startupGate.status === "blocked";
-  const startupGateFailureKey: TranslationKey =
-    startupGate.failureCode === "runtimeSessionApiMissing"
-      ? "launcher.runtimeSessionApiMissing"
-      : startupGate.failureCode === "accountIdentityMismatch"
-        ? "launcher.accountIdentityMismatch"
-        : "launcher.accountVerificationFailed";
   const environmentBlocked =
     localRuntimeReady && !localChecksReady && !environmentChecking;
   const launcherProgress = launcherProgressFromEvidence({
@@ -1385,13 +1379,6 @@ export function DesktopSetup() {
           automaticStartPending={automaticStartPending}
           commandBusy={installState.commandBusy}
         >
-
-        {postSignInBlocked &&
-        !updaterBlocksWorkspace ? (
-          <Alert tone="warning" title={t("launcher.accountVerificationBlocked")}>
-            <p>{t(startupGateFailureKey)}</p>
-          </Alert>
-        ) : null}
 
         {runtimeSessionFailureKey ? (
           <Alert tone="warning" title={t("launcher.runtimeSessionApiTitle")}>
