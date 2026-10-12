@@ -122,7 +122,7 @@ describe("qualified map and vehicle bindings", () => {
         source_content_sha256: oldHash,
         replacement_content_sha256: fixture.job.result_map_content_sha256,
       }],
-    } as Awaited<ReturnType<typeof core.getAgentCoreBootstrap>>);
+    } as unknown as Awaited<ReturnType<typeof core.getAgentCoreBootstrap>>);
     const bound = await reconcileAgentCoreWorkspace(workspace, loadAutonomyAssetLibrary("upgraded", "autonomy", workspace));
     expect(bound.mapPack.agentCoreContentSha256).toBe(fixture.job.result_map_content_sha256);
     expect(bound.mapPack.qualificationReceiptId).toBe(fixture.job.qualification_id);
