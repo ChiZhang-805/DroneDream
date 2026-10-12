@@ -123,7 +123,7 @@ fn normalized_archive_path(root: &Path, path: &Path) -> Result<String, String> {
     Ok(parts.join("/"))
 }
 
-fn collect_asset_directory_files(root: &Path) -> Result<Vec<(PathBuf, String, u64)>, String> {
+pub(crate) fn collect_asset_directory_files(root: &Path) -> Result<Vec<(PathBuf, String, u64)>, String> {
     let mut pending = vec![root.to_path_buf()];
     let mut files = Vec::new();
     let mut total_bytes = 0_u64;

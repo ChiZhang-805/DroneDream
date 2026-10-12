@@ -48,6 +48,7 @@ import {
 import type { BrandEditionId } from "../brand/edition-brand.generated";
 import { apiClient } from "../api/client";
 import { openAppSettings } from "../appSettings";
+import { MapImportDialog } from "../features/autonomy/MapImportDialog";
 import { AssetInterpretButton } from "../features/autonomy/AssetInterpretButton";
 import { PreferredAirspaceView } from "../features/autonomy/PreferredAirspaceView";
 import { AUTONOMY_CONVERSATIONS_CHANGED, autonomyConversationId, autonomyConversationPath, loadAutonomyConversation, newAutonomyConversation, preserveLegacyAutonomyConversation, saveAutonomyConversation, isAutonomyConversationDeleted, listAutonomyConversations, updateAutonomyConversation } from "../features/autonomy/conversationStore";
@@ -493,6 +494,7 @@ export function AutonomyAssetConnectorPanel({
   const [catalogState, setCatalogState] = useState<"loading" | "ready" | "unavailable">("loading");
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [mapImportOpen, setMapImportOpen] = useState(false);
   const [remoteOpen, setRemoteOpen] = useState(false);
   const [remoteType, setRemoteType] = useState<"direct_url" | "git">("direct_url");
   const [remoteLocation, setRemoteLocation] = useState("");
@@ -512,7 +514,7 @@ export function AutonomyAssetConnectorPanel({
       bootstrap.asset_versions
         .filter((version) => (
           (version.kind === kind || (kind === "map" && version.kind === "world"))
-          && ["simulation_ready", "flight_ready", "qualified"].includes(version.maturity)
+          && (kind === "map" || ["simulation_ready", "flight_ready", "qualified"].includes(version.maturity))
         ))
         .forEach((version) => registerExternalAsset(
           version,
@@ -573,6 +575,14 @@ export function AutonomyAssetConnectorPanel({
       setImporting(false);
     }
   };
+  if (kind === "map") return <div className="autonomy-repository-import">
+    <button type="button" className="btn btn-primary" aria-label={chinese ? "导入地图" : "Import map"}
+      title={chinese ? "导入地图" : "Import map"} onClick={() => setMapImportOpen(true)}>
+      <Upload aria-hidden="true" />
+    </button>
+    <MapImportDialog open={mapImportOpen} chinese={chinese} edition={outletWorkspace?.edition ?? "universal"}
+      onClose={() => setMapImportOpen(false)} onImported={registerExternalAsset} />
+  </div>;
   if (compact) {
     return (
       <div className="autonomy-repository-import">
@@ -741,10 +751,10 @@ export function AutonomyAssetConnectorPanel({
           />
         </article>;
       })}</div> : null}
-      {assetLibrary.externalAssets.some((asset) => asset.kind === kind || (kind === "map" && asset.kind === "world")) ? (
+      {assetLibrary.externalAssets.some((asset) => asset.kind === kind) ? (
         <div className="autonomy-import-jobs autonomy-imported-sources">
           {assetLibrary.externalAssets
-            .filter((asset) => asset.kind === kind || (kind === "map" && asset.kind === "world"))
+            .filter((asset) => asset.kind === kind)
             .slice(0, 6)
             .map((asset) => (
               <article key={`${asset.id}:${asset.contentSha256}`}>
@@ -2708,6 +2718,8 @@ export function AutonomyAircraft() {
 export function AutonomyMaps() {
   const {
     chinese,
+    edition,
+    removeAsset,
     workspace,
     assetLibrary,
     persist,
@@ -2861,7 +2873,7 @@ export function AutonomyMaps() {
   return (
     <section className="autonomy-repository-page">
       <div className="autonomy-repository-toolbar">
-        <p>{chinese ? "双击卡片查看详情" : "Double-click a card for details"}</p>
+        <AutonomyAssetConnectorPanel kind="map" chinese={chinese} compact />
       </div>
       <div
         className="autonomy-repository-grid"
@@ -2904,6 +2916,19 @@ export function AutonomyMaps() {
             </button>
           </article>;
         })}
+        {unrepresentedExternalAssets("map", catalogDefinitions.map((item) => ({ id: item.resourceId, name: item.en })), assetLibrary.externalAssets).map((asset) => (
+          <article key={`${asset.id}:${asset.contentSha256}`}>
+            <button type="button" className="autonomy-repository-card-surface" onDoubleClick={() => setDetails({
+              title: asset.name, kind: "map", previewKey: null,
+              rows: [[chinese ? "格式" : "Format", asset.sourceFormat], [chinese ? "来源" : "Source", asset.sourceApplication]],
+            })}>
+              <RepositoryAssetPreview kind="map" previewUrl={null} previewKey={null} name={asset.name} />
+              <span className="autonomy-repository-copy"><strong>{asset.name}</strong></span>
+            </button>
+            <AssetInterpretButton edition={edition} chinese={chinese} kind="map" assetId={asset.id} contentSha256={asset.contentSha256} name={asset.name} />
+            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? "删除地图" : "Delete map"} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
+          </article>
+        ))}
       </div>
       {details ? <RepositoryDetailsDialog chinese={chinese} details={details} onClose={() => setDetails(null)} /> : null}
     </section>

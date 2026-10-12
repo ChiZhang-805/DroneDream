@@ -24379,3 +24379,26 @@ body {
   .autonomy-repository-dialog-copy { max-height: 300px; }
 }
 .launcher-stage-list li[data-paused="true"] > span::before { animation: none; }
+
+.map-import-dialog { width: min(600px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); box-sizing: border-box; padding: 24px; border: 1px solid #e9dfea; border-radius: 20px; color: #302536; background: #fff; box-shadow: 0 24px 90px #24142830; overflow-y: auto; }
+.map-import-dialog::backdrop { background: #21152755; }
+.map-import-dialog header, .map-import-dialog h2, .map-import-dialog footer { display: flex; align-items: center; gap: 12px; }
+.map-import-dialog header { justify-content: space-between; margin-bottom: 20px; }
+.map-import-dialog h2 { margin: 0; font-size: 24px; }
+.map-import-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 40px; height: 40px; padding: 8px; border: 0; border-radius: 8px; background: transparent; color: inherit; cursor: pointer; }
+.map-import-icon:hover { background: #f5edf7; }
+.map-import-icon:disabled { opacity: .35; cursor: default; }
+.map-import-icon:focus-visible { outline: 2px solid #a557bb; outline-offset: 2px; }
+.map-import-slot { display: grid; grid-template-columns: 24px minmax(0, 1fr) 24px 40px; align-items: center; gap: 16px; min-height: 76px; border-top: 1px solid #eee7ef; }
+.map-import-file { display: grid; min-width: 0; gap: 4px; }
+.map-import-file strong { font-size: 17px; font-weight: 600; }
+.map-import-file span { font-size: 13px; color: #766b7b; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.map-import-status { display: flex; color: #b5aabc; }
+.map-import-status[data-state="uploaded"] { color: #16a277; }
+.map-import-status[data-state="busy"] svg, .map-import-spin { animation: map-upload-spin 1s linear infinite; }
+@keyframes map-upload-spin { to { transform: rotate(360deg); } }
+.map-import-dialog footer { justify-content: flex-end; margin-top: 20px; }
+.map-import-ai { display: flex; align-items: center; gap: 8px; margin-right: auto; font-size: 14px; }
+.map-import-ai .autonomy-repository-interpret { position: static; }
+.map-import-error { display: block; color: #c52d52; padding-top: 12px; }
+@media (max-width: 480px) { .map-import-dialog { padding: 18px; } .map-import-slot { gap: 10px; } }

@@ -1,5 +1,7 @@
 #[cfg(dronedream_agent)]
 mod agent_core;
+#[cfg(dronedream_agent)]
+mod map_import;
 mod app_update;
 mod browser_auth;
 mod browser_auth_audit;
@@ -150,6 +152,8 @@ pub fn run() {
         agent_core::agent_core_restart,
         agent_core::agent_core_status,
         agent_core::agent_core_import_asset_path,
+        map_import::stage_map_import_file,
+        map_import::prepare_map_import,
         agent_core::agent_core_submit_companion_result_path,
         field_adapters::get_field_adapter_catalog,
         field_adapters::inspect_field_adapter_frame,
@@ -206,6 +210,8 @@ pub fn run() {
         agent_core::agent_core_restart,
         agent_core::agent_core_status,
         agent_core::agent_core_import_asset_path,
+        map_import::stage_map_import_file,
+        map_import::prepare_map_import,
         agent_core::agent_core_submit_companion_result_path,
         field_adapters::get_field_adapter_catalog,
         field_adapters::inspect_field_adapter_frame,
@@ -262,6 +268,8 @@ pub fn run() {
         agent_core::agent_core_restart,
         agent_core::agent_core_status,
         agent_core::agent_core_import_asset_path,
+        map_import::stage_map_import_file,
+        map_import::prepare_map_import,
         agent_core::agent_core_submit_companion_result_path,
         field_adapters::get_field_adapter_catalog,
         field_adapters::inspect_field_adapter_frame,
@@ -319,6 +327,8 @@ pub fn run() {
         agent_core::agent_core_restart,
         agent_core::agent_core_status,
         agent_core::agent_core_import_asset_path,
+        map_import::stage_map_import_file,
+        map_import::prepare_map_import,
         agent_core::agent_core_submit_companion_result_path,
     ]);
 

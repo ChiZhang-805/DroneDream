@@ -1460,11 +1460,15 @@ export async function pickAndCreateAgentCoreAssetImportJob(
       : undefined,
   });
   if (!selection || Array.isArray(selection)) return null;
+  return createAgentCoreAssetImportFromPath(selection, expectedKind);
+}
+
+export async function createAgentCoreAssetImportFromPath(filePath: string, expectedKind: AgentCoreAssetKind): Promise<AgentCoreAssetImportJob> {
   const core = tauriCore();
   if (!core) throw new AgentCoreUnavailableError();
   const response = await core.invoke("agent_core_import_asset_path", {
     request: {
-      filePath: selection,
+      filePath,
       sourceFormat: "auto",
       expectedKind,
     },
@@ -1479,6 +1483,37 @@ export async function pickAndCreateAgentCoreAssetImportJob(
 
 export function processAgentCoreAssetImportJob(jobId: string): Promise<AgentCoreAssetImportJob> {
   return requestJson(`/v1/asset-import-jobs/${encodeURIComponent(jobId)}/process`, { method: "POST" });
+}
+
+export type MapUploadRole = "scene" | "resources" | "places" | "routes";
+export interface MapUploadReceipt {
+  role: MapUploadRole;
+  filePath: string;
+  name: string;
+  fileCount: number;
+}
+
+export async function pickMapUpload(role: MapUploadRole, chinese: boolean): Promise<MapUploadReceipt | null> {
+  const core = tauriCore();
+  if (!core) throw new AgentCoreUnavailableError();
+  const selection = await open({
+    multiple: false,
+    directory: role === "resources",
+    title: chinese ? "上传地图文件" : "Upload map file",
+    filters: role === "resources" ? undefined : [{
+      name: role === "scene" ? (chinese ? "地图" : "Map") : "JSON",
+      extensions: role === "scene" ? ["ddpkg", "zip", "sdf", "world", "yaml"] : ["json"],
+    }],
+  });
+  if (!selection || Array.isArray(selection)) return null;
+  return await core.invoke("stage_map_import_file", { filePath: selection, role }) as MapUploadReceipt;
+}
+
+export async function createMapUploadImport(uploads: MapUploadReceipt[]): Promise<AgentCoreAssetImportJob> {
+  const core = tauriCore();
+  if (!core) throw new AgentCoreUnavailableError();
+  const path = await core.invoke("prepare_map_import", { uploads }) as string;
+  return createAgentCoreAssetImportFromPath(path, "map");
 }
 
 export async function pickAndSubmitAgentCoreCompanionResult(
