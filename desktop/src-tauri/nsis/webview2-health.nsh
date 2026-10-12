@@ -11,6 +11,7 @@
 ; uninstall and never deletes shared WebView2 files or registry keys.
 
 !include "${__FILEDIR__}\runtime-mode.nsh"
+!include "${__FILEDIR__}\installed-app-process.nsh"
 !define DRONEDREAM_EDITION_IDENTITY_FILE "${__FILEDIR__}\edition-identity.nsh"
 !macro DRONEDREAM_EDITION_IDENTITY_TABLE
   !include "${DRONEDREAM_EDITION_IDENTITY_FILE}"

@@ -88,7 +88,7 @@ $substitutions = @(
     @{ Modified = 'Name "${DRONEDREAM_DISPLAYNAME}"'; Original = 'Name "${PRODUCTNAME}"'; Count = 1 },
     @{ Modified = 'VIAddVersionKey "ProductName" "${DRONEDREAM_DISPLAYNAME}"'; Original = 'VIAddVersionKey "ProductName" "${PRODUCTNAME}"'; Count = 1 },
     @{ Modified = 'VIAddVersionKey "FileDescription" "${DRONEDREAM_DISPLAYNAME}"'; Original = 'VIAddVersionKey "FileDescription" "${PRODUCTNAME}"'; Count = 1 },
-    @{ Modified = '!insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${DRONEDREAM_DISPLAYNAME}"'; Original = '!insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"'; Count = 2 },
+    @{ Modified = '!insertmacro DRONEDREAM_CHECK_INSTALLED_APP "${MAINBINARYNAME}.exe" "${DRONEDREAM_DISPLAYNAME}"'; Original = '!insertmacro CheckIfAppIsRunning "${MAINBINARYNAME}.exe" "${PRODUCTNAME}"'; Count = 2 },
     @{ Modified = '"Open with ${DRONEDREAM_DISPLAYNAME}"'; Original = '"Open with ${PRODUCTNAME}"'; Count = 1 },
     @{ Modified = 'WriteRegStr SHCTX "${UNINSTKEY}" "DisplayName" "${DRONEDREAM_DISPLAYNAME}"'; Original = 'WriteRegStr SHCTX "${UNINSTKEY}" "DisplayName" "${PRODUCTNAME}"'; Count = 1 },
     @{ Modified = '"$SMPROGRAMS\$AppStartMenuFolder\${DRONEDREAM_SHORTCUTNAME}.lnk"'; Original = '"$SMPROGRAMS\$AppStartMenuFolder\${PRODUCTNAME}.lnk"'; Count = 3 },
