@@ -65,7 +65,7 @@ const HARDWARE_ACTIONS = [
 
 const COPY = {
   en: {
-    title: "Sim-to-Real calibration laboratory",
+    title: "LAB workspace",
     subtitle:
       "Model + Harness connects simulation search, controlled real observations, model calibration, independent holdout, and evidence issuance in one bounded job.",
     packs: "Validated packs",
@@ -130,7 +130,7 @@ const COPY = {
     deniedCapabilities: "Denied capability IDs",
   },
   "zh-CN": {
-    title: "Sim-to-Real 校准实验室",
+    title: "LAB 工作区",
     subtitle:
       "Model + Harness 在同一份受预算约束的作业中贯通仿真搜索、受控真实观测、模型校准、独立 holdout 与证据签发。",
     packs: "已验证机型包",
@@ -292,6 +292,7 @@ export function LabSetup({
         </div>
       </header>
 
+      <div className="lab-navigation">
       <div className="lab-workspace-switch" role="group" aria-label={copy.workspaceLabel}>
         <button
           type="button"
@@ -340,6 +341,8 @@ export function LabSetup({
             </button>
           );
         })}
+      </div>
+
       </div>
 
       {view === "calibration" ? (
@@ -442,20 +445,22 @@ export function LabSetup({
                   <small>{selectedPack?.packId} · {selectedController?.model} · {selectedFirmware}</small>
                 </div>
               </div>
-              <div className="lab-deny-banner" role="alert">
-                <XCircle aria-hidden="true" />
-                <div><strong>{copy.actionsDenied}</strong><p>{copy.actionsDeniedBody}</p></div>
-              </div>
-              <div className="lab-hardware-actions" aria-label={copy.actionsDenied}>
+              <div className="lab-actions">
                 <Link to="/lab/hardware" className="btn btn-primary">
                   <RadioTower aria-hidden="true" /> {copy.openHardware}
                 </Link>
+              </div>
+              <details className="lab-details">
+                <summary>{copy.actionsDenied}</summary>
+                <p>{copy.actionsDeniedBody}</p>
+                <div className="lab-hardware-actions" aria-label={copy.actionsDenied}>
                 {[copy.discovery, copy.write, copy.arm, copy.flight].map((label) => (
                   <button key={label} type="button" className="btn" disabled>
                     <LockKeyhole aria-hidden="true" /> {label}
                   </button>
                 ))}
-              </div>
+                </div>
+              </details>
             </div>
           )}
         </section>
@@ -463,23 +468,27 @@ export function LabSetup({
 
       {view === "evidence" ? (
         <section id="lab-panel-evidence" className="lab-tool" role="tabpanel" aria-labelledby="lab-view-evidence">
+          <div className="lab-action-toolbar">
           <div className="lab-tool-intro">
             <FileCheck2 aria-hidden="true" />
             <h2>{copy.evidenceTitle}</h2>
           </div>
           <div className="lab-evidence-actions">
-            <label className="btn lab-file-button">
+            <label className="btn btn-primary lab-file-button">
               <Upload aria-hidden="true" /> {copy.chooseEvidence}
               <input type="file" accept="application/json,.json" onChange={previewEvidence} />
             </label>
             <button
               type="button"
               className="btn btn-ghost"
+              aria-label={copy.clearEvidence}
+              title={copy.clearEvidence}
               disabled={!evidence && !evidenceError && !evidenceImport.loading}
               onClick={evidenceImport.reset}
             >
-              <RotateCcw aria-hidden="true" /> {copy.clearEvidence}
+              <RotateCcw aria-hidden="true" />
             </button>
+          </div>
           </div>
           {evidenceError ? (
             <div className="lab-deny-banner" role="alert">

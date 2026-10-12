@@ -99,18 +99,18 @@ export function LabEvidenceBridgePanel() {
       : copy.matched;
 
   return (
-    <section
+    <details
       className="lab-evidence-bridge"
       data-bridge-state={decision.state}
       data-presentation-only="true"
       data-grants-hardware-authority="false"
       aria-labelledby="lab-evidence-bridge-title"
     >
-      <header>
+      <summary>
         <GitCompareArrows aria-hidden="true" />
         <h3 id="lab-evidence-bridge-title">{copy.title}</h3>
         <strong data-state={decision.state}>{status}</strong>
-      </header>
+      </summary>
 
       <div className="lab-evidence-bridge-inputs">
         <div>
@@ -153,6 +153,6 @@ export function LabEvidenceBridgePanel() {
         </details>
       ) : null}
       <p className="lab-evidence-bridge-safety"><ShieldX aria-hidden="true" />{copy.safety}</p>
-    </section>
+    </details>
   );
 }

@@ -27,7 +27,7 @@ describe("Lab setup", () => {
     const user = userEvent.setup();
     renderLab();
 
-    expect(screen.getByRole("heading", { name: "Sim-to-Real calibration laboratory" }))
+    expect(screen.getByRole("heading", { name: "LAB workspace" }))
       .toBeInTheDocument();
     expect(screen.getByText("0 of 8")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Simulation workspace/i }))
@@ -46,6 +46,7 @@ describe("Lab setup", () => {
     const packSelect = screen.getByRole("combobox", { name: "Vehicle Pack" });
     expect(packSelect).toHaveValue("holybro-x500-v2-pixhawk6");
     expect(within(packSelect).getAllByRole("option")).toHaveLength(7);
+    await user.click(screen.getByText("Hardware execution is denied", { exact: true }));
 
     for (const name of [
       "Discover controller",
@@ -102,10 +103,11 @@ describe("Lab setup", () => {
     const user = userEvent.setup();
     renderLab("zh-CN");
 
-    expect(screen.getByRole("heading", { name: "Sim-to-Real 校准实验室" }))
+    expect(screen.getByRole("heading", { name: "LAB 工作区" }))
       .toBeInTheDocument();
     expect(screen.getByText(/同一份受预算约束的作业/)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /真机实验室/ }));
+    await user.click(screen.getByText("真机执行已拒绝", { exact: true }));
     expect(screen.getByRole("button", { name: "写入参数" })).toBeDisabled();
     expect(screen.getByText("真机执行已拒绝")).toBeInTheDocument();
   });

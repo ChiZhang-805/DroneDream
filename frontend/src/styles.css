@@ -24338,3 +24338,13 @@ body {
 .launcher-registration-code .launcher-send-code { height: 48px; min-height: 48px; padding: 0 12px; font-size: 14px; white-space: nowrap; }
 .launcher-registration-message { color: #566174; font-size: 13px; line-height: 1.4; }
 .launcher-registration-message[role="alert"] { color: #b33150; }
+
+@media (max-width: 520px) {
+  .experiment-assistant-page .assistant-composer-bar { display: grid; grid-template-columns: 36px minmax(0, 1fr) 36px 36px; gap: 6px; }
+  .experiment-assistant-page .assistant-add-menu { grid-column: 1; grid-row: 1; }
+  .experiment-assistant-page .assistant-task-chip { grid-column: 2 / -1; grid-row: 1; justify-self: start; max-width: 100%; white-space: normal; text-align: left; overflow-wrap: anywhere; }
+  .experiment-assistant-page .assistant-composer-spacer { display: none; }
+  .experiment-assistant-page .assistant-model-picker { grid-column: 1 / 3; grid-row: 2; min-width: 0; }
+  .experiment-assistant-page .assistant-voice-button { grid-column: 3; grid-row: 2; }
+  .experiment-assistant-page .assistant-send-button { grid-column: 4; grid-row: 2; }
+}

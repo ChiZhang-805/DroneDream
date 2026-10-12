@@ -223,8 +223,8 @@ try {
     await page.goto(`${origin}/lab?docsPreview=1`, { waitUntil: "networkidle" });
 
     const title = testCase.locale === "en"
-      ? "Sim-to-Real calibration laboratory"
-      : "Sim-to-Real 校准实验室";
+      ? "LAB workspace"
+      : "LAB 工作区";
     await page.getByRole("heading", { name: title }).waitFor();
     const brandImage = page.locator('.workspace-switch-brand[data-brand-edition="lab"] img').first();
     await brandImage.waitFor({ state: "attached" });
@@ -252,6 +252,10 @@ try {
     assert.equal(await calibration.getAttribute("data-grants-hardware-authority"), "false");
     const bridge = page.locator('.lab-evidence-bridge[data-grants-hardware-authority="false"]');
     assert.equal(await bridge.getAttribute("data-presentation-only"), "true");
+    assert.equal(await bridge.getAttribute("open"), null);
+    await assertViewportFits(page, testCase, "calibration-empty");
+    evidence.push(await screenshot(page, testCase, "calibration-empty"));
+    await bridge.locator(":scope > summary").click();
     const bridgeInputs = bridge.locator('input[type="file"]');
     assert.equal(await bridgeInputs.count(), 2);
     await bridgeInputs.nth(0).setInputFiles({
@@ -278,7 +282,7 @@ try {
       ).count(),
       1,
     );
-    await page.locator('.lab-calibration-controls input[type="file"]').setInputFiles({
+    await page.locator('.lab-calibration-import input[type="file"]').setInputFiles({
       name: "calibration-input.fake.json",
       mimeType: "application/json",
       buffer: calibrationFixture,

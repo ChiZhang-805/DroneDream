@@ -35,8 +35,7 @@ export function LabHardwareWorkspace() {
     >
       <header className="lab-hardware-heading">
         <div>
-          <span><RadioTower aria-hidden="true" />{copy.eyebrow}</span>
-          <h1>{copy.title}</h1>
+          <h1><RadioTower aria-hidden="true" />{copy.title}</h1>
         </div>
         <div className="lab-hardware-deny" role="status">
           <LockKeyhole aria-hidden="true" />

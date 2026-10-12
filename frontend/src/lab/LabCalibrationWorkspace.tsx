@@ -275,18 +275,22 @@ export function LabCalibrationWorkspace() {
       data-presentation-only="true"
       data-grants-hardware-authority="false"
     >
+      <div className="lab-action-toolbar">
       <div className="lab-tool-intro">
         <RefreshCw aria-hidden="true" />
         <div><h2>{copy.title}</h2></div>
       </div>
-
-      <div className="lab-role-strip" aria-label={copy.title}>
-        <span><BrainCircuit aria-hidden="true" /><small>{copy.model}</small><strong>{copy.modelState}</strong></span>
-        <span><Gauge aria-hidden="true" /><small>{copy.harness}</small><strong>{copy.harnessState}</strong></span>
-        <span className="is-denied"><LockKeyhole aria-hidden="true" /><small>{copy.authority}</small><strong>{copy.authorityState}</strong></span>
+      <div className="lab-calibration-import">
+        <label className="btn btn-primary lab-file-button" title={copy.import}>
+          <Upload aria-hidden="true" /> {locale === "zh-CN" ? "导入循环证据" : "Import cycle"}
+          <input aria-label={copy.import} type="file" accept="application/json,.json" onChange={importEvidence} />
+        </label>
+        <button type="button" className="btn btn-ghost" aria-label={copy.reset} title={copy.reset}
+          disabled={!input && !error && !evidenceImport.loading} onClick={reset}>
+          <RefreshCw aria-hidden="true" />
+        </button>
       </div>
-
-      <LabEvidenceBridgePanel />
+      </div>
 
       <div className="lab-calibration-controls">
         <label>
@@ -319,17 +323,9 @@ export function LabCalibrationWorkspace() {
             ))}
           </select>
         </label>
-        <div className="lab-calibration-import">
-          <label className="btn lab-file-button">
-            <Upload aria-hidden="true" /> {copy.import}
-            <input type="file" accept="application/json,.json" onChange={importEvidence} />
-          </label>
-          <button type="button" className="btn btn-ghost"
-            disabled={!input && !error && !evidenceImport.loading} onClick={reset}>
-            <RefreshCw aria-hidden="true" /> {copy.reset}
-          </button>
-        </div>
       </div>
+
+      <LabEvidenceBridgePanel />
 
       {error ? (
         <div className="lab-deny-banner" role="alert">
@@ -403,6 +399,14 @@ export function LabCalibrationWorkspace() {
           </div>
         </>
       )}
+      <details className="lab-details">
+        <summary>{locale === "zh-CN" ? "规则与权限" : "Rules & permissions"}</summary>
+        <div className="lab-role-strip" aria-label={copy.title}>
+          <span><BrainCircuit aria-hidden="true" /><small>{copy.model}</small><strong>{copy.modelState}</strong></span>
+          <span><Gauge aria-hidden="true" /><small>{copy.harness}</small><strong>{copy.harnessState}</strong></span>
+          <span className="is-denied"><LockKeyhole aria-hidden="true" /><small>{copy.authority}</small><strong>{copy.authorityState}</strong></span>
+        </div>
+      </details>
     </section>
   );
 }
