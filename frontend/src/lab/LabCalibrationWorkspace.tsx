@@ -3,13 +3,9 @@ import type { ChangeEvent } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowRight,
-  BrainCircuit,
   Check,
   Download,
-  Gauge,
-  LockKeyhole,
   RefreshCw,
-  ShieldCheck,
   Upload,
   X,
 } from "lucide-react";
@@ -32,13 +28,9 @@ import { useEvidenceImport } from "./useEvidenceImport";
 
 const COPY = {
   en: {
+    exportFailed: "The draft receipt could not be generated.",
+    inspectFailed: "The evidence could not be inspected.",
     title: "Bidirectional calibration loop",
-    model: "Model",
-    modelState: "Proposal only",
-    harness: "Harness",
-    harnessState: "Constraints enforced",
-    authority: "Hardware",
-    authorityState: "DENY",
     objective: "Optimization objective",
     objectives: {
       tracking: "Tracking accuracy",
@@ -53,13 +45,9 @@ const COPY = {
     reset: "Reset analysis",
     noInput: "No cycle evidence bound",
     rejected: "Evidence rejected",
-    inspectFailed: "The evidence could not be inspected.",
-    exportFailed: "The draft receipt could not be generated.",
     workflow: "Job progression",
     gap: "Sim-real gap",
     aggregate: "Aggregate gap",
-    next: "Next Harness action",
-    recommendations: "Model revision inputs",
     sim: "SIM",
     real: "REAL",
     export: "Export draft receipt",
@@ -68,9 +56,6 @@ const COPY = {
     job: "Job",
     cycle: "Cycle",
     vehiclePack: "Vehicle Pack",
-    qualification: "Qualification",
-    qualificationBody: "Independent holdout and a validated Vehicle Pack are required before trusted evidence can be issued.",
-    safety: "Imported evidence and exported drafts never grant hardware authority.",
     status: { complete: "Complete", ready: "Ready", pending: "Pending", blocked: "Blocked" },
     metrics: {
       trackingRmseM: "Tracking RMSE",
@@ -89,23 +74,11 @@ const COPY = {
       "qualification-and-evidence": "Qualification evidence",
       "field-handoff": "FIELD handoff",
     },
-    actions: {
-      "revise-model-and-resimulate": "Revise the model, propose a new candidate, then resimulate within the frozen budget.",
-      "await-independent-holdout": "Freeze the calibrated model and run the independent holdout before qualification.",
-    },
-    reasons: {
-      "zero-validated-vehicle-packs": "Denied: zero validated Vehicle Packs",
-      "gap-outside-tolerance": "Denied: sim-real gap exceeds tolerance",
-    },
   },
   "zh-CN": {
+    exportFailed: "无法生成草稿回执。",
+    inspectFailed: "无法检查导入的证据。",
     title: "双向校准闭环",
-    model: "Model",
-    modelState: "仅提出建议",
-    harness: "Harness",
-    harnessState: "强制约束",
-    authority: "真机权限",
-    authorityState: "拒绝",
     objective: "优化目标",
     objectives: {
       tracking: "跟踪精度",
@@ -120,13 +93,9 @@ const COPY = {
     reset: "重置分析",
     noInput: "尚未绑定循环证据",
     rejected: "证据已拒绝",
-    inspectFailed: "无法检查导入的证据。",
-    exportFailed: "无法生成草稿回执。",
     workflow: "作业进程",
     gap: "仿真与真实差距",
     aggregate: "综合差距",
-    next: "下一项 Harness 动作",
-    recommendations: "模型修正输入",
     sim: "仿真",
     real: "真实",
     export: "导出草稿回执",
@@ -135,9 +104,6 @@ const COPY = {
     job: "作业",
     cycle: "循环",
     vehiclePack: "机型包",
-    qualification: "资格判定",
-    qualificationBody: "签发可信证据前必须通过独立留出验证，并使用已验证的机型包。",
-    safety: "导入证据与导出草稿均不会授予真机权限。",
     status: { complete: "完成", ready: "就绪", pending: "等待", blocked: "阻断" },
     metrics: {
       trackingRmseM: "跟踪 RMSE",
@@ -155,14 +121,6 @@ const COPY = {
       "independent-holdout": "独立留出验证",
       "qualification-and-evidence": "资格证据",
       "field-handoff": "FIELD 交接",
-    },
-    actions: {
-      "revise-model-and-resimulate": "修正模型，在冻结预算内提出下一组候选参数并重新仿真。",
-      "await-independent-holdout": "冻结校准模型，完成独立留出验证后再进行资格判定。",
-    },
-    reasons: {
-      "zero-validated-vehicle-packs": "拒绝：已验证机型包数量为零",
-      "gap-outside-tolerance": "拒绝：仿真与真实差距超出容限",
     },
   },
 } as const;
@@ -336,7 +294,7 @@ export function LabCalibrationWorkspace() {
           <RefreshCw aria-hidden="true" /><strong>{copy.noInput}</strong>
         </div>
       ) : (
-        <>
+        <div className="lab-calibration-results">
           <div className="lab-calibration-identity">
             <span><small>{copy.job}</small><strong>{input.jobId}</strong></span>
             <span><small>{copy.cycle}</small><strong>{input.cycleOrdinal}</strong></span>
@@ -378,35 +336,12 @@ export function LabCalibrationWorkspace() {
             </div>
           </section>
 
-          <div className="lab-next-action">
-            <BrainCircuit aria-hidden="true" />
-            <div>
-              <small>{copy.next}</small>
-              <strong>{copy.actions[analysis.nextAction]}</strong>
-              <span>{copy.recommendations}: {analysis.recommendations.join(" · ")}</span>
-            </div>
-          </div>
-
-          <div className="lab-qualification-deny" role="status">
-            <ShieldCheck aria-hidden="true" />
-            <div><strong>{copy.qualification}: {copy.reasons[analysis.qualificationReason]}</strong><p>{copy.qualificationBody}</p><small>{copy.safety}</small></div>
-          </div>
-
           <div className="lab-actions">
             <Link to="/jobs/new" className="btn btn-primary"><ArrowRight aria-hidden="true" /> {copy.openSim}</Link>
             <button type="button" className="btn" onClick={exportDraft}><Download aria-hidden="true" /> {copy.export}</button>
-            <button type="button" className="btn" disabled><LockKeyhole aria-hidden="true" /> {copy.authorityState}</button>
           </div>
-        </>
-      )}
-      <details className="lab-details">
-        <summary>{locale === "zh-CN" ? "规则与权限" : "Rules & permissions"}</summary>
-        <div className="lab-role-strip" aria-label={copy.title}>
-          <span><BrainCircuit aria-hidden="true" /><small>{copy.model}</small><strong>{copy.modelState}</strong></span>
-          <span><Gauge aria-hidden="true" /><small>{copy.harness}</small><strong>{copy.harnessState}</strong></span>
-          <span className="is-denied"><LockKeyhole aria-hidden="true" /><small>{copy.authority}</small><strong>{copy.authorityState}</strong></span>
         </div>
-      </details>
+      )}
     </section>
   );
 }

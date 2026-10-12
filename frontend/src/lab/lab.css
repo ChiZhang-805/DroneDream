@@ -1320,3 +1320,33 @@
   .lab-action-toolbar .lab-calibration-import .btn, .lab-action-toolbar .lab-evidence-actions .btn { width: auto; }
   .lab-action-toolbar .lab-calibration-import .btn-ghost, .lab-action-toolbar .lab-evidence-actions .btn-ghost { width: 40px; flex: 0 0 40px; }
 }
+/* Keep the workspace inside the window; results use the remaining height. */
+.app-shell:has(.lab-page) { height: 100dvh; min-height: 0; overflow: hidden; }
+.app-shell:has(.lab-page) .app-sidebar,
+.app-shell:has(.lab-page) .app-body { min-height: 0; }
+.app-shell:has(.lab-page) .app-body { height: 100%; overflow: hidden; }
+.app-shell .app-main:has(.lab-page) { display: flex; flex: 1 1 0; min-height: 0; padding: 0; overflow: hidden; }
+.lab-page { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.lab-header, .lab-navigation { flex: 0 0 auto; }
+.lab-page > .lab-tool { flex: 1; min-height: 0; overflow: auto; }
+.lab-calibration { flex: 1; min-height: 0; }
+.lab-calibration > :not(.lab-calibration-results):not(.lab-empty-evidence) { flex-shrink: 0; }
+.lab-page .lab-empty-evidence { flex: 1; min-height: 180px; }
+.lab-calibration-results { display: flex; flex-direction: column; gap: 16px; min-height: 0; flex: 1; overflow: auto; }
+.lab-calibration-results > * { flex-shrink: 0; }
+.lab-evidence-bridge { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 2fr); gap: 12px 24px; align-items: center; }
+.lab-evidence-bridge > header { display: flex; flex-wrap: wrap; gap: 8px; }
+.lab-evidence-bridge > header h3 { font-size: 15px; }
+.lab-evidence-bridge > header strong { font-size: 12px; }
+.lab-evidence-bridge-inputs { display: flex; justify-content: flex-end; flex-wrap: wrap; }
+.lab-evidence-bridge-inputs > div { display: flex; flex-direction: column; padding: 0; border: 0; background: transparent; }
+.lab-evidence-bridge-inputs .btn { min-height: 40px; }
+.lab-evidence-bridge-error, .lab-evidence-bridge-binding, .lab-evidence-bridge-blockers { grid-column: 1 / -1; }
+.lab-setup-layout { flex: 1; align-content: start; }
+.lab-page .lab-operator-confirmation { padding: 24px; background: #fff; }
+@media (max-width: 900px) {
+  .lab-calibration { flex: 1 0 auto; }
+  .lab-evidence-bridge { grid-template-columns: 1fr; }
+  .lab-evidence-bridge-inputs { justify-content: flex-start; }
+  .lab-calibration-results { flex: 1 0 auto; overflow: visible; }
+}

@@ -29,15 +29,12 @@ describe("Lab setup", () => {
 
     expect(screen.getByRole("heading", { name: "LAB workspace" }))
       .toBeInTheDocument();
-    expect(screen.getByText("0 of 8")).toBeInTheDocument();
+    expect(screen.queryByText("0 of 8")).not.toBeInTheDocument();
+    expect(screen.queryByText("Hardware authority")).not.toBeInTheDocument();
+    expect(screen.queryByText("Rules & permissions")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Simulation workspace/i }))
       .toHaveAttribute("aria-pressed", "true");
-    const workspaceNotice = screen.getByText(
-      "Workspace selection changes the workflow only; it never grants hardware authority.",
-      { exact: true },
-    );
-    expect(workspaceNotice).toBeInTheDocument();
-    expect(workspaceNotice.closest(".lab-page"))
+    expect(document.querySelector(".lab-page"))
       .toHaveAttribute("data-grants-hardware-authority", "false");
 
     await user.click(screen.getByRole("button", { name: /Hardware laboratory/i }));
@@ -46,7 +43,6 @@ describe("Lab setup", () => {
     const packSelect = screen.getByRole("combobox", { name: "Vehicle Pack" });
     expect(packSelect).toHaveValue("holybro-x500-v2-pixhawk6");
     expect(within(packSelect).getAllByRole("option")).toHaveLength(7);
-    await user.click(screen.getByText("Hardware execution is denied", { exact: true }));
 
     for (const name of [
       "Discover controller",
@@ -91,9 +87,7 @@ describe("Lab setup", () => {
     const safetyTab = screen.getByRole("tab", { name: "Safety review" });
     expect(safetyTab).toHaveAttribute("aria-selected", "true");
     expect(safetyTab).toHaveFocus();
-    const quorum = screen.getByLabelText("Execution quorum");
-    expect(within(quorum).getAllByText("Missing")).toHaveLength(3);
-    expect(within(quorum).getByText("DENY")).toBeInTheDocument();
+    expect(screen.queryByText("Quorum result")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Confirm hardware action" }))
       .toBeDisabled();
     expect(screen.getByLabelText("Operator challenge")).toBeDisabled();
@@ -105,10 +99,9 @@ describe("Lab setup", () => {
 
     expect(screen.getByRole("heading", { name: "LAB 工作区" }))
       .toBeInTheDocument();
-    expect(screen.getByText(/同一份受预算约束的作业/)).toBeInTheDocument();
+    expect(screen.queryByText(/同一份受预算约束的作业/)).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /真机实验室/ }));
-    await user.click(screen.getByText("真机执行已拒绝", { exact: true }));
     expect(screen.getByRole("button", { name: "写入参数" })).toBeDisabled();
-    expect(screen.getByText("真机执行已拒绝")).toBeInTheDocument();
+    expect(screen.queryByText("真机执行已拒绝")).not.toBeInTheDocument();
   });
 });
