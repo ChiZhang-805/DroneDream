@@ -869,6 +869,11 @@ export interface AgentCoreBootstrap {
   vehicles: AgentCoreAssetEntry[];
   asset_import_jobs: AgentCoreAssetImportJob[];
   asset_versions: AgentCoreAssetVersion[];
+  bundled_asset_replacements?: Array<{
+    asset_id: string;
+    source_content_sha256: string;
+    replacement_content_sha256: string;
+  }>;
   asset_qualification_jobs: AgentCoreAssetQualificationJob[];
   asset_source_adapters: AgentCoreAssetSourceAdapter[];
   plugins: AgentCorePluginEntry[];

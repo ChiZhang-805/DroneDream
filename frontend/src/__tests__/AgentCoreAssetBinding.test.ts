@@ -110,6 +110,25 @@ describe("qualified map and vehicle bindings", () => {
     expect(core.getAgentCoreAssetQualificationEvidence).not.toHaveBeenCalled();
   });
 
+  it("migrates an explicitly superseded bundled pin and binds the new pair receipt", async () => {
+    const workspace = defaultAutonomyWorkspace();
+    const oldHash = "a".repeat(64);
+    workspace.mapPack.agentCoreContentSha256 = oldHash;
+    vi.mocked(core.getAgentCoreBootstrap).mockResolvedValue({
+      asset_versions: fixture.versions,
+      asset_qualification_jobs: [fixture.job],
+      bundled_asset_replacements: [{
+        asset_id: fixture.job.map_asset_id,
+        source_content_sha256: oldHash,
+        replacement_content_sha256: fixture.job.result_map_content_sha256,
+      }],
+    } as Awaited<ReturnType<typeof core.getAgentCoreBootstrap>>);
+    const bound = await reconcileAgentCoreWorkspace(workspace, loadAutonomyAssetLibrary("upgraded", "autonomy", workspace));
+    expect(bound.mapPack.agentCoreContentSha256).toBe(fixture.job.result_map_content_sha256);
+    expect(bound.mapPack.qualificationReceiptId).toBe(fixture.job.qualification_id);
+    expect(workspace.mapPack.agentCoreContentSha256).toBe(oldHash);
+  });
+
   it.each(["state", "progress", "output-map", "output-vehicle", "asset-id"])("rejects a job with invalid %s", async (field) => {
     if (field === "state") fixture.job.state = "failed";
     if (field === "progress") fixture.job.progress_percent = 99;

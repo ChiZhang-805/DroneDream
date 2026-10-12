@@ -20,6 +20,7 @@ import {
   type AgentCoreAssetQualificationEvidence,
   type AgentCoreAssetQualificationJob,
   type AgentCoreAssetVersion,
+  type AgentCoreBootstrap,
   type AgentCoreMissionPrepareSummary,
   type AgentCoreThread,
 } from "./agentCore";
@@ -115,7 +116,7 @@ function saveThreadBinding(
 }
 
 /**
- * An explicit content hash is a pin: never substitute a newer/different asset.
+ * An explicit content hash is a pin, except for a release-declared bundled upgrade.
  * Without a pin, choose only a qualified version, not merely the newest import.
  */
 function latestAssetVersion(
@@ -123,16 +124,20 @@ function latestAssetVersion(
   assetId: string | null | undefined,
   explicitSha256: string | null | undefined,
   kind: AgentCoreAssetKind,
+  replacements: AgentCoreBootstrap["bundled_asset_replacements"] = [],
 ): AgentCoreAssetVersion {
+  const selectedHash = replacements.find((replacement) => (
+    replacement.asset_id === assetId && replacement.source_content_sha256 === explicitSha256
+  ))?.replacement_content_sha256 ?? explicitSha256;
   const candidates = versions
     .filter((version) => (
       version.asset_id === assetId
       && (version.kind === kind || (kind === "map" && version.kind === "world"))
     ))
     .sort((left, right) => right.imported_at.localeCompare(left.imported_at));
-  const selected = explicitSha256
+  const selected = selectedHash
     ? candidates.find((version) => (
-        version.content_sha256 === explicitSha256 && version.maturity === "qualified"
+        version.content_sha256 === selectedHash && version.maturity === "qualified"
       ))
     : candidates.find((version) => version.maturity === "qualified");
   if (!selected) throw new Error(`AGENT_CORE_ASSET_VERSION_NOT_FOUND:${kind}:${assetId || "unbound"}`);
@@ -160,7 +165,7 @@ export async function interpretAgentCoreAsset(input: Pick<AgentCorePlanningInput
     || (input.accessMode === "byok" && (entry.source !== "custom" || entry.profile_id !== input.agentCoreProfileId))) {
     throw new Error("AGENT_CORE_MODEL_NOT_AVAILABLE");
   }
-  const version = latestAssetVersion(bootstrap.asset_versions, input.assetId, input.contentSha256, input.kind);
+  const version = latestAssetVersion(bootstrap.asset_versions, input.assetId, input.contentSha256, input.kind, bootstrap.bundled_asset_replacements);
   const thread = await createAgentCoreThread({ title: input.locale === "zh-CN" ? "资产解析" : "Asset interpretation", selected_model: modelId });
   const grant = input.accessMode === "platform"
     // 资产解析包含验证和有限重试，不能使用只允许两次调用的普通聊天授权。
@@ -337,6 +342,7 @@ export async function resolveAgentCoreAssetPair(
         workspace.mapPack.agentCoreAssetId,
         workspace.mapPack.agentCoreContentSha256,
         "map",
+        bootstrap.bundled_asset_replacements,
       );
   const vehicleVersion = preferredJob
     ? bootstrap.asset_versions.find((version) => (
@@ -350,6 +356,7 @@ export async function resolveAgentCoreAssetPair(
         workspace.aircraft.agentCoreAssetId,
         workspace.aircraft.agentCoreContentSha256,
         "vehicle",
+        bootstrap.bundled_asset_replacements,
       );
   if (!mapVersion || !vehicleVersion) {
     throw new Error("AGENT_CORE_ASSET_VERSION_NOT_FOUND:qualification");
@@ -453,12 +460,14 @@ async function ensureThread(input: AgentCorePlanningInput): Promise<{
     input.workspace.mapPack.agentCoreAssetId,
     input.workspace.mapPack.agentCoreContentSha256,
     "map",
+    bootstrap.bundled_asset_replacements,
   );
   const vehicleVersion = latestAssetVersion(
     bootstrap.asset_versions,
     input.workspace.aircraft.agentCoreAssetId,
     input.workspace.aircraft.agentCoreContentSha256,
     "vehicle",
+    bootstrap.bundled_asset_replacements,
   );
   const rememberedThreadId = readThreadBinding(input);
   let thread = bootstrap.threads.find((entry) => entry.thread_id === rememberedThreadId) ?? null;

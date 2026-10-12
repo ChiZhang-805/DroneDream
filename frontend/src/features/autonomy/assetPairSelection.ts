@@ -28,7 +28,7 @@ const QUALIFIED_MAP_ASSET_IDS: Record<string, string> = {
 };
 
 const QUALIFICATION_IDS: Record<string, string> = {
-  "dronedream-school-map": "asset-qualification-54d4f94f3633bccf433f3f31",
+  "dronedream-school-map": "asset-qualification-57aa3819b5591401b2a92387",
 };
 
 function fallbackPair(map: (typeof MAPS)[number], vehicle: (typeof VEHICLES)[number]): AgentCoreAssetPairCatalogEntry {

@@ -36,6 +36,6 @@ describe("asset pair selection", () => {
   it("reports the default qualified map and aircraft pair", () => {
     const pair = selectedPair(FALLBACK_ASSET_PAIR_CATALOG, "dronedream-school-map", "px4-x500-depth");
     expect(pair?.status).toBe("qualified_builtin");
-    expect(pair?.qualification_id).toBe("asset-qualification-54d4f94f3633bccf433f3f31");
+    expect(pair?.qualification_id).toBe("asset-qualification-57aa3819b5591401b2a92387");
   });
 });
