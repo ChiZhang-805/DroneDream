@@ -58,6 +58,10 @@ for (const policyName of ["csp", "devCsp"]) {
   ) {
     fail(`${policyName} must allow the approved Supabase origin for profile avatars`);
   }
+  const connectSources = policy.match(/\bconnect-src\s+([^;]+)/u)?.[1].split(/\s+/u) ?? [];
+  if (!connectSources.includes("'self'")) {
+    fail(`${policyName} must allow bundled map geometry and other same-origin resources`);
+  }
 }
 
 if (!/^(universal|sim|lab|field|autonomy)$/u.test(editionId)) {
