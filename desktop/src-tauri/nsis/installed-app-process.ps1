@@ -26,12 +26,15 @@ try {
     elseif ($target.StartsWith('\\?\')) { $target=$target.Substring(4) }
 } finally { $file.Dispose() }
 
-$name=[IO.Path]::GetFileNameWithoutExtension($ExecutablePath)
-$matching=@(Get-Process -Name $name -ErrorAction SilentlyContinue | Where-Object { $_.Path -ieq $target })
+$name=[IO.Path]::GetFileName($ExecutablePath).Replace("'","''")
+# NSIS is 32-bit; Get-Process.Path cannot inspect a 64-bit application there.
+$matching=@(Get-CimInstance Win32_Process -Filter "Name='$name'" | Where-Object { $_.ExecutablePath -ieq $target })
 if ($Action -eq 'Check') { if ($matching.Count) { exit 10 }; exit 0 }
-foreach ($app in $matching) {
+foreach ($entry in $matching) {
     # The installer has already obtained consent to stop this installation.
     # Never use a process-name-wide kill: every edition uses the same filename.
+    $app=Get-Process -Id $entry.ProcessId -ErrorAction SilentlyContinue
+    if (!$app) { continue }
     $app.Kill()
     if (!$app.WaitForExit(15000)) { throw 'Installed application did not stop' }
 }

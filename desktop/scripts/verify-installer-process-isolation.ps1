@@ -12,7 +12,7 @@ $source=Join-Path $root 'Fixture.cs'
 & "$env:WINDIR/Microsoft.NET/Framework64/v4.0.30319/csc.exe" /nologo /target:winexe "/out:$first" $source
 if($LASTEXITCODE -ne 0){throw 'Fixture compilation failed'}
 Copy-Item -LiteralPath $first -Destination $second
-$shell=Join-Path $env:WINDIR 'System32/WindowsPowerShell/v1.0/powershell.exe'
+$shell=Join-Path $env:WINDIR 'SysWOW64/WindowsPowerShell/v1.0/powershell.exe'
 $one=$null;$two=$null
 try {
     $one=Start-Process -FilePath $first -WindowStyle Hidden -PassThru
