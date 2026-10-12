@@ -43,11 +43,14 @@ function localizedOptionLabel(value: string, chinese: boolean): string {
 }
 
 function localizedPrompt(question: AutonomyClarificationQuestion, chinese: boolean): string {
+  const prompt = question.prompt.trim();
+  const containsInternalField = Object.keys(FIELD_LABELS).some((field) => prompt.includes(field));
+  if (prompt && !containsInternalField && (!chinese || /[\u3400-\u9fff]/u.test(prompt))) return prompt;
   const field = machineField(question.questionId) ?? machineField(question.prompt);
   if (field === "target_entity") {
     return chinese
-      ? "外卖放在哪个位置？请选择地图中的地点，或者填写其他位置。"
-      : "Where should the pickup happen? Choose a mapped place or enter another location.";
+      ? "你说的是哪个地点？"
+      : "Which location do you mean?";
   }
   if (field) {
     const label = FIELD_LABELS[field];

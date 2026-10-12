@@ -52,7 +52,7 @@ it("planning requests a thread-bound job grant before any model stage", async ()
   expect(execute).not.toHaveBeenCalled();
 });
 
-it("generates a real-model title before planning without executing, and tolerates naming failure", async () => {
+it("starts independent model naming without executing, and tolerates naming failure", async () => {
   const title = vi.spyOn(core, "requestAgentCoreConversationTitle").mockResolvedValue({ title: "去外卖点取餐" });
   const prepare = vi.spyOn(core, "prepareAgentCoreMission").mockRejectedValue(new Error("PLANNING_BOUNDARY"));
   const onConversationTitle = vi.fn();
@@ -65,6 +65,17 @@ it("generates a real-model title before planning without executing, and tolerate
   await expect(planWithAgentCore({ ...input, onConversationTitle })).rejects.toThrow("PLANNING_BOUNDARY");
   expect(onConversationTitle).not.toHaveBeenCalled();
   expect(prepare).toHaveBeenCalledTimes(2);
+});
+
+it("does not wait for a slow title before returning the mission's clarification", async () => {
+  let finishTitle!: (value: { title: string }) => void;
+  vi.spyOn(core, "requestAgentCoreConversationTitle").mockReturnValue(new Promise((resolve) => { finishTitle = resolve; }));
+  vi.spyOn(core, "prepareAgentCoreMission").mockRejectedValue(new core.AgentCoreRequestError(409, "MISSION_CLARIFICATION_REQUIRED", ["去哪里取？"]));
+  const onConversationTitle = vi.fn();
+  await expect(planWithAgentCore({ ...input, instruction: "帮我拿个东西", onConversationTitle })).rejects.toThrow("MISSION_CLARIFICATION_REQUIRED");
+  expect(onConversationTitle).not.toHaveBeenCalled();
+  finishTitle({ title: "帮忙取件" });
+  await vi.waitFor(() => expect(onConversationTitle).toHaveBeenCalledExactlyOnceWith("帮忙取件"));
 });
 
 it("asset interpretation uses a job grant for validation and bounded retries", async () => {

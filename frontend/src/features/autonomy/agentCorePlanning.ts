@@ -487,6 +487,7 @@ export async function planWithAgentCore(
   input: AgentCorePlanningInput,
 ): Promise<AgentCoreMissionPrepareSummary> {
   if (!input.accountId) throw new Error("AGENT_CORE_ACCOUNT_REQUIRED");
+  const accountId = input.accountId;
   const { thread, mapVersion, vehicleVersion } = await ensureThread(input);
   input.onProgress?.({ stage: "assets", zh: "已绑定所选地图和无人机的精确版本，正在准备本次模型调用授权。", en: "Exact selected map and aircraft versions are bound; preparing authorization for this model job." });
   const modelSelectionId = selectedModelId(input);
@@ -504,21 +505,23 @@ export async function planWithAgentCore(
         input.model,
       )
     : await issueAgentCoreCustomModelGrant(input.agentCoreProfileId!, thread.thread_id);
-  if (input.onConversationTitle && input.requestPurpose === "initial_plan") {
-    input.onProgress?.({ stage: "naming", zh: "正在根据首次需求生成简短会话名称，随后进入地图理解和任务规划。", en: "Generating a short name from your first request before asset interpretation and mission planning." });
-    try {
-      // BYOK 授权只能消费一次，命名使用独立授权，不挤占规划连接。
-      const titleGrant = input.accessMode === "platform" ? grant : await issueAgentCoreCustomModelGrant(input.agentCoreProfileId!, thread.thread_id);
-      const result = await requestAgentCoreConversationTitle(thread.thread_id, {
-        expected_owner_account_id: input.accountId, source_edition: input.edition,
-        message: input.instruction.slice(0, 2000), model_id: modelSelectionId,
-        model_grant: titleGrant.grant, gateway_base_url: modelGatewayBaseUrl(titleGrant), locale: input.locale,
-      });
-      // 模型偶尔忽略语言要求时保留同语言临时标题，不把错误语言写入侧边栏。
-      if (taskUsesChinese(result.title) === (input.locale === "zh-CN")) input.onConversationTitle(result.title);
-    } catch {
-      // 命名不是飞行条件；失败保留临时标题，主规划继续正常报告自身错误。
-    }
+  const onConversationTitle = input.onConversationTitle;
+  if (onConversationTitle && input.requestPurpose === "initial_plan") {
+    // 命名独立进行，不让非关键模型调用阻塞规划或追问。
+    void (async () => {
+      try {
+        // BYOK 授权只能消费一次，命名使用独立授权，不挤占规划连接。
+        const titleGrant = input.accessMode === "platform" ? grant : await issueAgentCoreCustomModelGrant(input.agentCoreProfileId!, thread.thread_id);
+        const result = await requestAgentCoreConversationTitle(thread.thread_id, {
+          expected_owner_account_id: accountId, source_edition: input.edition,
+          message: input.instruction.slice(0, 2000), model_id: modelSelectionId,
+          model_grant: titleGrant.grant, gateway_base_url: modelGatewayBaseUrl(titleGrant), locale: input.locale,
+        });
+        if (taskUsesChinese(result.title) === (input.locale === "zh-CN")) onConversationTitle(result.title);
+      } catch {
+        // 命名失败保留现有标题，主规划独立处理自身结果。
+      }
+    })();
   }
   const progressRequestId = crypto.randomUUID();
   input.onProgress?.({ stage: "assets", zh: "正在提交规划请求；后端将检查已有地图解析，未命中的内容才需要调用模型处理。", en: "Submitting the planning request. The backend will check reusable asset knowledge before requesting new interpretation." });

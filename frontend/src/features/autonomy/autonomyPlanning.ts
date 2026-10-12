@@ -33,7 +33,6 @@ import type {
 } from "../../types/api";
 import {
   inspectAgentCoreAssetBindings,
-  isAgentCoreUnavailable,
   planWithAgentCore,
 } from "./agentCorePlanning";
 import { AgentCoreRequestError, type AgentCoreMissionPrepareSummary } from "./agentCore";
@@ -437,7 +436,6 @@ export async function planAutonomyMission(
       // The installed AGENT edition has exactly one planning and execution
       // authority. A Core failure must never be hidden by charging a second
       // planner or silently switching to the public compiler/runtime.
-      if (!isAgentCoreUnavailable(reason)) throw reason;
       throw reason;
     }
   }
