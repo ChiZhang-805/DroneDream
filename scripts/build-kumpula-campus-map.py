@@ -703,6 +703,12 @@ def _navigation_graph() -> dict[str, Any]:
                 for entity_id, zone in DELIVERY_ZONES.items()
                 for alias in (entity_id, zone["name"], zone["name_zh"], *zone["aliases"])
             },
+            **{
+                alias: f"{name.casefold()}-delivery-zone"
+                for name, (name_zh, aliases) in BUILDING_NAMES.items()
+                if f"{name.casefold()}-delivery-zone" in DELIVERY_ZONES
+                for alias in (name, name.casefold(), name_zh, *aliases)
+            },
         },
         "nodes": nodes,
         "edges": edges,

@@ -103,7 +103,24 @@
     "校园南侧起降点": "verified-000",
     "起点": "verified-000",
     "返航点": "verified-000",
-    "降落点": "verified-000"
+    "降落点": "verified-000",
+    "dynamicum": "dynamicum-delivery-zone",
+    "Dynamicum": "dynamicum-delivery-zone",
+    "气象楼": "dynamicum-delivery-zone",
+    "Dynamicum building": "dynamicum-delivery-zone",
+    "气象研究所大楼": "dynamicum-delivery-zone",
+    "exactum": "exactum-delivery-zone",
+    "Exactum": "exactum-delivery-zone",
+    "信息科学楼": "exactum-delivery-zone",
+    "Exactum building": "exactum-delivery-zone",
+    "计算机科学楼": "exactum-delivery-zone",
+    "数学与统计楼": "exactum-delivery-zone",
+    "physicum": "physicum-delivery-zone",
+    "Physicum": "physicum-delivery-zone",
+    "物理楼": "physicum-delivery-zone",
+    "Physicum building": "physicum-delivery-zone",
+    "物理科学楼": "physicum-delivery-zone",
+    "地球科学楼": "physicum-delivery-zone"
   },
   "nodes": [
     {
