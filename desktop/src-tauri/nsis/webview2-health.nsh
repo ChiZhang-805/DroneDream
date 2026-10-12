@@ -73,10 +73,10 @@
   ; case the orphaned sidecar keeps its installed executable open and NSIS
   ; cannot replace it.  Quiesce that current-user process here as a backward-
   ; compatible installer responsibility before any packaged files are copied.
-  ; The ordinary desktop executable is still handled by Tauri's own running-
-  ; application check immediately after this hook.
+  ; The ordinary desktop executable is handled by the same installation-scoped
+  ; check immediately after this hook. Sidecars must obey that scope too.
   IfFileExists "$INSTDIR\dronedream-autonomy-core.exe" 0 dronedream_agent_core_not_installed
-    !insertmacro CheckIfAppIsRunning "dronedream-autonomy-core.exe" "${DRONEDREAM_DISPLAYNAME}"
+    !insertmacro DRONEDREAM_CHECK_INSTALLED_APP "dronedream-autonomy-core.exe" "${DRONEDREAM_DISPLAYNAME}"
   dronedream_agent_core_not_installed:
 
   !if "${DRONEDREAM_EDITION_ID}" != "field"

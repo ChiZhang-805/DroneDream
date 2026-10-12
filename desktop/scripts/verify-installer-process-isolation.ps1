@@ -2,9 +2,14 @@ param([Parameter(Mandatory=$true)][string]$OutputRoot)
 $ErrorActionPreference='Stop'
 $repoRoot=(Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $helper=Join-Path $repoRoot 'desktop/src-tauri/nsis/installed-app-process.ps1'
+foreach($template in Get-ChildItem (Join-Path $repoRoot 'desktop/src-tauri/nsis') -File | Where-Object Extension -in @('.nsh','.nsi')) {
+    if((Get-Content $template.FullName -Raw) -match '!insertmacro\s+CheckIfAppIsRunning\b'){
+        throw "Process-name-wide shutdown remains in $($template.Name)"
+    }
+}
 $root=Join-Path $OutputRoot ('process-isolation-'+[Guid]::NewGuid().ToString('N'))
-$first=Join-Path $root 'one/drone-dream-process-fixture.exe'
-$second=Join-Path $root 'two/drone-dream-process-fixture.exe'
+$first=Join-Path $root 'one/dronedream-autonomy-core.exe'
+$second=Join-Path $root 'two/dronedream-autonomy-core.exe'
 [IO.Directory]::CreateDirectory((Split-Path $first)) | Out-Null
 [IO.Directory]::CreateDirectory((Split-Path $second)) | Out-Null
 $source=Join-Path $root 'Fixture.cs'
