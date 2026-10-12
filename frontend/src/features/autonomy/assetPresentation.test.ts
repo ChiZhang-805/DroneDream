@@ -56,6 +56,11 @@ describe("asset card presentation", () => {
     expect(catalogAssetKey("map", "external", "昆普拉科学园区")).toBe("kumpula-campus");
   });
 
+  it("keeps exact aircraft identities distinct when another model shares their prefix", () => {
+    expect(catalogAssetPresentation("vehicle", "px4-x500-mono-cam-down", "X500", false).name).toBe("X500 Down Cam");
+    expect(catalogAssetPresentation("vehicle", "px4-x500", "X500 Depth", false).name).toBe("X500 Standard");
+  });
+
   it("preserves genuinely user-imported assets", () => {
     const userMap = external("user-map-lab-west", "West laboratory");
     expect(unrepresentedExternalAssets("map", [], [userMap])).toEqual([userMap]);

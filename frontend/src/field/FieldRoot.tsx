@@ -26,21 +26,21 @@ const COPY = {
     illustrationDescription:
       "",
     cardKicker: "FIELD STARTUP",
-    cardTitle: "Preparing the tuning workspace",
+    cardTitle: "Starting workspace",
     cardHint: "",
-    stages: ["Check this computer", "Prepare device services", "Open the workspace"],
+    stages: ["Check system", "Start device services", "Connect services", "Open workspace"],
   },
   "zh-CN": {
     brand: "DroneDream · FIELD",
-    loading: "正在准备真机调优工作区",
+    loading: "正在启动工作区",
     ready: "Field 工作区已就绪",
     settings: "打开设置",
     illustrationTitle: "让想法起飞",
     illustrationDescription: "",
     cardKicker: "FIELD 启动",
-    cardTitle: "正在准备真机调优工作区",
+    cardTitle: "正在启动工作区",
     cardHint: "",
-    stages: ["检查这台电脑", "准备设备服务", "进入工作区"],
+    stages: ["检查系统", "启动设备服务", "连接服务", "进入工作区"],
   },
 } as const;
 
@@ -70,7 +70,7 @@ function FieldLaunchScreen({
   const { account } = useAuthOrLocal();
   const copy = COPY[locale];
   const ready = progress === 100;
-  const activeStage = ready ? 3 : progress < 34 ? 0 : progress < 74 ? 1 : 2;
+  const activeStage = ready ? 4 : progress < 25 ? 0 : progress < 60 ? 1 : progress < 95 ? 2 : 3;
   const launcherChromeRef = useRef<HTMLElement>(null);
   const launcherMainRef = useRef<HTMLElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
@@ -178,6 +178,7 @@ function FieldLaunchScreen({
                 {copy.stages.map((stage, index) => (
                   <li
                     className={index < activeStage ? "is-complete" : index === activeStage ? "is-current" : ""}
+                    aria-current={index === activeStage ? "step" : undefined}
                     key={stage}
                   >
                     <span aria-hidden="true">{index < activeStage ? "✓" : index + 1}</span>

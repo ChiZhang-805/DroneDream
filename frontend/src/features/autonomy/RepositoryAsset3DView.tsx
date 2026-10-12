@@ -147,16 +147,19 @@ function fitCameraToModel(
 ): void {
   const bounds = new THREE.Box3().setFromObject(model);
   if (bounds.isEmpty()) return;
-  const size = bounds.getSize(new THREE.Vector3());
   const center = bounds.getCenter(new THREE.Vector3());
-  const radius = Math.max(size.x, size.y * 1.6, size.z) * 0.62;
-  const distance = Math.max(8, radius / Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5)));
+  const radius = bounds.getBoundingSphere(new THREE.Sphere()).radius;
+  const verticalFov = THREE.MathUtils.degToRad(camera.fov * 0.5);
+  const horizontalFov = Math.atan(Math.tan(verticalFov) * camera.aspect);
+  const distance = radius / Math.sin(Math.min(verticalFov, horizontalFov)) * 1.12;
   controls.target.copy(center);
-  camera.position.set(center.x + distance * 0.74, center.y + distance * 0.56, center.z + distance * 0.86);
+  camera.position.copy(center).add(
+    new THREE.Vector3(0.74, 0.56, 0.86).normalize().multiplyScalar(distance),
+  );
   camera.near = Math.max(0.02, distance / 2000);
   camera.far = Math.max(320, distance * 12);
   camera.updateProjectionMatrix();
-  controls.minDistance = Math.max(1.5, radius * 0.08);
+  controls.minDistance = Math.max(0.1, radius * 0.35);
   controls.maxDistance = Math.max(30, distance * 4);
   controls.update();
 }
@@ -263,6 +266,7 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese }: Props
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
+      if (modelRoot.children.length) fitCameraToModel(camera, controls, modelRoot);
     };
     const observer = new ResizeObserver(resize);
     observer.observe(mount);

@@ -2561,10 +2561,13 @@ function RuntimeLauncherHero({
       : (checking || automaticStartPending) && phase === "idle"
         ? t("launcher.status.checking")
         : t(LAUNCHER_STATUS_KEYS[phase]);
-  const activeStage = ready ? 3 : percent < 34 ? 0 : percent < 74 ? 1 : 2;
+  const activeStage = ready ? 4 : active
+    ? (["starting", "healthChecking"].includes(phase) ? 2 : 1)
+    : percent < 20 ? 0 : percent < 55 ? 1 : percent < 95 ? 2 : 3;
   const stages = [
     t("launcher.stage.system"),
     t("launcher.stage.runtime"),
+    t("launcher.stage.services"),
     t("launcher.stage.workspace"),
   ];
 
@@ -2590,6 +2593,8 @@ function RuntimeLauncherHero({
           {stages.map((stage, index) => (
             <li
               className={index < activeStage ? "is-complete" : index === activeStage ? "is-current" : ""}
+              aria-current={index === activeStage ? "step" : undefined}
+              data-paused={index === activeStage && (gateBlocked || ["failed", "cancelled", "waitingForRestart"].includes(phase)) || undefined}
               key={stage}
             >
               <span aria-hidden="true">{index < activeStage ? "✓" : index + 1}</span>

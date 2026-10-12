@@ -68,6 +68,8 @@ function definitions(kind: CatalogAssetKind): CatalogAssetDefinition[] {
 
 function findDefinition(kind: CatalogAssetKind, id: string, name: string): CatalogAssetDefinition | null {
   const identity = normalizedIdentity(id, name);
+  const exact = definitions(kind).find(definition => definition.resourceId === id || definition.key === id);
+  if (exact) return exact;
   return definitions(kind).find((definition) => (
     definition.resourceId === id
     || definition.aliases.some((alias) => {

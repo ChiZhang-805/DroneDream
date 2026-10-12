@@ -21,6 +21,7 @@ assert(
   `Unsupported shared desktop launcher edition: ${edition}`,
 );
 const desktopOnly = Boolean(args.get("--desktop-only"));
+const progressOnly = Boolean(args.get("--progress-only"));
 const label = String(args.get("--label") || "working-tree");
 const outputRoot = path.resolve(
   repoRoot,
@@ -231,9 +232,9 @@ async function installDesktopFixture(context, testCase) {
           calls.push(command);
           if (command === "probe_system_prerequisites") return prerequisites;
           if (command === "probe_runtime_status") {
-            return fixture.scenario === "missing" ? fixture.missing : fixture.ready;
+            return fixture.scenario === "starting" ? { ...fixture.ready, running: false, ready: false } : fixture.scenario === "missing" ? fixture.missing : fixture.ready;
           }
-          if (command === "start_runtime") return fixture.ready;
+          if (command === "start_runtime") return fixture.scenario === "starting" ? new Promise(() => {}) : fixture.ready;
           if (command === "get_runtime_install_progress") return idleInstall;
           if (command === "get_runtime_install_plan") return installPlan;
           if (command === "get_installer_runtime_intent") {
@@ -265,7 +266,7 @@ async function installDesktopFixture(context, testCase) {
     };
   }, {
     locale: testCase.locale,
-    fixture: desktopFixture(testCase.scenario),
+    fixture: desktopFixture(progressOnly ? "starting" : testCase.scenario),
   });
 }
 
@@ -285,6 +286,23 @@ async function verifyCase(browser, testCase) {
     // nonexistent HTTP server to resolve an application route. Exercise the
     // same URL shape here instead of accidentally testing the hosted router.
     await page.goto(`${origin}/${edition === "field" ? "field.html" : ""}#/desktop/setup`, { waitUntil: "networkidle" });
+    if (progressOnly) {
+      await page.goto(origin + '/?docsPreview=1#/desktop/setup', { waitUntil: 'networkidle' });
+      await page.locator('.launcher-stage-list').waitFor();
+      assert.equal(await page.locator('.launcher-stage-list li').count(), 4);
+      const marker = page.locator('.launcher-stage-list li[aria-current="step"] > span');
+      assert.equal(await marker.count(), 1);
+      const before = await marker.evaluate(el => getComputedStyle(el, '::before').transform);
+      await page.waitForTimeout(160);
+      const after = await marker.evaluate(el => getComputedStyle(el, '::before').transform);
+      assert.notEqual(before, after, 'The active checkpoint must visibly rotate');
+      const heading = await page.locator('.launcher-status-card-heading h2').evaluate(el => ({ height: el.getBoundingClientRect().height, lineHeight: parseFloat(getComputedStyle(el).lineHeight), width:el.clientWidth, scrollWidth:el.scrollWidth }));
+      assert(heading.height <= heading.lineHeight + 1 && heading.scrollWidth <= heading.width + 1, 'Startup title must fit one line');
+      const panel = await page.locator('.launcher-progress-panel').evaluate(el=>({height:el.clientHeight,scrollHeight:el.scrollHeight}));
+      assert(panel.scrollHeight <= panel.height + 1, 'All four checkpoints must fit the card');
+      await page.screenshot({path:path.join(outputRoot, testCase.id + '-progress.png')});
+      return { case: testCase, status:'pass', heading, panel, animated:true };
+    }
     const form = page.locator(".launcher-account-form");
     await form.waitFor();
     const before = await page.locator(".launcher-progress-panel").boundingBox();
@@ -399,7 +417,7 @@ const results = [];
 let failure;
 
 try {
-  for (const testCase of cases) {
+  for (const testCase of (progressOnly ? cases.filter(item => item.scenario === "ready") : cases)) {
     try {
       results.push(await verifyCase(browser, testCase));
     } catch (error) {

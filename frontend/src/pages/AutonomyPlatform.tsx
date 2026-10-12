@@ -2514,14 +2514,22 @@ export function AutonomyAircraft() {
     assetLibrary.externalAssets,
   );
   const openAircraftDetails = (aircraft: AutonomyWorkspaceState["aircraft"]) => setDetails({
-    title: aircraft.name,
+    title: catalogAssetPresentation("vehicle", aircraft.agentCoreAssetId?.trim() || aircraft.id, aircraft.name, chinese).name,
     kind: "vehicle",
     previewKey: catalogAssetKey("vehicle", aircraft.agentCoreAssetId?.trim() || aircraft.id, aircraft.name),
     rows: [
       [chinese ? "制造商" : "Manufacturer", aircraft.manufacturer || "—"],
       [chinese ? "机架" : "Airframe", aircraft.airframe || "—"],
       [chinese ? "飞控" : "Flight controller", aircraft.flightController || "—"],
-      [chinese ? "传感器" : "Sensors", aircraft.sensors.join(" · ") || "—"],
+      [chinese ? "传感器" : "Sensors", localizedVehicleDetails(aircraft.sensors, chinese)],
+      [chinese ? "固件" : "Firmware", aircraft.firmware || aircraft.autopilot.toUpperCase()],
+      [chinese ? "控制接口" : "Control interface", aircraft.controlInterface.toUpperCase()],
+      [chinese ? "机身尺寸" : "Body size", `${aircraft.bodyLengthM} × ${aircraft.bodyWidthM} × ${aircraft.bodyHeightM} m`],
+      [chinese ? "空机质量" : "Dry mass", `${aircraft.dryMassKg.toFixed(2)} kg`],
+      [chinese ? "最大起飞质量" : "Takeoff mass", `${aircraft.maximumTakeoffMassKg.toFixed(2)} kg`],
+      [chinese ? "任务载荷" : "Payload", `${aircraft.maximumPickupPayloadKg} kg`],
+      [chinese ? "电池能量" : "Battery", `${aircraft.batteryEnergyWh} Wh`],
+      [chinese ? "速度上限" : "Speed limit", `${aircraft.maximumSpeedMps} m/s`],
     ],
   });
   useEffect(() => {
@@ -2629,6 +2637,8 @@ export function AutonomyAircraft() {
               <RepositoryAssetPreview kind="vehicle" previewUrl={presentation.previewUrl} previewKey={presentation.key} name={presentation.name} />
               <span className="autonomy-repository-copy">
                 <strong title={presentation.name}>{presentation.name}</strong>
+                <small>{resource ? localizedVehicleDetails(resource.analysis.resolved_sensor_types, chinese) : aircraft ? localizedVehicleDetails(aircraft.sensors, chinese) : (definition.key.includes("x500") ? "PX4 · X500" : "PX4 · VTOL")}</small>
+                {aircraft && <small>{aircraft.flightController} · {aircraft.dryMassKg.toFixed(2)} kg · {aircraft.batteryEnergyWh} Wh</small>}
               </span>
             </button>
             {resource && !aircraft ? <button
@@ -2660,7 +2670,7 @@ export function AutonomyAircraft() {
               selectAircraft(aircraft.id);
             }} onDoubleClick={() => openAircraftDetails(aircraft)}>
               <RepositoryAssetPreview kind="vehicle" previewUrl={presentation.previewUrl} previewKey={presentation.key} name={presentation.name} />
-              <span className="autonomy-repository-copy"><strong title={presentation.name}>{presentation.name}</strong></span>
+              <span className="autonomy-repository-copy"><strong title={presentation.name}>{presentation.name}</strong><small>{aircraft.flightController} · {localizedVehicleDetails(aircraft.sensors, chinese)}</small><small>{aircraft.dryMassKg.toFixed(2)} kg · {aircraft.batteryEnergyWh} Wh · {aircraft.maximumSpeedMps} m/s</small></span>
             </button>
             <AssetInterpretButton edition={edition} chinese={chinese} kind="vehicle" assetId={aircraft.agentCoreAssetId ?? null} contentSha256={aircraft.agentCoreContentSha256 ?? null} name={aircraft.name} />
             <button type="button" className="autonomy-repository-delete" aria-label={chinese ? "删除无人机" : "Delete aircraft"} title={chinese ? `删除 ${aircraft.name}` : `Delete ${aircraft.name}`} onClick={() => removeAsset("aircraft", aircraft.id)}><Trash2 aria-hidden="true" /></button>
