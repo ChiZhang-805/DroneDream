@@ -120,7 +120,7 @@ beforeEach(() => {
 });
 
 describe("autonomy conversation persistence", () => {
-  it("shows Kumpula and New Map and opens an uncluttered interactive map detail", async () => {
+  it("shows Kumpula and Import map and opens an uncluttered interactive map detail", async () => {
     const workspace = defaultAutonomyWorkspace();
     workspace.mapPack.agentCoreContentSha256 = "a".repeat(64);
     workspace.aircraft.agentCoreContentSha256 = "b".repeat(64);
@@ -132,7 +132,7 @@ describe("autonomy conversation persistence", () => {
     expect(screen.queryByRole("region", { name: "3D UAV Corridor" })).not.toBeInTheDocument();
 
     const mapCard = screen.getByRole("button", { name: /Kumpula Campus/u });
-    expect(screen.getByRole("region", { name: "Map repository" }).querySelectorAll("article")).toHaveLength(2);
+    expect(screen.getByRole("region", { name: "Map repository" }).querySelectorAll("article")).toHaveLength(1);
     fireEvent.click(mapCard);
     expect(screen.queryByRole("region", { name: "3D UAV Corridor" })).not.toBeInTheDocument();
 

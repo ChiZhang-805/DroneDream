@@ -1615,6 +1615,18 @@ function SettingsDialog({
         : null,
     },
     {
+      id: "graphics",
+      label: interfaceLocale === "zh-CN" ? "显卡驱动" : "Graphics driver",
+      detail: prerequisiteSnapshot?.gpus.map((gpu) => `${gpu.name}${gpu.driverVersion ? ` · ${gpu.driverVersion}` : ""}`).join(" / ") || null,
+      result: prerequisiteSnapshot ? prerequisiteSnapshot.gpus.length > 0 && prerequisiteSnapshot.gpus.every((gpu) => Boolean(gpu.driverVersion)) : null,
+    },
+    {
+      id: "storage",
+      label: interfaceLocale === "zh-CN" ? "可用存储" : "Available storage",
+      detail: prerequisiteSnapshot?.disks.map((disk) => `${disk.drive} ${(disk.freeBytes / 1_073_741_824).toFixed(1)} GB`).join(" · ") || null,
+      result: prerequisiteSnapshot ? prerequisiteSnapshot.disks.length > 0 && prerequisiteSnapshot.disks.every((disk) => disk.freeBytes > 0) : null,
+    },
+    {
       id: "runtime-installed",
       label: runtimeCheckCopy.installed,
       detail: runtimeSnapshot?.version ?? null,
@@ -2419,6 +2431,7 @@ function SettingsDialog({
             </ol>
           </section>
           <SettingsUpdateCenter
+            runtime={runtimeSnapshot}
             onOpenRuntimeBase={() => {
               onClose();
               navigate("/desktop/setup");

@@ -70,7 +70,7 @@ try {
   if (await schoolMap.count() !== 1) throw new Error("Map repository must expose exactly one Kumpula Campus card.");
   if (await schoolMap.getAttribute("data-selected") !== "false") throw new Error("Map repository must begin without a selected map.");
   if (await page.locator(".autonomy-asset-toolbar button").count() !== 0) throw new Error("Map repository must not expose an in-product map creator.");
-  if (await page.getByRole("button", { name: "New Map", exact: true }).count() !== 1) throw new Error("The map repository must expose the upload checklist.");
+  if (await page.getByRole("button", { name: "Import map", exact: true }).count() !== 1) throw new Error("The map repository must expose the upload checklist.");
   if (await page.getByRole("region", { name: "3D UAV Corridor" }).count() !== 0) throw new Error("The 3D corridor must remain inside the map detail dialog.");
   const mapScreenshot = path.join(outputRoot, `${screenshotPrefix}school-map-repository-1600x1000.png`);
   await page.screenshot({ path: mapScreenshot, fullPage: false });

@@ -34,7 +34,7 @@ try {
       throw new Error(command);
     } } };
   });
-  await page.locator('.autonomy-new-map-card > button').click();
+  await page.locator('.autonomy-repository-import > button').click();
   const dialog = page.locator("dialog.map-import-dialog");
   await dialog.waitFor({ state: "visible" });
   if ((await page.evaluate(() => window.mapUploadCalls)).length) throw new Error("Opening Import must not open a picker");

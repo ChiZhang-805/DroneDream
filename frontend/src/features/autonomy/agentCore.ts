@@ -1440,7 +1440,7 @@ export async function pickAndCreateAgentCoreAssetImportJob(
   const chinese = locale === "zh-CN";
   const extensions = Array.from(new Set(
     adapters
-      .filter((adapter) => adapter.asset_kinds.includes(expectedKind))
+      .filter((adapter) => adapter.enabled && adapter.availability === "builtin" && adapter.asset_kinds.includes(expectedKind))
       .flatMap((adapter) => adapter.file_extensions)
       .map((extension) => extension.replace(/^\./u, "").toLowerCase())
       .filter((extension) => /^[a-z0-9]+$/u.test(extension)),
@@ -1456,7 +1456,7 @@ export async function pickAndCreateAgentCoreAssetImportJob(
         ? chinese ? "导入地图或世界文件夹" : "Import map or world directory"
         : chinese ? "导入地图或世界资产" : "Import map or world asset",
     filters: sourceKind === "file" && extensions.length
-      ? [{ name: chinese ? "可用的三维资产" : "Supported 3D assets", extensions }]
+      ? [{ name: expectedKind === "vehicle" ? (chinese ? "无人机资产包与模型" : "Aircraft packages & models") : (chinese ? "地图资产" : "Map assets"), extensions }]
       : undefined,
   });
   if (!selection || Array.isArray(selection)) return null;

@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 
 import { useAppUpdaterState } from "../desktop/updaterContext";
+import type { RuntimeStatusReport } from "../desktop/bridge";
 import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 
 type SettingsUpdateTone = "current" | "busy" | "attention" | "error";
@@ -14,9 +15,11 @@ type SettingsUpdateTone = "current" | "busy" | "attention" | "error";
 export function SettingsUpdateCenter({
   onOpenRuntimeBase,
   runtimeBaseActionDisabled = false,
+  runtime,
 }: {
   onOpenRuntimeBase: () => void | Promise<void>;
   runtimeBaseActionDisabled?: boolean;
+  runtime?: RuntimeStatusReport | null;
 }) {
   const { locale, t } = useI18n();
   const updater = useAppUpdaterState();
@@ -163,6 +166,16 @@ export function SettingsUpdateCenter({
     action = () => { void updater.checkForUpdates(); };
   }
 
+  const unknown = locale === "zh-CN" ? "未检查" : "Not checked";
+  const versionRows = [
+    { label: "Runtime Base", version: runtime?.version, state: runtime ? (runtime.installed ? (locale === "zh-CN" ? "已安装" : "Installed") : (locale === "zh-CN" ? "未安装" : "Not installed")) : unknown },
+    { label: "Engine Pack", version: updater.enginePack?.installedPackId, state: updater.enginePack ? (updater.enginePack.updateRequired ? copy.oldVersion : copy.current) : unknown },
+    ...(["capability-pack", "asset-pack"] as const).map((id) => {
+      const candidate = updater.componentUpdates?.candidates.find((item) => item.componentId === id);
+      return { label: id === "capability-pack" ? "Capability Pack" : "Asset Pack", version: candidate?.installedVersion, state: candidate ? (candidate.available ? `${copy.oldVersion} → ${candidate.version}` : copy.current) : unknown };
+    }),
+  ];
+
   return (
     <section className="settings-update-center settings-runtime-module" aria-labelledby="settings-updates-title">
       <div className="settings-update-heading">
@@ -206,6 +219,9 @@ export function SettingsUpdateCenter({
           />
         ) : null}
       </div>
+      <dl className="settings-update-versions">{versionRows.map((row) => <div key={row.label}>
+        <dt>{row.label}</dt><dd title={row.version ?? undefined}>{row.version ?? "—"}</dd><dd>{row.state}</dd>
+      </div>)}</dl>
       {localizedError ? <p className="settings-update-error" role="alert">{localizedError}</p> : null}
     </section>
   );

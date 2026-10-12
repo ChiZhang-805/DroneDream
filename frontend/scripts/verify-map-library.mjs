@@ -37,10 +37,10 @@ try {
   await page.reload({ waitUntil: 'networkidle' });
   await clearDialog(page);
   const grid = page.locator('.autonomy-repository-grid');
-  assert.equal(await grid.locator('article').count(), 2); // Only current campus and New Map; retired demo versions must not return.
+  assert.equal(await grid.locator('article').count(), 1); // Only current campus and Import map; retired demo versions must not return.
   assert.equal(await grid.locator('.autonomy-repository-delete').count(), 1);
-  assert.equal(await page.locator('.autonomy-repository-toolbar').count(), 0);
-  await page.getByRole('button', { name: 'New Map', exact: true }).click();
+  assert.equal(await page.locator('.autonomy-repository-toolbar').count(), 1);
+  await page.getByRole('button', { name: 'Import map', exact: true }).click();
   await page.locator('dialog.map-import-dialog').waitFor({ state: 'visible' });
   await page.keyboard.press('Escape');
   await grid.locator('article').filter({ hasText: 'Kumpula Campus' }).locator('.autonomy-repository-card-surface').dblclick();

@@ -24404,15 +24404,10 @@ body {
 @media (max-width: 480px) { .map-import-dialog { padding: 18px; } .map-import-slot { gap: 10px; } }
 
 /* Map library: one upload card, compact captions, and full-height interactive details. */
-.autonomy-map-repository { padding-top: 4px; }
-.autonomy-map-repository .autonomy-repository-copy { min-height: 60px; height: 60px; padding: 10px 54px 10px 16px; }
-.autonomy-map-repository .autonomy-repository-copy strong { font-size: clamp(18px, 1.4vw, 22px); line-height: 1.25; }
-.autonomy-map-repository .autonomy-repository-delete { width: 32px; height: 32px; bottom: 14px; }
-.autonomy-map-repository .autonomy-repository-delete svg { width: 19px; height: 19px; }
-.autonomy-new-map-preview { color: var(--dd-brand-middle); background: color-mix(in srgb, var(--dd-brand-middle) 5%, #fff); }
-.autonomy-new-map-preview > svg { width: 56px; height: 56px; filter: none; }
-.autonomy-new-map-card:hover { border-color: var(--dd-brand-middle); }
-.autonomy-new-map-card .autonomy-repository-copy { padding-right: 16px; }
+.autonomy-repository-page .autonomy-repository-copy { min-height: 60px; height: 60px; padding: 10px 54px 10px 16px; }
+.autonomy-repository-page .autonomy-repository-copy strong { font-size: clamp(18px, 1.4vw, 22px); line-height: 1.25; }
+.autonomy-repository-page .autonomy-repository-delete { width: 32px; height: 32px; bottom: 14px; }
+.autonomy-repository-page .autonomy-repository-delete svg { width: 19px; height: 19px; }
 .autonomy-repository-dialog[data-kind="map"] { width: min(1280px, calc(100vw - 40px)); box-sizing: border-box; }
 .autonomy-repository-dialog[data-kind="map"] .autonomy-repository-dialog-body { grid-template-columns: minmax(240px, .65fr) minmax(0, 1.35fr); height: min(620px, calc(100dvh - 150px)); }
 .autonomy-repository-dialog[data-kind="map"] .autonomy-repository-dialog-copy { overflow: visible; max-height: none; }
@@ -24428,3 +24423,38 @@ body {
 }
 
 .autonomy-map-repository .autonomy-repository-preview.is-map::after { box-shadow: none; }
+
+/* Let real content fill settings modules; keep calendar cells square. */
+.settings-workspace-content .settings-model-panel { grid-template-rows: minmax(0, 1fr); }
+.settings-workspace-content .settings-allowance-history {
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+}
+.settings-workspace-content .settings-allowance-bars { min-height: 0; height: 100%; box-sizing: border-box; }
+.settings-workspace-content .settings-allowance-year { align-content: center; gap: 16px; }
+.settings-workspace-content .settings-allowance-heatmap {
+  grid-template-columns: repeat(53, minmax(0, 1fr));
+  grid-template-rows: repeat(7, auto);
+  grid-auto-columns: auto;
+  height: auto;
+  padding: 0;
+  border: 0;
+}
+.settings-workspace-content .settings-allowance-heatmap i { aspect-ratio: 1; width: 100%; height: auto; }
+.settings-workspace-content .settings-allowance-year-heading,
+.settings-workspace-content .settings-allowance-range button,
+.settings-workspace-content .settings-allowance-bars small { font-size: .85rem; }
+.settings-workspace-content .settings-model-usage-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); font-size: .95rem; gap: 18px; }
+.settings-workspace-content .settings-model-usage-grid > div { min-height: 54px; }
+.settings-workspace-content .settings-model-usage-grid > div > span { font-size: .9rem; }
+.settings-workspace-content .settings-runtime-panel { grid-template-rows: minmax(0, 1.2fr) minmax(0, 1fr); }
+.settings-runtime-environment-module { grid-template-rows: auto auto minmax(0, 1fr); gap: 6px; }
+.settings-runtime-module .settings-runtime-check-steps { display: grid; grid-template-rows: repeat(7, minmax(0, 1fr)); min-height: 0; margin: 0; }
+.settings-runtime-module .settings-runtime-check-steps > li { min-height: 0; max-height: none; padding-block: 4px; }
+.settings-runtime-module.settings-update-center { grid-template-rows: auto auto minmax(0, 1fr); gap: 6px; }
+.settings-runtime-module .settings-update-state { min-height: 36px; padding-block: 4px; }
+.settings-update-versions { display: grid; grid-template-rows: repeat(4, minmax(0, 1fr)); margin: 0; min-height: 0; }
+.settings-update-versions > div { display: grid; grid-template-columns: minmax(130px, .8fr) minmax(0, 1.5fr) minmax(110px, .7fr); align-items: center; gap: 16px; border-top: 1px solid var(--border); font-size: .95rem; }
+.settings-update-versions dt { font-weight: 600; }
+.settings-update-versions dd { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings-update-versions dd:last-child { text-align: right; }
