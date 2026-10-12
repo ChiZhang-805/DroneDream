@@ -49,6 +49,7 @@ function FieldLaunchScreen({
   locale,
   progress,
   onEnter,
+  onAuthenticated,
   onLocaleChange,
   settingsOpen,
   onSettingsOpen,
@@ -59,6 +60,7 @@ function FieldLaunchScreen({
   locale: FieldLocale;
   progress: number;
   onEnter: () => void;
+  onAuthenticated: () => void;
   onLocaleChange: (locale: FieldLocale) => void;
   settingsOpen: boolean;
   onSettingsOpen: () => void;
@@ -166,7 +168,7 @@ function FieldLaunchScreen({
               />
             </div>
             <div className="launcher-progress-panel">
-              {!account ? <LauncherAccountForm locale={locale} /> : <>
+              {!account ? <LauncherAccountForm locale={locale} onAuthenticated={onAuthenticated} /> : <>
               <div className="launcher-status-card-heading">
                 <span>{copy.cardKicker}</span>
                 <h2>{copy.cardTitle}</h2>
@@ -235,6 +237,7 @@ export function FieldRoot() {
   const { locale, setLocale } = useFieldLocale();
   const { account } = useAuthOrLocal();
   const [entered, setEntered] = useState(false);
+  const [authCompleted, setAuthCompleted] = useState(false);
   const [settingsPresentation, setSettingsPresentation] = useState<
     "closed" | "quick" | "workspace"
   >("closed");
@@ -306,7 +309,7 @@ export function FieldRoot() {
     };
   }, []);
 
-  if (entered) {
+  if (entered || (authCompleted && account && progress === 100)) {
     return (
       <Suspense fallback={null}>
         <FieldApp initialLocale={locale} focusOnMount />
@@ -330,6 +333,7 @@ export function FieldRoot() {
         locale={locale}
         progress={progress}
         onEnter={() => setEntered(true)}
+        onAuthenticated={() => setAuthCompleted(true)}
         onLocaleChange={setLocale}
         settingsOpen={settingsPresentation === "quick"}
         onSettingsOpen={() => setSettingsPresentation("quick")}

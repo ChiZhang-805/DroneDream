@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { BUILD_EDITION } from "../edition";
 
 
 const optionalAuthState = vi.hoisted(() => ({
@@ -57,6 +58,9 @@ vi.mock("../features/auth/AuthContext", async (importOriginal) => {
     useAuthOrLocal: () => ({ configured: optionalAuthState.current?.configured ?? true,
       signInWithPassword: async () => { optionalAuthState.current = { configured: true, loading: false,
         account: { id: "accepted", email: "pilot@example.com", displayName: "Pilot", avatarUrl: null } }; },
+      sendRegistrationCode: async () => undefined,
+      verifyRegistrationCode: async () => { optionalAuthState.current = { configured: true, loading: false,
+        account: { id: "registered", email: "pilot@example.com", displayName: "Pilot", avatarUrl: null } }; },
     }),
   };
 });
@@ -513,7 +517,7 @@ describe("DesktopSetup", () => {
     expect(invoke).not.toHaveBeenCalledWith("restore_browser_auth_vault", undefined);
   });
 
-  it("enters only after software password authentication and local checks", async () => {
+  it.each(["login", "register"])("enters the installed edition Chatbot after %s and local checks", async (mode) => {
     optionalAuthState.current = { configured: true, loading: false, account: null };
     window.__TAURI__ = { core: { invoke: vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
@@ -521,10 +525,16 @@ describe("DesktopSetup", () => {
       throw new Error(`Unexpected command: ${command}`);
     }) } };
     renderPage();
+    if (mode === "register") await userEvent.click(screen.getByRole("tab", { name: "Create account" }));
     await userEvent.type(screen.getByLabelText("Email"), "pilot@example.com");
     await userEvent.type(screen.getByLabelText("Password"), "fixture-password");
-    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
-    await waitFor(() => expect(screen.getByTestId("current-route")).toHaveTextContent("/assistant"));
+    if (mode === "register") {
+      await userEvent.type(screen.getByLabelText("Confirm password"), "fixture-password");
+      await userEvent.click(screen.getByRole("button", { name: "Send code" }));
+      await userEvent.type(screen.getByLabelText("Email code"), "123456");
+    }
+    await userEvent.click(screen.getByRole("button", { name: mode === "login" ? "Sign in" : "Create account" }));
+    await waitFor(() => expect(screen.getByTestId("current-route")).toHaveTextContent(BUILD_EDITION === "autonomy" ? "/autonomy" : "/assistant"));
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
   });
 

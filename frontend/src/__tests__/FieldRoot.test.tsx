@@ -27,7 +27,7 @@ vi.mock("../components/LauncherFlightIllustration", () => ({
 
 const fieldAuth = vi.hoisted(() => ({ account: { id: "field-test" } as { id: string } | null }));
 vi.mock("../features/auth/AuthContext", () => ({ useAuthOrLocal: () => ({ account: fieldAuth.account }) }));
-vi.mock("../components/LauncherAccountForm", () => ({ LauncherAccountForm: () => <form aria-label="Email account" /> }));
+vi.mock("../components/LauncherAccountForm", () => ({ LauncherAccountForm: ({ onAuthenticated }: { onAuthenticated: () => void }) => <form aria-label="Email account"><button type="button" onClick={() => { fieldAuth.account = { id: "new-field-account" }; onAuthenticated(); }}>Complete authentication</button></form> }));
 
 vi.mock("../field/FieldApp", () => ({
   FieldApp: ({
@@ -75,6 +75,17 @@ describe("FieldRoot", () => {
     render(<FieldLocaleProvider><FieldRoot /></FieldLocaleProvider>);
     expect(screen.getByRole("form", { name: "Email account" })).toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
+  it("automatically opens the Field Chatbot after authentication and readiness", async () => {
+    vi.useFakeTimers();
+    fieldAuth.account = null;
+    render(<FieldLocaleProvider><FieldRoot /></FieldLocaleProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "Complete authentication" }));
+    expect(screen.queryByTestId("field-workspace")).not.toBeInTheDocument();
+    await finishLoading();
+    expect(screen.getByTestId("field-workspace")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Enter workspace" })).not.toBeInTheDocument();
   });
 
   it("loads the lightweight launch screen to 100 percent before offering entry", async () => {
