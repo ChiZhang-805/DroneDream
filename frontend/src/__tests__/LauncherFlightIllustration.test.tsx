@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { LauncherFlightIllustration } from "../components/LauncherFlightIllustration";
 
 describe("LauncherFlightIllustration", () => {
-  it("renders a lightweight route illustration without WebGL or a canvas", () => {
+  it("renders the approved raster artwork without procedural drawing", () => {
     const { container } = render(
       <LauncherFlightIllustration
         active
@@ -16,14 +16,15 @@ describe("LauncherFlightIllustration", () => {
 
     expect(screen.getByRole("heading", { name: "Autonomous flight, ready when you are" }))
       .toBeInTheDocument();
-    expect(container.querySelector("svg.launcher-flight-map")).toBeInTheDocument();
+    expect(container.querySelector("img.launcher-flight-image")).toBeInTheDocument();
+    expect(container.querySelector("svg")).not.toBeInTheDocument();
     expect(container.querySelector("canvas")).not.toBeInTheDocument();
     expect(container.querySelector(".drone-launch-scene")).not.toBeInTheDocument();
     expect(container.querySelector(".launcher-flight-illustration"))
       .toHaveAttribute("data-progress", "45");
   });
 
-  it("clamps progress before drawing the route", () => {
+  it("clamps progress metadata", () => {
     const { container, rerender } = render(
       <LauncherFlightIllustration description="Description" progress={-8} title="Title" />,
     );

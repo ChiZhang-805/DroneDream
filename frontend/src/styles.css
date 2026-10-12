@@ -14697,149 +14697,6 @@ a {
   backdrop-filter: blur(18px);
 }
 
-.launcher-flight-map {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.launcher-flight-road {
-  fill: none;
-  stroke: rgba(188, 194, 207, 0.5);
-  stroke-linecap: round;
-  stroke-width: 26;
-}
-
-.launcher-flight-road-secondary {
-  stroke-width: 16;
-}
-
-.launcher-flight-route-base,
-.launcher-flight-route-progress {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 8;
-}
-
-.launcher-flight-route-base {
-  stroke: rgba(207, 196, 215, 0.72);
-  stroke-dasharray: 3 16;
-}
-
-.launcher-flight-route-progress {
-  stroke: url(#launcher-route);
-  stroke-dasharray: 100;
-  transition: stroke-dashoffset 420ms ease;
-}
-
-.launcher-flight-pin circle:first-child {
-  fill: #ffffff;
-  stroke: rgba(255, 63, 104, 0.28);
-  stroke-width: 5;
-}
-
-.launcher-flight-pin circle:last-child {
-  fill: #ff3f68;
-}
-
-.launcher-flight-pin-end circle:first-child {
-  stroke: rgba(52, 164, 180, 0.28);
-}
-
-.launcher-flight-pin-end circle:last-child {
-  fill: #34a4b4;
-}
-
-.launcher-flight-drone:not(:has(animateMotion)) {
-  transform: translate(291px, 273px);
-}
-
-.launcher-flight-drone-halo {
-  fill: rgba(255, 255, 255, 0.92);
-  stroke: rgba(255, 63, 104, 0.16);
-  stroke-width: 2;
-}
-
-.launcher-flight-drone-arm {
-  fill: none;
-  stroke: #352f40;
-  stroke-linecap: round;
-  stroke-width: 5;
-}
-
-.launcher-flight-drone-body {
-  fill: #ff3f68;
-}
-
-.launcher-flight-rotor {
-  fill: rgba(67, 184, 197, 0.82);
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: launcher-flight-rotor 0.9s linear infinite;
-}
-
-@keyframes launcher-flight-rotor {
-  to { transform: rotate(360deg); }
-}
-
-.launcher-flight-orb {
-  position: absolute;
-  z-index: 0;
-  border-radius: 50%;
-  filter: blur(2px);
-  pointer-events: none;
-}
-
-.launcher-flight-orb-a {
-  top: 8%;
-  left: 7%;
-  width: 92px;
-  height: 92px;
-  background: rgba(255, 198, 92, 0.38);
-}
-
-.launcher-flight-orb-b {
-  right: 8%;
-  bottom: 11%;
-  width: 128px;
-  height: 128px;
-  background: rgba(94, 205, 210, 0.24);
-}
-
-.launcher-flight-legend {
-  position: absolute;
-  right: 1.25rem;
-  bottom: 1.1rem;
-  display: flex;
-  gap: 1rem;
-  padding: 0.55rem 0.75rem;
-  border: 1px solid rgba(126, 111, 148, 0.1);
-  border-radius: 999px;
-  color: #6f6778;
-  background: rgba(255, 255, 255, 0.84);
-  font-size: 0.72rem;
-  font-weight: 650;
-  backdrop-filter: blur(12px);
-}
-
-.launcher-flight-legend span {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.launcher-flight-legend i {
-  display: inline-block;
-  width: 18px;
-  height: 4px;
-  border-radius: 999px;
-}
-
-.launcher-flight-legend-drone { background: #ff3f68; }
-.launcher-flight-legend-route { background: #43b8c5; }
-
 .launcher-flight-copy {
   padding: clamp(1.25rem, 2.8vh, 2rem) 0 0;
   text-align: left;
@@ -24389,3 +24246,76 @@ body {
     max-height: 2.65rem;
   }
 }
+
+/* One continuous light canvas and a stable account/readiness card. */
+.app-shell-launcher, .field-launcher { background: #f8fafc; }
+.app-shell-launcher .launcher-chrome { background: transparent; border: 0; }
+.launcher-hero { grid-template-columns: minmax(0, 1fr) 420px; gap: 3vw; padding: 90px 6vw 32px 0; background: transparent; }
+.launcher-hero::before { content: none; }
+.launcher-hero-visual { height: 100%; align-self: stretch; }
+.launcher-flight-illustration { display: block; }
+.launcher-flight-art { position: absolute; inset: 0 -50px 0 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; backdrop-filter: none; mask-image: linear-gradient(to right, #000 85%, transparent); }
+.launcher-flight-image { width: 100%; height: 100%; object-fit: cover; object-position: 42% center; mask-image: linear-gradient(to bottom, transparent, #000 8%, #000 92%, transparent); }
+.launcher-flight-copy { position: absolute; left: 7vw; bottom: 7%; padding: 0; }
+.launcher-flight-copy h1 { max-width: 20ch; font-size: clamp(1.8rem, 2.5vw, 3rem); text-shadow: 0 2px 20px white, 0 2px 6px white; }
+.launcher-flight-copy p { display: none; }
+.launcher-progress-panel { box-sizing: border-box; width: 420px; height: 540px; padding: 32px; border-radius: 20px; background: #fff; box-shadow: 0 16px 60px #3445620b; overflow-y: auto; }
+.launcher-account-form { display: flex; flex-direction: column; height: 100%; gap: 14px; }
+.launcher-account-form h2 { margin: 0 0 8px; color: #252c38; font-size: 23px; line-height: 1.3; }
+.launcher-auth-tabs { display: flex; gap: 24px; margin-bottom: 4px; }
+.launcher-auth-tabs button, .launcher-browser-signin { border: 0; padding: 5px 0; background: transparent; color: #717b8b; font: inherit; cursor: pointer; }
+.launcher-auth-tabs button[aria-selected="true"] { color: #d53059; box-shadow: 0 2px #d53059; }
+.launcher-account-form label { display: grid; gap: 6px; color: #566174; font-size: 13px; }
+.launcher-account-form input { box-sizing: border-box; width: 100%; height: 42px; border: 1px solid #e0e5eb; border-radius: 8px; padding: 0 12px; background: #fff; color: #252c38; font: inherit; }
+.launcher-account-form input:focus { outline: 2px solid #f3b3c3; outline-offset: 2px; }
+.launcher-auth-verification { height: 72px; flex: 0 0 72px; }
+.launcher-auth-message { height: 38px; flex: 0 0 38px; overflow-y: auto; color: #b33150; font-size: 12px; line-height: 18px; }
+.launcher-account-form > .btn, .launcher-card-actions .btn { width: 100%; min-height: 42px; }
+.launcher-browser-signin { font-size: 12px; }
+.launcher-card-actions { margin-top: 24px; max-height: 165px; overflow-y: auto; }
+.launcher-card-actions .launcher-ready-actions { position: static; display: block; width: 100%; transform: none; margin: 12px 0 0; }
+.launcher-card-actions .alert { margin: 0; font-size: 12px; }
+.launcher-status-card-heading p:empty { display: none; }
+*, *::before, *::after { scrollbar-width: none !important; scrollbar-gutter: auto !important; }
+*::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+@media (max-width: 850px) {
+  .launcher-hero { grid-template-columns: minmax(0, 1fr); justify-items: center; padding: 78px 16px 20px; overflow-y: auto; }
+  .launcher-hero-visual { display: none; }
+  .launcher-progress-panel { width: min(420px, 100%); height: 540px; padding: 28px; }
+}
+@media (max-height: 650px) and (min-width: 851px) {
+  .launcher-hero { padding-top: 70px; padding-bottom: 16px; overflow-y: auto; }
+  .launcher-progress-panel { height: 520px; padding: 24px 32px; }
+}
+
+.launcher-progress-panel .btn-primary { display: flex; justify-content: center; align-items: center; }
+.launcher-status-card-heading p { display: none; }
+
+/* The illustration is the full-window backdrop, including both top corners. */
+.launcher-hero { padding: 76px 6vw 32px; }
+.launcher-hero-visual { position: absolute; inset: 0; width: 100%; height: 100%; }
+.launcher-flight-art { inset: 0; mask-image: none; }
+.launcher-flight-image { object-position: center; mask-image: none; }
+.launcher-flight-copy { left: 6vw; bottom: 8%; }
+.launcher-progress-panel { grid-column: 2; height: 450px; padding: 26px 32px; background: rgba(255, 255, 255, .97); }
+.launcher-account-form { gap: 9px; }
+.launcher-account-form h2 { font-size: 22px; margin-bottom: 5px; }
+.launcher-account-form input { height: 36px; }
+.launcher-auth-verification { height: 58px; flex-basis: 58px; }
+.launcher-auth-verification[hidden], .launcher-auth-tabs[hidden] { display: none; }
+.launcher-auth-message { height: 36px; flex-basis: 36px; margin-top: auto; }
+.launcher-auth-secondary { border: 0; padding: 5px 0; background: transparent; color: #667387; font: inherit; font-size: 12px; text-align: center; cursor: pointer; }
+@media (max-width: 850px) {
+  .launcher-hero { padding: 78px 16px 20px; }
+  .launcher-hero-visual { display: block; }
+  .launcher-flight-art { display: block; opacity: .6; }
+  .launcher-flight-copy { display: none; }
+  .launcher-progress-panel { grid-column: 1; height: 450px; padding: 26px; }
+}
+@media (max-height: 570px) {
+  .launcher-hero { align-items: start; overflow-y: auto; }
+}
+
+.launcher-progress-panel { height: 400px; }
+.launcher-account-form label[hidden] { display: none; }
+.account-software-auth { width: 100%; padding: 16px; box-shadow: none; border: 0; }

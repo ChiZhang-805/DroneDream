@@ -1,4 +1,5 @@
 import {
+  type ReactNode,
   useCallback,
   useEffect,
   useRef,
@@ -9,6 +10,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { editionLandingPath } from "../edition";
 import { Alert } from "../components/Alert";
+import { LauncherAccountForm } from "../components/LauncherAccountForm";
 import { LauncherFlightIllustration } from "../components/LauncherFlightIllustration";
 import { Loading } from "../components/States";
 import { SectionCard } from "../components/SectionCard";
@@ -40,11 +42,7 @@ import type {
 import { formatBytes } from "../desktop/format";
 import { useDesktopRuntimeAccess } from "../desktop/access";
 import { useOptionalAuth } from "../features/auth/AuthContext";
-import {
-  cancelDesktopBrowserSignIn,
-  completeDesktopBrowserSignIn,
-} from "../features/auth/desktopBrowserSignIn";
-import { browserAuthConfiguration } from "../features/auth/supabaseClient";
+
 import { probeSystemPrerequisitesWithStartupGrace } from "../desktop/prerequisiteProbe";
 import {
   isOverallDesktopReady,
@@ -319,7 +317,6 @@ export function DesktopSetup() {
   const installerDiscardRequested = useRef(false);
   const installerDiscardSucceeded = useRef(false);
   const componentMounted = useRef(false);
-  const browserAuthController = useRef<AbortController | null>(null);
   const selectedDriveRef = useRef("");
   const [state, setState] = useState<ProbeState>(() => ({
     ...INITIAL_STATE,
@@ -338,12 +335,7 @@ export function DesktopSetup() {
   const [installerAttempt, setInstallerAttempt] = useState(0);
   const [dismissedLauncherError, setDismissedLauncherError] = useState("");
   const [launcherErrorExpanded, setLauncherErrorExpanded] = useState(false);
-  const [browserAuthStatus, setBrowserAuthStatus] = useState<
-    "idle" | "restoring" | "waiting" | "adopting"
-  >("idle");
-  const [browserAuthCompletedForLaunch, setBrowserAuthCompletedForLaunch] =
-    useState(false);
-  const [browserAuthError, setBrowserAuthError] = useState<string | null>(null);
+  const [authCompletedForLaunch, setAuthCompletedForLaunch] = useState(false);
   const releaseManifestUrl = configuredRuntimeReleaseManifestUrl();
   const installActive = isActiveInstall(installState.snapshot);
   const receiptCleanupPending =
@@ -376,7 +368,7 @@ export function DesktopSetup() {
     auth?.configured && !auth.loading ? auth.account : null;
   const startupGateReady =
     !desktopAvailable ||
-    (browserAuthCompletedForLaunch &&
+    (authCompletedForLaunch &&
       startupGate.status === "ready" &&
       Boolean(signedInAccount) &&
       startupGate.accountId === signedInAccount?.id);
@@ -411,7 +403,7 @@ export function DesktopSetup() {
       (runtimeAccess.status === "ready" && !runtimeAccess.isChecking));
   const workspaceReady =
     localChecksReady &&
-    browserAuthCompletedForLaunch &&
+    authCompletedForLaunch &&
     Boolean(signedInAccount) &&
     startupGateReady &&
     !updaterBlocksWorkspace;
@@ -421,14 +413,8 @@ export function DesktopSetup() {
     runtimeAccess.isChecking ||
     runtimeAccess.status === "checking" ||
     runtimeAccess.status === "starting";
-  const accountVerificationInProgress =
-    browserAuthCompletedForLaunch &&
-    Boolean(
-      (auth?.configured && auth.loading) ||
-      startupGate.status === "checking",
-    );
   const postSignInBlocked =
-    browserAuthCompletedForLaunch && startupGate.status === "blocked";
+    authCompletedForLaunch && startupGate.status === "blocked";
   const startupGateFailureKey: TranslationKey =
     startupGate.failureCode === "runtimeSessionApiMissing"
       ? "launcher.runtimeSessionApiMissing"
@@ -524,8 +510,6 @@ export function DesktopSetup() {
     componentMounted.current = true;
     return () => {
       componentMounted.current = false;
-      const controller = browserAuthController.current;
-      if (controller) void cancelDesktopBrowserSignIn(controller);
     };
   }, []);
 
@@ -560,10 +544,9 @@ export function DesktopSetup() {
 
   useEffect(() => {
     if (!desktopAvailable) return;
-    // Account state is deliberately a second stage. It must never participate
-    // in the environment percentage or run before the user selects the single
-    // browser sign-in action shown at 100%.
-    if (!localChecksReady || !browserAuthCompletedForLaunch) return;
+    // Account entry and environment readiness are independent. Open the
+    // workspace only after explicit authentication and fresh local checks.
+    if (!localChecksReady || !authCompletedForLaunch) return;
     if (
       updater.status === "checking" ||
       updater.status === "downloading" ||
@@ -602,7 +585,7 @@ export function DesktopSetup() {
     if (!signedInAccount) return;
     approveDesktopStartupGateForAccount(signedInAccount.id);
   }, [
-    browserAuthCompletedForLaunch,
+    authCompletedForLaunch,
     desktopAvailable,
     localChecksReady,
     locale,
@@ -617,57 +600,16 @@ export function DesktopSetup() {
     if (
       workspaceReady &&
       auth?.configured &&
-      auth.account &&
-      browserAuthStatus === "idle"
+      auth.account
     ) {
       navigate(editionLandingPath(), { replace: true });
     }
   }, [
     auth?.account,
     auth?.configured,
-    browserAuthStatus,
     navigate,
     workspaceReady,
   ]);
-
-  const startBrowserSignIn = useCallback(async () => {
-    if (!launcherEnvironmentReady || browserAuthController.current) return;
-    const configuration = browserAuthConfiguration();
-    if (!configuration) {
-      setBrowserAuthError(t("launcher.browserAuthNotConfigured"));
-      return;
-    }
-    setBrowserAuthError(null);
-    setBrowserAuthCompletedForLaunch(false);
-    setDesktopStartupGateState("idle");
-    setBrowserAuthStatus("waiting");
-    const controller = new AbortController();
-    browserAuthController.current = controller;
-    try {
-      await completeDesktopBrowserSignIn(locale, {
-        signal: controller.signal,
-        onAdopting: () => {
-          if (componentMounted.current) setBrowserAuthStatus("adopting");
-        },
-      });
-      if (!componentMounted.current) return;
-      if (componentMounted.current) {
-        setBrowserAuthCompletedForLaunch(true);
-        setBrowserAuthStatus("idle");
-      }
-    } catch (error) {
-      if (!componentMounted.current) return;
-      setBrowserAuthStatus("idle");
-      const message = error instanceof Error ? error.message : String(error);
-      if (!/cancelled/iu.test(message)) {
-        setBrowserAuthError(t("launcher.browserAuthFailed"));
-      }
-    } finally {
-      if (browserAuthController.current === controller) {
-        browserAuthController.current = null;
-      }
-    }
-  }, [launcherEnvironmentReady, locale, t]);
 
   const refresh = useCallback(async (installerTargetRoot?: string) => {
     if (!desktopAvailable) return;
@@ -1421,6 +1363,8 @@ export function DesktopSetup() {
         aria-busy={busy}
       >
         <RuntimeLauncherHero
+          accountForm={!signedInAccount ? <LauncherAccountForm locale={locale}
+            onAuthenticated={() => setAuthCompletedForLaunch(true)} /> : null}
           snapshot={installState.snapshot}
           environmentProgress={launcherProgress}
           localReady={localChecksReady}
@@ -1440,7 +1384,7 @@ export function DesktopSetup() {
           }
           automaticStartPending={automaticStartPending}
           commandBusy={installState.commandBusy}
-        />
+        >
 
         {postSignInBlocked &&
         !updaterBlocksWorkspace ? (
@@ -1521,26 +1465,6 @@ export function DesktopSetup() {
               {t("launcher.retryChecks")}
             </button>
           </div>
-        ) : launcherEnvironmentReady && !workspaceReady ? (
-          <div className="launcher-ready-actions">
-            <button
-              type="button"
-              className="btn btn-primary launcher-primary-action"
-              disabled={
-                browserAuthStatus !== "idle" ||
-                accountVerificationInProgress
-              }
-              onClick={() => void startBrowserSignIn()}
-            >
-              {browserAuthStatus === "waiting"
-                ? t("launcher.browserAuthWaiting")
-                : browserAuthStatus === "adopting" || browserAuthStatus === "restoring"
-                  ? t("launcher.browserAuthAdopting")
-                  : accountVerificationInProgress
-                    ? t("launcher.browserAuthAdopting")
-                  : t("launcher.signIn")}
-            </button>
-          </div>
         ) : workspaceReady ? null : localRuntimeReady &&
           (environmentChecking || !launcherEnvironmentReady) ? null : localRuntimeReady ? (
           <div className="launcher-ready-actions">
@@ -1584,11 +1508,7 @@ export function DesktopSetup() {
           </>
         )}
 
-        {browserAuthError ? (
-          <Alert tone="danger" title={t("launcher.browserAuthErrorTitle")}>
-            <p>{browserAuthError}</p>
-          </Alert>
-        ) : null}
+        </RuntimeLauncherHero>
 
         {requestedFeatureLabel && !workspaceReady ? (
           <span className="sr-only">
@@ -1680,7 +1600,7 @@ export function DesktopSetup() {
           ) : null}
         </div>
 
-        {launcherErrorVisible ? (
+        {signedInAccount && launcherErrorVisible ? (
           <LauncherErrorDialog
             title={t(runtimeHealthCopy?.titleKey ?? "launcher.errorTitle")}
             hint={t(runtimeHealthCopy?.hintKey ?? "launcher.errorHint")}
@@ -2591,6 +2511,8 @@ const LAUNCHER_STATUS_KEYS: Record<RuntimeInstallPhase, TranslationKey> = {
 };
 
 function RuntimeLauncherHero({
+  accountForm,
+  children,
   snapshot,
   environmentProgress,
   localReady,
@@ -2601,6 +2523,8 @@ function RuntimeLauncherHero({
   automaticStartPending,
   commandBusy,
 }: {
+  accountForm: ReactNode;
+  children: ReactNode;
   snapshot: RuntimeInstallSnapshot | null;
   environmentProgress: number;
   localReady: boolean;
@@ -2655,7 +2579,8 @@ function RuntimeLauncherHero({
         />
       </div>
 
-      <div className="launcher-progress-panel" role="status" aria-live="polite">
+      <div className="launcher-progress-panel">
+        {accountForm || <>
         <div className="launcher-status-card-heading">
           <span>{t("launcher.cardKicker")}</span>
           <h2>{t("launcher.cardTitle")}</h2>
@@ -2688,6 +2613,8 @@ function RuntimeLauncherHero({
             {percent === null ? "" : `${percent}%`}
           </span>
         </div>
+        <div className="launcher-card-actions">{children}</div>
+        </>}
       </div>
     </div>
   );

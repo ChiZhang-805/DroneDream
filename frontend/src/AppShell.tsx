@@ -1,3 +1,4 @@
+import { LauncherAccountForm } from "./components/LauncherAccountForm";
 import {
   Fragment,
   useCallback,
@@ -108,10 +109,6 @@ import {
 } from "./appSettings";
 import { AuthCaptcha } from "./features/auth/AuthCaptcha";
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
-import {
-  cancelDesktopBrowserSignIn,
-  completeDesktopBrowserSignIn,
-} from "./features/auth/desktopBrowserSignIn";
 import { OPEN_ACCOUNT_DIALOG_EVENT } from "./features/auth/events";
 import {
   useAdminAccess,
@@ -2919,8 +2916,6 @@ export function AccountDialog({
   closeRef,
   required,
   edition,
-  desktopBrowserAuthReady = false,
-  onOpenDesktopSetup,
   onClose,
 }: {
   closeRef: RefObject<HTMLButtonElement>;
@@ -2947,7 +2942,6 @@ export function AccountDialog({
   );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [browserAuthWaiting, setBrowserAuthWaiting] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [avatarCropSource, setAvatarCropSource] = useState<{
@@ -2959,39 +2953,11 @@ export function AccountDialog({
   const cameraButtonRef = useRef<HTMLButtonElement>(null);
   const cameraVideoRef = useRef<HTMLVideoElement>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
-  const browserAuthControllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
     setDisplayName(auth.account?.displayName ?? "");
   }, [auth.account?.displayName]);
-
-  const startDesktopBrowserSignIn = useCallback(async () => {
-    if (!desktopRuntime || browserAuthControllerRef.current) return;
-    const controller = new AbortController();
-    browserAuthControllerRef.current = controller;
-    setError(null);
-    setBrowserAuthWaiting(true);
-    try {
-      await completeDesktopBrowserSignIn(locale, { signal: controller.signal });
-    } catch (reason) {
-      const message = reason instanceof Error ? reason.message : String(reason);
-      if (mountedRef.current && !/cancelled/iu.test(message)) {
-        setError(copy.browserSignInFailed);
-      }
-    } finally {
-      if (browserAuthControllerRef.current === controller) {
-        browserAuthControllerRef.current = null;
-        if (mountedRef.current) setBrowserAuthWaiting(false);
-      }
-    }
-  }, [copy.browserSignInFailed, desktopRuntime, locale]);
-
-  const cancelDesktopSignIn = useCallback(async () => {
-    const controller = browserAuthControllerRef.current;
-    if (!desktopRuntime || !controller) return;
-    await cancelDesktopBrowserSignIn(controller);
-  }, [desktopRuntime]);
 
   const stopCamera = useCallback(() => {
     cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -3010,8 +2976,6 @@ export function AccountDialog({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      const controller = browserAuthControllerRef.current;
-      if (controller) void cancelDesktopBrowserSignIn(controller);
       cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
       cameraStreamRef.current = null;
     };
@@ -3358,35 +3322,8 @@ export function AccountDialog({
           ) : null}
         </div>
       ) : desktopRuntime ? (
-        <div className="account-desktop-browser-auth">
-          <p>{desktopBrowserAuthReady
-            ? copy.browserSignInBody
-            : copy.browserRuntimeRequired}</p>
-          {desktopBrowserAuthReady ? (
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={browserAuthWaiting}
-              onClick={() => void startDesktopBrowserSignIn()}
-            >
-              <LogIn aria-hidden="true" strokeWidth={1.85} />
-              {browserAuthWaiting ? copy.browserSignInWaiting : copy.browserSignIn}
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={onOpenDesktopSetup}
-            >
-              <MonitorCog aria-hidden="true" strokeWidth={1.85} />
-              {copy.openEnvironment}
-            </button>
-          )}
-          {desktopBrowserAuthReady && browserAuthWaiting ? (
-            <button type="button" className="btn" onClick={() => void cancelDesktopSignIn()}>
-              {copy.cancelBrowserSignIn}
-            </button>
-          ) : null}
+        <div className="launcher-progress-panel account-software-auth">
+          <LauncherAccountForm locale={locale} />
         </div>
       ) : (
         <>

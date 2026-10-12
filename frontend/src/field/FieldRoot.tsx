@@ -5,7 +5,7 @@ import { LauncherFlightIllustration } from "../components/LauncherFlightIllustra
 import type { SettingsSurfaceTabId } from "../components/EditionSettingsSurface";
 import { useAuthOrLocal } from "../features/auth/AuthContext";
 import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
-import { FieldAuthControl } from "./FieldAuthControl";
+import { LauncherAccountForm } from "../components/LauncherAccountForm";
 import { FieldBrandLockup } from "./FieldBrandLockup";
 import { useFieldLocale } from "./FieldLocaleProvider";
 import { FieldSettingsDialog } from "./FieldSettingsDialog";
@@ -22,12 +22,12 @@ const COPY = {
     loading: "Preparing the real-device tuning workspace",
     ready: "Field workspace ready",
     settings: "Open settings",
-    illustrationTitle: "Tune real aircraft with a clear view",
+    illustrationTitle: "Ready for takeoff",
     illustrationDescription:
-      "A lightweight route animation keeps startup responsive while the device workspace is prepared.",
+      "",
     cardKicker: "FIELD STARTUP",
     cardTitle: "Preparing the tuning workspace",
-    cardHint: "Device services and local safeguards are checked before the workspace opens.",
+    cardHint: "",
     stages: ["Check this computer", "Prepare device services", "Open the workspace"],
   },
   "zh-CN": {
@@ -35,11 +35,11 @@ const COPY = {
     loading: "正在准备真机调优工作区",
     ready: "Field 工作区已就绪",
     settings: "打开设置",
-    illustrationTitle: "清晰掌握无人机的每一次飞行",
-    illustrationDescription: "轻量航线动画保证首屏快速出现，真机工作区会在后台继续准备。",
+    illustrationTitle: "让想法起飞",
+    illustrationDescription: "",
     cardKicker: "FIELD 启动",
     cardTitle: "正在准备真机调优工作区",
-    cardHint: "设备服务与本地保护检查完成后，将自动进入工作区。",
+    cardHint: "",
     stages: ["检查这台电脑", "准备设备服务", "进入工作区"],
   },
 } as const;
@@ -65,6 +65,7 @@ function FieldLaunchScreen({
   onSettingsClose: () => void;
   onOpenSettingsWorkspace: (tab: SettingsSurfaceTabId) => void;
 }) {
+  const { account } = useAuthOrLocal();
   const copy = COPY[locale];
   const ready = progress === 100;
   const activeStage = ready ? 3 : progress < 34 ? 0 : progress < 74 ? 1 : 2;
@@ -168,17 +169,8 @@ function FieldLaunchScreen({
                 title={copy.illustrationTitle}
               />
             </div>
-            {ready ? (
-              <div className="launcher-ready-actions">
-                <FieldAuthControl
-                  launcher
-                  launcherReady
-                  locale={locale}
-                  onAuthenticated={onEnter}
-                />
-              </div>
-            ) : null}
-            <div className="launcher-progress-panel" role="status" aria-live="polite">
+            <div className="launcher-progress-panel">
+              {!account ? <LauncherAccountForm locale={locale} /> : <>
               <div className="launcher-status-card-heading">
                 <span>{copy.cardKicker}</span>
                 <h2>{copy.cardTitle}</h2>
@@ -211,6 +203,12 @@ function FieldLaunchScreen({
                 </strong>
                 <span className="launcher-progress-percent">{progress}%</span>
               </div>
+              <div className="launcher-card-actions">
+                <button className="btn btn-primary" disabled={!ready} onClick={onEnter}>
+                  {locale === "zh-CN" ? "进入工作区" : "Enter workspace"}
+                </button>
+              </div>
+              </>}
             </div>
           </div>
         </div>

@@ -25,23 +25,9 @@ vi.mock("../components/LauncherFlightIllustration", () => ({
   ),
 }));
 
-vi.mock("../field/FieldAuthControl", () => ({
-  FieldAuthControl: ({
-    locale,
-    launcherReady,
-    onAuthenticated,
-  }: {
-    locale: "en" | "zh-CN";
-    launcherReady: boolean;
-    onAuthenticated: () => void;
-  }) => (
-    <button type="button" disabled={!launcherReady} onClick={onAuthenticated}>
-      {locale === "en"
-        ? "Sign in and enter the tuning platform"
-        : "登录并进入调优平台"}
-    </button>
-  ),
-}));
+const fieldAuth = vi.hoisted(() => ({ account: { id: "field-test" } as { id: string } | null }));
+vi.mock("../features/auth/AuthContext", () => ({ useAuthOrLocal: () => ({ account: fieldAuth.account }) }));
+vi.mock("../components/LauncherAccountForm", () => ({ LauncherAccountForm: () => <form aria-label="Email account" /> }));
 
 vi.mock("../field/FieldApp", () => ({
   FieldApp: ({
@@ -69,6 +55,7 @@ async function finishLoading(): Promise<void> {
 
 describe("FieldRoot", () => {
   beforeEach(() => {
+    fieldAuth.account = { id: "field-test" };
     document.documentElement.dataset.brandEdition = "field";
     document.documentElement.style.setProperty("--dd-brand-start", "#ff9f3f");
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(() => ({
@@ -83,6 +70,13 @@ describe("FieldRoot", () => {
     vi.restoreAllMocks();
   });
 
+  it("shows the email form immediately when signed out", () => {
+    fieldAuth.account = null;
+    render(<FieldLocaleProvider><FieldRoot /></FieldLocaleProvider>);
+    expect(screen.getByRole("form", { name: "Email account" })).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+  });
+
   it("loads the lightweight launch screen to 100 percent before offering entry", async () => {
     vi.useFakeTimers();
     const { container } = render(
@@ -93,19 +87,19 @@ describe("FieldRoot", () => {
 
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "0");
     expect(screen.queryByRole("button", {
-      name: "Sign in and enter the tuning platform",
-    })).not.toBeInTheDocument();
+      name: "Enter workspace",
+    })).toBeDisabled();
 
     await finishLoading();
 
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
     expect(screen.getByText("100%")).toBeInTheDocument();
     expect(screen.getByRole("button", {
-      name: "Sign in and enter the tuning platform",
+      name: "Enter workspace",
     })).toBeEnabled();
     expect(screen.getByTestId("field-drone-scene")).toHaveAttribute("data-active", "false");
     expect(screen.getByTestId("field-drone-scene"))
-      .toHaveAttribute("data-title", "Tune real aircraft with a clear view");
+      .toHaveAttribute("data-title", "Ready for takeoff");
     expect(container.firstChild).toHaveAttribute("data-authority", "false");
     expect(container).not.toHaveTextContent(/PX4|Gazebo|SITL|HITL/i);
 
@@ -143,7 +137,7 @@ describe("FieldRoot", () => {
     fireEvent.click(screen.getByRole("button", { name: "关闭设置" }));
     await finishLoading();
 
-    const enter = screen.getByRole("button", { name: "登录并进入调优平台" });
+    const enter = screen.getByRole("button", { name: "进入工作区" });
     expect(enter).toBeEnabled();
     await act(async () => {
       fireEvent.click(enter);

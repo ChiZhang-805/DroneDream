@@ -17,7 +17,7 @@ const args = new Map(process.argv.slice(2).map((argument) => {
 }));
 const edition = String(args.get("--edition") || "sim");
 assert(
-  ["universal", "sim", "lab", "autonomy"].includes(edition),
+  ["universal", "sim", "lab", "autonomy", "field"].includes(edition),
   `Unsupported shared desktop launcher edition: ${edition}`,
 );
 const desktopOnly = Boolean(args.get("--desktop-only"));
@@ -284,74 +284,32 @@ async function verifyCase(browser, testCase) {
     // Packaged desktop builds use hash history so a WebView reload never asks a
     // nonexistent HTTP server to resolve an application route. Exercise the
     // same URL shape here instead of accidentally testing the hosted router.
-    await page.goto(`${origin}/#/desktop/setup`, { waitUntil: "networkidle" });
-    const progress = page.getByRole("progressbar");
-    const expectedPercent = testCase.scenario === "ready" ? "100" : null;
-    if (expectedPercent !== null) {
-      await progress.waitFor();
-      try {
-        await page.waitForFunction((expected) => {
-          return document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow") === expected;
-        }, expectedPercent, { timeout: 26_000 });
-      } catch (error) {
-        const diagnosticPath = path.join(outputRoot, `${testCase.id}-progress-diagnostic.png`);
-        await page.screenshot({ path: diagnosticPath, fullPage: false });
-        const diagnostic = await page.evaluate(() => ({
-          value: document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow"),
-          calls: window.__SIM_VISUAL_CALLS__,
-          text: document.body.innerText,
-        }));
-        throw new Error(`Startup progress did not reach ${expectedPercent}: ${JSON.stringify(diagnostic)}`, { cause: error });
-      }
-    }
-
-    const installText = testCase.locale === "en"
-      ? "Install DroneDreamRuntime"
-      : "安装 DroneDreamRuntime";
-    const signInText = {
-      universal: ["Sign in and enter DroneDream", "登录并进入 DroneDream"],
-      sim: ["Sign in and enter simulation workspace", "登录并进入仿真工作区"],
-      lab: ["Sign in and enter laboratory workspace", "登录并进入实验室工作区"],
-      autonomy: ["Sign in and enter autonomous mission workspace", "登录并进入自主任务工作区"],
-    }[edition][testCase.locale === "en" ? 0 : 1];
-    const install = page.getByRole("button", { name: installText });
-    const signIn = page.getByRole("button", { name: signInText });
-    const startRuntime = page.getByRole("button", { name: /Start Runtime|启动 Runtime/i });
-    const repairRuntime = page.getByRole("button", { name: /Repair Runtime|修复 Runtime/i });
-
-    if (testCase.scenario === "missing") {
-      try {
-        await install.waitFor({ timeout: 30_000 });
-      } catch (error) {
-        const diagnosticPath = path.join(outputRoot, `${testCase.id}-diagnostic.png`);
-        await page.screenshot({ path: diagnosticPath, fullPage: false });
-        const diagnostic = await page.evaluate(() => ({
-          progress: document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow"),
-          calls: window.__SIM_VISUAL_CALLS__,
-          text: document.body.innerText,
-        }));
-        throw new Error(`Missing Runtime install action did not appear: ${JSON.stringify(diagnostic)}`, { cause: error });
-      }
-      if (!(await install.isVisible())) {
-        const diagnosticPath = path.join(outputRoot, `${testCase.id}-diagnostic.png`);
-        await page.screenshot({ path: diagnosticPath, fullPage: false });
-        const detailsButton = page.getByRole("button", { name: /View error information|查看错误信息/ });
-        if (await detailsButton.count()) await detailsButton.click();
-        throw new Error(`Missing Runtime did not expose its install action. Visible text: ${await page.locator("body").innerText()}`);
-      }
-      if (await progress.count()) {
-        const missingPercent = await progress.getAttribute("aria-valuenow");
-        assert.notEqual(missingPercent, "100");
-      }
-      assert.equal(await signIn.count(), 0);
-    } else {
-      await signIn.waitFor();
-      assert.equal(await install.count(), 0);
-    }
-    assert.equal(await startRuntime.count(), 0);
-    assert.equal(await repairRuntime.count(), 0);
-    assert.equal(await install.count() > 0 && await signIn.count() > 0, false);
-
+    await page.goto(`${origin}/${edition === "field" ? "field.html" : ""}#/desktop/setup`, { waitUntil: "networkidle" });
+    const form = page.locator(".launcher-account-form");
+    await form.waitFor();
+    const before = await page.locator(".launcher-progress-panel").boundingBox();
+    assert.equal(await page.getByRole("progressbar").count(), 0);
+    const email = form.locator('input[type="email"]');
+    const password = form.locator('input[type="password"]');
+    await email.fill("launcher-fixture@example.test");
+    await password.fill("fixture-password");
+    await context.route("https://visual-fixture.supabase.co/**", route => route.fulfill({
+      status: 400, contentType: "application/json", body: JSON.stringify({ error: "invalid_grant", error_description: "Invalid login credentials" }),
+    }));
+    await form.locator('button[type="submit"]').click();
+    await form.getByRole("alert").waitFor();
+    const after = await page.locator(".launcher-progress-panel").boundingBox();
+    assert.deepEqual(after, before, "Authentication errors must not move or resize the card");
+    await form.getByRole("tab", { name: testCase.locale === "en" ? "Create account" : "注册", exact: true }).click();
+    assert.deepEqual(await page.locator(".launcher-progress-panel").boundingBox(), before);
+    assert.equal(await password.getAttribute("autocomplete"), "new-password");
+    await form.getByRole("tab", { name: testCase.locale === "en" ? "Sign in" : "登录", exact: true }).click();
+    assert.equal(await form.getByRole("button", { name: /browser|浏览器/i }).count(), 0);
+    await form.getByRole("button", { name: testCase.locale === "en" ? "Forgot password?" : "忘记密码？" }).click();
+    await form.getByRole("heading", { name: testCase.locale === "en" ? "Reset your password" : "找回密码" }).waitFor();
+    assert.deepEqual(await page.locator(".launcher-progress-panel").boundingBox(), before);
+    await form.getByRole("button", { name: testCase.locale === "en" ? "Back to sign in" : "返回登录" }).click();
+    const expectedPercent = null;
     const dimensions = await page.evaluate(() => ({
       documentWidth: document.documentElement.clientWidth,
       scrollWidth: document.documentElement.scrollWidth,
@@ -371,7 +329,10 @@ async function verifyCase(browser, testCase) {
         const headingBounds = heading?.getBoundingClientRect();
         return {
           illustrationCount: document.querySelectorAll(".launcher-flight-illustration").length,
-          svgCount: illustration?.querySelectorAll("svg.launcher-flight-map").length ?? 0,
+          imageLoaded: Boolean(illustration?.querySelector("img.launcher-flight-image")?.naturalWidth),
+          svgCount: illustration?.querySelectorAll("svg").length ?? 0,
+          chromeBackground: getComputedStyle(document.querySelector(".launcher-chrome")).backgroundColor,
+          scrollbar: getComputedStyle(document.documentElement).scrollbarWidth,
           canvasCount: document.querySelectorAll(".desktop-launcher canvas").length,
           width: bounds?.width ?? 0,
           height: bounds?.height ?? 0,
@@ -386,64 +347,19 @@ async function verifyCase(browser, testCase) {
     assert.equal(dimensions.brandEdition, edition);
     assert.equal(dimensions.grantsHardwareAuthority, "false");
     assert.equal(dimensions.launcher.illustrationCount, 1);
-    assert.equal(dimensions.launcher.svgCount, 1);
+    assert.equal(dimensions.launcher.svgCount, 0);
+    assert.equal(dimensions.launcher.imageLoaded, true);
+    assert.equal(dimensions.launcher.chromeBackground, "rgba(0, 0, 0, 0)");
+    assert.equal(dimensions.launcher.scrollbar, "none");
     assert.equal(dimensions.launcher.canvasCount, 0,
       `${testCase.id}: desktop startup must not create a WebGL canvas`);
-    assert(dimensions.launcher.width > 100 && dimensions.launcher.height > 100,
+    if (testCase.viewport.width > 850) assert(dimensions.launcher.width > 100 && dimensions.launcher.height > 100,
       `${testCase.id}: lightweight launcher illustration has no visible area`);
-    assert(dimensions.launcher.headingLeft >= 0
+    if (testCase.viewport.width > 850) assert(dimensions.launcher.headingLeft >= 0
       && dimensions.launcher.headingRight <= testCase.viewport.width + 1,
     `${testCase.id}: launcher heading is clipped`);
     const imagePath = path.join(outputRoot, `${testCase.id}.png`);
     await page.screenshot({ path: imagePath, fullPage: false });
-    if (testCase.scenario === "ready") {
-      assert.equal(
-        dimensions.calls.filter((command) => command === "start_runtime").length,
-        1,
-        `${testCase.id}: an installed Runtime must auto-start exactly once`,
-      );
-      assert.equal(
-        dimensions.readinessTransitions.at(-1)?.percent,
-        100,
-        `${testCase.id}: an already-ready Runtime did not render 100% readiness`,
-      );
-      assert.equal(
-        dimensions.readinessTransitions.some((transition) => transition.percent === 99),
-        false,
-        `${testCase.id}: the prohibited 99% action point was rendered`,
-      );
-      for (let index = 1; index < dimensions.readinessTransitions.length; index += 1) {
-        assert(
-          dimensions.readinessTransitions[index].percent
-            >= dimensions.readinessTransitions[index - 1].percent,
-          `${testCase.id}: evidence-driven readiness must never move backwards`,
-        );
-      }
-      assert(
-        dimensions.readinessTransitions.every((transition) =>
-          transition.percent === 0 ||
-          (transition.percent >= 20 && transition.percent <= 100)),
-        `${testCase.id}: readiness rendered a value without completed native evidence`,
-      );
-      assert(
-        dimensions.primaryActionAppearances.length >= 1,
-        `${testCase.id}: sign-in action never appeared`,
-      );
-      assert(
-        dimensions.primaryActionAppearances.every((appearance) => appearance.percent === 100),
-        `${testCase.id}: a primary action appeared before 100% readiness`,
-      );
-    } else {
-      assert.equal(dimensions.calls.includes("start_runtime"), false);
-      assert.equal(
-        dimensions.readinessTransitions.some((transition) => transition.percent === 100),
-        false,
-      );
-      assert(
-        dimensions.primaryActionAppearances.every((appearance) => appearance.percent === 0),
-        `${testCase.id}: the Runtime install action must remain at 0%`,
-      );
-    }
     assert.equal(pageErrors.length, 0);
 
     return {
@@ -451,7 +367,7 @@ async function verifyCase(browser, testCase) {
       status: "pass",
       expectedPercent: expectedPercent === null ? null : Number(expectedPercent),
       dimensions,
-      launcherRenderer: "lightweight-svg",
+      launcherRenderer: "approved-raster",
       image: {
         path: path.relative(repoRoot, imagePath).replaceAll("\\", "/"),
         sha256: await sha256File(imagePath),

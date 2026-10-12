@@ -270,7 +270,7 @@ const enTranslations = {
     "launcher.startupBlocked": "Startup checks need attention",
     "launcher.progressLabel": "Startup readiness progress",
     "launcher.tagline": "Let Every Flight Flow Like a Dream",
-    "launcher.illustrationTitle": "Autonomous flight, ready when you are",
+    "launcher.illustrationTitle": "Ready for takeoff",
     "launcher.illustrationDescription":
       "A lightweight route animation keeps startup fast while DroneDream prepares the real map, aircraft, and simulator.",
     "launcher.cardKicker": "DRONEDREAM STARTUP",
@@ -1912,7 +1912,7 @@ const zhTranslations = {
     "launcher.startupBlocked": "启动检查需要处理",
     "launcher.progressLabel": "启动就绪进度",
     "launcher.tagline": "蝶 梦 水 云 乡",
-    "launcher.illustrationTitle": "让无人机沿着地图，自主完成任务",
+    "launcher.illustrationTitle": "让想法起飞",
     "launcher.illustrationDescription":
       "轻量航线动画保证首屏快速出现；真实地图、无人机和仿真环境会在后台继续准备。",
     "launcher.cardKicker": "DRONEDREAM 启动",

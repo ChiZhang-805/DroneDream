@@ -601,6 +601,17 @@ describe("AuthContext account profile", () => {
       .toBeLessThan(authMock.signOut.mock.invocationCallOrder[0]);
   });
 
+  it("adopts an explicit desktop password login and follows SDK token refresh", async () => {
+    window.__TAURI__ = { core: { invoke: vi.fn() } };
+    authMock.signInWithPassword.mockResolvedValueOnce({ data: { session: { user: authMock.state.user, access_token: "password-token" } }, error: null });
+    render(<AuthProvider><AccountProbe /></AuthProvider>);
+    expect(screen.getByLabelText("email")).toBeEmptyDOMElement();
+    fireEvent.click(screen.getByRole("button", { name: "Password sign in" }));
+    await waitFor(() => expect(screen.getByLabelText("email")).toHaveTextContent(authMock.state.user.email));
+    act(() => authMock.emitAuthStateChange("SIGNED_OUT", null));
+    expect(screen.getByLabelText("email")).toBeEmptyDOMElement();
+  });
+
   it.each(["/", "/#/desktop/setup"])(
     "keeps Supabase session state out of the desktop launcher at %s and adopts only the native access token",
     async (launcherUrl) => {

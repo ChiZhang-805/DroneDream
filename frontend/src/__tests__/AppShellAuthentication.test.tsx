@@ -28,6 +28,7 @@ vi.mock("../features/auth/desktopBrowserSignIn", () => ({
 
 vi.mock("../features/auth/AuthContext", () => ({
   AuthProvider: ({ children }: { children: ReactNode }) => children,
+  useAuthOrLocal: () => ({ configured: true, ...authMock }),
   useAuth: () => ({
     configured: true,
     loading: false,
@@ -143,70 +144,17 @@ describe("workspace email and password authentication", () => {
     router.dispose();
   });
 
-  it("uses only the edition-bound browser flow in the desktop account dialog", async () => {
+  it("keeps desktop account login inside the software", async () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     window.__TAURI__ = { core: { invoke: vi.fn() } };
-    let finishSignIn: (() => void) | undefined;
-    desktopSignInMock.complete.mockImplementationOnce(() => new Promise<undefined>((resolve) => {
-      finishSignIn = () => resolve(undefined);
-    }));
-
-    render(
-      <I18nProvider>
-        <AccountDialog
-          closeRef={createRef<HTMLButtonElement>()}
-          required
-          edition="sim"
-          desktopBrowserAuthReady
-          onClose={vi.fn()}
-        />
-      </I18nProvider>,
-    );
-
+    render(<I18nProvider><AccountDialog closeRef={createRef<HTMLButtonElement>()} required edition="sim" onClose={vi.fn()} /></I18nProvider>);
     const dialog = screen.getByRole("dialog", { name: "Sign in to DroneDream" });
-    expect(within(dialog).queryByLabelText("Email address")).not.toBeInTheDocument();
-    expect(within(dialog).queryByLabelText("Password")).not.toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole("button", {
-      name: "Continue securely in browser",
-    }));
-    await waitFor(() => {
-      expect(desktopSignInMock.complete).toHaveBeenCalledWith("en", {
-        signal: expect.any(AbortSignal),
-      });
-    });
-    expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeVisible();
-    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
-    await waitFor(() => {
-      expect(desktopSignInMock.cancel).toHaveBeenCalledWith(
-        expect.any(AbortController),
-      );
-    });
-    finishSignIn?.();
-  });
-
-  it("routes desktop users to Environment before browser authorization", () => {
-    window.localStorage.setItem("drone-dream:locale", "en");
-    window.__TAURI__ = { core: { invoke: vi.fn() } };
-    const onOpenDesktopSetup = vi.fn();
-
-    render(
-      <I18nProvider>
-        <AccountDialog
-          closeRef={createRef<HTMLButtonElement>()}
-          required
-          edition="sim"
-          onOpenDesktopSetup={onOpenDesktopSetup}
-          onClose={vi.fn()}
-        />
-      </I18nProvider>,
-    );
-
-    const dialog = screen.getByRole("dialog", { name: "Sign in to DroneDream" });
-    expect(within(dialog).queryByRole("button", {
-      name: "Continue securely in browser",
-    })).not.toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole("button", { name: "Open Environment" }));
-    expect(onOpenDesktopSetup).toHaveBeenCalledOnce();
+    fireEvent.change(within(dialog).getByLabelText("Email"), { target: { value: "pilot@example.com" } });
+    fireEvent.change(within(dialog).getByLabelText("Password"), { target: { value: "test-password" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Sign in" }));
+    await waitFor(() => expect(authMock.signInWithPassword).toHaveBeenCalledWith("pilot@example.com", "test-password", undefined));
+    expect(within(dialog).getByRole("button", { name: "Forgot password?" })).toBeInTheDocument();
     expect(desktopSignInMock.complete).not.toHaveBeenCalled();
+    expect(within(dialog).queryByRole("button", { name: /browser/i })).not.toBeInTheDocument();
   });
 });

@@ -408,7 +408,7 @@ afterEach(() => {
     expect(await screen.findByText("The installed runtime is ready."))
       .toBeInTheDocument();
     expect(await screen.findByRole("button", {
-      name: "Sign in and enter DroneDream",
+      name: "Sign in",
     })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "Start runtime" }))
       .not.toBeInTheDocument();
@@ -581,8 +581,8 @@ afterEach(() => {
     expect(workspace.querySelector(".settings-runtime-status"))
       .toHaveAttribute("title", expect.stringContaining("DroneDreamRuntime is not installed."));
     fireEvent.click(within(workspace).getByRole("button", { name: "Back to app" }));
-    expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
-      .toHaveAttribute("aria-valuenow", "0");
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
 
     router.dispose();
   }, 12_000);
