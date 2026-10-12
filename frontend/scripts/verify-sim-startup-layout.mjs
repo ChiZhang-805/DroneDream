@@ -301,8 +301,16 @@ async function verifyCase(browser, testCase) {
     const after = await page.locator(".launcher-progress-panel").boundingBox();
     assert.deepEqual(after, before, "Authentication errors must not move or resize the card");
     await form.getByRole("tab", { name: testCase.locale === "en" ? "Create account" : "注册", exact: true }).click();
-    assert.deepEqual(await page.locator(".launcher-progress-panel").boundingBox(), before);
-    assert.equal(await password.getAttribute("autocomplete"), "new-password");
+    const registrationBounds = await page.locator(".launcher-progress-panel").boundingBox();
+    assert(registrationBounds.height > before.height, "Registration expands for all four fields");
+    assert.equal(await form.locator('input:visible').count(), 4);
+    assert.equal(await password.first().getAttribute("autocomplete"), "new-password");
+    assert.equal(await form.locator('button[type="submit"]').textContent(), testCase.locale === "en" ? "Create account" : "完成注册");
+    const registrationSubmit = await form.locator('button[type="submit"]').boundingBox();
+    const codeBounds = await form.locator('input[autocomplete="one-time-code"]').boundingBox();
+    assert(registrationSubmit.y - codeBounds.y - codeBounds.height <= 16);
+    assert(registrationSubmit.y + registrationSubmit.height < registrationBounds.y + registrationBounds.height);
+    await page.screenshot({ path: path.join(outputRoot, `${testCase.id}-registration.png`), fullPage: false });
     await form.getByRole("tab", { name: testCase.locale === "en" ? "Sign in" : "登录", exact: true }).click();
     assert.equal(await form.getByRole("button", { name: /browser|浏览器/i }).count(), 0);
     await form.getByRole("button", { name: testCase.locale === "en" ? "Forgot password?" : "忘记密码？" }).click();

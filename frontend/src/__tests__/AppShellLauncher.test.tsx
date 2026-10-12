@@ -190,7 +190,7 @@ describe("desktop launcher chrome", () => {
     expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
     const launcherActions = document.querySelector(".launcher-chrome-actions");
     expect(launcherActions?.querySelector(".launcher-runtime-indicator"))
-      .toBeInTheDocument();
+      .not.toBeInTheDocument();
     expect(launcherActions?.querySelectorAll("button")).toHaveLength(1);
 
     router.dispose();
@@ -220,7 +220,7 @@ describe("desktop launcher chrome", () => {
     });
     const { router } = renderLauncher();
 
-    await screen.findByText("Checked");
+    await screen.findByRole("button", { name: "Settings" });
     const workspace = await openSettingsWorkspace();
     fireEvent.click(within(workspace).getByRole("tab", { name: "Memory" }));
     const memory = await within(workspace).findByLabelText(/Cross-session memory/);
@@ -282,8 +282,8 @@ describe("desktop launcher chrome", () => {
     installDesktopBridge();
     const { router } = renderLauncher();
 
-    const checked = await screen.findByText("Checked");
-    expect(checked.closest(".launcher-runtime-indicator")).toHaveClass("is-checked");
+    await screen.findByRole("button", { name: "Settings" });
+    expect(document.querySelector(".launcher-runtime-indicator")).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Language" })).not.toBeInTheDocument();
     const settings = screen.getByRole("button", { name: "Settings" });
     expect(settings).toHaveAttribute("aria-expanded", "false");

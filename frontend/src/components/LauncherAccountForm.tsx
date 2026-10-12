@@ -19,15 +19,45 @@ export function LauncherAccountForm({ locale, onAuthenticated }: {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [captcha, setCaptcha] = useState<string | null>(null);
   const [captchaAttempt, setCaptchaAttempt] = useState(0);
   const submitting = useRef(false);
+  const emailInput = useRef<HTMLInputElement>(null);
+  const registrationCopy = locale === "zh-CN"
+    ? { confirm: "确认密码", complete: "完成注册", mismatch: "两次输入的密码不一致。", resend: "重新发送", sendFirst: "请先发送邮箱验证码。" }
+    : { confirm: "Confirm password", complete: "Create account", mismatch: "Passwords do not match.", resend: "Resend code", sendFirst: "Send an email code first." };
+  const sendRegistrationCode = async () => {
+    if (submitting.current || !emailInput.current?.reportValidity()) return;
+    submitting.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      await auth.sendRegistrationCode(email, captcha ?? undefined);
+      setSent(true);
+    } catch {
+      setError(copy.codeFailed);
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+      setCaptcha(null);
+      setCaptchaAttempt((value) => value + 1);
+    }
+  };
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (submitting.current) return;
+    if (mode === "register" && password !== confirmPassword) {
+      setError(registrationCopy.mismatch);
+      return;
+    }
+    if (mode === "register" && !sent) {
+      setError(registrationCopy.sendFirst);
+      return;
+    }
     submitting.current = true;
     setBusy(true);
     setError("");
@@ -35,15 +65,16 @@ export function LauncherAccountForm({ locale, onAuthenticated }: {
       if (mode === "login") {
         await auth.signInWithPassword(email, password, captcha ?? undefined);
         setPassword("");
+        setConfirmPassword("");
         onAuthenticated?.();
       } else if (!sent) {
-        if (mode === "recovery") await auth.sendRecoveryCode(email, captcha ?? undefined);
-        else await auth.sendRegistrationCode(email, captcha ?? undefined);
+        await auth.sendRecoveryCode(email, captcha ?? undefined);
         setSent(true);
       } else {
         if (mode === "recovery") await auth.verifyRecoveryCode(email, code, password);
         else await auth.verifyRegistrationCode(email, code, password);
         setPassword("");
+        setConfirmPassword("");
         onAuthenticated?.();
       }
     } catch {
@@ -58,29 +89,41 @@ export function LauncherAccountForm({ locale, onAuthenticated }: {
   const message = error || (!auth.configured ? copy.unavailable : sent ? copy.sent : "");
   const caption = <span className="launcher-auth-message" role={error ? "alert" : "status"} aria-live="polite" title={message}>{message}</span>;
   return (
-    <form className="launcher-account-form" onSubmit={(event) => void submit(event)}>
+    <form className="launcher-account-form" data-mode={mode} onSubmit={(event) => void submit(event)}>
       <h2>{mode === "recovery" ? copy.recovery : copy.title}</h2>
       <div role="tablist" className="launcher-auth-tabs" hidden={mode === "recovery"} aria-label={copy.title}>
         {(["login", "register"] as const).map((value) => <button role="tab" key={value} type="button" disabled={busy}
-          aria-selected={mode === value} onClick={() => { setMode(value); setError(""); setSent(false); setCode(""); setPassword(""); }}>
+          aria-selected={mode === value} onClick={() => { setMode(value); setError(""); setSent(false); setCode(""); setPassword(""); setConfirmPassword(""); }}>
           {copy[value]}
         </button>)}
       </div>
-      <label>{copy.email}<input type="email" autoComplete="username" required value={email} disabled={busy || sent}
-        onChange={(event) => setEmail(event.target.value)} /></label>
-      <label hidden={sent}><span className="launcher-auth-caption">{mode === "recovery" ? copy.newPassword : copy.password}{!sent ? caption : null}</span><input aria-label={mode === "recovery" ? copy.newPassword : copy.password} aria-invalid={Boolean(error)} type="password" autoComplete={mode === "login" ? "current-password" : "new-password"}
+      <label>{copy.email}<input ref={emailInput} type="email" autoComplete="username" required value={email} disabled={busy || (sent && mode === "recovery")}
+        onChange={(event) => { setEmail(event.target.value); setSent(false); setCode(""); setError(""); }} /></label>
+      <label hidden={sent && mode === "recovery"}><span className="launcher-auth-caption">{mode === "recovery" ? copy.newPassword : copy.password}{!sent && mode !== "register" ? caption : null}</span><input aria-label={mode === "recovery" ? copy.newPassword : copy.password} aria-invalid={Boolean(error) && mode !== "register"} type="password" autoComplete={mode === "login" ? "current-password" : "new-password"}
         required minLength={mode !== "login" ? 8 : undefined} placeholder={mode !== "login" ? copy.passwordHint : undefined}
-        value={password} disabled={busy} onChange={(event) => setPassword(event.target.value)} /></label>
-      <div className="launcher-auth-verification" hidden={!sent && !captchaProtectionConfigured}>
+        value={password} disabled={busy} onChange={(event) => { setPassword(event.target.value); setError(""); }} /></label>
+      {mode === "register" ? <>
+        <label>{registrationCopy.confirm}<input type="password" autoComplete="new-password" required minLength={8}
+          aria-invalid={error === registrationCopy.mismatch} value={confirmPassword} disabled={busy}
+          onChange={(event) => { setConfirmPassword(event.target.value); setError(""); }} /></label>
+        <div className="launcher-registration-code">
+          <label>{copy.code}<input autoComplete="one-time-code" inputMode="numeric" required value={code}
+            onChange={(event) => setCode(event.target.value)} disabled={busy} /></label>
+          <button className="btn launcher-send-code" type="button" onClick={() => void sendRegistrationCode()}
+            disabled={busy || !auth.configured || (captchaProtectionConfigured && !captcha)}>{sent ? registrationCopy.resend : copy.send}</button>
+        </div>
+        {captchaProtectionConfigured ? <AuthCaptcha key={captchaAttempt} siteKey={turnstileSiteKey} locale={locale} onTokenChange={setCaptcha} /> : null}
+        {message ? <div className="launcher-registration-message" role={error ? "alert" : "status"} aria-live="polite">{message}</div> : null}
+      </> : <div className="launcher-auth-verification" hidden={!sent && !captchaProtectionConfigured}>
         {sent ? <label><span className="launcher-auth-caption">{copy.code}{caption}</span><input aria-label={copy.code} aria-invalid={Boolean(error)} autoComplete="one-time-code" inputMode="numeric" required value={code}
           onChange={(event) => setCode(event.target.value)} disabled={busy} /></label>
           : captchaProtectionConfigured ? <AuthCaptcha key={captchaAttempt} siteKey={turnstileSiteKey} locale={locale} onTokenChange={setCaptcha} /> : null}
-      </div>
-      <button className="btn btn-primary" type="submit" disabled={busy || !auth.configured || (captchaProtectionConfigured && !sent && !captcha)}>
-        {busy ? copy.busy : mode === "login" ? copy.login : sent ? mode === "recovery" ? copy.reset : copy.verify : copy.send}
+      </div>}
+      <button className="btn btn-primary" type="submit" disabled={busy || !auth.configured || (mode !== "register" && captchaProtectionConfigured && !sent && !captcha)}>
+        {busy ? copy.busy : mode === "register" ? registrationCopy.complete : mode === "login" ? copy.login : sent ? copy.reset : copy.send}
       </button>
       <button className="launcher-auth-secondary" type="button" disabled={busy} onClick={() => {
-        setMode(mode === "login" ? "recovery" : "login"); setSent(false); setCode(""); setPassword(""); setError("");
+        setMode(mode === "login" ? "recovery" : "login"); setSent(false); setCode(""); setPassword(""); setConfirmPassword(""); setError("");
       }}>{mode === "login" ? copy.forgot : copy.back}</button>
     </form>
   );

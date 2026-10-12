@@ -24333,3 +24333,8 @@ body {
 .launcher-account-form > .btn { min-height: 48px; font-size: 16px; }
 .launcher-auth-secondary { font-size: 14px; padding: 0; }
 .launcher-account-form { gap: 10px; }
+.launcher-progress-panel:has(.launcher-account-form[data-mode="register"]) { height: auto; min-height: 0; }
+.launcher-registration-code { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px; }
+.launcher-registration-code .launcher-send-code { height: 48px; min-height: 48px; padding: 0 12px; font-size: 14px; white-space: nowrap; }
+.launcher-registration-message { color: #566174; font-size: 13px; line-height: 1.4; }
+.launcher-registration-message[role="alert"] { color: #b33150; }
