@@ -1,12 +1,24 @@
 # Aircraft and import review — 2026-10-13
 
-This is a source/catalog review, not a new flight test. The pinned Agent Core
+The default catalog now admits only X500 Depth. Candidate selection prioritizes
+the current campus perception/pickup workflow, not a claim about market share.
+X500 Flow was also evaluated through the actual importer and qualification
+preparation: the model-only archive normalizes but fails with
+`ASSET_QUALIFICATION_CONTRACT_MISSING:dronedream.vehicle.v1`; the full five-model
+dependency archive fails with `ASSET_SOURCE_ENTRYPOINT_AMBIGUOUS`. It has not
+passed a flight test and is removed from the default catalog along with the
+other eleven variants. Actual user imports and historical evidence are preserved.
+Evidence: `Q:\DroneDream-Workspace\TestRuns\Aircraft-Selection-20261013\candidate-review.json`.
+
+Depth's bundled package was inspected and its current campus round-trip
+preparation passed using a 500 m candidate search range; the generic 30 m
+range contains no usable campus round trip. This is a preparation recheck,
+not a new physical flight. The pinned Agent Core
 `asset_pair_catalog.py` lists one exact qualified pair: normalized
 `dronedream.my-drone.v1` (X500 Depth) and `dronedream.school-map.v1` (Kumpula),
-qualification `asset-qualification-9e8f76549880788ec9e81ef0`.
-The other twelve source models are reviewed catalog resources requiring
-dependency resolution and aircraft/map qualification. Their cards and model
-previews do not establish mission readiness. Even the qualified built-in pair
+qualification `asset-qualification-54d4f94f3633bccf433f3f31`.
+The other twelve reviewed sources remain historical metadata and are no longer
+offered by the default resource API, cards, or selectors. Even the qualified built-in pair
 does not prove arbitrary natural-language pickup/delivery missions succeed.
 
 | Aircraft | Main distinction | Current campus execution evidence |

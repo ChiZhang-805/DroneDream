@@ -84,7 +84,7 @@ function findDefinition(kind: CatalogAssetKind, id: string, name: string): Catal
 }
 
 export function catalogAssetDefinitions(kind: CatalogAssetKind): readonly CatalogAssetDefinition[] {
-  return definitions(kind);
+  return kind === "vehicle" ? VEHICLES.filter(item => item.resourceId === "px4-x500-depth") : MAPS;
 }
 
 export function catalogAssetKey(kind: CatalogAssetKind, id: string, name: string): string | null {

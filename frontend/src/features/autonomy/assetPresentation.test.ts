@@ -28,11 +28,11 @@ function external(id: string, name: string, kind: "map" | "vehicle" = "map"): Au
 }
 
 describe("asset card presentation", () => {
-  it("ships one verified real default map and thirteen aircraft before the runtime responds", () => {
+  it("ships one verified real default map and one admitted aircraft before the runtime responds", () => {
     expect(catalogAssetDefinitions("map")).toHaveLength(1);
-    expect(catalogAssetDefinitions("vehicle")).toHaveLength(13);
+    expect(catalogAssetDefinitions("vehicle")).toHaveLength(1);
     expect(new Set(catalogAssetDefinitions("map").map((item) => item.key)).size).toBe(1);
-    expect(new Set(catalogAssetDefinitions("vehicle").map((item) => item.key)).size).toBe(13);
+    expect(new Set(catalogAssetDefinitions("vehicle").map((item) => item.key)).size).toBe(1);
   });
 
   it("merges stored School Map identities into the Kumpula Campus card", () => {
@@ -64,6 +64,9 @@ describe("asset card presentation", () => {
   it("preserves genuinely user-imported assets", () => {
     const userMap = external("user-map-lab-west", "West laboratory");
     expect(unrepresentedExternalAssets("map", [], [userMap])).toEqual([userMap]);
+    const userFlow = external("user-flow", "X500 Flow", "vehicle");
+    const defaults = catalogAssetDefinitions("vehicle").map(item => ({ id: item.resourceId, name: item.en }));
+    expect(unrepresentedExternalAssets("vehicle", defaults, [userFlow])).toEqual([userFlow]);
   });
 
   it("ships every reviewed preview referenced by the presentation catalog", () => {

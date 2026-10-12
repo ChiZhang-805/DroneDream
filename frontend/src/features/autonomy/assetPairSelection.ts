@@ -18,18 +18,7 @@ const MAPS: Array<{ resourceId: string; name: LocalizedName }> = [
 
 const VEHICLES: Array<{ resourceId: string; name: LocalizedName; vehicleClass: "multicopter" | "vtol" }> = [
   { resourceId: "px4-x500-depth", name: { "zh-CN": "X500 深度感知", "en-US": "X500 Depth" }, vehicleClass: "multicopter" },
-  { resourceId: "px4-x500-flow", name: { "zh-CN": "X500 光流型", "en-US": "X500 Flow" }, vehicleClass: "multicopter" },
-  { resourceId: "px4-x500-lidar-down", name: { "zh-CN": "X500 下视雷达", "en-US": "X500 Down LiDAR" }, vehicleClass: "multicopter" },
-  { resourceId: "px4-x500-lidar-front", name: { "zh-CN": "X500 前视雷达", "en-US": "X500 Front LiDAR" }, vehicleClass: "multicopter" },
-  { resourceId: "px4-x500-mono-cam", name: { "zh-CN": "X500 前视相机", "en-US": "X500 Front Cam" }, vehicleClass: "multicopter" },
-  { resourceId: "px4-x500-mono-cam-down", name: { "zh-CN": "X500 下视相机", "en-US": "X500 Down Cam" }, vehicleClass: "multicopter" },
-  { resourceId: "px4-x500-lidar-2d", name: { "zh-CN": "X500 二维雷达", "en-US": "X500 2D LiDAR" }, vehicleClass: "multicopter" },
-  { resourceId: "px4-x500-vision", name: { "zh-CN": "X500 视觉里程计", "en-US": "X500 Vision" }, vehicleClass: "multicopter" },
-  { resourceId: "px4-x500-gimbal", name: { "zh-CN": "X500 云台巡检", "en-US": "X500 Gimbal" }, vehicleClass: "multicopter" },
-  { resourceId: "px4-x500", name: { "zh-CN": "X500 标准型", "en-US": "X500 Standard" }, vehicleClass: "multicopter" },
-  { resourceId: "px4-standard-vtol", name: { "zh-CN": "标准垂直起降机", "en-US": "Standard VTOL" }, vehicleClass: "vtol" },
-  { resourceId: "px4-tiltrotor", name: { "zh-CN": "倾转旋翼机", "en-US": "Tiltrotor VTOL" }, vehicleClass: "vtol" },
-  { resourceId: "px4-quadtailsitter", name: { "zh-CN": "四旋翼尾座机", "en-US": "Tailsitter VTOL" }, vehicleClass: "vtol" },
+
 ];
 
 const OUTDOOR_VTOL_MAPS = new Set(["dronedream-school-map"]);
@@ -39,7 +28,7 @@ const QUALIFIED_MAP_ASSET_IDS: Record<string, string> = {
 };
 
 const QUALIFICATION_IDS: Record<string, string> = {
-  "dronedream-school-map": "asset-qualification-582554632b54abc53723f55b",
+  "dronedream-school-map": "asset-qualification-54d4f94f3633bccf433f3f31",
 };
 
 function fallbackPair(map: (typeof MAPS)[number], vehicle: (typeof VEHICLES)[number]): AgentCoreAssetPairCatalogEntry {
@@ -52,7 +41,7 @@ function fallbackPair(map: (typeof MAPS)[number], vehicle: (typeof VEHICLES)[num
     pair_id: `${map.resourceId}::${vehicle.resourceId}`,
     map_resource_id: map.resourceId,
     map_display_name: map.name,
-    environment_class: map.resourceId.includes("campus") || map.resourceId.includes("battle") ? "outdoor" : "indoor",
+    environment_class: "outdoor_campus",
     vehicle_resource_id: vehicle.resourceId,
     vehicle_display_name: vehicle.name,
     vehicle_class: vehicle.vehicleClass,
@@ -72,7 +61,7 @@ const FALLBACK_PAIRS = MAPS.flatMap((map) => VEHICLES.map((vehicle) => fallbackP
 
 export const FALLBACK_ASSET_PAIR_CATALOG: AgentCoreAssetPairCatalog = {
   schema_version: "dronedream.asset-pair-catalog.v1",
-  catalog_revision: "frontend-fallback-2026-10-11.1",
+  catalog_revision: "frontend-fallback-2026-10-13.1",
   map_count: MAPS.length,
   vehicle_count: VEHICLES.length,
   pair_count: FALLBACK_PAIRS.length,
@@ -85,6 +74,7 @@ export const FALLBACK_ASSET_PAIR_CATALOG: AgentCoreAssetPairCatalog = {
 };
 
 function uniqueChoices(pairs: AgentCoreAssetPairCatalogEntry[], kind: "map" | "vehicle"): PairCatalogChoice[] {
+  pairs = pairs.filter(pair => VEHICLES.some(vehicle => vehicle.resourceId === pair.vehicle_resource_id));
   const resourceId = (pair: AgentCoreAssetPairCatalogEntry) => kind === "map" ? pair.map_resource_id : pair.vehicle_resource_id;
   const names = (pair: AgentCoreAssetPairCatalogEntry) => kind === "map" ? pair.map_display_name : pair.vehicle_display_name;
   return [...new Set(pairs.map(resourceId))].map((id) => {
@@ -109,6 +99,6 @@ export function compatibleMapChoices(catalog: AgentCoreAssetPairCatalog, selecte
 }
 
 export function selectedPair(catalog: AgentCoreAssetPairCatalog, mapId: string | null, vehicleId: string | null): AgentCoreAssetPairCatalogEntry | null {
-  if (!mapId || !vehicleId) return null;
+  if (!mapId || !vehicleId || !VEHICLES.some(vehicle => vehicle.resourceId === vehicleId)) return null;
   return catalog.pairs.find((pair) => pair.map_resource_id === mapId && pair.vehicle_resource_id === vehicleId) ?? null;
 }

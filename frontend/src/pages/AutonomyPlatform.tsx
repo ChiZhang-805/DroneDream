@@ -1730,7 +1730,7 @@ export function AutonomyOverview() {
   useEffect(() => {
     let active = true;
     void getAgentCoreAssetPairCatalog().then((catalog) => {
-      if (active && catalog.map_count === 8 && catalog.vehicle_count === 13 && catalog.pair_count === catalog.pairs.length) {
+      if (active && catalog.pair_count === catalog.pairs.length) {
         setAssetPairCatalog(catalog);
       }
     }).catch(() => {
@@ -2517,11 +2517,11 @@ export function AutonomyAircraft() {
   const [defaultResources, setDefaultResources] = useState<AgentCoreVehicleResource[]>([]);
   const [resourceStates, setResourceStates] = useState<Record<string, "idle" | "working" | "qualification" | "ready" | "error">>({});
   const catalogDefinitions = catalogAssetDefinitions("vehicle");
-  const customAircraft = assetLibrary.aircraft.filter((aircraft) => !catalogAssetKey(
+  const customAircraft = assetLibrary.aircraft.filter((aircraft) => !catalogDefinitions.some(definition => definition.key === catalogAssetKey(
     "vehicle",
     aircraft.agentCoreAssetId?.trim() || aircraft.id,
     aircraft.name,
-  ));
+  )));
   const externalAircraft = unrepresentedExternalAssets(
     "vehicle",
     [

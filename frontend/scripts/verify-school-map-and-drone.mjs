@@ -88,8 +88,8 @@ try {
   await mapDialog.getByRole("button", { name: "Close" }).click();
 
   await openProductPage(page, "/console/autonomy/aircraft", ".autonomy-repository-page");
-  if (await page.locator(".autonomy-repository-grid article").count() !== 13) {
-    throw new Error("Aircraft repository must expose all thirteen reviewed PX4 models.");
+  if (await page.locator(".autonomy-repository-grid article").count() !== 1) {
+    throw new Error("Aircraft repository must expose only the admitted X500 Depth model.");
   }
   const myDrone = page.locator(".autonomy-repository-grid article").filter({ hasText: "X500 Depth" });
   if (await myDrone.count() !== 1) throw new Error("Aircraft repository must expose exactly one X500 Depth card.");
@@ -128,6 +128,12 @@ try {
   if (submenuMetrics.scrollbarWidth !== "none") throw new Error("Map submenu scrollbar must remain visually hidden.");
   const contextScreenshot = path.join(outputRoot, `${screenshotPrefix}autonomy-mission-context-1600x1000.png`);
   await page.screenshot({ path: contextScreenshot, fullPage: false });
+  await contextPopover.getByRole("menuitem", { name: "Select aircraft", exact: true }).hover();
+  const aircraftOptions = contextPopover.locator(".autonomy-context-submenu .autonomy-context-choice:not(.is-clear)");
+  await aircraftOptions.filter({ hasText: "X500 Depth" }).waitFor({ state: "visible" });
+  if (await aircraftOptions.count() !== 1 || await aircraftOptions.first().innerText() !== "X500 Depth") {
+    throw new Error("Aircraft picker must only expose the admitted X500 Depth default.");
+  }
 
   process.stdout.write(`${JSON.stringify({
     status: "pass",

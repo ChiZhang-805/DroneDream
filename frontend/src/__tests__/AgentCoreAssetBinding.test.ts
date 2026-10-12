@@ -9,7 +9,7 @@ import { defaultAutonomyWorkspace, normalizeAutonomyWorkspace } from "../feature
 import { loadAutonomyAssetLibrary } from "../features/autonomy/assetLibraryStore";
 import sample from "./fixtures/qualifiedAssetPair.json";
 
-// 来源为当前内置 Kumpula 地图与 My Drone 的认证合同，用于验证前后端绑定协议。
+// 历史内置 Kumpula/My Drone 回执夹具验证绑定协议；当前目录 ID 另有目录一致性测试。
 let fixture: typeof sample;
 beforeEach(() => {
   fixture = structuredClone(sample);
@@ -26,7 +26,7 @@ beforeEach(() => {
 describe("qualified map and vehicle bindings", () => {
   it("resolves a catalog resource selection to its installed package IDs", async () => {
     const original = defaultAutonomyWorkspace();
-    const pair = selectedPair(FALLBACK_ASSET_PAIR_CATALOG, "dronedream-school-map", "px4-x500-depth");
+    const pair = { ...selectedPair(FALLBACK_ASSET_PAIR_CATALOG, "dronedream-school-map", "px4-x500-depth")!, qualification_id: fixture.job.qualification_id };
     expect(pair?.qualified_map_asset_id).toBe("dronedream.school-map.v1");
     const bound = await bindCatalogAssetPair(
       original,
@@ -46,7 +46,7 @@ describe("qualified map and vehicle bindings", () => {
       imported_at: "2099-01-01T00:00:00.000Z",
     });
     const original = defaultAutonomyWorkspace();
-    const pair = selectedPair(FALLBACK_ASSET_PAIR_CATALOG, "dronedream-school-map", "px4-x500-depth")!;
+    const pair = { ...selectedPair(FALLBACK_ASSET_PAIR_CATALOG, "dronedream-school-map", "px4-x500-depth")!, qualification_id: fixture.job.qualification_id };
     const bound = await bindCatalogAssetPair(
       original,
       loadAutonomyAssetLibrary("catalog-exact-receipt", "autonomy", original),
