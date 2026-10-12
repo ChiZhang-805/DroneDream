@@ -2844,6 +2844,7 @@ function AccountMenuPopover({
   onOpenSettings: () => void;
 }) {
   const auth = useAuth();
+  const navigate = useNavigate();
   const { interfaceLocale } = useI18n();
   const accountLocale = interfaceLocale === "en" ? "en" : "zh-CN";
   const copy = ACCOUNT_COPY[accountLocale];
@@ -2884,6 +2885,7 @@ function AccountMenuPopover({
     try {
       await auth.signOut();
       onClose();
+      if (isDesktopRuntime()) navigate("/desktop/setup", { replace: true });
     } catch {
       setSignOutError(true);
       setSignOutPending(false);
