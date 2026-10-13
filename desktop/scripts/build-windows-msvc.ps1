@@ -302,6 +302,23 @@ if ($AllowUnsignedUpdater -and
     }
 }
 $desktopRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$prebuiltConfigPath = Join-Path $CargoTargetDir "tauri-prebuilt-$EditionId.json"
+[ordered]@{
+    build = [ordered]@{
+        beforeBuildCommand = ""
+    }
+} | ConvertTo-Json -Depth 4 | Set-Content `
+    -LiteralPath $prebuiltConfigPath `
+    -Encoding UTF8
+
+# Build the edition frontend before starting Tauri. Running npm directly keeps
+# Node outside Tauri's Windows child-process teardown, which avoids a Node 24
+# libuv assertion after Vite has already produced a valid dist directory.
+Invoke-CheckedNativeCommand `
+    -FilePath "npm.cmd" `
+    -DisplayName "$EditionId frontend build" `
+    -ArgumentList @("--prefix", $desktopRoot, "run", "frontend:build")
+
 $tauriConfigArguments = @("--target", $targetTriple)
 if ($additionalConfig) {
     $tauriConfigArguments += @("--config", $additionalConfig)
@@ -309,6 +326,7 @@ if ($additionalConfig) {
 if ($visualQaConfig) {
     $tauriConfigArguments += @("--config", $visualQaConfig)
 }
+$tauriConfigArguments += @("--config", $prebuiltConfigPath)
 Invoke-CheckedNativeCommand `
     -FilePath "npm.cmd" `
     -DisplayName "Tauri desktop MSVC build" `
