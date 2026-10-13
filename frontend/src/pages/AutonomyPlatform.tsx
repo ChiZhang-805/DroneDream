@@ -15,6 +15,7 @@ import {
   Paperclip,
   Orbit,
   Plus,
+  Power,
   Route,
   ShieldCheck,
   Sparkles,
@@ -23,6 +24,7 @@ import {
   Play,
   Square,
   VideoOff,
+  Video,
   X,
 } from "lucide-react";
 import {
@@ -1486,7 +1488,7 @@ export function AutonomyOverview() {
     const now = new Date().toISOString();
     persist({ ...current, mission: { ...current.mission, updatedAt: now, messages: [...current.mission.messages, {
       id: executionMessageId, role: "assistant", createdAt: now, planContractId: null,
-      content: conversationUsesChinese(current) ? "已收到你的开始指令，执行请求已受理，正在启动仿真并进行起飞前检查。画面就绪后可点击下方“查看运行”。" : "Your start command has been accepted. Simulation startup and preflight checks are underway. View the run below once a camera frame is available.",
+      content: conversationUsesChinese(current) ? "已收到你的开始指令，仿真正在运行。" : "Start command received. Simulation is running.",
     }] } });
   };
   const preparationEvents = useAutonomyProgress(ownerId, edition, workspace.mission.conversationId);
@@ -2014,9 +2016,16 @@ export function AutonomyOverview() {
                   ) : null}
                   <div className="autonomy-conversation-body">
                     {/* Preserve the conversation while presenting internal clarification fields in the user's language. */}
-                    <p role={message.kind === "error" ? "alert" : undefined}>{message.clarification
+                    {message.id === executionMessageId && workspace.mission.conversationId ? (
+                      <InlineSimulationViewer
+                        chinese={conversationUsesChinese(workspace)}
+                        conversationId={workspace.mission.conversationId}
+                        accountId={auth?.account?.id ?? null}
+                        viewState={executionView}
+                      />
+                    ) : <p role={message.kind === "error" ? "alert" : undefined}>{message.clarification
                       ? clarificationBrief([], presentAutonomyClarification(message.clarification, conversationUsesChinese(workspace)), conversationUsesChinese(workspace))
-                      : message.content}</p>
+                      : message.content}</p>}
                     {message.clarification?.questions.map((question) => {
                       const presentedClarification = presentAutonomyClarification({ questions: [question] }, conversationUsesChinese(workspace));
                       const presentedQuestion = presentedClarification?.questions[0] ?? question;
@@ -2076,15 +2085,6 @@ export function AutonomyOverview() {
                       && message.planContractId === workspace.mission.compiledPlan.contractId
                       ? <MissionPlanCard chinese={conversationUsesChinese(workspace)} workspace={workspace} title={listAutonomyConversations(ownerId, edition).find((item) => item.id === workspace.mission.conversationId)?.title ?? (conversationUsesChinese(workspace) ? "任务计划" : "Mission plan")} formatIssue={localizedPlanIssue} controls={edition === "autonomy" && !publicDemoConsole ? <AgentCoreLiveMission key={`${ownerId}:${workspace.mission.conversationId}:${workspace.mission.planningRunId}`} chinese={conversationUsesChinese(workspace)} workspace={workspace} planningModel={workspace.mission.planningModel} accountId={auth?.account?.id ?? null} compact onAccepted={recordExecutionAccepted} onViewState={setExecutionView} /> : undefined} />
                       : null}
-                    {message.id === executionMessageId ? <div className="autonomy-execution-view-link">
-                      {executionView?.conversationId === workspace.mission.conversationId && executionView.sourceId
-                        ? <Link className="btn btn-primary" to={`/autonomy/conversations/${encodeURIComponent(workspace.mission.conversationId!)}/live?source=${encodeURIComponent(executionView.sourceId)}&autoplay=1`}>{conversationUsesChinese(workspace) ? "查看运行" : "View run"}</Link>
-                        : <button className="btn btn-primary" type="button" disabled>{executionView?.conversationId === workspace.mission.conversationId && ["failed", "completed"].includes(executionView.state)
-                          ? (conversationUsesChinese(workspace) ? "运行已结束（无实时画面）" : "Run ended (no live camera)")
-                          : executionView?.conversationId === workspace.mission.conversationId && executionView?.state === "unavailable"
-                            ? (conversationUsesChinese(workspace) ? "运行状态暂不可用" : "Run status unavailable")
-                            : (conversationUsesChinese(workspace) ? "查看运行（等待画面）" : "View run (waiting for camera)")}</button>}
-                    </div> : null}
                   </div>
                   {message.role === "user" ? (
                     <span className="autonomy-conversation-avatar is-user-account" aria-label={auth?.account?.displayName ?? (chinese ? "本地用户" : "Local user")}>
@@ -2868,6 +2868,108 @@ function RepositoryDetailsDialog({
   );
 }
 
+// 将当前 Gazebo 摄像机帧嵌入执行回执；电源键只控制画面拉取，不启动或停止任务。
+function InlineSimulationViewer({
+  chinese,
+  conversationId,
+  accountId,
+  viewState,
+}: {
+  chinese: boolean;
+  conversationId: string;
+  accountId: string | null;
+  viewState: { conversationId: string; state: string; sourceId: string | null } | null;
+}) {
+  const [powered, setPowered] = useState(false);
+  const [threadId, setThreadId] = useState("");
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const binding = useMemo(() => ({
+    edition: "autonomy" as const,
+    accountId,
+    conversationId,
+  }), [accountId, conversationId]);
+  const sourceId = viewState?.conversationId === conversationId ? viewState.sourceId : null;
+
+  useEffect(() => {
+    if (!powered) {
+      setThreadId("");
+      return undefined;
+    }
+    let cancelled = false;
+    const bind = async () => {
+      try {
+        const thread = await getBoundAgentCoreThread(binding);
+        if (!cancelled) setThreadId(thread?.thread_id ?? "");
+      } catch {
+        if (!cancelled) setThreadId("");
+      }
+    };
+    void bind();
+    const timer = window.setInterval(() => void bind(), 1_500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [binding, powered]);
+
+  useEffect(() => {
+    if (!powered || !threadId || !sourceId) return undefined;
+    let cancelled = false;
+    let drawing = false;
+    const draw = async () => {
+      if (drawing) return;
+      drawing = true;
+      try {
+        const frame = await getAgentCoreLiveFrame(threadId, sourceId);
+        const bitmap = await createImageBitmap(frame);
+        const canvas = canvasRef.current;
+        if (canvas && !cancelled) {
+          if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+          }
+          canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
+        }
+        bitmap.close();
+      } catch {
+        // Gazebo may need a moment before the next camera frame is available.
+      } finally {
+        drawing = false;
+      }
+    };
+    void draw();
+    const timer = window.setInterval(() => void draw(), 120);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [powered, sourceId, threadId]);
+
+  const livePath = sourceId
+    ? `/autonomy/conversations/${encodeURIComponent(conversationId)}/live?source=${encodeURIComponent(sourceId)}&autoplay=1`
+    : null;
+  return <section className="autonomy-inline-simulation" data-state={viewState?.state ?? "unbound"}>
+    <header>
+      <span>{chinese ? "已收到你的开始指令，仿真正在运行。" : "Start command received. Simulation is running."}</span>
+      {livePath
+        ? <Link className="autonomy-inline-simulation-live" to={livePath} aria-label={chinese ? "在 Live 中查看" : "Open in Live"}><Video aria-hidden="true" /></Link>
+        : <button className="autonomy-inline-simulation-live" type="button" disabled aria-label={chinese ? "Live 画面尚未就绪" : "Live view is not ready"}><Video aria-hidden="true" /></button>}
+    </header>
+    <div className="autonomy-inline-television">
+      <div className="autonomy-inline-television-screen" data-powered={powered && Boolean(sourceId && threadId)}>
+        {powered && sourceId ? <canvas ref={canvasRef} aria-label={chinese ? "Gazebo 仿真画面" : "Gazebo simulation view"} /> : null}
+        <button
+          className="autonomy-inline-television-power"
+          type="button"
+          aria-pressed={powered}
+          aria-label={powered ? (chinese ? "关闭运行画面" : "Turn off simulation view") : (chinese ? "打开运行画面" : "Turn on simulation view")}
+          onClick={() => setPowered((current) => !current)}
+        ><Power aria-hidden="true" /></button>
+      </div>
+    </div>
+  </section>;
+}
+
 // 功能：
 //   显示当前任务状态与显式启动入口；仅在确认时调用绑定计划的执行接口。
 // 输入：
@@ -3071,9 +3173,8 @@ export function AgentCoreLiveMission({
   if (compact) return <div className="autonomy-mission-start-controls">
     <button className="btn btn-primary" type="button" disabled={accepted || working || runtimeReady !== true || thread?.state !== "awaiting_confirmation" || !workspace.mission.planningRunId} onClick={() => void start()}><Play aria-hidden="true" />{thread?.state === "failed" ? (chinese ? "运行失败" : "Run failed") : thread?.state === "completed" ? (chinese ? "已完成" : "Completed") : working ? (chinese ? "正在启动" : "Starting") : accepted || ["executing", "holding", "landing"].includes(thread?.state ?? "") ? (chinese ? "正在运行" : "Running") : (chinese ? "开始仿真" : "Start simulation")}</button>
     {thread?.state === "failed" ? <p role="alert">{statusMessages.filter((message) => message.kind === "error").at(-1)?.content || (chinese ? "本次运行已结束，未取得成功完成的证据。请保留对话和运行日志以便排查。" : "This run ended without successful completion evidence. Keep the conversation and logs for diagnosis.")}</p> : null}
-    {runtimeReady === null ? <small>{chinese ? "正在检查运行环境" : "Checking runtime"}</small> : null}
-    {runtimeReady === false ? <small>{runtimeIssue === "RUNTIME_PROVISION_REQUIRED" ? (chinese ? "正在自动准备运行环境" : "Preparing the runtime automatically") : localizedAutonomyError(runtimeIssue, chinese, { zh: "运行环境尚未就绪", en: "Runtime not ready" })}</small> : null}
-    {thread && thread.state !== "awaiting_confirmation" ? <small>{stateLabel}</small> : null}
+    {thread?.state === "awaiting_confirmation" && runtimeReady === null ? <small>{chinese ? "正在检查运行环境" : "Checking runtime"}</small> : null}
+    {thread?.state === "awaiting_confirmation" && runtimeReady === false ? <small>{runtimeIssue === "RUNTIME_PROVISION_REQUIRED" ? (chinese ? "正在自动准备运行环境" : "Preparing the runtime automatically") : localizedAutonomyError(runtimeIssue, chinese, { zh: "运行环境尚未就绪", en: "Runtime not ready" })}</small> : null}
     {error ? <p role="alert">{error}</p> : null}
   </div>;
   return (

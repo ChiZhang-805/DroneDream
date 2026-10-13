@@ -1260,6 +1260,146 @@ body:has(.autonomy-platform-page),
   border-bottom-left-radius: 5px;
 }
 
+.autonomy-inline-simulation {
+  width: 100%;
+  padding: 0.72rem 0.9rem 1.75rem;
+  border-radius: 16px 16px 16px 5px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 10px 28px rgba(65, 43, 75, 0.07);
+}
+
+.autonomy-inline-simulation > header {
+  display: grid;
+  min-height: 2.25rem;
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.7rem;
+  color: #342a38;
+  font-size: 0.83rem;
+  line-height: 1.5;
+}
+
+.autonomy-inline-simulation-live {
+  display: grid;
+  width: 2.2rem;
+  height: 2.2rem;
+  place-items: center;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 38%, #e7dce9);
+  border-radius: 10px;
+  color: var(--dd-brand-middle);
+  background: #fff;
+  text-decoration: none;
+}
+
+.autonomy-inline-simulation-live:hover,
+.autonomy-inline-simulation-live:focus-visible {
+  border-color: var(--dd-brand-middle);
+  background: var(--dd-brand-light-surface);
+}
+
+.autonomy-inline-simulation-live:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.autonomy-inline-simulation-live svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.autonomy-inline-television {
+  position: relative;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: clamp(0.42rem, 0.8vw, 0.68rem);
+  border: 1px solid #d8d2dc;
+  border-radius: 14px;
+  background: linear-gradient(145deg, #f9f8fa 0%, #dfdbe3 58%, #f4f2f5 100%);
+  box-shadow: 0 12px 25px rgba(40, 31, 44, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.88);
+}
+
+.autonomy-inline-television::before {
+  position: absolute;
+  z-index: 0;
+  bottom: -0.85rem;
+  left: 50%;
+  width: clamp(5.5rem, 16%, 8.5rem);
+  height: 0.92rem;
+  border: 1px solid #cfc8d2;
+  border-top: 0;
+  background: linear-gradient(180deg, #d6d0da 0%, #aaa1af 100%);
+  content: "";
+  transform: translateX(-50%);
+}
+
+.autonomy-inline-television::after {
+  position: absolute;
+  z-index: 1;
+  bottom: -1.2rem;
+  left: 50%;
+  width: clamp(9rem, 29%, 15rem);
+  height: 0.48rem;
+  border: 1px solid #c9c2cc;
+  border-radius: 999px 999px 7px 7px;
+  background: linear-gradient(180deg, #edeaef 0%, #bbb3c0 100%);
+  box-shadow: 0 3px 7px rgba(42, 33, 46, 0.16);
+  content: "";
+  transform: translateX(-50%);
+}
+
+.autonomy-inline-television-screen {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid #343039;
+  border-radius: 9px;
+  background: radial-gradient(circle at 50% 45%, #27222a 0%, #17151a 68%, #100f12 100%);
+  box-shadow: inset 0 0 1.4rem rgba(0, 0, 0, 0.55);
+}
+
+.autonomy-inline-television-screen canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #111015;
+}
+
+.autonomy-inline-television-power {
+  position: absolute;
+  z-index: 3;
+  right: 0.72rem;
+  bottom: 0.72rem;
+  display: grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 10px;
+  color: #fff;
+  background: rgba(31, 25, 34, 0.7);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.24);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+}
+
+.autonomy-inline-television-power:hover,
+.autonomy-inline-television-power:focus-visible,
+.autonomy-inline-television-power[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 70%, #fff);
+  color: #fff;
+  background: var(--dd-brand-middle);
+}
+
+.autonomy-inline-television-power svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
 .autonomy-clarification {
   width: 100%;
   margin-top: 0.65rem;
@@ -22765,7 +22905,6 @@ body {
 .autonomy-mission-start-controls { display: flex; align-items: flex-end; flex-direction: column; gap: 0.45rem; width: 100%; min-width: 0; max-width: 100%; }
 .autonomy-mission-start-controls > small { color: #6f6275; }
 .autonomy-mission-start-controls > p { margin: 0; color: #b32249; overflow-wrap: anywhere; white-space: normal; min-width: 0; max-width: 100%; width: 100%; text-align: start; }
-.autonomy-execution-view-link { margin-top: 0.6rem; }
 
 .autonomy-live-screen {
   position: relative;

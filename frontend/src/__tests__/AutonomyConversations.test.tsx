@@ -255,7 +255,7 @@ describe("Chatbot to independent conversation", () => {
     expect(screen.queryByRole("button", { name: "正在运行" })).toBeNull();
     if (state === "failed") expect(screen.getByRole("alert")).toHaveTextContent("运行插件加载失败");
   });
-  it("starts from the plan card, records acceptance only after the receipt, and keeps viewing disabled without frames", async () => {
+  it("starts from the plan card, records acceptance only after the receipt, and embeds the inactive simulation viewer", async () => {
     const requested = preparedConversation("requested");
     saveAutonomyConversation("local", "autonomy", requested);
     saveAutonomyWorkspace("local", "autonomy", conversation("other", "检查另一处"));
@@ -264,13 +264,15 @@ describe("Chatbot to independent conversation", () => {
     await waitFor(() => expect(start).toBeEnabled());
     expect(mocks.execute).not.toHaveBeenCalled();
     expect(mocks.boundThread).toHaveBeenCalledWith(expect.objectContaining({ conversationId: "requested" }));
-    expect(screen.queryByText(/执行请求已受理/)).toBeNull();
+    expect(screen.queryByText(/仿真正在运行/)).toBeNull();
     fireEvent.click(start);
     await waitFor(() => expect(mocks.execute).toHaveBeenCalledOnce());
     expect(mocks.execute).toHaveBeenCalledWith(expect.objectContaining({ conversationId: "requested", planRevisionId: "revision-requested" }));
-    expect(await screen.findByText(/执行请求已受理/)).toBeVisible();
-    expect(screen.getByRole("button", { name: "查看运行（等待画面）" })).toBeDisabled();
+    expect(await screen.findByText("已收到你的开始指令，仿真正在运行。")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Live 画面尚未就绪" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "打开运行画面" })).toBeVisible();
     expect(screen.getByRole("button", { name: "正在运行" })).toBeDisabled();
+    expect(screen.queryByText("真实仿真执行中")).toBeNull();
   });
 
   it("shows the confirmation but prevents starting until the runtime is ready", async () => {
@@ -305,7 +307,7 @@ describe("Chatbot to independent conversation", () => {
     await waitFor(() => expect(start).toBeEnabled());
     fireEvent.click(start);
     expect(await screen.findByRole("alert")).toBeVisible();
-    expect(screen.queryByText(/执行请求已受理/)).toBeNull();
+    expect(screen.queryByText(/仿真正在运行/)).toBeNull();
   });
 
   it("enables viewing only after a simulation camera frame decodes, not just a source flag", async () => {
@@ -318,9 +320,9 @@ describe("Chatbot to independent conversation", () => {
     vi.stubGlobal("createImageBitmap", vi.fn(() => new Promise((resolve) => { decode = resolve; })));
     renderWorkspace("/autonomy/conversations/view");
     await waitFor(() => expect(mocks.frame).toHaveBeenCalled());
-    expect(screen.getByRole("button", { name: "查看运行（等待画面）" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Live 画面尚未就绪" })).toBeDisabled();
     await act(async () => decode({ width: 640, height: 480, close: vi.fn() }));
-    expect(await screen.findByRole("link", { name: "查看运行" })).toHaveAttribute("href", "/autonomy/conversations/view/live?source=front&autoplay=1");
+    expect(await screen.findByRole("link", { name: "在 Live 中查看" })).toHaveAttribute("href", "/autonomy/conversations/view/live?source=front&autoplay=1");
     vi.unstubAllGlobals();
   });
 
@@ -330,8 +332,9 @@ describe("Chatbot to independent conversation", () => {
     saveAutonomyConversation("local", "autonomy", workspace);
     mocks.boundThread.mockResolvedValue({ thread_id: "core-ended", state, messages: [] });
     renderWorkspace("/autonomy/conversations/ended");
-    expect(await screen.findByRole("button", { name: "运行已结束（无实时画面）" })).toBeDisabled();
-    expect(screen.queryByRole("button", { name: "查看运行（等待画面）" })).toBeNull();
+    expect(await screen.findByRole("button", { name: "Live 画面尚未就绪" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "打开运行画面" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "运行已结束（无实时画面）" })).toBeNull();
     expect(mocks.frame).not.toHaveBeenCalled();
   });
 
