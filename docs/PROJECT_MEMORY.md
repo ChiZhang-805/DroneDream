@@ -97,6 +97,7 @@
 - 之前两次物理楼飞行虽然落地，但跨版本安装器先误关主程序、后误关 Agent Core，不能算桌面全流程通过。现已修复所有相关 NSIS 调用，按实际安装路径分别识别主程序和后台进程；真实 SIM 更新时 AGENT、Universal 的 6 个主程序/后台进程全部存活，编译后的 NSIS 隔离回归也通过。
 - 并行安装期间曾出现一次 Runtime 自动启动失败，安装完成后界面重试恢复；随后正常关闭、从桌面重新启动并登录，干净启动通过。该瞬态记录保留，不把重试前状态写成成功，也不宣称已确定其根因。
 - 随后同时启动多个版本复现了明确的共享启动锁争用：原生命令返回“Another DroneDream process is installing, starting, or repairing the runtime.”。普通启动现改为在已有操作时限内等待当前所有者释放锁；不重试真实错误，不改变安装与修复操作的忙碌响应。需要对最终安装版做并发启动复验，不能只用各版本单独启动证明共存。
+- build 1942 已实际通过五版本同时启动、登录及 Runtime 就绪检查。随后 build 1945 复现另一处退出隔离问题：AGENT 与 Universal 均就绪时，点击关闭 Universal 会停止 AGENT 共用的 Runtime。退出改为释放本版本会话，使用 Windows 自动释放的共享文件锁识别是否仍有其他桌面会话；只有最后一个会话退出才停止整个 Runtime。各版本仍关闭自己的 Core，不给飞行循环增加检查。最终安装版需复验关闭兄弟版本后的连续可用性。
 - 证据目录：`Q:\DroneDream-Workspace\TestRuns\Natural-Language-E2E-20261013`。核心记录为 `acceptance-progress.json`、`chemistry-full-pass-r7.json`、`physics-full-pass-r12.json`、`physics-reopen-r13-result.json`、`five-edition-installed-r13.json`、`compact-progress-r13.json`。
 - 验证范围仍是当前校园室外资产和上述取送任务。模型参与规划、阶段判断及完成校验；本次运行未启用持续模型短时操控，不能宣称已验收全程连续模型驾驶。聊天任务完成记录保存在会话中，现有 Run History 的实验 Jobs 不等于聊天任务历史。完整建筑入口资料和室内通行仍不能靠本次室外飞行证明。
 
