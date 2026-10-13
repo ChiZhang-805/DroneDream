@@ -49,6 +49,7 @@
 
 ## 界面与账户要求
 
+- 产品首次启动一律使用英文，不根据国家、系统区域或安装器语言自动切换。用户只有在 Settings 中主动选择中文后，界面及该次自然语言任务的对话、计划和运行状态才使用中文；已保存的主动选择继续生效。
 - 五个版本统一浅色；界面简洁，删除冗余说明性文字和无助于操作的状态展示，不把说明藏进默认展开的折叠区算作删除。
 - 优先单屏、平整布局；合理使用模块高度和可用空间。需要滚动时保留滚轮或触控滚动能力，隐藏可见滚动条。按钮按任务关系重排，避免混乱和大块无意义留白。
 - 用户点名移除的可见项包括 Rules & permissions、Model / Proposal only、Harness / Constraints enforced、Hardware / Denied、Hardware authority / Denied、Validated packs 0 of 8。移除展示不等于取消底层权限与安全控制。
@@ -107,6 +108,7 @@
 - 证据目录：`Q:\DroneDream-Workspace\TestRuns\Natural-Language-E2E-20261013`。核心记录为 `acceptance-progress.json`、`five-edition-installed-r16.json`、`before-sibling-exit-r16.json`、`after-sibling-exit-r16.json`、`physics-corrected-full-pass-r16.json`、`physics-corrected-reopen-r16.json`、`compact-progress-r16.json`。
 - 验证范围仍是当前校园室外资产和上述取送任务。模型参与规划、阶段判断及完成校验；本次运行未启用持续模型短时操控，不能宣称已验收全程连续模型驾驶。聊天任务完成记录保存在会话中，现有 Run History 的实验 Jobs 不等于聊天任务历史。完整建筑入口资料和室内通行仍不能靠本次室外飞行证明。
 - 化学仪器用例的第一次安装版运行实际完成取件、返航、降落且执行器退出码为 0，但结束验收把健康发布延迟和数据源年龄重复相加，误报 `live_depth_perception_healthy`。完成边界应分别核对两者是否在 0.5 秒内，并继续拒绝飞行中断流、身份错误、真值替代或定位过期；任务结束后传感器正常停流不能改写已冻结的控制完成证据。
+- 校园默认路径不得把建筑屋顶当作捷径。全局规划以建筑真实旋转后的二维占地为全高度禁穿区域，在约 3 米的低空通道中沿楼间空地绕行；二维任务视角必须展示同一条实际航线。化学楼 `verified-000 → verified-004` 的真实地图规划为约 297 米、4 个简化航点，往返复用反向路线，任何线段均不穿越建筑占地。
 
 ## 记录来源
 

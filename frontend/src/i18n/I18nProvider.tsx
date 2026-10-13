@@ -7,7 +7,6 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import { getInstallerLocale, isDesktopRuntime } from "../desktop/bridge";
 import { BUILD_EDITION } from "../edition";
 import { launcherCopyForEdition } from "./launcherEditionCopy";
 
@@ -3332,35 +3331,6 @@ function initialLocale(): InterfaceLocale {
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [interfaceLocale, setLocaleState] = useState<InterfaceLocale>(initialLocale);
   const locale: Locale = interfaceLocale === "zh-CN" ? "zh-CN" : "en";
-
-  useEffect(() => {
-    if (!isDesktopRuntime()) return;
-    try {
-      const saved = window.localStorage.getItem("drone-dream:locale");
-      if (saved === "en" || saved === "zh-CN") return;
-    } catch {
-      // The installer preference is still safe to use in memory.
-    }
-
-    let active = true;
-    void getInstallerLocale()
-      .then((installerLocale) => {
-        if (!active) return;
-        try {
-          const saved = window.localStorage.getItem("drone-dream:locale");
-          if (saved === "en" || saved === "zh-CN") return;
-        } catch {
-          // Apply the installer language without persistence.
-        }
-        setLocaleState(installerLocale);
-      })
-      .catch(() => {
-        // English is the safe default if the installer record cannot be read.
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const setLocale = useCallback((next: InterfaceLocale) => {
     setLocaleState(next);

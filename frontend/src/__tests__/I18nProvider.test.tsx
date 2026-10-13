@@ -103,14 +103,15 @@ describe("I18nProvider", () => {
     expect(document.documentElement.lang).toBe("en");
   });
 
-  it("uses Chinese only when a fresh desktop install recorded Chinese", async () => {
+  it("defaults to English on a fresh desktop install regardless of installer language", () => {
     window.localStorage.clear();
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "get_installer_locale") return "zh-CN";
+      throw new Error(`Unexpected command: ${command}`);
+    });
     window.__TAURI__ = {
       core: {
-        invoke: vi.fn(async (command: string) => {
-          if (command === "get_installer_locale") return "zh-CN";
-          throw new Error(`Unexpected command: ${command}`);
-        }),
+        invoke,
       },
     };
 
@@ -120,8 +121,9 @@ describe("I18nProvider", () => {
       </I18nProvider>,
     );
 
-    expect(await screen.findByText("新建调优实验")).toBeInTheDocument();
-    expect(document.documentElement.lang).toBe("zh-CN");
+    expect(screen.getByText("New Tuning Experiment")).toBeInTheDocument();
+    expect(document.documentElement.lang).toBe("en");
+    expect(invoke).not.toHaveBeenCalled();
   });
 
   it("keeps the selected in-memory locale when persistence fails", () => {
