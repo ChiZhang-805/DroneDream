@@ -5,6 +5,7 @@ import { AutonomyConversationSidebar } from "../components/AutonomyConversationS
 import { acquireAutonomyPlanning } from "../features/autonomy/conversationActivity";
 import { autonomyConversationPath, listAutonomyConversations, loadAutonomyConversation, newAutonomyConversation, preserveLegacyAutonomyConversation, saveAutonomyConversation } from "../features/autonomy/conversationStore";
 import { defaultAutonomyWorkspace, saveAutonomyWorkspace } from "../features/autonomy/workspaceStore";
+import { I18nProvider } from "../i18n/I18nProvider";
 import { AutonomyLive, AutonomyMaps, AutonomyOverview, AutonomyPlatform } from "../pages/AutonomyPlatform";
 
 const mocks = vi.hoisted(() => ({ plan: vi.fn(), reconcile: vi.fn(), bindCatalog: vi.fn(), boundThread: vi.fn(), runtime: vi.fn(), setup: vi.fn(), execute: vi.fn(), sources: vi.fn(), frame: vi.fn(), owner: null as null | { id: string } }));
@@ -101,7 +102,7 @@ function renderWorkspace(initial = "/autonomy") {
       { path: "live", element: <AutonomyLive /> },
     ] }],
   }], { initialEntries: [initial] });
-  render(<RouterProvider router={router} />);
+  render(<I18nProvider><RouterProvider router={router} /></I18nProvider>);
   return router;
 }
 
@@ -141,6 +142,13 @@ describe("autonomy conversation persistence", () => {
     const corridor = await within(dialog).findByRole("img", { name: "Interactive 3D view of Kumpula Campus" });
     expect(corridor).toBeVisible();
     expect(screen.getByRole("region", { name: "Map repository" })).not.toContainElement(corridor);
+  });
+
+  it("uses the interface language for the built-in map repository name", async () => {
+    localStorage.setItem("drone-dream:locale", "zh-CN");
+    renderWorkspace("/autonomy/maps");
+    expect(await screen.findByRole("button", { name: /赫尔辛基大学昆普拉校区/u })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Kumpula Campus/u })).toBeNull();
   });
 
   it("always opens the Chatbot root as a blank new task even when an older conversation exists", async () => {
@@ -376,6 +384,17 @@ describe("Chatbot to independent conversation", () => {
     expect(mocks.plan.mock.calls[0][0].chinese).toBe(true);
   });
 
+  it("keeps an English conversation in English while the interface is Chinese", async () => {
+    localStorage.setItem("drone-dream:locale", "zh-CN");
+    mocks.plan.mockResolvedValue({ compiledPlan: null, planningBrief: "Which pickup point do you mean?", planningRunId: "english-turn" });
+    renderWorkspace();
+    const composer = await screen.findByRole("textbox");
+    fireEvent.change(composer, { target: { value: "Please collect the lab sample and return." } });
+    fireEvent.submit(composer.closest("form")!);
+    expect(await screen.findByText("Which pickup point do you mean?")).toBeVisible();
+    expect(mocks.plan.mock.calls[0][0].chinese).toBe(false);
+  });
+
   it("creates and lists the first message before asset checks, even if those checks fail", async () => {
     let rejectAssets: (reason: Error) => void = () => {};
     mocks.reconcile.mockReturnValue(new Promise((_, reject) => { rejectAssets = reject; }));
@@ -385,15 +404,15 @@ describe("Chatbot to independent conversation", () => {
     fireEvent.click(screen.getByRole("button", { name: "Build mission contract" }));
     await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/autonomy\/conversations\//u));
     expect(within(screen.getByRole("region", { name: "Conversations" })).getByRole("link", { name: "领取快递" })).toBeVisible();
-    expect(screen.getByLabelText("Generating mission plan")).toBeVisible();
+    expect(screen.getByLabelText("正在生成任务计划")).toBeVisible();
     await act(async () => { rejectAssets(new Error("ASSET_NOT_READY")); });
-    expect(await screen.findByRole("alert")).toHaveTextContent("ASSET_NOT_READY");
+    expect(await screen.findByRole("alert")).toHaveTextContent("请检查规划模型、任务资产与运行环境后重试。（ASSET_NOT_READY）");
     expect(mocks.plan).not.toHaveBeenCalled();
     const id = listAutonomyConversations("local", "autonomy")[0].id;
     const stored = loadAutonomyConversation("local", "autonomy", id);
     expect(stored?.mission.planningError).toBeNull();
     expect(stored?.mission.messages.at(-1)).toEqual(expect.objectContaining({
-      role: "assistant", kind: "error", content: expect.stringContaining("ASSET_NOT_READY"),
+      role: "assistant", kind: "error", content: "请检查规划模型、任务资产与运行环境后重试。（ASSET_NOT_READY）",
     }));
   });
 

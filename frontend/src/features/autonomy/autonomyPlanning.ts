@@ -86,6 +86,14 @@ export interface AutonomyPlanningResult {
   clarification?: AutonomyClarification | null;
 }
 
+function conversationLanguageText(value: string | null | undefined, chinese: boolean): string {
+  const text = value?.trim() ?? "";
+  if (text && taskUsesChinese(text, chinese) === chinese) return text;
+  return chinese
+    ? "任务计划已生成，可以确认后开始仿真。"
+    : "The mission plan is ready. Confirm it to start the simulation.";
+}
+
 export function requiresAgentCoreRuntime(
   _edition: BrandEditionId,
   publicDemo: boolean,
@@ -394,10 +402,10 @@ export async function planAutonomyMission(
       }
       planningRunId = coreSummary.plan_revision_id;
       planningArtifactSha256 = coreSummary.integration_artifact_sha256;
-      planningBrief = coreSummary.notifications?.find((item) => item.kind === "plan")?.content.trim()
-        || (input.chinese
-          ? `计划已生成：${coreSummary.goal}（${coreSummary.model_calls} 次模型调用，${coreSummary.planning_attempts} 轮规划验证）`
-          : `Plan ready: ${coreSummary.goal} (${coreSummary.model_calls} model calls, ${coreSummary.planning_attempts} planning rounds)`);
+      planningBrief = conversationLanguageText(
+        coreSummary.notifications?.find((item) => item.kind === "plan")?.content,
+        input.chinese,
+      );
       const plannerBinding: NonNullable<AutonomyCompileAssetContext["planner_binding"]> = {
         schema_version: "dronedream.autonomy.planner-binding.v1",
         status: "draft",
@@ -541,7 +549,10 @@ export async function planAutonomyMission(
     if (bindingIssues.length) {
       throw new Error(`The model planner artifact failed binding: ${bindingIssues.join(", ")}`);
     }
-    planningBrief = response.assistant_message?.trim() || response.experiment_summary.trim();
+    planningBrief = conversationLanguageText(
+      response.assistant_message?.trim() || response.experiment_summary.trim(),
+      input.chinese,
+    );
     planningRunId = response.orchestration?.run_id ?? planningRunId;
     if (plannerArtifact.status !== "draft") {
       harnessInspection = {

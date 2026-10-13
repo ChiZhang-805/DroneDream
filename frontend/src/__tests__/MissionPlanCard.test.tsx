@@ -47,11 +47,13 @@ describe("compact plan presentation", () => {
     const workspace = fixture();
     const before = JSON.stringify(workspace);
     render(<MemoryRouter><MissionPlanCard chinese={chinese} workspace={workspace} title={chinese ? "去外卖点取餐" : "Meal pickup"} formatIssue={(issue) => issue.message} /></MemoryRouter>);
-    expect(screen.getByText("Generated mission plan")).toBeVisible();
+    expect(screen.getByText(chinese ? "已生成任务计划" : "Generated mission plan")).toBeVisible();
     expect(screen.getByRole("heading", { level: 3 })).toHaveTextContent(chinese ? "去外卖点取餐" : "Meal pickup");
     expect(screen.getByText(chinese ? "无人机" : "Aircraft")).toBeVisible();
     expect(screen.getByText(chinese ? "地图" : "Map")).toBeVisible();
     expect(screen.getByText(chinese ? "路线" : "Route")).toBeVisible();
+    expect(screen.getByText(chinese ? "X500 深度感知" : "X500 Depth")).toBeVisible();
+    expect(screen.getByText(chinese ? "赫尔辛基大学昆普拉校区" : "Kumpula Campus")).toBeVisible();
     const steps = screen.getAllByRole("listitem");
     expect(steps).toHaveLength(8);
     expect(steps[0]).toHaveTextContent(chinese ? "01起飞" : "01Take off");

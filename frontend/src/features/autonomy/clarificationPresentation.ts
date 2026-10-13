@@ -17,6 +17,10 @@ const PLACE_LABELS: Readonly<Record<string, { zh: string; en: string }>> = {
   supplies: { zh: "物资区", en: "Supplies" },
   office: { zh: "办公室", en: "Office" },
   reception: { zh: "接待处", en: "Reception" },
+  chemicum: { zh: "化学楼", en: "Chemicum" },
+  dynamicum: { zh: "气象楼", en: "Dynamicum" },
+  exactum: { zh: "信息科学楼", en: "Exactum" },
+  physicum: { zh: "物理楼", en: "Physicum" },
 };
 
 function machineField(value: string): string | null {
@@ -36,7 +40,7 @@ function localizedOptionLabel(value: string, chinese: boolean): string {
   const compact = value.replace(/\s+/gu, " ").trim();
   const token = englishToken(compact);
   const known = token ? PLACE_LABELS[token] : undefined;
-  if (known) return chinese ? `${known.zh}（${token}）` : `${known.en} (${known.zh})`;
+  if (known) return chinese ? known.zh : known.en;
   if (!chinese || /[\u3400-\u9fff]/u.test(compact) === false) return compact;
   const englishFirst = compact.match(/^([a-z][a-z0-9 _-]{1,48})\s+([\u3400-\u9fff].*)$/iu);
   return englishFirst ? `${englishFirst[2]}（${englishFirst[1].trim()}）` : compact;
@@ -132,6 +136,22 @@ export function clarificationOptionAnswer(
   }
   const prefix = field === "target_entity" ? "Destination" : "My choice";
   return `${prefix}: ${label}${entity && !label.toLocaleLowerCase("en-US").includes(entity.toLocaleLowerCase("en-US")) ? `, map entity ${entity}` : ""}.`;
+}
+
+// 功能：
+//   生成用户在会话里看到的选择文本；地图内部实体 ID 只传给规划器，不显示在聊天记录中。
+export function clarificationOptionDisplayAnswer(
+  question: AutonomyClarificationQuestion,
+  option: AutonomyClarificationOption,
+  chinese: boolean,
+): string {
+  const label = localizedOptionLabel(option.label, chinese);
+  const field = machineField(question.questionId) ?? machineField(question.prompt);
+  if (!field) return label;
+  const prefix = field === "target_entity"
+    ? (chinese ? "目标地点" : "Destination")
+    : (chinese ? "我的选择" : "My choice");
+  return chinese ? `${prefix}：${label}。` : `${prefix}: ${label}.`;
 }
 
 export function clarificationOtherAnswer(

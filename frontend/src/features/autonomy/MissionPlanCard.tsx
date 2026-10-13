@@ -2,6 +2,7 @@ import { Airplay, Layers3, Navigation2, Route, ShieldCheck } from "lucide-react"
 import { Link } from "react-router-dom";
 import type { ReactNode } from "react";
 import type { AutonomyWorkspaceState } from "./workspaceStore";
+import { catalogAssetPresentation } from "./assetPresentation";
 import { missionStepTitle } from "./missionPresentation";
 
 // 功能：
@@ -14,11 +15,23 @@ export function MissionPlanCard({ chinese, workspace, title, formatIssue, contro
   const plan = workspace.mission.compiledPlan;
   if (!plan) return null;
   const blockingIssues = plan.issues.filter((issue) => issue.severity === "error");
+  const aircraftName = catalogAssetPresentation(
+    "vehicle",
+    workspace.aircraft.agentCoreAssetId?.trim() || workspace.aircraft.id,
+    workspace.aircraft.name,
+    chinese,
+  ).name;
+  const mapName = catalogAssetPresentation(
+    "map",
+    workspace.mapPack.agentCoreAssetId?.trim() || workspace.mapPack.id,
+    workspace.mapPack.name,
+    chinese,
+  ).name;
   return <section className="autonomy-inline-plan" aria-live="polite">
-    <header><div><small>Generated mission plan</small><h3>{title}</h3></div></header>
+    <header><div><small>{chinese ? "已生成任务计划" : "Generated mission plan"}</small><h3>{title}</h3></div></header>
     <div className="autonomy-inline-plan-bindings">
-      <span><Navigation2 aria-hidden="true" /><small>{chinese ? "无人机" : "Aircraft"}</small><strong>{workspace.aircraft.name}</strong></span>
-      <span><Layers3 aria-hidden="true" /><small>{chinese ? "地图" : "Map"}</small><strong>{workspace.mapPack.name}</strong></span>
+      <span><Navigation2 aria-hidden="true" /><small>{chinese ? "无人机" : "Aircraft"}</small><strong>{aircraftName}</strong></span>
+      <span><Layers3 aria-hidden="true" /><small>{chinese ? "地图" : "Map"}</small><strong>{mapName}</strong></span>
       <span><Route aria-hidden="true" /><small>{chinese ? "路线" : "Route"}</small><strong>{plan.metrics.routeLengthM.toFixed(1)} {chinese ? "米" : "m"}</strong></span>
     </div>
     {blockingIssues.length > 0 && <ul className="autonomy-inline-plan-issues">{blockingIssues.map((issue) => <li key={issue.code}><ShieldCheck aria-hidden="true" /><span>{formatIssue(issue, chinese)}</span></li>)}</ul>}

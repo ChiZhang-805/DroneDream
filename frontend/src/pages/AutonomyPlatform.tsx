@@ -61,6 +61,7 @@ import { conversationUsesChinese, taskUsesChinese } from "../features/autonomy/m
 import {
   clarificationBrief,
   clarificationOptionAnswer,
+  clarificationOptionDisplayAnswer,
   clarificationOtherAnswer,
   presentAutonomyClarification,
 } from "../features/autonomy/clarificationPresentation";
@@ -1722,7 +1723,7 @@ export function AutonomyOverview() {
           {
             id: "migrated-assistant-message",
             role: "assistant",
-            content: workspace.mission.planningBrief || copy.deterministicPlanReply,
+            content: workspace.mission.planningBrief || (conversationUsesChinese(workspace) ? "任务计划已生成。" : "The mission plan is ready."),
             createdAt: workspace.mission.updatedAt,
             planContractId: workspace.mission.compiledPlan.contractId,
           },
@@ -1803,7 +1804,7 @@ export function AutonomyOverview() {
     };
   }, [contextMenuOpen, contextSubmenu]);
 
-  const submitMission = async (event?: FormEvent, intentOverride?: string) => {
+  const submitMission = async (event?: FormEvent, intentOverride?: string, displayIntentOverride?: string) => {
     event?.preventDefault();
     if (submitting.current) return;
     const intent = (intentOverride ?? composer).trim();
@@ -1824,6 +1825,7 @@ export function AutonomyOverview() {
     submitting.current = true;
     setError(null);
     let submittedWorkspace: AutonomyWorkspaceState | null = null;
+    const responseChinese = taskUsesChinese(intent, conversationUsesChinese(workspace));
     try {
       const submittedAttachments = intentOverride === undefined
         ? pendingAttachments.slice(0, 8)
@@ -1852,7 +1854,7 @@ export function AutonomyOverview() {
       const userMessage: AutonomyConversationMessage = {
         id: `user-${turnId}`,
         role: "user",
-        content: intent,
+        content: (displayIntentOverride ?? intent).trim(),
         createdAt: submittedAt,
         planContractId: null,
         attachments: submittedAttachments.map((file) => ({
@@ -1938,7 +1940,7 @@ export function AutonomyOverview() {
       const assistantMessage: AutonomyConversationMessage = {
         id: `assistant-${turnId}`,
         role: "assistant",
-        content: planning.planningBrief || copy.deterministicPlanReply,
+        content: planning.planningBrief || (replyChinese ? "任务计划已生成。" : "The mission plan is ready."),
         createdAt: updatedAt,
         planContractId: planning.compiledPlan.contractId,
       };
@@ -1959,7 +1961,7 @@ export function AutonomyOverview() {
         },
       }));
     } catch (reason) {
-      const message = localizedAutonomyError(reason, chinese, {
+      const message = localizedAutonomyError(reason, responseChinese, {
         zh: "请检查规划模型、任务资产与运行环境后重试。",
         en: "Check the planning model, mission assets, and runtime before trying again.",
       });
@@ -1968,7 +1970,7 @@ export function AutonomyOverview() {
           const failedAt = new Date().toISOString();
           const recovery = reason instanceof AgentCoreRequestError
             && reason.message === "ROUTE_ALTERNATIVE_NO_FEASIBLE_CANDIDATE"
-            ? (chinese
+            ? (responseChinese
                 ? "当前地图中的命名地点没有找到满足机体净空的可执行三维航迹。系统已保留任务；请检查所选地图与无人机，或更换目标地点后重新规划。"
                 : "No clearance-valid 3D route was found between the named places for this aircraft. The task is preserved; review the selected map and aircraft or choose another destination, then replan.")
             : message;
@@ -1987,7 +1989,7 @@ export function AutonomyOverview() {
             compiledPlan: null,
             updatedAt: failedAt,
           } }));
-        } catch { setError(chinese ? "会话保存失败，请检查本机存储。" : "Conversation could not be saved. Check local storage."); }
+        } catch { setError(responseChinese ? "会话保存失败，请检查本机存储。" : "Conversation could not be saved. Check local storage."); }
       } else setError(message);
     } finally {
       submitting.current = false;
@@ -2039,7 +2041,14 @@ export function AutonomyOverview() {
                             type="button"
                             key={option.optionId}
                             disabled={!active}
-                            onClick={() => void submitMission(undefined, clarificationOptionAnswer(presentedQuestion, option, conversationUsesChinese(workspace)))}
+                            onClick={() => {
+                              const answerChinese = conversationUsesChinese(workspace);
+                              void submitMission(
+                                undefined,
+                                clarificationOptionAnswer(presentedQuestion, option, answerChinese),
+                                clarificationOptionDisplayAnswer(presentedQuestion, option, answerChinese),
+                              );
+                            }}
                           ><span>{option.optionId}</span><b>{option.label}</b></button>)}
                           {presentedQuestion.allowOther ? <button
                             type="button"
@@ -2066,7 +2075,7 @@ export function AutonomyOverview() {
                           <button type="button" disabled={!(clarificationOther[key] ?? "").trim() || !active} onClick={() => {
                             const answer = (clarificationOther[key] ?? "").trim();
                             if (answer) void submitMission(undefined, clarificationOtherAnswer(presentedQuestion, answer, conversationUsesChinese(workspace)));
-                          }}>{chinese ? "提交" : "Submit"}</button>
+                          }}>{conversationUsesChinese(workspace) ? "提交" : "Submit"}</button>
                         </div> : null}
                       </section>;
                     })}
@@ -2100,7 +2109,7 @@ export function AutonomyOverview() {
                 </article>
               ))}
               {generating ? (
-                <article className="autonomy-conversation-message is-assistant is-generating" aria-label={chinese ? "正在生成任务计划" : "Generating mission plan"}>
+                <article className="autonomy-conversation-message is-assistant is-generating" aria-label={conversationUsesChinese(workspace) ? "正在生成任务计划" : "Generating mission plan"}>
                   <span className="autonomy-conversation-avatar" aria-hidden="true"><Sparkles /></span>
                   <PreparationProgress events={preparationEvents} chinese={conversationUsesChinese(workspace)} />
                 </article>
@@ -2279,12 +2288,12 @@ export function AutonomyOverview() {
             {selectedAircraftChoice || conversationActive ? <span className="assistant-asset-chip is-aircraft">
               <QuadcopterIcon aria-hidden="true" />{selectedAircraftChoice
                 ? localizedChoiceName(selectedAircraftChoice)
-                : workspace.aircraft.name}
+                : catalogAssetPresentation("vehicle", workspace.aircraft.agentCoreAssetId?.trim() || workspace.aircraft.id, workspace.aircraft.name, chinese).name}
             </span> : null}
             {selectedMapChoice || conversationActive ? <span className="assistant-asset-chip is-map">
               <Layers3 aria-hidden="true" />{selectedMapChoice
                 ? localizedChoiceName(selectedMapChoice)
-                : workspace.mapPack.name}
+                : catalogAssetPresentation("map", workspace.mapPack.agentCoreAssetId?.trim() || workspace.mapPack.id, workspace.mapPack.name, chinese).name}
             </span> : null}
             <span className="assistant-composer-spacer" />
             <AssistantModelPicker
