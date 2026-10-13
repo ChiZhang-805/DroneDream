@@ -1360,7 +1360,10 @@ body:has(.autonomy-platform-page),
   box-shadow: inset 0 0 1.4rem rgba(0, 0, 0, 0.55);
 }
 
-.autonomy-inline-television-screen canvas {
+.autonomy-inline-television-screen canvas,
+.autonomy-inline-television-screen video,
+.autonomy-inline-television-screen > img,
+.autonomy-inline-mission-map {
   display: block;
   width: 100%;
   height: 100%;
@@ -1368,10 +1371,100 @@ body:has(.autonomy-platform-page),
   background: #111015;
 }
 
+.autonomy-inline-mission-map {
+  background: #dce7de;
+}
+
+.autonomy-inline-map-shade {
+  fill: rgba(18, 24, 24, 0.08);
+}
+
+.autonomy-inline-map-fallback {
+  fill: #dbe7df;
+}
+
+.autonomy-inline-map-route-shadow,
+.autonomy-inline-map-route {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.autonomy-inline-map-route-shadow {
+  stroke: rgba(255, 255, 255, 0.94);
+  stroke-width: 6px;
+  stroke-dasharray: 3 5;
+  animation: autonomy-inline-route-flow 1.15s linear infinite;
+}
+
+.autonomy-inline-map-route {
+  stroke: var(--dd-brand-middle);
+  stroke-width: 3px;
+  stroke-dasharray: 3 5;
+  animation: autonomy-inline-route-flow 1.15s linear infinite;
+}
+
+@keyframes autonomy-inline-route-flow {
+  to { stroke-dashoffset: -16; }
+}
+
+.autonomy-inline-map-marker circle,
+.autonomy-inline-map-aircraft circle,
+.autonomy-inline-map-aircraft path {
+  vector-effect: non-scaling-stroke;
+}
+
+.autonomy-inline-map-marker-halo {
+  fill: rgba(255, 255, 255, 0.84);
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 2px;
+}
+
+.autonomy-inline-map-marker-core {
+  fill: #fff;
+  stroke-width: 3px;
+}
+
+.autonomy-inline-map-marker.is-start .autonomy-inline-map-marker-core { stroke: #14a768; }
+.autonomy-inline-map-marker.is-via .autonomy-inline-map-marker-core { stroke: #f4a316; }
+.autonomy-inline-map-marker.is-destination .autonomy-inline-map-marker-core { stroke: var(--dd-brand-middle); }
+
+.autonomy-inline-map-marker text,
+.autonomy-inline-map-aircraft text {
+  fill: #fff;
+  font-weight: 750;
+  paint-order: stroke;
+  stroke: rgba(26, 22, 28, 0.88);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  user-select: none;
+}
+
+.autonomy-inline-map-aircraft circle {
+  fill: rgba(255, 255, 255, 0.24);
+  stroke: rgba(255, 255, 255, 0.9);
+  stroke-width: 2px;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: autonomy-inline-aircraft-pulse 1.8s ease-out infinite;
+}
+
+.autonomy-inline-map-aircraft path {
+  fill: #fff;
+  stroke: var(--dd-brand-middle);
+  stroke-width: 2px;
+}
+
+@keyframes autonomy-inline-aircraft-pulse {
+  0% { opacity: 0.95; transform: scale(0.68); }
+  75%, 100% { opacity: 0; transform: scale(1.28); }
+}
+
 .autonomy-inline-television-power {
   position: absolute;
   z-index: 3;
-  right: 0.72rem;
+  left: 0.72rem;
   bottom: 0.72rem;
   display: grid;
   width: 2.35rem;
@@ -1398,6 +1491,52 @@ body:has(.autonomy-platform-page),
 .autonomy-inline-television-power svg {
   width: 1.15rem;
   height: 1.15rem;
+}
+
+.autonomy-inline-view-switch {
+  position: absolute;
+  z-index: 4;
+  right: 0.72rem;
+  bottom: 0.72rem;
+  display: flex;
+  gap: 0.2rem;
+  padding: 0.24rem;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 12px;
+  background: rgba(26, 22, 29, 0.72);
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(9px);
+}
+
+.autonomy-inline-view-switch button {
+  display: grid;
+  min-width: 3.55rem;
+  min-height: 2.65rem;
+  place-items: center;
+  gap: 0.05rem;
+  padding: 0.28rem 0.46rem;
+  border: 0;
+  border-radius: 9px;
+  color: rgba(255, 255, 255, 0.82);
+  background: transparent;
+  cursor: pointer;
+}
+
+.autonomy-inline-view-switch button:hover,
+.autonomy-inline-view-switch button:focus-visible,
+.autonomy-inline-view-switch button[data-active="true"] {
+  color: var(--dd-brand-middle);
+  background: #fff;
+}
+
+.autonomy-inline-view-switch svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.autonomy-inline-view-switch span {
+  font-size: 0.68rem;
+  font-weight: 750;
 }
 
 .autonomy-clarification {

@@ -56,6 +56,7 @@ import { AssetInterpretButton } from "../features/autonomy/AssetInterpretButton"
 import { AUTONOMY_CONVERSATIONS_CHANGED, autonomyConversationId, autonomyConversationPath, loadAutonomyConversation, newAutonomyConversation, preserveLegacyAutonomyConversation, saveAutonomyConversation, isAutonomyConversationDeleted, listAutonomyConversations, updateAutonomyConversation } from "../features/autonomy/conversationStore";
 import { acquireAutonomyPlanning, useAutonomyPlanning, useAutonomyProgress, publishAutonomyProgress } from "../features/autonomy/conversationActivity";
 import { PreparationProgress } from "../features/autonomy/PreparationProgress";
+import { InlineMissionMap } from "../features/autonomy/InlineMissionMap";
 import { MissionPlanCard } from "../features/autonomy/MissionPlanCard";
 import { conversationUsesChinese, taskUsesChinese } from "../features/autonomy/missionPresentation";
 import {
@@ -2024,6 +2025,7 @@ export function AutonomyOverview() {
                         conversationId={workspace.mission.conversationId}
                         accountId={auth?.account?.id ?? null}
                         viewState={executionView}
+                        workspace={workspace}
                       />
                     ) : <p role={message.kind === "error" ? "alert" : undefined}>{message.clarification
                       ? clarificationBrief([], presentAutonomyClarification(message.clarification, conversationUsesChinese(workspace)), conversationUsesChinese(workspace))
@@ -2883,14 +2885,19 @@ function InlineSimulationViewer({
   conversationId,
   accountId,
   viewState,
+  workspace,
 }: {
   chinese: boolean;
   conversationId: string;
   accountId: string | null;
   viewState: { conversationId: string; state: string; sourceId: string | null } | null;
+  workspace: AutonomyWorkspaceState;
 }) {
   const [powered, setPowered] = useState(false);
   const [threadId, setThreadId] = useState("");
+  const [sources, setSources] = useState<AgentCoreLiveSource[]>([]);
+  const [activeView, setActiveView] = useState("map");
+  const [telemetry, setTelemetry] = useState<AgentCoreLiveTelemetry | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const binding = useMemo(() => ({
     edition: "autonomy" as const,
@@ -2900,10 +2907,6 @@ function InlineSimulationViewer({
   const sourceId = viewState?.conversationId === conversationId ? viewState.sourceId : null;
 
   useEffect(() => {
-    if (!powered) {
-      setThreadId("");
-      return undefined;
-    }
     let cancelled = false;
     const bind = async () => {
       try {
@@ -2919,17 +2922,67 @@ function InlineSimulationViewer({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [binding, powered]);
+  }, [binding]);
 
   useEffect(() => {
-    if (!powered || !threadId || !sourceId) return undefined;
+    if (!threadId) {
+      setSources([]);
+      return undefined;
+    }
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const catalog = await getAgentCoreLiveSources(threadId);
+        if (!cancelled) setSources(catalog.sources.filter((source) => source.ready && (source.kind === "simulation" || source.kind === "camera")));
+      } catch {
+        if (!cancelled) setSources([]);
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 1_200);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [threadId]);
+
+  useEffect(() => {
+    if (activeView !== "map" && !sources.some((source) => source.id === activeView)) setActiveView("map");
+  }, [activeView, sources]);
+
+  useEffect(() => {
+    if (!powered || !threadId) {
+      setTelemetry(null);
+      return undefined;
+    }
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const value = await getAgentCoreLiveTelemetry(threadId);
+        if (!cancelled) setTelemetry(value);
+      } catch {
+        if (!cancelled) setTelemetry(null);
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 400);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [powered, threadId]);
+
+  const selectedSource = sources.find((source) => source.id === activeView) ?? null;
+
+  useEffect(() => {
+    if (!powered || !threadId || selectedSource?.transport !== "agent-core-frame") return undefined;
     let cancelled = false;
     let drawing = false;
     const draw = async () => {
       if (drawing) return;
       drawing = true;
       try {
-        const frame = await getAgentCoreLiveFrame(threadId, sourceId);
+        const frame = await getAgentCoreLiveFrame(threadId, selectedSource.id);
         const bitmap = await createImageBitmap(frame);
         const canvas = canvasRef.current;
         if (canvas && !cancelled) {
@@ -2952,7 +3005,17 @@ function InlineSimulationViewer({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [powered, sourceId, threadId]);
+  }, [powered, selectedSource?.id, selectedSource?.transport, threadId]);
+
+  const sourceLabel = (source: AgentCoreLiveSource) => {
+    const identity = `${source.id} ${source.label}`.toLowerCase();
+    if (identity.includes("gimbal")) return chinese ? "云台" : "Gimbal";
+    if (identity.includes("front") || identity.includes("forward")) return chinese ? "前视" : "Forward";
+    return source.kind === "simulation" ? (chinese ? "仿真" : "Simulation") : source.label;
+  };
+  const previewUrl = workspace.mapPack.agentCoreAssetId === "dronedream.school-map.v1" || workspace.mapPack.id === "map-school"
+    ? "/asset-previews/maps/kumpula-campus-orthophoto.jpg"
+    : null;
 
   const livePath = sourceId
     ? `/autonomy/conversations/${encodeURIComponent(conversationId)}/live?source=${encodeURIComponent(sourceId)}&autoplay=1`
@@ -2965,8 +3028,17 @@ function InlineSimulationViewer({
         : <button className="autonomy-inline-simulation-live" type="button" disabled aria-label={chinese ? "Live 画面尚未就绪" : "Live view is not ready"}><Video aria-hidden="true" /></button>}
     </header>
     <div className="autonomy-inline-television">
-      <div className="autonomy-inline-television-screen" data-powered={powered && Boolean(sourceId && threadId)}>
-        {powered && sourceId ? <canvas ref={canvasRef} aria-label={chinese ? "Gazebo 仿真画面" : "Gazebo simulation view"} /> : null}
+      <div className="autonomy-inline-television-screen" data-powered={powered}>
+        {powered && activeView === "map" ? <InlineMissionMap
+          chinese={chinese}
+          routePositions={workspace.mission.compiledPlan?.routePositionsM ?? []}
+          telemetry={telemetry}
+          bounds={workspace.mapPack.boundsM}
+          previewUrl={previewUrl}
+        /> : null}
+        {powered && selectedSource?.transport === "agent-core-frame" ? <canvas ref={canvasRef} aria-label={sourceLabel(selectedSource)} /> : null}
+        {powered && selectedSource?.transport === "video" && selectedSource.url ? <video src={selectedSource.url} autoPlay playsInline muted /> : null}
+        {powered && selectedSource?.transport === "image" && selectedSource.url ? <img src={selectedSource.url} alt={sourceLabel(selectedSource)} /> : null}
         <button
           className="autonomy-inline-television-power"
           type="button"
@@ -2974,6 +3046,10 @@ function InlineSimulationViewer({
           aria-label={powered ? (chinese ? "关闭运行画面" : "Turn off simulation view") : (chinese ? "打开运行画面" : "Turn on simulation view")}
           onClick={() => setPowered((current) => !current)}
         ><Power aria-hidden="true" /></button>
+        <div className="autonomy-inline-view-switch" role="group" aria-label={chinese ? "切换运行视角" : "Switch live view"}>
+          <button type="button" data-active={activeView === "map"} aria-pressed={activeView === "map"} onClick={() => setActiveView("map")}><MapPin aria-hidden="true" /><span>{chinese ? "二维" : "2D"}</span></button>
+          {sources.map((source) => <button key={source.id} type="button" data-active={activeView === source.id} aria-pressed={activeView === source.id} onClick={() => setActiveView(source.id)}><Camera aria-hidden="true" /><span>{sourceLabel(source)}</span></button>)}
+        </div>
       </div>
     </div>
   </section>;

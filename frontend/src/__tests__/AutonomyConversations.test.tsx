@@ -8,7 +8,7 @@ import { defaultAutonomyWorkspace, saveAutonomyWorkspace } from "../features/aut
 import { I18nProvider } from "../i18n/I18nProvider";
 import { AutonomyLive, AutonomyMaps, AutonomyOverview, AutonomyPlatform } from "../pages/AutonomyPlatform";
 
-const mocks = vi.hoisted(() => ({ plan: vi.fn(), reconcile: vi.fn(), bindCatalog: vi.fn(), boundThread: vi.fn(), runtime: vi.fn(), setup: vi.fn(), execute: vi.fn(), sources: vi.fn(), frame: vi.fn(), owner: null as null | { id: string } }));
+const mocks = vi.hoisted(() => ({ plan: vi.fn(), reconcile: vi.fn(), bindCatalog: vi.fn(), boundThread: vi.fn(), runtime: vi.fn(), setup: vi.fn(), execute: vi.fn(), sources: vi.fn(), frame: vi.fn(), telemetry: vi.fn(), owner: null as null | { id: string } }));
 vi.mock("../features/auth/AuthContext", () => ({ useOptionalAuth: () => ({ account: mocks.owner }) }));
 vi.mock("../theme/EditionThemeProvider", () => ({ useEditionTheme: () => ({ id: "autonomy" }) }));
 vi.mock("../features/settings/ModelAccessContext", () => ({ useModelAccess: () => ({
@@ -32,6 +32,7 @@ vi.mock("../features/autonomy/agentCore", async (original) => ({
   startAgentCoreRuntimeSetup: mocks.setup,
   getAgentCoreLiveSources: mocks.sources,
   getAgentCoreLiveFrame: mocks.frame,
+  getAgentCoreLiveTelemetry: mocks.telemetry,
   listAgentCoreMapResources: async () => ({ resources: [] }),
   getPreferredAirspace: async (request: { map_asset_id: string; map_content_sha256: string; vehicle_asset_id: string; vehicle_content_sha256: string }) => ({
     schema_version: "dronedream.preferred-airspace.v1",
@@ -80,7 +81,7 @@ function conversation(id: string, content = "拿下快递") {
 function preparedConversation(id: string) {
   const workspace = conversation(id, "帮我取餐");
   workspace.mission.planningRunId = `revision-${id}`;
-  workspace.mission.compiledPlan = { source: "agent-core", contractId: "contract-test", readiness: "simulation_ready", canExecute: true, feasible: true, steps: [], issues: [], metrics: { routeLengthM: 10 }, taskGraph: { nodes: [{ task_id: "takeoff", label: "起飞", status: "pending", executor: "px4_bridge", risk: "high", fallback: "land", inserted_by: "compiler", depends_on: [] }] } } as unknown as NonNullable<typeof workspace.mission.compiledPlan>;
+  workspace.mission.compiledPlan = { source: "agent-core", contractId: "contract-test", readiness: "simulation_ready", canExecute: true, feasible: true, routePositionsM: [{ x: -41, y: -83, z: 1.5 }, { x: 0, y: -5, z: 35 }, { x: 43, y: 55, z: 2 }, { x: 0, y: -5, z: 35 }, { x: -41, y: -83, z: 1.5 }], routeMapSha256: "a".repeat(64), routeVehicleSha256: "b".repeat(64), steps: [], issues: [], metrics: { routeLengthM: 10 }, taskGraph: { nodes: [{ task_id: "takeoff", label: "起飞", status: "pending", executor: "px4_bridge", risk: "high", fallback: "land", inserted_by: "compiler", depends_on: [] }] } } as unknown as NonNullable<typeof workspace.mission.compiledPlan>;
   workspace.mission.messages.push({ id: "plan-message", role: "assistant", content: "计划已生成", createdAt: new Date().toISOString(), planContractId: "contract-test" });
   return workspace;
 }
@@ -118,6 +119,7 @@ beforeEach(() => {
   mocks.execute.mockReset().mockResolvedValue({ state: "executing", execution_id: "execution-test" });
   mocks.sources.mockReset().mockResolvedValue({ sources: [] });
   mocks.frame.mockReset().mockResolvedValue(new Blob(["test frame"], { type: "image/png" }));
+  mocks.telemetry.mockReset().mockResolvedValue({ schema_version: "dronedream.live-telemetry.v1", mode: "simulation", coordinate_frame: "gazebo-enu", east_m: 2, north_m: 3, up_m: 4, updated_at_unix_ms: 1 });
 });
 
 describe("autonomy conversation persistence", () => {
@@ -331,6 +333,33 @@ describe("Chatbot to independent conversation", () => {
     expect(screen.getByRole("button", { name: "Live 画面尚未就绪" })).toBeDisabled();
     await act(async () => decode({ width: 640, height: 480, close: vi.fn() }));
     expect(await screen.findByRole("link", { name: "在 Live 中查看" })).toHaveAttribute("href", "/autonomy/conversations/view/live?source=front&autoplay=1");
+    vi.unstubAllGlobals();
+  });
+
+  it("opens on the projected 2D route and switches to the available simulation camera", async () => {
+    const workspace = preparedConversation("map-view");
+    workspace.mission.messages.push({ id: "execution-accepted:revision-map-view", role: "assistant", content: "执行请求已受理", createdAt: new Date().toISOString(), planContractId: null });
+    saveAutonomyConversation("local", "autonomy", workspace);
+    mocks.boundThread.mockResolvedValue({ thread_id: "core-map-view", state: "executing", messages: [] });
+    mocks.sources.mockResolvedValue({ sources: [{ id: "gazebo-render", kind: "simulation", label: "Gazebo", ready: true, mode: "simulation", transport: "agent-core-frame" }] });
+    vi.stubGlobal("createImageBitmap", vi.fn(async () => ({ width: 640, height: 360, close: vi.fn() })));
+    const canvasContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue({ drawImage: vi.fn() } as unknown as CanvasRenderingContext2D);
+
+    renderWorkspace("/autonomy/conversations/map-view");
+    fireEvent.click(await screen.findByRole("button", { name: "打开运行画面" }));
+    const map = await screen.findByRole("img", { name: "二维任务地图" });
+    expect(map).toBeVisible();
+    expect(within(map).getByText("起点 / 返航")).toBeVisible();
+    expect(await within(map).findByText("无人机")).toBeVisible();
+    await waitFor(() => expect(mocks.telemetry).toHaveBeenCalledWith("core-map-view"));
+
+    const simulation = await screen.findByRole("button", { name: "仿真" });
+    mocks.frame.mockClear();
+    fireEvent.click(simulation);
+    await waitFor(() => expect(mocks.frame).toHaveBeenCalledWith("core-map-view", "gazebo-render"));
+    expect(document.querySelector('canvas[aria-label="仿真"]')).toBeVisible();
+    canvasContext.mockRestore();
     vi.unstubAllGlobals();
   });
 
