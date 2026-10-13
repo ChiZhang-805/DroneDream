@@ -90,15 +90,16 @@
 
 ## 2026-10-13 实测与安装结果
 
-- 五个桌面版本均已安装 `1.0.0 / build 1941`，应用代码提交 `ff94ce0c71429f050db036527e4a4a77a048532b`，Agent Core 提交 `2581bd62066bad7bdbcd9937320cd882a1165956`。安装回执核对可执行文件归一化哈希、安装包哈希和各自桌面快捷方式。后续仅修改本文不代表安装包代码发生变化。
-- 使用后台真实普通测试账户，通过实际安装版 WebView2 的登录表单和按钮验收。桌面入口使用 Windows Shell 打开真实快捷方式；当前工具不具备原生鼠标双击能力，不能声称做过物理鼠标操作。测试密码仅以 Windows DPAPI 加密凭据保存。
+- 五个桌面版本均已安装 `1.0.0 / build 1946`，应用代码提交 `7e5654d9072f342cc91d6ad5ba45cceacffbf93f`，Agent Core 提交 `e931a936e06cc0fea3e0918203a3a74af3227d9d`。安装回执核对可执行文件归一化哈希、安装包哈希、当前校园资产配对和各自桌面快捷方式。后续仅修改本文不代表安装包代码发生变化。
+- 使用后台真实普通测试账户，通过实际安装版登录表单和按钮验收；测试密码仅以 Windows DPAPI 加密凭据保存。桌面窗口的启动、输入、提交、关闭和重开同时使用 Windows 原生 Computer Use 与安装版 WebView2 驱动留证。
 - “帮我拿个东西”先自然追问；补充“去化学系拿一份样品回来”后，build 1934 的完整校园室外取件、载荷确认、返航和落地通过，关闭重开后完成状态保留。
 - “帮我去物理楼拿份资料，拿到后带回来。”在 build 1940 实际完成约 370.3 米往返，仿真 1606.88 秒，4 项载荷动作、2 次模型阶段判断、25 项必要任务检查通过；桌面状态为完成，退出码 0，清理正常。更新到 build 1941 后重开，完成记录仍在。1941 相对 1940 只精简准备进度展示：真实阶段标题和旋转状态，移除内部说明段落与逐字显示定时器；执行逻辑未改。
 - 之前两次物理楼飞行虽然落地，但跨版本安装器先误关主程序、后误关 Agent Core，不能算桌面全流程通过。现已修复所有相关 NSIS 调用，按实际安装路径分别识别主程序和后台进程；真实 SIM 更新时 AGENT、Universal 的 6 个主程序/后台进程全部存活，编译后的 NSIS 隔离回归也通过。
 - 并行安装期间曾出现一次 Runtime 自动启动失败，安装完成后界面重试恢复；随后正常关闭、从桌面重新启动并登录，干净启动通过。该瞬态记录保留，不把重试前状态写成成功，也不宣称已确定其根因。
-- 随后同时启动多个版本复现了明确的共享启动锁争用：原生命令返回“Another DroneDream process is installing, starting, or repairing the runtime.”。普通启动现改为在已有操作时限内等待当前所有者释放锁；不重试真实错误，不改变安装与修复操作的忙碌响应。需要对最终安装版做并发启动复验，不能只用各版本单独启动证明共存。
-- build 1942 已实际通过五版本同时启动、登录及 Runtime 就绪检查。随后 build 1945 复现另一处退出隔离问题：AGENT 与 Universal 均就绪时，点击关闭 Universal 会停止 AGENT 共用的 Runtime。退出改为释放本版本会话，使用 Windows 自动释放的共享文件锁识别是否仍有其他桌面会话；只有最后一个会话退出才停止整个 Runtime。各版本仍关闭自己的 Core，不给飞行循环增加检查。最终安装版需复验关闭兄弟版本后的连续可用性。
-- 证据目录：`Q:\DroneDream-Workspace\TestRuns\Natural-Language-E2E-20261013`。核心记录为 `acceptance-progress.json`、`chemistry-full-pass-r7.json`、`physics-full-pass-r12.json`、`physics-reopen-r13-result.json`、`five-edition-installed-r13.json`、`compact-progress-r13.json`。
+- 随后同时启动多个版本复现了明确的共享启动锁争用：原生命令返回“Another DroneDream process is installing, starting, or repairing the runtime.”。普通启动现改为在已有操作时限内等待当前所有者释放锁；不重试真实错误，不改变安装与修复操作的忙碌响应。build 1946 已实际完成五版本并发启动、登录和各自 Runtime 状态检查，5 个端口均为 Running/Ready，6 个组件全部就绪。
+- build 1942 已实际通过五版本同时启动、登录及 Runtime 就绪检查。随后 build 1945 复现另一处退出隔离问题：AGENT 与 Universal 均就绪时，点击关闭 Universal 会停止 AGENT 共用的 Runtime。退出改为释放本版本会话，使用 Windows 自动释放的共享文件锁识别是否仍有其他桌面会话；只有最后一个会话退出才停止整个 Runtime。build 1946 安装版已复验：AGENT 与 Universal 同时 Ready，关闭 Universal 后 AGENT 的 Runtime 仍为 Running/Ready，6 个组件全部就绪、无诊断项。
+- build 1946 又从桌面安装版输入“帮我去物理楼拿份资料，拿到后带回来。”，模型解析到新 Physicum 室外交接点 `(22.218, 68.372, 2)`，规划 394.109 米往返。Gazebo/PX4 实际执行 1666.69 秒，4 项载荷动作、2 次模型阶段判断和 25 项必要任务检查全部通过；无中止，PX4 遥测确认 `ON_GROUND`，桌面宿主退出码 0、清理正常。关闭并重开 AGENT、重新登录后，会话仍显示“已完成 / 运行已完成 / 运行已结束”。
+- 证据目录：`Q:\DroneDream-Workspace\TestRuns\Natural-Language-E2E-20261013`。核心记录为 `acceptance-progress.json`、`five-edition-installed-r16.json`、`before-sibling-exit-r16.json`、`after-sibling-exit-r16.json`、`physics-corrected-full-pass-r16.json`、`physics-corrected-reopen-r16.json`、`compact-progress-r16.json`。
 - 验证范围仍是当前校园室外资产和上述取送任务。模型参与规划、阶段判断及完成校验；本次运行未启用持续模型短时操控，不能宣称已验收全程连续模型驾驶。聊天任务完成记录保存在会话中，现有 Run History 的实验 Jobs 不等于聊天任务历史。完整建筑入口资料和室内通行仍不能靠本次室外飞行证明。
 
 ## 记录来源
