@@ -130,7 +130,7 @@ DELIVERY_ZONES: dict[str, dict[str, Any]] = {
     "exactum-delivery-zone": {
         "name": "Exactum outdoor delivery zone",
         "name_zh": "信息科学楼室外交付点",
-        "position": (-75.122, -43.307, 2.0),
+        "position": (-93.680, -24.274, 2.0),
         "aliases": (
             "Exactum delivery zone",
             "Exactum handoff point",
@@ -142,7 +142,7 @@ DELIVERY_ZONES: dict[str, dict[str, Any]] = {
     "physicum-delivery-zone": {
         "name": "Physicum outdoor delivery zone",
         "name_zh": "物理楼室外交付点",
-        "position": (54.629, 35.294, 2.0),
+        "position": (22.218, 68.372, 2.0),
         "aliases": (
             "Physicum delivery zone",
             "Physicum handoff point",
@@ -654,16 +654,11 @@ def _navigation_graph() -> dict[str, Any]:
                 "semantic": "outdoor" if phase == "transit" else phase,
             }
         )
-    for entity_id, zone in DELIVERY_ZONES.items():
-        x, y, z = zone["position"]
-        nodes.append(
-            {
-                "node_id": entity_id,
-                "label": zone["name"],
-                "position_m": {"x": x, "y": y, "z": z},
-                "semantic": "delivery",
-            }
-        )
+    # Generated offline by Agent Core's build_map_handoffs.py from the public
+    # building/door index and current collision geometry. Do not reconstruct
+    # only the four named buildings and discard the rest of the campus.
+    handoffs = json.loads((Path(__file__).parent / "data/kumpula-handoff-bindings.json").read_bytes())
+    nodes.extend(handoffs["nodes"])
     edges = []
     for index in range(len(ROUTE[:5]) - 1):
         start = nodes[index]["position_m"]
@@ -689,27 +684,7 @@ def _navigation_graph() -> dict[str, Any]:
         "asset_id": ASSET_ID,
         "name": DISPLAY_NAME,
         "coordinate_frame": "map_enu",
-        "named_entities": {
-            "campus-south-launch-pad": nodes[0]["node_id"],
-            "office-launch-pad": nodes[0]["node_id"],
-            "chemicum-south-handoff-point": nodes[4]["node_id"],
-            "launch-pad": nodes[0]["node_id"],
-            "takeout-pickup": nodes[4]["node_id"],
-            "takeout-pickup-pad": nodes[4]["node_id"],
-            **{alias: nodes[0]["node_id"] for alias in LAUNCH_ALIASES},
-            **{alias: nodes[4]["node_id"] for alias in PICKUP_ALIASES},
-            **{
-                alias: entity_id
-                for entity_id, zone in DELIVERY_ZONES.items()
-                for alias in (entity_id, zone["name"], zone["name_zh"], *zone["aliases"])
-            },
-            **{
-                alias: f"{name.casefold()}-delivery-zone"
-                for name, (name_zh, aliases) in BUILDING_NAMES.items()
-                if f"{name.casefold()}-delivery-zone" in DELIVERY_ZONES
-                for alias in (name, name.casefold(), name_zh, *aliases)
-            },
-        },
+        "named_entities": handoffs["named_entities"],
         "nodes": nodes,
         "edges": edges,
     }
