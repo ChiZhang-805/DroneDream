@@ -106,6 +106,7 @@
 - build 1946 又从桌面安装版输入“帮我去物理楼拿份资料，拿到后带回来。”，模型解析到新 Physicum 室外交接点 `(22.218, 68.372, 2)`，规划 394.109 米往返。Gazebo/PX4 实际执行 1666.69 秒，4 项载荷动作、2 次模型阶段判断和 25 项必要任务检查全部通过；无中止，PX4 遥测确认 `ON_GROUND`，桌面宿主退出码 0、清理正常。关闭并重开 AGENT、重新登录后，会话仍显示“已完成 / 运行已完成 / 运行已结束”。
 - 证据目录：`Q:\DroneDream-Workspace\TestRuns\Natural-Language-E2E-20261013`。核心记录为 `acceptance-progress.json`、`five-edition-installed-r16.json`、`before-sibling-exit-r16.json`、`after-sibling-exit-r16.json`、`physics-corrected-full-pass-r16.json`、`physics-corrected-reopen-r16.json`、`compact-progress-r16.json`。
 - 验证范围仍是当前校园室外资产和上述取送任务。模型参与规划、阶段判断及完成校验；本次运行未启用持续模型短时操控，不能宣称已验收全程连续模型驾驶。聊天任务完成记录保存在会话中，现有 Run History 的实验 Jobs 不等于聊天任务历史。完整建筑入口资料和室内通行仍不能靠本次室外飞行证明。
+- 化学仪器用例的第一次安装版运行实际完成取件、返航、降落且执行器退出码为 0，但结束验收把健康发布延迟和数据源年龄重复相加，误报 `live_depth_perception_healthy`。完成边界应分别核对两者是否在 0.5 秒内，并继续拒绝飞行中断流、身份错误、真值替代或定位过期；任务结束后传感器正常停流不能改写已冻结的控制完成证据。
 
 ## 记录来源
 
