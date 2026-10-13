@@ -1,7 +1,7 @@
 {
   "schema_version": "dronedream.public-core-source-reference.v1",
   "repository": "ChiZhang-805/DroneDream-Agent-Core",
-  "commit": "e931a936e06cc0fea3e0918203a3a74af3227d9d",
+  "commit": "13860fc64c3b6bd2ea597eaa47aaac28979baf35",
   "license": "MIT",
   "default_asset_license_grant": "runtime/default-assets-licenses.json",
   "purpose": "Reviewed public source reference for signing preparation; not a qualified binary build or update-channel promotion.",
