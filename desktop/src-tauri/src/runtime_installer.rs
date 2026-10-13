@@ -1013,13 +1013,19 @@ async fn run_runtime_maintenance(
     keepalive: crate::runtime_keepalive::RuntimeKeepalive,
     repair: bool,
 ) -> Result<crate::runtime::RuntimeStatusReport, String> {
-    let operation = installer.prepare_operation()?;
     tauri::async_runtime::spawn_blocking(move || {
-        let _operation = operation;
         let executor = ProductionWslExecutor;
         let maintenance_deadline = Instant::now()
             .checked_add(RUNTIME_MAINTENANCE_TIMEOUT)
             .ok_or_else(|| "Runtime maintenance deadline overflowed.".to_string())?;
+        // Editions share one Runtime. Queue ordinary starts behind the current
+        // owner instead of reporting lock contention as a startup failure.
+        // Install/repair requests retain their explicit busy behavior.
+        let _operation = if repair {
+            installer.prepare_operation()?
+        } else {
+            wait_for_runtime_start_operation(maintenance_deadline, || installer.prepare_operation())?
+        };
         let health_deadline = maintenance_deadline
             .checked_sub(crate::runtime::RUNTIME_STATUS_PROBE_BUDGET)
             .ok_or_else(|| "Runtime maintenance probe budget is invalid.".to_string())?;
@@ -1161,6 +1167,28 @@ async fn run_runtime_maintenance(
     })
     .await
     .map_err(|error| format!("Runtime maintenance task failed: {error}"))?
+}
+
+fn wait_for_runtime_start_operation<T>(
+    deadline: Instant,
+    mut acquire: impl FnMut() -> Result<T, String>,
+) -> Result<T, String> {
+    loop {
+        match acquire() {
+            Ok(operation) => return Ok(operation),
+            Err(error)
+                if (error.starts_with("Another DroneDream process")
+                    || error.starts_with("Another runtime installation"))
+                    && Instant::now() < deadline =>
+            {
+                std::thread::sleep(
+                    Duration::from_millis(100)
+                        .min(deadline.saturating_duration_since(Instant::now())),
+                );
+            }
+            Err(error) => return Err(error),
+        }
+    }
 }
 
 fn require_runtime_maintenance_budget(
@@ -7122,6 +7150,43 @@ mod tests {
         release_sender.send(()).unwrap();
         holder.join().unwrap();
         assert!(CrossProcessOperationLease::acquire_at(&path).is_ok());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn runtime_start_waits_for_another_editions_operation() {
+        let sandbox = Sandbox::new();
+        let path = sandbox.0.join("runtime-operation.lock");
+        let owner = CrossProcessOperationLease::acquire_at(&path).unwrap();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let contender = std::thread::spawn(move || {
+            let operation = wait_for_runtime_start_operation(
+                Instant::now() + Duration::from_secs(2),
+                || CrossProcessOperationLease::acquire_at(&path),
+            );
+            sender.send(operation.is_ok()).unwrap();
+        });
+        assert!(receiver.recv_timeout(Duration::from_millis(150)).is_err());
+        drop(owner);
+        assert!(receiver.recv_timeout(Duration::from_secs(2)).unwrap());
+        contender.join().unwrap();
+    }
+
+    #[test]
+    fn runtime_start_does_not_retry_real_errors_or_expired_contention() {
+        let mut attempts = 0;
+        let error = wait_for_runtime_start_operation::<()>(
+            Instant::now() + Duration::from_secs(2),
+            || {
+                attempts += 1;
+                Err("Runtime ownership is invalid".to_string())
+            },
+        ).unwrap_err();
+        assert_eq!(attempts, 1);
+        assert_eq!(error, "Runtime ownership is invalid");
+        let busy = "Another DroneDream process is installing, starting, or repairing the runtime.";
+        let error = wait_for_runtime_start_operation::<()>(Instant::now(), || Err(busy.to_string())).unwrap_err();
+        assert_eq!(error, busy);
     }
 
     #[cfg(target_os = "windows")]
