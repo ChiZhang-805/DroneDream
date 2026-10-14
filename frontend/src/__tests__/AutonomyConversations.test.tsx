@@ -299,6 +299,7 @@ describe("Chatbot to independent conversation", () => {
   it("automatically provisions a signed runtime update and enables simulation when ready", async () => {
     const workspace = preparedConversation("auto-provision");
     saveAutonomyConversation("local", "autonomy", workspace);
+    mocks.setup.mockImplementation(() => new Promise(() => {}));
     mocks.runtime
       .mockResolvedValueOnce({ runtime_available: true, resources_ready: true, provisioned: false, issue: "RUNTIME_PROVISION_REQUIRED" })
       .mockResolvedValue({ runtime_available: true, resources_ready: true, provisioned: true, issue: null });

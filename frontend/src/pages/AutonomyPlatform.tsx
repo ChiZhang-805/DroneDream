@@ -3128,12 +3128,9 @@ export function AgentCoreLiveMission({
           && !runtimeSetupLock.current
         ) {
           runtimeSetupLock.current = true;
-          try {
-            await startAgentCoreRuntimeSetup();
-          } catch (reason) {
+          void startAgentCoreRuntimeSetup().catch(() => {
             runtimeSetupLock.current = false;
-            throw reason;
-          }
+          });
         }
         if (compact && callbacks.current.onViewState) {
           let sourceId: string | null = null;
