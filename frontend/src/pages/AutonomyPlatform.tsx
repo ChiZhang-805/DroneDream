@@ -2955,13 +2955,14 @@ function InlineSimulationViewer({
       setTelemetry(null);
       return undefined;
     }
+    setTelemetry(null);
     let cancelled = false;
     const refresh = async () => {
       try {
         const value = await getAgentCoreLiveTelemetry(threadId);
         if (!cancelled) setTelemetry(value);
       } catch {
-        if (!cancelled) setTelemetry(null);
+        // Keep the latest measured altitude visible while a completed run is being archived.
       }
     };
     void refresh();

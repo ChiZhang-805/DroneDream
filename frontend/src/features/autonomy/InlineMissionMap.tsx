@@ -68,16 +68,12 @@ export function InlineMissionMap({
   const aircraft = telemetry && typeof telemetry.east_m === "number" && typeof telemetry.north_m === "number"
     ? { x: telemetry.east_m, y: -telemetry.north_m }
     : null;
-  const fontSize = Math.max(6.5, Math.min(9, view.width * 0.045));
-  const markerRadius = Math.max(2.8, Math.min(4.6, view.width * 0.02));
+  const fontSize = Math.max(2.4, Math.min(4.2, view.width * 0.022));
+  const markerRadius = Math.max(1.35, Math.min(2.4, view.width * 0.014));
   const points = route.map((point) => `${point.x},${point.y}`).join(" ");
   const altitude = telemetry && typeof telemetry.up_m === "number" && Number.isFinite(telemetry.up_m)
     ? `${chinese ? "高度" : "Altitude"} ${telemetry.up_m.toFixed(1)} m`
     : `${chinese ? "高度" : "Altitude"} —`;
-  const altitudeX = view.x + view.width * 0.018;
-  const altitudeY = view.y + view.height * 0.032;
-  const altitudeWidth = fontSize * (chinese ? 8.8 : 10.8);
-  const altitudeHeight = fontSize * 2.35;
 
   const marker = (point: PlanarPoint | null, kind: "start" | "via" | "destination", label: string) => point ? (
     <g className={`autonomy-inline-map-marker is-${kind}`} transform={`translate(${point.x} ${point.y})`}>
@@ -87,13 +83,12 @@ export function InlineMissionMap({
     </g>
   ) : null;
 
-  return (
+  return <div className="autonomy-inline-mission-map-wrap" role="img" aria-label={chinese ? "二维任务地图" : "2D mission map"}>
     <svg
       className="autonomy-inline-mission-map"
       viewBox={`${view.x} ${view.y} ${view.width} ${view.height}`}
       preserveAspectRatio="xMidYMid slice"
-      role="img"
-      aria-label={chinese ? "二维任务地图" : "2D mission map"}
+      aria-hidden="true"
     >
       {previewUrl ? (
         <image
@@ -122,10 +117,7 @@ export function InlineMissionMap({
           <text x={markerRadius * 1.75} y={markerRadius * 0.5} style={{ fontSize }}>{chinese ? "无人机" : "Aircraft"}</text>
         </g>
       ) : null}
-      <g className="autonomy-inline-map-altitude" transform={`translate(${altitudeX} ${altitudeY})`}>
-        <rect width={altitudeWidth} height={altitudeHeight} rx={fontSize * 0.62} />
-        <text x={fontSize * 0.8} y={fontSize * 1.55} style={{ fontSize }}>{altitude}</text>
-      </g>
     </svg>
-  );
+    <span className="autonomy-inline-map-altitude">{altitude}</span>
+  </div>;
 }

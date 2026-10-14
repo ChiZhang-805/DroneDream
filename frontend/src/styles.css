@@ -1363,7 +1363,7 @@ body:has(.autonomy-platform-page),
 .autonomy-inline-television-screen canvas,
 .autonomy-inline-television-screen video,
 .autonomy-inline-television-screen > img,
-.autonomy-inline-mission-map {
+.autonomy-inline-mission-map-wrap {
   display: block;
   width: 100%;
   height: 100%;
@@ -1371,7 +1371,15 @@ body:has(.autonomy-platform-page),
   background: #111015;
 }
 
+.autonomy-inline-mission-map-wrap {
+  position: relative;
+  overflow: hidden;
+}
+
 .autonomy-inline-mission-map {
+  display: block;
+  width: 100%;
+  height: 100%;
   background: #dce7de;
 }
 
@@ -1415,18 +1423,21 @@ body:has(.autonomy-platform-page),
   vector-effect: non-scaling-stroke;
 }
 
-.autonomy-inline-map-altitude rect {
-  fill: rgba(24, 20, 27, 0.78);
-  stroke: rgba(255, 255, 255, 0.72);
-  stroke-width: 1px;
-  vector-effect: non-scaling-stroke;
-}
-
-.autonomy-inline-map-altitude text {
-  fill: #fff;
+.autonomy-inline-map-altitude {
+  position: absolute;
+  top: 0.72rem;
+  left: 0.72rem;
+  z-index: 2;
+  padding: 0.42rem 0.68rem;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 9px;
+  color: #fff;
+  background: rgba(24, 20, 27, 0.78);
+  font-size: clamp(0.8rem, 1.3vw, 1rem);
   font-weight: 780;
   letter-spacing: 0.01em;
   user-select: none;
+  backdrop-filter: blur(6px);
 }
 
 .autonomy-inline-map-marker-halo {
