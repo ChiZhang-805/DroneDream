@@ -1415,6 +1415,20 @@ body:has(.autonomy-platform-page),
   vector-effect: non-scaling-stroke;
 }
 
+.autonomy-inline-map-altitude rect {
+  fill: rgba(24, 20, 27, 0.78);
+  stroke: rgba(255, 255, 255, 0.72);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+
+.autonomy-inline-map-altitude text {
+  fill: #fff;
+  font-weight: 780;
+  letter-spacing: 0.01em;
+  user-select: none;
+}
+
 .autonomy-inline-map-marker-halo {
   fill: rgba(255, 255, 255, 0.84);
   stroke: rgba(255, 255, 255, 0.92);

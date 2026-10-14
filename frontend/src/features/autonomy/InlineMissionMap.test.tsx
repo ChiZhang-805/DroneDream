@@ -32,6 +32,7 @@ describe("InlineMissionMap", () => {
     expect(screen.getByText("中转点")).toBeVisible();
     expect(screen.getByText("终点")).toBeVisible();
     expect(screen.getByText("无人机")).toBeVisible();
+    expect(screen.getByText("高度 18.0 m")).toBeVisible();
     expect(container.querySelector(".autonomy-inline-map-route")?.getAttribute("points"))
       .toBe("-41,83 0,5 43,-55 0,5 -41,83");
     expect(container.querySelector(".autonomy-inline-map-aircraft")?.getAttribute("transform"))
@@ -51,5 +52,6 @@ describe("InlineMissionMap", () => {
     expect(screen.getByText("Destination")).toBeVisible();
     expect(screen.queryByText("Waypoint")).toBeNull();
     expect(screen.queryByText("Aircraft")).toBeNull();
+    expect(screen.getByText("Altitude —")).toBeVisible();
   });
 });
