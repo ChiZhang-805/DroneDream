@@ -2905,6 +2905,8 @@ function InlineSimulationViewer({
     conversationId,
   }), [accountId, conversationId]);
   const sourceId = viewState?.conversationId === conversationId ? viewState.sourceId : null;
+  const executionComplete = viewState?.conversationId === conversationId
+    && ["complete", "completed", "verified"].includes(viewState.state.toLowerCase());
 
   useEffect(() => {
     let cancelled = false;
@@ -3023,7 +3025,9 @@ function InlineSimulationViewer({
     : null;
   return <section className="autonomy-inline-simulation" data-state={viewState?.state ?? "unbound"}>
     <header>
-      <span>{chinese ? "已收到你的开始指令，仿真正在运行。" : "Start command received. Simulation is running."}</span>
+      <span>{executionComplete
+        ? (chinese ? "任务已完成。" : "Mission completed.")
+        : (chinese ? "已收到你的开始指令，仿真正在运行。" : "Start command received. Simulation is running.")}</span>
       {livePath
         ? <Link className="autonomy-inline-simulation-live" to={livePath} aria-label={chinese ? "在 Live 中查看" : "Open in Live"}><Video aria-hidden="true" /></Link>
         : <button className="autonomy-inline-simulation-live" type="button" disabled aria-label={chinese ? "Live 画面尚未就绪" : "Live view is not ready"}><Video aria-hidden="true" /></button>}
