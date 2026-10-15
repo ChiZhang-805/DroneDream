@@ -27,6 +27,7 @@ import {
   browserAuthConfiguration,
   cloudAuthConfigured,
   googleAuthEnabled,
+  hasActiveDesktopAuthSession,
   supabaseClient,
 } from "./supabaseClient";
 
@@ -110,9 +111,11 @@ function shouldDeferDesktopAuth(): boolean {
   // Tauri uses a hash router and initially mounts the provider at `/` before
   // the index redirect selects `#/desktop/setup`.  Looking only at pathname
   // therefore lets account hydration race the environment-only launcher.
-  // Desktop auth is explicit on each launch, through the inline account form
-  // or the optional browser flow. Never hydrate a previous SDK session here.
-  return isDesktopRuntime();
+  // Desktop auth is explicit on each process launch, through the inline account
+  // form or the optional browser flow. A reload within that same WebView keeps
+  // sessionStorage, so hydrate that already-active process session instead of
+  // incorrectly falling back to Local user.
+  return isDesktopRuntime() && !hasActiveDesktopAuthSession();
 }
 
 function avatarStorageKey(userId: string): string {

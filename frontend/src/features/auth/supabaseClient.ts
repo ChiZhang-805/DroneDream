@@ -135,6 +135,28 @@ const clientHost = globalThis as typeof globalThis & DroneDreamGlobal;
 const selectedAuthStorage = authStorage();
 migrateLegacyBrowserAuthStorage(selectedAuthStorage);
 
+/**
+ * Detect only an active session already owned by this WebView process.
+ * Desktop storage is session-scoped, so this restores a page reload without
+ * turning a later application launch into an implicit sign-in.
+ */
+export function hasActiveDesktopAuthSession(): boolean {
+  if (!desktopRuntime || !desktopStorageKey || !selectedAuthStorage) return false;
+  try {
+    const raw = selectedAuthStorage.getItem(desktopStorageKey);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return typeof parsed.access_token === "string"
+      && parsed.access_token.length > 0
+      && typeof parsed.refresh_token === "string"
+      && parsed.refresh_token.length > 0
+      && typeof parsed.user === "object"
+      && parsed.user !== null;
+  } catch {
+    return false;
+  }
+}
+
 export const supabaseClient: SupabaseClient | null = cloudAuthConfigured
   ? (clientHost.__droneDreamSupabaseClient ??=
       createClient(supabaseUrl ?? "", supabasePublishableKey ?? "", {

@@ -43,6 +43,7 @@ const authMock = vi.hoisted(() => {
   return {
     state,
     getSession,
+    hasActiveDesktopAuthSession: vi.fn(() => false),
     onAuthStateChange,
     signInWithPassword: vi.fn(async () => ({ data: {}, error: null })),
     signInWithOtp: vi.fn(async () => ({ data: {}, error: null })),
@@ -84,6 +85,7 @@ vi.mock("../features/auth/supabaseClient", () => ({
   }),
   cloudAuthConfigured: true,
   googleAuthEnabled: false,
+  hasActiveDesktopAuthSession: authMock.hasActiveDesktopAuthSession,
   supabaseClient: {
     auth: {
       getSession: authMock.getSession,
@@ -307,6 +309,8 @@ describe("AuthContext account profile", () => {
     authMock.removeAvatar.mockClear();
     authMock.storageFrom.mockClear();
     authMock.getSession.mockClear();
+    authMock.hasActiveDesktopAuthSession.mockReset();
+    authMock.hasActiveDesktopAuthSession.mockReturnValue(false);
     authMock.onAuthStateChange.mockClear();
     authMock.signInWithPassword.mockClear();
     authMock.signInWithOtp.mockClear();
@@ -338,6 +342,21 @@ describe("AuthContext account profile", () => {
       .toHaveTextContent("DroneDream Pilot");
     expect(screen.getByLabelText("email")).toHaveTextContent("pilot@example.com");
     expect(authMock.getSession).not.toHaveBeenCalled();
+  });
+
+  it("restores the current desktop process session after a WebView reload", async () => {
+    window.__TAURI__ = { core: { invoke: vi.fn() } };
+    authMock.hasActiveDesktopAuthSession.mockReturnValue(true);
+
+    render(
+      <AuthProvider>
+        <AccountProbe />
+      </AuthProvider>,
+    );
+
+    expect(await screen.findByLabelText("email"))
+      .toHaveTextContent("pilot.name@example.com");
+    expect(authMock.getSession).toHaveBeenCalledOnce();
   });
 
   it("defaults to the email prefix and lets the user save a custom username", async () => {
