@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
@@ -12,12 +13,12 @@ import type { WebsiteRelease } from "./release";
 
 import heroCampus from "./assets/home/hero-campus.webp";
 import bridgeInspection from "./assets/home/card-bridge-inspection.webp";
-import buildingInspection from "./assets/home/card-building-inspection.webp";
 import campusDelivery from "./assets/home/card-campus-delivery.webp";
 import coastalWindTest from "./assets/home/card-coastal-wind-test.webp";
 import constructionProgress from "./assets/home/card-construction-progress.webp";
 import emergencySearch from "./assets/home/card-emergency-search.webp";
 import forestMapping from "./assets/home/card-forest-mapping.webp";
+import hospitalLogistics from "./assets/home/card-hospital-logistics.webp";
 import industrialMapping from "./assets/home/card-industrial-mapping.webp";
 import nightPatrol from "./assets/home/card-night-patrol.webp";
 import solarSurvey from "./assets/home/card-solar-survey.webp";
@@ -25,11 +26,11 @@ import warehouseInventory from "./assets/home/card-warehouse-inventory.webp";
 
 const missionCards = [
   { title: "Campus delivery", image: campusDelivery },
-  { title: "Building inspection", image: buildingInspection },
+  { title: "Hospital logistics", image: hospitalLogistics },
   { title: "Solar array survey", image: solarSurvey },
-  { title: "Industrial mapping", image: industrialMapping },
+  { title: "Industrial plant mapping", image: industrialMapping },
   { title: "Bridge inspection", image: bridgeInspection },
-  { title: "Forest mapping", image: forestMapping },
+  { title: "Forest conservation", image: forestMapping },
   { title: "Warehouse inventory", image: warehouseInventory },
   { title: "Construction progress", image: constructionProgress },
   { title: "Emergency search", image: emergencySearch },
@@ -37,7 +38,7 @@ const missionCards = [
   { title: "Coastal wind test", image: coastalWindTest },
 ] as const;
 
-const initialCard = 0;
+const initialCard = 5;
 
 function DownloadIcon() {
   return (
@@ -69,6 +70,10 @@ export function HomeExperience({ release }: { release: WebsiteRelease }) {
     }
     setActiveCard(index);
   }, []);
+
+  useLayoutEffect(() => {
+    centerCard(initialCard, "auto");
+  }, [centerCard]);
 
   useEffect(() => () => {
     if (scrollFrameRef.current !== null) window.cancelAnimationFrame(scrollFrameRef.current);
@@ -131,10 +136,10 @@ export function HomeExperience({ release }: { release: WebsiteRelease }) {
     >
       <div className="site-home-backdrop" aria-hidden="true" />
       <div className="site-home-copy">
-        <h1 id="home-experience-title">Describe the mission. Watch it fly.</h1>
+        <h1 id="home-experience-title">Say the mission. Watch it fly.</h1>
         <p>
-          Natural-language missions, planned and simulated in one workspace.<br />{" "}
-          From map-aware routing to live flight views.
+          Turn everyday language into complete drone missions.<br />{" "}
+          Plan the route, choose the aircraft, and follow every move.
         </p>
         <a
           className="site-home-download"
@@ -162,9 +167,9 @@ export function HomeExperience({ release }: { release: WebsiteRelease }) {
             {missionCards.map((card, index) => {
               const distance = Math.abs(index - activeCard);
               const style = {
-                "--card-scale": Math.max(0.935, 1.025 - (distance * 0.018)),
-                "--card-lift": `${Math.max(0, 12 - (distance * 3))}px`,
-                "--card-brightness": Math.max(0.56, 1 - (distance * 0.1)),
+                "--card-scale": Math.max(0.9, 1.06 - (distance * 0.06)),
+                "--card-lift": `${Math.max(0, 18 - (distance * 7))}px`,
+                "--card-brightness": Math.max(0.46, 1 - (distance * 0.18)),
                 zIndex: missionCards.length - distance,
               } as CSSProperties;
               return (
@@ -184,11 +189,6 @@ export function HomeExperience({ release }: { release: WebsiteRelease }) {
               );
             })}
           </div>
-        </div>
-        <div className="site-home-card-position" aria-live="polite">
-          <span>{String(activeCard + 1).padStart(2, "0")}</span>
-          <i aria-hidden="true" />
-          <span>{String(missionCards.length).padStart(2, "0")}</span>
         </div>
       </div>
     </section>

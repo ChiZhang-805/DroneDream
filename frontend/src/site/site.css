@@ -4132,14 +4132,14 @@ body:has(.dd-site[data-page="home"]) {
 .dd-site[data-page="home"] .site-header,
 .dd-site[data-page="home"] .site-header.is-scrolled {
   height: clamp(68px, 8.5vh, 88px);
-  padding-inline: clamp(24px, 4vw, 76px);
+  padding-inline: clamp(14px, 1.6vw, 30px);
   border: 0;
   background: linear-gradient(180deg, rgba(3, 8, 18, 0.7), rgba(3, 8, 18, 0));
   box-shadow: none;
 }
 
 .dd-site[data-page="home"] .site-brand .brand-lockup {
-  height: clamp(42px, 5.6vh, 58px);
+  height: clamp(38px, 4.8vh, 50px);
 }
 
 .dd-site[data-page="home"] .site-nav {
@@ -4293,7 +4293,7 @@ body:has(.dd-site[data-page="home"]) {
 .site-account-menu > button:last-child { color: #ffb5ca; }
 
 .site-home-experience {
-  --home-card-width: clamp(126px, min(13.2vw, 24vh), 236px);
+  --home-card-width: clamp(210px, min(22vw, 30vh), 330px);
   position: relative;
   height: 100vh;
   height: 100dvh;
@@ -4343,7 +4343,7 @@ body:has(.dd-site[data-page="home"]) {
 .site-home-copy {
   position: absolute;
   z-index: 3;
-  top: clamp(118px, 23.5vh, 240px);
+  top: clamp(145px, 26vh, 280px);
   left: 50%;
   display: grid;
   width: min(1540px, calc(100% - 64px));
@@ -4416,7 +4416,7 @@ body:has(.dd-site[data-page="home"]) {
   right: 0;
   bottom: 0;
   left: 0;
-  height: clamp(190px, 34vh, 390px);
+  height: clamp(260px, 43vh, 430px);
   overflow: hidden;
 }
 
@@ -4435,8 +4435,9 @@ body:has(.dd-site[data-page="home"]) {
 .site-home-card-viewport {
   position: relative;
   z-index: 1;
-  width: 100%;
-  height: calc(100% - 30px);
+  width: min(100%, 1680px);
+  height: 100%;
+  margin-inline: auto;
   overflow-x: auto;
   overflow-y: hidden;
   outline: none;
@@ -4458,7 +4459,7 @@ body:has(.dd-site[data-page="home"]) {
   width: max-content;
   height: 100%;
   align-items: flex-end;
-  padding: 12px clamp(12px, 2vw, 32px) 10px;
+  padding: 12px max(24px, calc((100% - var(--home-card-width)) / 2)) 10px;
 }
 
 .site-home-card {
@@ -4483,7 +4484,7 @@ body:has(.dd-site[data-page="home"]) {
 }
 
 .site-home-card + .site-home-card {
-  margin-left: clamp(-24px, -1.35vw, -12px);
+  margin-left: clamp(-72px, -3.2vw, -34px);
 }
 
 .site-home-card::after {
@@ -4529,23 +4530,6 @@ body:has(.dd-site[data-page="home"]) {
 .site-home-card:focus-visible img,
 .site-home-card.is-active img { transform: scale(1.026); }
 
-.site-home-card-position {
-  position: absolute;
-  z-index: 2;
-  bottom: 6px;
-  left: 50%;
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  color: rgba(232, 240, 250, 0.58);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 0.65rem;
-  transform: translateX(-50%);
-}
-
-.site-home-card-position span:first-child { color: #fff; }
-.site-home-card-position i { width: 26px; height: 1px; background: rgba(232, 240, 250, 0.3); }
-
 @media (min-width: 901px) and (max-width: 1160px) {
   .dd-site[data-page="home"] .site-header { grid-template-columns: minmax(160px, 1fr) auto minmax(130px, 1fr); }
   .dd-site[data-page="home"] .site-nav {
@@ -4586,16 +4570,16 @@ body:has(.dd-site[data-page="home"]) {
   .dd-site[data-page="home"] .site-nav a { padding: 0.72rem 0.85rem; text-align: center; }
   .dd-site[data-page="home"] .site-menu-button { display: inline-flex; }
   .site-home-copy {
-    top: clamp(96px, 17vh, 148px);
+    top: clamp(112px, 20vh, 172px);
     width: min(680px, calc(100% - 34px));
   }
   .site-home-copy h1 { font-size: clamp(2rem, 7.3vw, 3.4rem); line-height: 1.02; }
   .site-home-copy h1 { white-space: normal; }
   .site-home-copy p { font-size: clamp(0.78rem, 2.3vw, 0.98rem); }
   .site-home-copy p br { display: none; }
-  .site-home-card-stage { height: clamp(182px, 33vh, 320px); }
-  .site-home-experience { --home-card-width: clamp(118px, min(29vw, 23vh), 190px); }
-  .site-home-card + .site-home-card { margin-left: -9px; }
+  .site-home-card-stage { height: clamp(238px, 39vh, 340px); }
+  .site-home-experience { --home-card-width: clamp(176px, min(38vw, 28vh), 250px); }
+  .site-home-card + .site-home-card { margin-left: clamp(-52px, -7vw, -34px); }
 }
 
 @media (max-width: 520px) {
@@ -4604,19 +4588,19 @@ body:has(.dd-site[data-page="home"]) {
   .dd-site[data-page="home"] .site-account-button { width: auto; height: 40px; min-height: 40px; padding: 0.3rem 0.62rem 0.3rem 0.34rem; }
   .dd-site[data-page="home"] .site-account-avatar { display: grid; width: 28px; height: 28px; }
   .dd-site[data-page="home"] .site-account-button > span:nth-child(2) { display: inline-block; max-width: 64px; overflow: hidden; text-overflow: ellipsis; }
-  .site-home-copy { top: clamp(90px, 15vh, 120px); }
+  .site-home-copy { top: clamp(108px, 17vh, 140px); }
   .site-home-copy h1 { font-size: clamp(1.8rem, 8.7vw, 2.55rem); }
   .site-home-copy p { max-width: 340px; line-height: 1.4; }
   .site-home-download { min-height: 43px; margin-top: 0.85rem; padding-inline: 1rem; font-size: 0.82rem; }
-  .site-home-card-stage { height: clamp(168px, 31vh, 246px); }
+  .site-home-card-stage { height: clamp(235px, 37vh, 312px); }
 }
 
 @media (max-height: 680px) and (min-width: 521px) {
-  .site-home-copy { top: 15.5vh; }
+  .site-home-copy { top: 18vh; }
   .site-home-copy h1 { font-size: clamp(2rem, 4.1vw, 3.6rem); }
   .site-home-copy p { margin-top: 0.55rem; line-height: 1.35; }
   .site-home-download { min-height: 42px; margin-top: 0.75rem; }
-  .site-home-card-stage { height: 31vh; min-height: 176px; }
+  .site-home-card-stage { height: 40vh; min-height: 232px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
