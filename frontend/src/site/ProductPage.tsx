@@ -143,7 +143,7 @@ function ProductEditionCard({ id, availability }: {
   );
 }
 
-export function ProductPage({ availability, locale: _locale, release }: {
+export function ProductPage({ availability, release }: {
   availability: EditionAvailabilityDocument;
   locale: Locale;
   release?: WebsiteRelease;
@@ -202,7 +202,7 @@ export function ProductPage({ availability, locale: _locale, release }: {
         </div>
       </section>
 
-      <section className="site-product-editions" aria-labelledby="site-product-editions-title">
+      <section id="editions" className="site-product-editions" aria-labelledby="site-product-editions-title">
         <div className="site-product-section-heading"><p className="site-product-kicker">FIVE EDITIONS</p><h2 id="site-product-editions-title">Start with the workspace that fits the flight.</h2><p>Universal combines the full platform. SIM, LAB, FIELD, and AGENT focus the interface around a specific kind of work.</p></div>
         <div className="site-product-family-strip" aria-label="DroneDream edition family">
           <article data-edition="universal"><img src={universalMark} alt="" aria-hidden="true" /><div><strong>Universal</strong><span>Complete integrated workspace</span></div></article>

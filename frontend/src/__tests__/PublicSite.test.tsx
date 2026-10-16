@@ -43,95 +43,46 @@ describe("DroneDream public website", () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline test")));
   });
 
-  it("renders a direct, versioned Windows download and the primary product sections", async () => {
+  it("renders the one-screen landing page, direct Universal download, and mission gallery", async () => {
     const { container } = renderSite();
 
     expect(document.title).toBe("DroneDream");
-    expect(screen.getByRole("heading", { name: /Describe the mission/i })).toBeVisible();
-    expect(screen.getByText("NATURAL-LANGUAGE UAV ENGINEERING")).toBeVisible();
-    expect(screen.queryByText("LAB")).toBeNull();
-    const starflightButton = screen.getByRole("button", { name: /begin a starflight/i });
-    expect(starflightButton).not.toHaveTextContent("+");
-    expect(container.querySelector(".site-starflight-icon")).not.toBeNull();
-    expect(screen.queryByText(/Select the parameters that matter/i)).toBeNull();
+    expect(screen.getByRole("heading", { name: "Describe the mission. Watch it fly." })).toBeVisible();
+    expect(screen.getByText(/Natural-language missions, planned and simulated/i)).toBeVisible();
     expect(screen.getByRole("navigation", { name: "Primary navigation" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: /running mission/i })).toBeVisible();
-    expect(screen.getByRole("heading", { name: /Tune in (?:three|3) steps/i })).toBeVisible();
-    expect(screen.getByRole("figure", { name: /natural-language request to monitored flight/i })).toBeVisible();
-    expect(container.querySelectorAll(".site-workflow-visual animateMotion")).toHaveLength(2);
-    expect(container.querySelectorAll(".site-workflow-step-icon")).toHaveLength(4);
-    expect(container.querySelector(".site-workflow-steps")).not.toHaveTextContent("01");
-    expect(container.querySelectorAll(".site-phase-description")).toHaveLength(3);
-    container.querySelectorAll(".site-phase-description").forEach((description) => {
-      expect(description.querySelectorAll(":scope > span")).toHaveLength(6);
-    });
-    expect(container.querySelectorAll(".site-release-card dl > div")).toHaveLength(4);
-    expect(container.querySelector(".site-checksum")).toBeNull();
-    expect(container.querySelector(".site-release-card details")).toBeNull();
-    expect(container).not.toHaveTextContent("Copy checksum");
-    expect(container).not.toHaveTextContent("Before installing");
-    expect(container).not.toHaveTextContent("↗");
-    expect(container.querySelectorAll(".site-manual-links svg")).toHaveLength(2);
-    expect(container.querySelector(".site-footer a svg")).not.toBeNull();
-    expect(screen.getByRole("link", { name: "Code signing policy" })).toHaveAttribute(
-      "href",
-      "https://github.com/ChiZhang-805/DroneDream/blob/main/CODE_SIGNING_POLICY.md",
-    );
-    expect(screen.getByRole("link", { name: "Privacy policy" })).toHaveAttribute(
-      "href",
-      "https://github.com/ChiZhang-805/DroneDream/blob/main/PRIVACY.md",
-    );
-    expect(screen.getByText(
-      /Version 1\.0\.0 is available now\./i,
-    )).toBeVisible();
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Product" })).toHaveAttribute("href", "/product/");
-    expect(screen.getByRole("link", { name: "Pricing" })).toHaveAttribute("href", "/pricing/");
-    expect(screen.queryByRole("link", { name: "Workflow" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Editions" })).toHaveAttribute("href", "/product/#editions");
     expect(screen.getByRole("link", { name: "Manual" })).toHaveAttribute("href", "/manual/");
     expect(screen.getByRole("link", { name: "Community" })).toHaveAttribute("href", "/community/");
-    expect(screen.getByRole("button", { name: "Console" })).toBeVisible();
-    expect(container.querySelector(".drone-launch-scene")).toHaveAttribute(
-      "data-theme-primary",
-      "#68e8ff",
-    );
-    expect(container.querySelector(".drone-launch-scene")).toHaveAttribute(
-      "data-theme-secondary",
-      "#9b72ff",
-    );
-    expect(container.querySelector(".drone-launch-scene")).toHaveAttribute(
-      "data-theme-tertiary",
-      "#f166d8",
-    );
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeVisible();
+    expect(container.querySelector(".site-account-avatar")).toBeVisible();
+    expect(container.querySelector(".site-footer")).toBeNull();
+    expect(container.querySelectorAll(".site-home-card")).toHaveLength(11);
+    expect(screen.getByRole("region", { name: "Mission examples" })).toBeVisible();
     expectContentLinksToUseIcons(container);
 
-    const downloads = screen.getAllByRole("link", { name: /Download/i });
-    expect(downloads.some((link) => link.getAttribute("href") === fallbackRelease.downloadUrl)).toBe(true);
-    const tabs = screen.getAllByRole("tab");
-    expect(tabs[0]).toHaveAttribute("aria-selected", "true");
-    fireEvent.keyDown(tabs[0], { key: "ArrowRight" });
-    expect(tabs[1]).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("heading", { name: "Build the complete route" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "Full manual" })).toHaveAttribute("href", "/manual/");
-    expectContentLinksToUseIcons(container);
+    expect(screen.getByRole("link", { name: "Download Universal" })).toHaveAttribute(
+      "href",
+      fallbackRelease.downloadUrl,
+    );
+    expect(screen.getByRole("button", { name: /Campus delivery, card 1 of 11/i }))
+      .toHaveAttribute("aria-current", "true");
+    fireEvent.keyDown(screen.getByRole("region", { name: "Mission examples" }), { key: "ArrowRight" });
+    expect(screen.getByRole("button", { name: /Building inspection, card 2 of 11/i }))
+      .toHaveAttribute("aria-current", "true");
     await waitFor(() => expect(fetch).toHaveBeenCalledWith(
       "/downloads/latest.json",
       expect.objectContaining({ cache: "no-cache" }),
     ));
   });
 
-  it("flips capability cards and browses their localized detail carousel", async () => {
+  it("selects a mission card without tilting or navigating away", () => {
     renderSite();
 
-    const open = screen.getByRole("button", { name: "Open details for Map intelligence" });
-    fireEvent.click(open);
-
-    expect(screen.getAllByText("Named buildings").length).toBeGreaterThan(0);
-    fireEvent.click(screen.getByRole("button", { name: "Next detail" }));
-    expect(screen.getAllByText("Entrances").length).toBeGreaterThan(0);
-
-    const back = screen.getByRole("button", { name: "Return to overview: Map intelligence" });
-    fireEvent.click(back);
-    await waitFor(() => expect(open).toHaveFocus());
+    const card = screen.getByRole("button", { name: /Emergency search, card 9 of 11/i });
+    fireEvent.click(card);
+    expect(card).toHaveAttribute("aria-current", "true");
   });
 
   it("renders the production manual reader with its chapter sidebar and offline editions", () => {
@@ -282,29 +233,13 @@ describe("DroneDream public website", () => {
     window.localStorage.setItem("drone-dream:locale", "zh-CN");
     const { container } = renderSite();
 
-    const workflowBefore = screen.getByRole("heading", { name: "Describe" }).closest("li") as HTMLElement;
-    const capabilityBefore = screen.getByRole("heading", { name: "Map intelligence" }).closest("article") as HTMLElement;
-    const manualStepBefore = screen.getByRole("heading", { name: "Install the app" }).closest("li") as HTMLElement;
-    expect(workflowBefore).toHaveClass("is-visible");
-    expect(capabilityBefore).toHaveClass("is-visible");
-    expect(manualStepBefore).toHaveClass("is-visible");
-
     expect(document.documentElement).toHaveAttribute("lang", "en");
     expect(document.title).toBe("DroneDream");
     expect(screen.queryByRole("button", { name: /Switch to Simplified Chinese/i })).toBeNull();
-    expect(screen.getByRole("heading", { name: /Describe the mission/i })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Tune in 3 steps." })).toBeVisible();
-    expect(screen.getByRole("figure", { name: /natural-language request to monitored flight/i })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Describe the mission. Watch it fly." })).toBeVisible();
     expect(screen.getByText("Product")).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Describe" }).closest("li")).toBe(workflowBefore);
-    expect(screen.getByRole("heading", { name: "Map intelligence" }).closest("article")).toBe(capabilityBefore);
-    expect(screen.getByRole("heading", { name: "Install the app" }).closest("li")).toBe(manualStepBefore);
-    expect(screen.getByRole("link", { name: "Code signing policy" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "Privacy policy" })).toBeVisible();
-    expect(workflowBefore).toHaveClass("is-visible");
-    expect(capabilityBefore).toHaveClass("is-visible");
-    expect(manualStepBefore).toHaveClass("is-visible");
-    expect(container.querySelectorAll("[data-reveal]:not(.is-visible)")).toHaveLength(0);
+    expect(screen.getByRole("link", { name: "Download Universal" })).toBeVisible();
+    expect(container.querySelectorAll(".site-home-card")).toHaveLength(11);
     expectContentLinksToUseIcons(container);
   });
 
@@ -315,7 +250,7 @@ describe("DroneDream public website", () => {
     expect(screen.getByRole("heading", { name: /Describe the mission/i })).toBeVisible();
   });
 
-  it("removes the starflight control when the operating system requests reduced motion", () => {
+  it("keeps the full mission gallery available when the operating system requests reduced motion", () => {
     vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({
       matches: true,
       addEventListener: vi.fn(),
@@ -325,7 +260,7 @@ describe("DroneDream public website", () => {
     renderSite();
 
     expect(screen.queryByRole("button", { name: /begin a starflight/i })).toBeNull();
-    expect(document.querySelectorAll(".site-workflow-visual animateMotion")).toHaveLength(0);
+    expect(document.querySelectorAll(".site-home-card")).toHaveLength(11);
   });
 
   it("validates release metadata and formats binary sizes", () => {

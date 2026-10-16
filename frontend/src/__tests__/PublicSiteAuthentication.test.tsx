@@ -10,7 +10,7 @@ const authMock = vi.hoisted(() => ({
       id: string;
       email: string;
       displayName: string;
-      avatarUrl: null;
+      avatarUrl: string | null;
     } | null,
   },
   signInWithPassword: vi.fn(async (): Promise<void> => undefined),
@@ -59,6 +59,15 @@ function renderOAuthPage(locale: "en" | "zh-CN" = "en") {
   );
 }
 
+function renderHomePage() {
+  window.history.replaceState(null, "", "/");
+  return render(
+    <I18nProvider>
+      <SiteApp />
+    </I18nProvider>,
+  );
+}
+
 describe("public website account authentication", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -79,6 +88,31 @@ describe("public website account authentication", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
+  });
+
+  it("replaces Sign in with the signed-in user's avatar, name, and account menu", () => {
+    authMock.state.account = {
+      id: "account-1",
+      email: "pilot@example.com",
+      displayName: "Pilot Rivera",
+      avatarUrl: "data:image/png;base64,iVBORw0KGgo=",
+    };
+
+    const { container } = renderHomePage();
+    const accountButton = screen.getByRole("button", { name: "Pilot Rivera" });
+    expect(accountButton).toBeVisible();
+    expect(container.querySelector(".site-account-avatar img")).toHaveAttribute(
+      "src",
+      authMock.state.account.avatarUrl,
+    );
+
+    fireEvent.click(accountButton);
+    const menu = screen.getByRole("menu", { name: "Account" });
+    expect(within(menu).getByText("pilot@example.com")).toBeVisible();
+    expect(within(menu).getByRole("menuitem", { name: "Account" })).toBeVisible();
+    expect(within(menu).getByRole("menuitem", { name: "Open console" })).toBeVisible();
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Sign out" }));
+    expect(authMock.signOut).toHaveBeenCalledOnce();
   });
 
   it("opens a branded non-closable sign-in page directly for desktop OAuth", async () => {

@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { BrandLockup } from "../components/BrandLockup";
-import { DroneLaunchScene } from "../components/DroneLaunchScene";
 import { AuthCaptcha } from "../features/auth/AuthCaptcha";
 import { useAuthOrLocal } from "../features/auth/AuthContext";
 import { getManagedModelUsage } from "../features/settings/cloudModelAccess";
@@ -13,10 +12,10 @@ import {
   captchaProtectionConfigured,
   turnstileSiteKey,
 } from "../features/auth/supabaseClient";
-import { usePrefersReducedMotion } from "../hooks/usePrefersReducedMotion";
 import { useI18n } from "../i18n/I18nProvider";
 import { CommunityPage } from "./CommunityPage";
 import { headerDownloadCatalog } from "./downloadCatalog";
+import { HomeExperience } from "./HomeExperience";
 import { ManualPage } from "./ManualPage";
 import { OAuthConsentPage } from "./OAuthConsentPage";
 import { authorizationIdFromLocation } from "./oauthConsentPolicy";
@@ -39,7 +38,6 @@ import {
 const GITHUB_URL = "https://github.com/ChiZhang-805/DroneDream";
 const CODE_SIGNING_POLICY_URL = `${GITHUB_URL}/blob/main/CODE_SIGNING_POLICY.md`;
 const PRIVACY_POLICY_URL = `${GITHUB_URL}/blob/main/PRIVACY.md`;
-const COMMUNITY_GUIDELINES_URL = `${GITHUB_URL}/blob/main/COMMUNITY_GUIDELINES.md`;
 
 type AuthMode =
   | "sign-in"
@@ -48,15 +46,6 @@ type AuthMode =
   | "recovery-sign-in"
   | "recovery-password"
   | "reset-update";
-
-const WEBSITE_DRONE_THEME = Object.freeze({
-  primary: 0x68e8ff,
-  secondary: 0x9b72ff,
-  tertiary: 0xf166d8,
-  darkSurface: 0x070913,
-  fog: 0x070913,
-  gridMinor: 0x34244f,
-});
 
 const content = {
   en: {
@@ -485,46 +474,6 @@ const content = {
   },
 } as const;
 
-type IconName = "sliders" | "orbit" | "shield" | "report";
-
-function FeatureIcon({ name }: { name: IconName }) {
-  const common = {
-    fill: "none",
-    stroke: "currentColor",
-    strokeLinecap: "round" as const,
-    strokeLinejoin: "round" as const,
-    strokeWidth: 1.8,
-  };
-  return (
-    <svg viewBox="0 0 32 32" aria-hidden="true">
-      {name === "sliders" ? (
-        <>
-          <path d="M6 8h20M6 16h20M6 24h20" {...common} />
-          <circle cx="12" cy="8" r="2.4" {...common} />
-          <circle cx="21" cy="16" r="2.4" {...common} />
-          <circle cx="15" cy="24" r="2.4" {...common} />
-        </>
-      ) : null}
-      {name === "orbit" ? (
-        <>
-          <circle cx="16" cy="16" r="3.3" {...common} />
-          <ellipse cx="16" cy="16" rx="12" ry="6" transform="rotate(28 16 16)" {...common} />
-          <ellipse cx="16" cy="16" rx="12" ry="6" transform="rotate(-28 16 16)" {...common} />
-        </>
-      ) : null}
-      {name === "shield" ? (
-        <path d="M16 4 26 8v7c0 6.4-4 10.7-10 13-6-2.3-10-6.6-10-13V8l10-4Zm-4.5 12 3 3 6-7" {...common} />
-      ) : null}
-      {name === "report" ? (
-        <>
-          <path d="M8 4h12l5 5v19H8V4Z M20 4v6h5" {...common} />
-          <path d="M12 16h9M12 21h9M12 11h3" {...common} />
-        </>
-      ) : null}
-    </svg>
-  );
-}
-
 function DownloadIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -549,287 +498,11 @@ function ArrowRightIcon() {
   );
 }
 
-function ScrollIcon() {
-  return (
-    <svg className="site-scroll-icon" viewBox="0 0 24 34" aria-hidden="true">
-      <path d="M12 2v27m-5-6 5 6 5-6" />
-    </svg>
-  );
-}
-
-function DocumentIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M6.5 3.5h7.8l3.2 3.2v13.8h-11V3.5Z M14 3.8V7h3.2M9 11h6M9 14h6M9 17h4" />
-    </svg>
-  );
-}
-
-function GitHubIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 2.7a9.4 9.4 0 0 0-3 18.3c.5.1.7-.2.7-.5v-1.8c-2.8.6-3.4-1.2-3.4-1.2-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 0 1.6 1.1 1.6 1.1.9 1.6 2.4 1.1 2.9.9.1-.7.4-1.1.7-1.4-2.3-.3-4.6-1.1-4.6-4.7 0-1 .4-1.9 1-2.5-.1-.3-.4-1.3.1-2.6 0 0 .8-.3 2.6 1a9 9 0 0 1 4.8 0c1.8-1.3 2.6-1 2.6-1 .5 1.3.2 2.3.1 2.6.6.6 1 1.5 1 2.5 0 3.6-2.4 4.4-4.6 4.7.4.3.7 1 .7 1.9v2.8c0 .3.2.6.7.5A9.4 9.4 0 0 0 12 2.7Z" />
-    </svg>
-  );
-}
-
 function AccountIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="8" r="3.4" />
       <path d="M5.5 20c.5-4.1 2.7-6.2 6.5-6.2s6 2.1 6.5 6.2" />
-    </svg>
-  );
-}
-
-type WorkflowStep = readonly [string, string];
-type CapabilityDetail = readonly [string, string];
-
-function WorkflowStepIcon({ index }: { index: number }) {
-  return (
-    <svg viewBox="0 0 96 96" aria-hidden="true" focusable="false">
-      <circle className="site-workflow-node-aura" cx="48" cy="48" r="43" />
-      <circle className="site-workflow-node-ring" cx="48" cy="48" r="34" />
-      {index === 0 ? (
-        <>
-          <path className="site-workflow-icon-line" d="M29 59V35h38v24H29Zm7-16c5 0 6 10 12 10s8-10 15-7" />
-          <circle className="site-workflow-icon-dot" cx="36" cy="43" r="2.8" />
-          <circle className="site-workflow-icon-dot" cx="63" cy="46" r="2.8" />
-        </>
-      ) : null}
-      {index === 1 ? (
-        <>
-          <path className="site-workflow-icon-line" d="M29 36h38M29 48h38M29 60h38" />
-          <circle className="site-workflow-control" cx="41" cy="36" r="4.2" />
-          <circle className="site-workflow-control" cx="58" cy="48" r="4.2" />
-          <circle className="site-workflow-control" cx="46" cy="60" r="4.2" />
-        </>
-      ) : null}
-      {index === 2 ? (
-        <>
-          <rect className="site-workflow-chamber" x="29" y="31" width="38" height="34" rx="7" />
-          <path className="site-workflow-icon-line" d="M36 40h24M36 48h18M36 56h27" />
-          <circle className="site-workflow-icon-dot" cx="62" cy="40" r="2.6" />
-          <circle className="site-workflow-icon-dot" cx="56" cy="48" r="2.6" />
-          <circle className="site-workflow-icon-dot" cx="64" cy="56" r="2.6" />
-        </>
-      ) : null}
-      {index === 3 ? (
-        <>
-          <path className="site-workflow-icon-line" d="M29 63V50h8v13M42 63V40h8v23M55 63V32h8v31" />
-          <path className="site-workflow-check" d="m52 45 7 7 13-17" />
-        </>
-      ) : null}
-    </svg>
-  );
-}
-
-function WorkflowLoopVisual({
-  label,
-  reducedMotion,
-  steps,
-}: {
-  label: string;
-  reducedMotion: boolean;
-  steps: readonly WorkflowStep[];
-}) {
-  // Match the desktop visual's 1200 x 400 coordinate space. The rail passes
-  // through each icon centre and stays above every title and description.
-  const route = "M150 68 C250 68 350 150 450 150 S650 68 750 68 S950 150 1050 150";
-  return (
-    <figure
-      className={`site-workflow-visual${reducedMotion ? " is-reduced-motion" : ""}`}
-      aria-labelledby="site-workflow-caption"
-      data-reveal
-    >
-      <figcaption id="site-workflow-caption" className="site-sr-only">{label}</figcaption>
-      <svg className="site-workflow-route" viewBox="0 0 1200 400" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-        <defs>
-          <linearGradient id="site-workflow-rail" x1="0" x2="1">
-            <stop offset="0" stopColor="#68e8ff" />
-            <stop offset=".52" stopColor="#9b72ff" />
-            <stop offset="1" stopColor="#f166d8" />
-          </linearGradient>
-          <radialGradient id="site-workflow-node-glow">
-            <stop stopColor="#9b72ff" stopOpacity=".34" />
-            <stop offset="1" stopColor="#9b72ff" stopOpacity="0" />
-          </radialGradient>
-          <filter id="site-workflow-soft-glow" x="-80%" y="-80%" width="260%" height="260%">
-            <feGaussianBlur stdDeviation="5" result="blur" />
-            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-        </defs>
-
-        <path className="site-workflow-return" d="M1050 150 C930 330 360 330 150 68" />
-        <path id="site-workflow-route" className="site-workflow-rail-glow" d={route} />
-        <path className="site-workflow-rail" d={route} />
-
-        <circle className="site-workflow-packet" r="5" filter="url(#site-workflow-soft-glow)">
-          {!reducedMotion ? (
-            <animateMotion dur="8s" repeatCount="indefinite" path={route} />
-          ) : null}
-        </circle>
-        <circle className="site-workflow-packet site-workflow-packet-secondary" r="4">
-          {!reducedMotion ? (
-            <animateMotion dur="8s" begin="-4s" repeatCount="indefinite" path={route} />
-          ) : null}
-        </circle>
-      </svg>
-      <ol className="site-workflow-steps">
-        {steps.map(([title, description], index) => (
-          <li key={`site-workflow-step-${index}`} data-reveal>
-            <span className="site-workflow-step-icon"><WorkflowStepIcon index={index} /></span>
-            <h3>{title}</h3>
-            <p data-copy-block data-copy-id={`workflow-${index}`}>{description}</p>
-          </li>
-        ))}
-      </ol>
-    </figure>
-  );
-}
-
-function ChevronIcon({ direction }: { direction: "left" | "right" }) {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d={direction === "left" ? "m15 5-7 7 7 7" : "m9 5 7 7-7 7"} />
-    </svg>
-  );
-}
-
-function FlipBackIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M8 7H4v-4M4.5 7.2A9 9 0 1 1 3 14" />
-    </svg>
-  );
-}
-
-function CapabilityCard({
-  index,
-  title,
-  summary,
-  icon,
-  details,
-  openLabel,
-  backLabel,
-  previousLabel,
-  nextLabel,
-}: {
-  index: number;
-  title: string;
-  summary: readonly string[];
-  icon: IconName;
-  details: readonly CapabilityDetail[];
-  openLabel: string;
-  backLabel: string;
-  previousLabel: string;
-  nextLabel: string;
-}) {
-  const [flipped, setFlipped] = useState(false);
-  const [detailIndex, setDetailIndex] = useState(0);
-  const frontRef = useRef<HTMLButtonElement>(null);
-  const backRef = useRef<HTMLButtonElement>(null);
-  const pendingFocusRef = useRef<"front" | "back" | null>(null);
-  const detail = details[detailIndex] ?? details[0];
-  const detailId = `site-capability-${index}-details`;
-
-  useLayoutEffect(() => {
-    const target = pendingFocusRef.current;
-    if (!target) return;
-    pendingFocusRef.current = null;
-    (target === "back" ? backRef.current : frontRef.current)?.focus({ preventScroll: true });
-  }, [flipped]);
-
-  const showDetails = () => {
-    pendingFocusRef.current = "back";
-    setFlipped(true);
-  };
-  const showOverview = () => {
-    pendingFocusRef.current = "front";
-    setFlipped(false);
-  };
-  const move = (delta: number) => {
-    setDetailIndex((current) => (current + delta + details.length) % details.length);
-  };
-
-  return (
-    <article
-      className={`site-capability-card card-${index + 1}${flipped ? " is-flipped" : ""}`}
-      data-reveal
-    >
-      <div className="site-capability-card-inner">
-        <button
-          ref={frontRef}
-          type="button"
-          className="site-capability-face site-capability-front"
-          aria-expanded={flipped}
-          aria-controls={detailId}
-          aria-label={`${openLabel} ${title}`}
-          aria-hidden={flipped}
-          tabIndex={flipped ? -1 : 0}
-          onClick={showDetails}
-        >
-          <span className="site-capability-front-heading">
-            <span className="site-feature-icon"><FeatureIcon name={icon} /></span>
-            <span role="heading" aria-level={3}>{title}</span>
-          </span>
-          <span className="site-capability-summary" data-copy-block data-copy-id={`capability-summary-${index}`}>
-            {summary.map((line) => <span key={line}>{line}</span>)}
-          </span>
-        </button>
-
-        <section
-          id={detailId}
-          className="site-capability-face site-capability-back"
-          aria-hidden={!flipped}
-          aria-label={title}
-        >
-          <header>
-            <span className="site-feature-icon"><FeatureIcon name={icon} /></span>
-            <button
-              ref={backRef}
-              type="button"
-              className="site-capability-flip-back"
-              aria-label={`${backLabel}: ${title}`}
-              tabIndex={flipped ? 0 : -1}
-              onClick={showOverview}
-            >
-              <FlipBackIcon />
-            </button>
-          </header>
-          <div className="site-capability-entry" aria-live="polite" aria-atomic="true">
-            <h3>{detail?.[0]}</h3>
-            <p data-copy-block data-copy-id={`capability-detail-${index}-${detailIndex}`}>{detail?.[1]}</p>
-          </div>
-          <nav aria-label={title}>
-            <button
-              type="button"
-              aria-label={previousLabel}
-              tabIndex={flipped ? 0 : -1}
-              onClick={() => move(-1)}
-            >
-              <ChevronIcon direction="left" />
-            </button>
-            <span>{detailIndex + 1} / {details.length}</span>
-            <button
-              type="button"
-              aria-label={nextLabel}
-              tabIndex={flipped ? 0 : -1}
-              onClick={() => move(1)}
-            >
-              <ChevronIcon direction="right" />
-            </button>
-          </nav>
-        </section>
-      </div>
-    </article>
-  );
-}
-
-function StarflightIcon() {
-  return (
-    <svg className="site-starflight-icon" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 1.75c.74 5.84 4.41 9.51 10.25 10.25C16.41 12.74 12.74 16.41 12 22.25 11.26 16.41 7.59 12.74 1.75 12 7.59 11.26 11.26 7.59 12 1.75Z" />
     </svg>
   );
 }
@@ -842,9 +515,9 @@ export function SiteApp() {
   const [release, setRelease] = useState<WebsiteRelease>(fallbackRelease);
   const [editionAvailability, setEditionAvailability] =
     useState<EditionAvailabilityDocument>(fallbackEditionAvailability);
-  const [activePhase, setActivePhase] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
@@ -864,7 +537,6 @@ export function SiteApp() {
     name: string;
     billingScope: "individual" | "business";
   } | null>(null);
-  const reducedMotion = usePrefersReducedMotion();
   useLayoutEffect(() => {
     setLocale("en");
     document.documentElement.lang = "en";
@@ -872,7 +544,8 @@ export function SiteApp() {
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const downloadButtonRef = useRef<HTMLButtonElement>(null);
   const downloadMenuRef = useRef<HTMLDivElement>(null);
-  const droneFlightRef = useRef<(() => void) | null>(null);
+  const accountButtonRef = useRef<HTMLButtonElement>(null);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
   const authDialogRef = useRef<HTMLElement>(null);
   const authCloseRef = useRef<HTMLButtonElement>(null);
   const path = window.location.pathname.replace(/\/+$/u, "") || "/";
@@ -1128,34 +801,33 @@ export function SiteApp() {
     };
   }, [downloadMenuOpen]);
 
-  const currentPhase = copy.demoPhases[activePhase];
-  const displaySize = useMemo(() => formatBinarySize(release.sizeBytes), [release.sizeBytes]);
-
-  const selectPhaseFromKeyboard = (
-    event: React.KeyboardEvent<HTMLButtonElement>,
-    currentIndex: number,
-  ) => {
-    const lastIndex = copy.demoPhases.length - 1;
-    const nextIndex = event.key === "ArrowRight" || event.key === "ArrowDown"
-      ? (currentIndex + 1) % copy.demoPhases.length
-      : event.key === "ArrowLeft" || event.key === "ArrowUp"
-        ? (currentIndex + lastIndex) % copy.demoPhases.length
-        : event.key === "Home"
-          ? 0
-          : event.key === "End"
-            ? lastIndex
-            : null;
-    if (nextIndex === null) return;
-    event.preventDefault();
-    setActivePhase(nextIndex);
-    event.currentTarget.parentElement
-      ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[nextIndex]
-      ?.focus();
-  };
+  useEffect(() => {
+    if (!accountMenuOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node
+        && !accountMenuRef.current?.contains(event.target)
+      ) {
+        setAccountMenuOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setAccountMenuOpen(false);
+      accountButtonRef.current?.focus();
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("pointerdown", onPointerDown);
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [accountMenuOpen]);
 
   const closeMenu = () => {
     setMenuOpen(false);
     setDownloadMenuOpen(false);
+    setAccountMenuOpen(false);
   };
   const openAccount = useCallback((mode: AuthMode = "sign-in") => {
     setAuthMode(mode);
@@ -1169,6 +841,7 @@ export function SiteApp() {
     setAuthNotice(null);
     setMenuOpen(false);
     setDownloadMenuOpen(false);
+    setAccountMenuOpen(false);
     setAuthOpen(true);
   }, []);
 
@@ -1444,6 +1117,16 @@ export function SiteApp() {
     || authMode === "register"
     || recoveryCodeMode
   );
+  const headerNavigation = sitePage === "home"
+    ? [
+        ["Home", "/"],
+        ["Product", "/product/"],
+        ["Editions", "/product/#editions"],
+        ["Manual", "/manual/"],
+        ["Community", "/community/"],
+      ]
+    : copy.nav;
+  const accountName = auth.account?.displayName.trim() || copy.account;
 
   return (
     <div className="dd-site" data-locale={locale} data-page={sitePage}>
@@ -1457,23 +1140,117 @@ export function SiteApp() {
           className={`site-nav${menuOpen ? " is-open" : ""}`}
           aria-label={copy.navLabel}
         >
-          {copy.nav.map(([label, target]) => (
-            <a key={target} href={target} onClick={closeMenu}>{label}</a>
+          {headerNavigation.map(([label, target]) => (
+            <a
+              key={target}
+              href={target}
+              aria-current={sitePage === "home" && target === "/" ? "page" : undefined}
+              onClick={closeMenu}
+            >
+              {label}
+            </a>
           ))}
-          {organizationAccess?.authorized ? (
+          {sitePage !== "home" && organizationAccess?.authorized ? (
             <a href="/organization/" onClick={closeMenu}>{copy.organization}</a>
           ) : null}
-          <button type="button" onClick={openConsole}>{copy.console}</button>
+          {sitePage !== "home" ? (
+            <button type="button" onClick={openConsole}>{copy.console}</button>
+          ) : null}
         </nav>
         <div className="site-header-actions">
-          <button
-            type="button"
-            className="site-account-button"
-            onClick={() => openAccount("sign-in")}
+          <div
+            ref={accountMenuRef}
+            className={`site-account-picker${accountMenuOpen ? " is-open" : ""}`}
           >
-            <AccountIcon />
-            <span>{auth.account ? copy.account : copy.signIn}</span>
-          </button>
+            <button
+              ref={accountButtonRef}
+              type="button"
+              className="site-account-button"
+              aria-haspopup={auth.account ? "menu" : undefined}
+              aria-expanded={auth.account ? accountMenuOpen : undefined}
+              aria-controls={auth.account ? "site-account-menu" : undefined}
+              onClick={() => {
+                setDownloadMenuOpen(false);
+                setMenuOpen(false);
+                if (!auth.account) {
+                  openAccount("sign-in");
+                  return;
+                }
+                setAccountMenuOpen((open) => !open);
+              }}
+            >
+              <span className="site-account-avatar" aria-hidden="true">
+                {auth.account?.avatarUrl ? (
+                  <img src={auth.account.avatarUrl} alt="" />
+                ) : (
+                  <AccountIcon />
+                )}
+              </span>
+              <span>{auth.account ? accountName : copy.signIn}</span>
+              {auth.account ? <DownloadChevronIcon /> : null}
+            </button>
+            {auth.account && accountMenuOpen ? (
+              <div
+                id="site-account-menu"
+                className="site-account-menu"
+                role="menu"
+                aria-label={copy.account}
+              >
+                <div className="site-account-menu-profile">
+                  <strong>{accountName}</strong>
+                  <span>{auth.account.email}</span>
+                </div>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => openAccount("sign-in")}
+                >
+                  {copy.account}
+                </button>
+                <button type="button" role="menuitem" onClick={openConsole}>
+                  {copy.openConsole}
+                </button>
+                {organizationAccess?.authorized ? (
+                  <a href="/organization/" role="menuitem" onClick={closeMenu}>
+                    {copy.organization}
+                  </a>
+                ) : null}
+                <a
+                  href={PRIVACY_POLICY_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  role="menuitem"
+                  onClick={closeMenu}
+                >
+                  {copy.privacyPolicy}
+                </a>
+                <a
+                  href={CODE_SIGNING_POLICY_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  role="menuitem"
+                  onClick={closeMenu}
+                >
+                  {copy.codeSigningPolicy}
+                </a>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={authPending}
+                  onClick={() => {
+                    setAccountMenuOpen(false);
+                    setAuthPending(true);
+                    void auth.signOut()
+                      .catch((reason: unknown) => setAuthError(localizedAuthError(reason)))
+                      .finally(() => setAuthPending(false));
+                  }}
+                >
+                  {copy.signOut}
+                </button>
+              </div>
+            ) : null}
+          </div>
+          {sitePage !== "home" ? (
           <div
             ref={downloadMenuRef}
             className={`site-download-picker${downloadMenuOpen ? " is-open" : ""}`}
@@ -1532,6 +1309,7 @@ export function SiteApp() {
               </div>
             ) : null}
           </div>
+          ) : null}
           <button
             ref={menuButtonRef}
             type="button"
@@ -1597,238 +1375,7 @@ export function SiteApp() {
         ) : sitePage === "oauth-consent" && desktopOAuthFreshAuthReady ? (
           <div className="site-oauth-auth-stage" aria-hidden="true" />
         ) : (
-          <>
-        <section className="site-hero" id="home" aria-labelledby="hero-title">
-          <div className="site-hero-scene" aria-hidden="true">
-            <DroneLaunchScene
-              active
-              starflightControllerRef={droneFlightRef}
-              themeOverride={WEBSITE_DRONE_THEME}
-              visualOffsetX={1.58}
-            />
-          </div>
-          <div className="site-hero-shade" aria-hidden="true" />
-          <div className="site-shell site-hero-layout">
-            <div className="site-hero-copy">
-              <p className="site-eyebrow">{copy.eyebrow}</p>
-              <h1 id="hero-title">
-                <span className="site-hero-line">{copy.heroLead}</span>
-                <span className="site-hero-line site-hero-line-accent">{copy.heroAccent}</span>
-              </h1>
-              <div className="site-hero-actions">
-                <a className="site-button site-button-primary" href={release.downloadUrl} download={release.fileName}>
-                  <DownloadIcon />
-                  {copy.downloadWindows}
-                </a>
-                <a className="site-button site-button-ghost" href="#product">
-                  <ArrowRightIcon />
-                  {copy.explore}
-                </a>
-              </div>
-              <div className="site-release-line" aria-label={`${copy.version} ${release.version}`}>
-                <span className="site-live-dot" />
-                <strong>{copy.releasePrefix} {release.version}</strong>
-                <span>{displaySize}</span>
-                <span>{copy.system}</span>
-              </div>
-            </div>
-            {!reducedMotion ? (
-              <button
-                type="button"
-                className="site-drone-hint"
-                onClick={() => droneFlightRef.current?.()}
-              >
-                <StarflightIcon />
-                <span>{copy.clickDrone}</span>
-              </button>
-            ) : null}
-          </div>
-          <a className="site-scroll-cue" href="#product">
-            <span>{copy.scroll}</span>
-            <ScrollIcon />
-          </a>
-        </section>
-
-        <section className="site-section site-product" id="product">
-          <div className="site-shell">
-            <div className="site-section-heading" data-reveal>
-              <p className="site-eyebrow">{copy.productEyebrow}</p>
-              <h2>{copy.productTitle}</h2>
-              <p data-copy-block data-copy-id="product-body">{copy.productBody}</p>
-            </div>
-            <div className="site-product-demo" data-reveal>
-              <div className="site-demo-copy">
-                <div className="site-phase-tabs" role="tablist" aria-label={copy.productEyebrow}>
-                  {copy.demoPhases.map((phase, index) => (
-                    <button
-                      key={`site-phase-tab-${index}`}
-                      type="button"
-                      role="tab"
-                      id={`site-phase-tab-${index}`}
-                      aria-controls={`site-phase-panel-${index}`}
-                      aria-selected={activePhase === index}
-                      tabIndex={activePhase === index ? 0 : -1}
-                      className={activePhase === index ? "is-active" : ""}
-                      onClick={() => setActivePhase(index)}
-                      onKeyDown={(event) => selectPhaseFromKeyboard(event, index)}
-                    >
-                      <span>{phase.label}</span>
-                      <i aria-hidden="true" />
-                    </button>
-                  ))}
-                </div>
-                {copy.demoPhases.map((phase, index) => (
-                  <div
-                    key={`site-phase-panel-${index}`}
-                    id={`site-phase-panel-${index}`}
-                    className="site-phase-copy"
-                    role="tabpanel"
-                    aria-labelledby={`site-phase-tab-${index}`}
-                    tabIndex={0}
-                    hidden={activePhase !== index}
-                  >
-                    <span>{phase.label}</span>
-                    <h3>{phase.title}</h3>
-                    <p className="site-phase-description" data-copy-block data-copy-id={`phase-${index}`}>
-                      {phase.body.map((line, lineIndex) => (
-                        <span key={`site-phase-line-${index}-${lineIndex}`}>{line}</span>
-                      ))}
-                    </p>
-                  </div>
-                ))}
-              </div>
-              <div className={`site-demo-visual phase-${activePhase}`}>
-                <div className="site-demo-topbar">
-                  <span><i /> DroneDream / EXP-024</span>
-                  <strong>{currentPhase.status}</strong>
-                </div>
-                <div className="site-demo-grid">
-                  <div className="site-demo-chart">
-                    <div className="site-chart-labels">
-                      {copy.metricLabels.map((label, index) => <span key={`site-metric-${index}`} style={{ "--index": index } as React.CSSProperties}>{label}</span>)}
-                    </div>
-                    <svg viewBox="0 0 640 280" preserveAspectRatio="none" aria-hidden="true">
-                      <defs>
-                        <linearGradient id="site-chart-gradient" x1="0" y1="0" x2="1" y2="0">
-                          <stop offset="0" stopColor="#68e8ff" />
-                          <stop offset="0.55" stopColor="#9b7cff" />
-                          <stop offset="1" stopColor="#f166d8" />
-                        </linearGradient>
-                        <linearGradient id="site-chart-area" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0" stopColor="#9877ff" stopOpacity=".35" />
-                          <stop offset="1" stopColor="#9877ff" stopOpacity="0" />
-                        </linearGradient>
-                      </defs>
-                      <path className="site-chart-grid" d="M0 55H640M0 110H640M0 165H640M0 220H640" />
-                      <path className="site-chart-area" d="M0 224C72 215 82 93 150 108s76 90 137 60 72-104 137-73 78 130 126 83 56-73 90-118V280H0Z" />
-                      <path className="site-chart-line" d="M0 224C72 215 82 93 150 108s76 90 137 60 72-104 137-73 78 130 126 83 56-73 90-118" />
-                      <circle className="site-chart-point point-a" cx="150" cy="108" r="5" />
-                      <circle className="site-chart-point point-b" cx="424" cy="95" r="5" />
-                      <circle className="site-chart-point point-c" cx="640" cy="60" r="6" />
-                    </svg>
-                  </div>
-                  <aside className="site-parameter-stack">
-                    <p>{copy.parameterTitle}</p>
-                    {copy.parameters.map((parameter, index) => (
-                      <div key={`site-parameter-${index}`}>
-                        <span>{parameter}</span>
-                        <strong>{[6.84, 0.19, 1.72][index].toFixed(2)}</strong>
-                        <i><b style={{ width: `${[72, 43, 61][index]}%` }} /></i>
-                      </div>
-                    ))}
-                  </aside>
-                </div>
-                <div className="site-pulse-orbit" aria-hidden="true"><i /><i /><i /></div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="site-section site-workflow" id="workflow">
-          <div className="site-shell">
-            <div className="site-section-heading site-heading-light" data-reveal>
-              <p className="site-eyebrow">{copy.workflowEyebrow}</p>
-              <h2>{copy.workflowTitle}</h2>
-            </div>
-            <WorkflowLoopVisual
-              label={copy.workflowVisualLabel}
-              reducedMotion={reducedMotion}
-              steps={copy.workflow}
-            />
-          </div>
-        </section>
-
-        <section className="site-section site-capabilities" id="capabilities">
-          <div className="site-shell">
-            <div className="site-section-heading" data-reveal>
-              <p className="site-eyebrow">{copy.capabilitiesEyebrow}</p>
-              <h2>{copy.capabilitiesTitle}</h2>
-            </div>
-            <div className="site-capability-grid">
-              {copy.capabilities.map(([title, summary, icon], index) => (
-                <CapabilityCard
-                  key={`site-capability-${index}`}
-                  index={index}
-                  title={title}
-                  summary={summary}
-                  icon={icon as IconName}
-                  details={copy.capabilityDetails[index]}
-                  openLabel={copy.capabilityOpen}
-                  backLabel={copy.capabilityBack}
-                  previousLabel={copy.capabilityPrevious}
-                  nextLabel={copy.capabilityNext}
-                />
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="site-section site-manual" id="manual">
-          <div className="site-shell site-manual-layout">
-            <div className="site-manual-copy" data-reveal>
-              <p className="site-eyebrow">{copy.manualEyebrow}</p>
-              <h2>{copy.manualTitle}</h2>
-              <div className="site-manual-links">
-                <a href="/manual/"><DocumentIcon /><span>{copy.openManual}</span></a>
-                <a href={GITHUB_URL} target="_blank" rel="noreferrer"><GitHubIcon /><span>{copy.github}</span></a>
-              </div>
-            </div>
-            <ol className="site-manual-steps">
-              {copy.manualSteps.map(([title, description], index) => (
-                <li key={`site-manual-step-${index}`} data-reveal>
-                  <span>{index + 1}</span>
-                  <div><h3>{title}</h3><p data-copy-block data-copy-id={`manual-step-${index}`}>{description}</p></div>
-                </li>
-              ))}
-            </ol>
-          </div>
-        </section>
-
-        <section className="site-section site-download" id="download">
-          <div className="site-shell">
-            <div className="site-download-card" data-reveal>
-              <div className="site-download-glow" aria-hidden="true" />
-              <div className="site-download-copy">
-                <p className="site-eyebrow">{copy.downloadEyebrow}</p>
-                <h2>{copy.downloadTitle}</h2>
-                <p data-copy-block data-copy-id="download-body">{copy.downloadBody}</p>
-                <a className="site-button site-button-primary" href={release.downloadUrl} download={release.fileName}>
-                  <DownloadIcon />
-                  {copy.downloadAgain}
-                </a>
-              </div>
-              <div className="site-release-card">
-                <dl>
-                  <div><dt>{copy.version}</dt><dd>{release.version}</dd></div>
-                  <div><dt>{copy.size}</dt><dd>{displaySize}</dd></div>
-                  <div><dt>{copy.platform}</dt><dd>{copy.platformValue}</dd></div>
-                  <div><dt>{copy.released}</dt><dd>{release.publishedAt}</dd></div>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </section>
-          </>
+          <HomeExperience release={release} />
         )}
       </main>
 
@@ -2087,31 +1634,6 @@ export function SiteApp() {
         </div>
       ) : null}
 
-      {sitePage === "home" ? (
-        <footer className="site-footer">
-          <div className="site-shell">
-            <div className="site-footer-brand" role="img" aria-label="DroneDream">
-              <BrandLockup />
-            </div>
-            <p data-copy-block data-copy-id="footer-line">{copy.footerLine}</p>
-            <nav className="site-footer-policy-links" aria-label={copy.privacyPolicy}>
-              <a href={CODE_SIGNING_POLICY_URL} target="_blank" rel="noreferrer">
-                <FeatureIcon name="shield" />
-                {copy.codeSigningPolicy}
-              </a>
-              <a href={PRIVACY_POLICY_URL} target="_blank" rel="noreferrer">
-                <DocumentIcon />
-                {copy.privacyPolicy}
-              </a>
-              <a href={COMMUNITY_GUIDELINES_URL} target="_blank" rel="noreferrer">
-                <FeatureIcon name="report" />
-                {copy.communityGuidelines}
-              </a>
-            </nav>
-            <a href={GITHUB_URL} target="_blank" rel="noreferrer"><GitHubIcon /><span>GitHub</span></a>
-          </div>
-        </footer>
-      ) : null}
     </div>
   );
 }
