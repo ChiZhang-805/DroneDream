@@ -228,79 +228,79 @@ describe("public website account authentication", () => {
     });
   });
 
-  it("keeps the Simplified Chinese authentication page free of English field copy", async () => {
+  it("keeps the public authentication page in English when an old Chinese preference exists", async () => {
     renderOAuthPage("zh-CN");
 
-    const dialog = await screen.findByRole("dialog", { name: "登录" });
-    expect(within(dialog).getByLabelText("邮箱地址")).toBeVisible();
-    expect(within(dialog).getByLabelText("密码")).toBeVisible();
-    expect(within(dialog).getByRole("button", { name: "注册" })).toBeVisible();
-    expect(within(dialog).getByRole("button", { name: "忘记密码" })).toBeVisible();
-    expect(within(dialog).queryByText("Email address")).not.toBeInTheDocument();
-    expect(within(dialog).queryByText("Forgot password")).not.toBeInTheDocument();
+    const dialog = await screen.findByRole("dialog", { name: "Sign in" });
+    expect(within(dialog).getByLabelText("Email address")).toBeVisible();
+    expect(within(dialog).getByLabelText("Password")).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "Register" })).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "Forgot password" })).toBeVisible();
+    expect(within(dialog).queryByText("邮箱地址")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("忘记密码")).not.toBeInTheDocument();
   });
 
-  it("localizes every Simplified Chinese registration and recovery mode", async () => {
+  it("keeps every public registration and recovery mode in English", async () => {
     renderOAuthPage("zh-CN");
 
-    let dialog = await screen.findByRole("dialog", { name: "登录" });
-    fireEvent.click(within(dialog).getByRole("button", { name: "注册" }));
+    let dialog = await screen.findByRole("dialog", { name: "Sign in" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Register" }));
 
-    dialog = screen.getByRole("dialog", { name: "创建账号" });
-    expect(within(dialog).getByLabelText("邮箱地址")).toBeVisible();
-    expect(within(dialog).getByLabelText("密码")).toBeVisible();
-    expect(within(dialog).getByLabelText("确认密码")).toBeVisible();
-    expect(within(dialog).getByLabelText("邮箱验证码")).toBeVisible();
-    expect(within(dialog).getByRole("button", { name: "发送验证码" })).toBeVisible();
-    expect(within(dialog).getByRole("button", { name: "返回登录" })).toBeVisible();
+    dialog = screen.getByRole("dialog", { name: "Create account" });
+    expect(within(dialog).getByLabelText("Email address")).toBeVisible();
+    expect(within(dialog).getByLabelText("Password")).toBeVisible();
+    expect(within(dialog).getByLabelText("Confirm password")).toBeVisible();
+    expect(within(dialog).getByLabelText("Verification code")).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "Send code" })).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "Back to sign in" })).toBeVisible();
 
-    fireEvent.click(within(dialog).getByRole("button", { name: "返回登录" }));
-    dialog = screen.getByRole("dialog", { name: "登录" });
-    fireEvent.click(within(dialog).getByRole("button", { name: "忘记密码" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Back to sign in" }));
+    dialog = screen.getByRole("dialog", { name: "Sign in" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Forgot password" }));
 
-    dialog = screen.getByRole("dialog", { name: "找回账号" });
-    expect(within(dialog).getByRole("button", { name: "使用邮箱验证码登录" }))
+    dialog = screen.getByRole("dialog", { name: "Recover account" });
+    expect(within(dialog).getByRole("button", { name: "Sign in with an email code" }))
       .toBeVisible();
-    expect(within(dialog).getByRole("button", { name: "使用邮箱验证码修改密码" }))
+    expect(within(dialog).getByRole("button", { name: "Reset password with an email code" }))
       .toBeVisible();
-    fireEvent.click(within(dialog).getByRole("button", { name: "使用邮箱验证码登录" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Sign in with an email code" }));
 
-    dialog = screen.getByRole("dialog", { name: "邮箱验证码登录" });
-    expect(within(dialog).getByLabelText("邮箱地址")).toBeVisible();
-    expect(within(dialog).getByLabelText("邮箱验证码")).toBeVisible();
-    expect(within(dialog).getByRole("button", { name: "登录" })).toBeVisible();
-    fireEvent.click(within(dialog).getByRole("button", { name: "返回登录" }));
-    fireEvent.click(screen.getByRole("button", { name: "忘记密码" }));
-    fireEvent.click(screen.getByRole("button", { name: "使用邮箱验证码修改密码" }));
+    dialog = screen.getByRole("dialog", { name: "Email code sign-in" });
+    expect(within(dialog).getByLabelText("Email address")).toBeVisible();
+    expect(within(dialog).getByLabelText("Verification code")).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "Sign in" })).toBeVisible();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Back to sign in" }));
+    fireEvent.click(screen.getByRole("button", { name: "Forgot password" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reset password with an email code" }));
 
-    dialog = screen.getByRole("dialog", { name: "修改密码" });
-    expect(within(dialog).getByLabelText("邮箱地址")).toBeVisible();
-    expect(within(dialog).getByLabelText("密码")).toBeVisible();
-    expect(within(dialog).getByLabelText("确认密码")).toBeVisible();
-    expect(within(dialog).getByLabelText("邮箱验证码")).toBeVisible();
-    expect(within(dialog).getByRole("button", { name: "修改密码并登录" })).toBeVisible();
+    dialog = screen.getByRole("dialog", { name: "Reset password" });
+    expect(within(dialog).getByLabelText("Email address")).toBeVisible();
+    expect(within(dialog).getByLabelText("Password")).toBeVisible();
+    expect(within(dialog).getByLabelText("Confirm password")).toBeVisible();
+    expect(within(dialog).getByLabelText("Verification code")).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "Reset password and sign in" })).toBeVisible();
     expect(dialog).not.toHaveTextContent(
-      /Create account|Email address|Confirm password|Verification code|Forgot password|Reset password/u,
+      /创建账号|邮箱地址|确认密码|邮箱验证码|忘记密码|修改密码/u,
     );
   });
 
-  it("replaces English Supabase failures with a localized Chinese account error", async () => {
+  it("replaces provider failures with the public English account error", async () => {
     authMock.signInWithPassword.mockRejectedValueOnce(
       new Error("Invalid login credentials"),
     );
     renderOAuthPage("zh-CN");
 
-    const dialog = await screen.findByRole("dialog", { name: "登录" });
-    fireEvent.change(within(dialog).getByLabelText("邮箱地址"), {
+    const dialog = await screen.findByRole("dialog", { name: "Sign in" });
+    fireEvent.change(within(dialog).getByLabelText("Email address"), {
       target: { value: "pilot@example.com" },
     });
-    fireEvent.change(within(dialog).getByLabelText("密码"), {
+    fireEvent.change(within(dialog).getByLabelText("Password"), {
       target: { value: "wrong-password" },
     });
-    fireEvent.click(within(dialog).getByRole("button", { name: "登录" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Sign in" }));
 
     expect(await within(dialog).findByRole("alert"))
-      .toHaveTextContent("无法完成账号请求，请稍后重试。");
+      .toHaveTextContent("The account request could not be completed. Please try again.");
     expect(dialog).not.toHaveTextContent("Invalid login credentials");
   });
 

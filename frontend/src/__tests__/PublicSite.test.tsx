@@ -47,17 +47,17 @@ describe("DroneDream public website", () => {
     const { container } = renderSite();
 
     expect(document.title).toBe("DroneDream");
-    expect(screen.getByRole("heading", { name: /Tune with evidence/i })).toBeVisible();
-    expect(screen.getByText("AGENTIC PX4 / GAZEBO PARAMETER OPTIMIZATION")).toBeVisible();
+    expect(screen.getByRole("heading", { name: /Describe the mission/i })).toBeVisible();
+    expect(screen.getByText("NATURAL-LANGUAGE UAV ENGINEERING")).toBeVisible();
     expect(screen.queryByText("LAB")).toBeNull();
     const starflightButton = screen.getByRole("button", { name: /begin a starflight/i });
     expect(starflightButton).not.toHaveTextContent("+");
     expect(container.querySelector(".site-starflight-icon")).not.toBeNull();
     expect(screen.queryByText(/Select the parameters that matter/i)).toBeNull();
     expect(screen.getByRole("navigation", { name: "Primary navigation" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: /defensible result/i })).toBeVisible();
+    expect(screen.getByRole("heading", { name: /running mission/i })).toBeVisible();
     expect(screen.getByRole("heading", { name: /Tune in (?:three|3) steps/i })).toBeVisible();
-    expect(screen.getByRole("figure", { name: /automated closed loop/i })).toBeVisible();
+    expect(screen.getByRole("figure", { name: /natural-language request to monitored flight/i })).toBeVisible();
     expect(container.querySelectorAll(".site-workflow-visual animateMotion")).toHaveLength(2);
     expect(container.querySelectorAll(".site-workflow-step-icon")).toHaveLength(4);
     expect(container.querySelector(".site-workflow-steps")).not.toHaveTextContent("01");
@@ -110,7 +110,7 @@ describe("DroneDream public website", () => {
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
     fireEvent.keyDown(tabs[0], { key: "ArrowRight" });
     expect(tabs[1]).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("heading", { name: "Choose the next trial" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Build the complete route" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Full manual" })).toHaveAttribute("href", "/manual/");
     expectContentLinksToUseIcons(container);
     await waitFor(() => expect(fetch).toHaveBeenCalledWith(
@@ -122,14 +122,14 @@ describe("DroneDream public website", () => {
   it("flips capability cards and browses their localized detail carousel", async () => {
     renderSite();
 
-    const open = screen.getByRole("button", { name: "Open details for Selective tuning" });
+    const open = screen.getByRole("button", { name: "Open details for Map intelligence" });
     fireEvent.click(open);
 
-    expect(screen.getAllByText("MPC_XY_P").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Named buildings").length).toBeGreaterThan(0);
     fireEvent.click(screen.getByRole("button", { name: "Next detail" }));
-    expect(screen.getAllByText("MPC_XY_VEL_P_ACC").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Entrances").length).toBeGreaterThan(0);
 
-    const back = screen.getByRole("button", { name: "Return to overview: Selective tuning" });
+    const back = screen.getByRole("button", { name: "Return to overview: Map intelligence" });
     fireEvent.click(back);
     await waitFor(() => expect(open).toHaveFocus());
   });
@@ -156,13 +156,16 @@ describe("DroneDream public website", () => {
     expect(container.querySelector(".site-footer")).toBeNull();
   });
 
-  it("routes Product to the three focused software download entries", () => {
+  it("routes Product to the complete product overview and focused downloads", () => {
     window.history.replaceState(null, "", "/product/");
 
     const { container } = renderSite();
 
-    expect(screen.getByRole("heading", { name: "Choose Your DroneDream Edition" })).toBeVisible();
-    expect(screen.getAllByRole("article")).toHaveLength(3);
+    expect(screen.getByRole("heading", { name: /Describe the mission/i })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Every layer of the mission stays connected." })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Start with the workspace that fits the flight." })).toBeVisible();
+    expect(container.querySelectorAll(".site-product-family-strip article")).toHaveLength(5);
+    expect(container.querySelectorAll(".site-product-edition")).toHaveLength(3);
     expect(screen.getByRole("heading", { name: "DroneDream · SIM" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · LAB" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "DroneDream · FIELD" })).toBeVisible();
@@ -275,31 +278,29 @@ describe("DroneDream public website", () => {
     expect(screen.getByRole("dialog", { name: "Sign in" })).toBeVisible();
   });
 
-  it("switches the entire website to Simplified Chinese", () => {
+  it("keeps the public website in English when a Chinese preference was stored", () => {
+    window.localStorage.setItem("drone-dream:locale", "zh-CN");
     const { container } = renderSite();
 
-    const workflowBefore = screen.getByRole("heading", { name: "Define" }).closest("li") as HTMLElement;
-    const capabilityBefore = screen.getByRole("heading", { name: "Selective tuning" }).closest("article") as HTMLElement;
+    const workflowBefore = screen.getByRole("heading", { name: "Describe" }).closest("li") as HTMLElement;
+    const capabilityBefore = screen.getByRole("heading", { name: "Map intelligence" }).closest("article") as HTMLElement;
     const manualStepBefore = screen.getByRole("heading", { name: "Install the app" }).closest("li") as HTMLElement;
     expect(workflowBefore).toHaveClass("is-visible");
     expect(capabilityBefore).toHaveClass("is-visible");
     expect(manualStepBefore).toHaveClass("is-visible");
 
-    fireEvent.click(screen.getByRole("button", { name: "Switch to Simplified Chinese" }));
-
-    expect(document.documentElement).toHaveAttribute("lang", "zh-CN");
+    expect(document.documentElement).toHaveAttribute("lang", "en");
     expect(document.title).toBe("DroneDream");
-    expect(screen.getByRole("button", { name: "切换到英文" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: /让调优有章法/ })).toBeVisible();
-    expect(screen.getByRole("heading", { name: /让飞行更加从容/ })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "三步开始调优。" })).toBeVisible();
-    expect(screen.getByRole("figure", { name: "从飞行任务到证据决策的自动闭环工作流" })).toBeVisible();
-    expect(screen.queryByText("Product")).toBeNull();
-    expect(screen.getByRole("heading", { name: "定义任务" }).closest("li")).toBe(workflowBefore);
-    expect(screen.getByRole("heading", { name: "按需选择参数" }).closest("article")).toBe(capabilityBefore);
-    expect(screen.getByRole("heading", { name: "安装桌面程序" }).closest("li")).toBe(manualStepBefore);
-    expect(screen.getByRole("link", { name: "代码签名政策" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "隐私政策" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Switch to Simplified Chinese/i })).toBeNull();
+    expect(screen.getByRole("heading", { name: /Describe the mission/i })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Tune in 3 steps." })).toBeVisible();
+    expect(screen.getByRole("figure", { name: /natural-language request to monitored flight/i })).toBeVisible();
+    expect(screen.getByText("Product")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Describe" }).closest("li")).toBe(workflowBefore);
+    expect(screen.getByRole("heading", { name: "Map intelligence" }).closest("article")).toBe(capabilityBefore);
+    expect(screen.getByRole("heading", { name: "Install the app" }).closest("li")).toBe(manualStepBefore);
+    expect(screen.getByRole("link", { name: "Code signing policy" })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Privacy policy" })).toBeVisible();
     expect(workflowBefore).toHaveClass("is-visible");
     expect(capabilityBefore).toHaveClass("is-visible");
     expect(manualStepBefore).toHaveClass("is-visible");
@@ -311,7 +312,7 @@ describe("DroneDream public website", () => {
     window.history.replaceState(null, "", "/#%E0%A4%A");
 
     expect(() => renderSite()).not.toThrow();
-    expect(screen.getByRole("heading", { name: /Tune with evidence/i })).toBeVisible();
+    expect(screen.getByRole("heading", { name: /Describe the mission/i })).toBeVisible();
   });
 
   it("removes the starflight control when the operating system requests reduced motion", () => {

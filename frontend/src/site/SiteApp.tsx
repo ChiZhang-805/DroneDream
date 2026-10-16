@@ -62,7 +62,7 @@ const content = {
   en: {
     skip: "Skip to content",
     metaTitle: "DroneDream",
-    metaDescription: "Configure, optimize, simulate, and compare PX4 control parameters in one local Windows workflow.",
+    metaDescription: "Plan, simulate, monitor, and extend autonomous UAV missions in one local Windows workspace.",
     navLabel: "Primary navigation",
     nav: [
       ["Product", "/product/"],
@@ -128,9 +128,9 @@ const content = {
     openConsole: "Open console",
     signOut: "Sign out",
     closeAuth: "Close account dialog",
-    eyebrow: "AGENTIC PX4 / GAZEBO PARAMETER OPTIMIZATION",
-    heroLead: "Tune with evidence.",
-    heroAccent: "Fly with confidence.",
+    eyebrow: "NATURAL-LANGUAGE UAV ENGINEERING",
+    heroLead: "Describe the mission.",
+    heroAccent: "See it take flight.",
     downloadWindows: "Download for Windows",
     explore: "See how it works",
     releasePrefix: "Version",
@@ -138,69 +138,69 @@ const content = {
     clickDrone: "Click the drone to begin a starflight",
     scroll: "Scroll to explore",
     productEyebrow: "ONE CONTINUOUS WORKFLOW",
-    productTitle: "From question to defensible result.",
+    productTitle: "From intent to a running mission.",
     productBody:
-      "Keep parameters, simulations, decisions, and reports in one reproducible study.",
+      "Keep the request, map, aircraft, route, simulation, and live state in one connected workspace.",
     demoPhases: [
       {
-        label: "01 · Define",
-        title: "Define the target flight",
+        label: "01 · Describe",
+        title: "Describe the outcome",
         body: [
-          "Pick vehicle, PX4 stack, Gazebo world, and route.",
-          "Set safety limits, budget, and success metrics.",
-          "Tie every run to one repeatable flight question.",
-          "Record assumptions before spending a trial.",
-          "Make targets measurable for later review.",
-          "Start with clean rules and comparable outcomes.",
+          "Ask for the result in ordinary language.",
+          "Mention a building, item, inspection, or destination.",
+          "Use the selected map and aircraft as context.",
+          "Resolve familiar names into real map locations.",
+          "Keep the request concise and human.",
+          "Let the workspace assemble the technical details.",
         ],
-        status: "Experiment configured",
+        status: "Intent understood",
       },
       {
-        label: "02 · Search",
-        title: "Choose the next trial",
+        label: "02 · Plan",
+        title: "Build the complete route",
         body: [
-          "Read history, failed trials, and new feedback.",
-          "Keep bounds, coupling, and feasibility active.",
-          "Let Bayesian, trust-region, evolution compete.",
-          "Spend budget where the model still learns.",
-          "Propose candidates with clear information value.",
-          "Turn gain guesses into evidence-led search.",
+          "Resolve start, destination, and handoff points.",
+          "Route through usable space between buildings.",
+          "Keep clearance while smoothing tight turns.",
+          "Choose an aircraft and required payloads.",
+          "Turn the request into ordered mission actions.",
+          "Show the plan before the flight begins.",
         ],
-        status: "Candidate 24 / 60",
+        status: "Route ready",
       },
       {
-        label: "03 · Verify",
-        title: "Compare the evidence",
+        label: "03 · Fly",
+        title: "Run and watch the mission",
         body: [
-          "Check feasibility, error, overshoot, and settle time.",
-          "Compare repeats, robustness, and Pareto fronts.",
-          "Reject winners that break hidden constraints.",
-          "Keep logs, metrics, seeds, and snapshots linked.",
-          "Preserve evidence for accepted control settings.",
-          "Make every result auditable by the flight team.",
+          "Launch PX4 and Gazebo through the local Runtime.",
+          "Follow the aircraft on the 2D route view.",
+          "Switch to simulation, forward, or gimbal cameras.",
+          "Watch altitude, position, speed, and progress live.",
+          "Complete pickup, inspection, and return actions.",
+          "Finish the full mission in one continuous run.",
         ],
-        status: "Acceptance passed",
+        status: "Mission in progress",
       },
     ],
-    metricLabels: ["Tracking error", "Overshoot", "Settling time"],
-    parameterTitle: "Live candidate",
-    parameters: ["MC_ROLL_P", "MC_PITCHRATE_I", "MPC_XY_VEL_P_ACC"],
-    workflowEyebrow: "BUILT AROUND THE EXPERIMENT",
-    workflowTitle: "Let software handle the repetition.",
+    metricLabels: ["Route progress", "Flight speed", "Link quality"],
+    parameterTitle: "Live mission",
+    parameters: ["Altitude", "Ground speed", "Payload state"],
+    workflowEyebrow: "BUILT AROUND THE MISSION",
+    workflowTitle: "One flow from request to flight.",
     workflow: [
-      ["Define", "Set vehicle, route, limits, and success."],
-      ["Select", "Tune chosen PX4 parameters in safe ranges."],
-      ["Simulate", "Run isolated PX4 / Gazebo trials."],
-      ["Decide", "Rank feasible candidates and retain evidence."],
+      ["Describe", "State the destination, item, or inspection."],
+      ["Plan", "Resolve places, actions, aircraft, and route."],
+      ["Simulate", "Run PX4 and Gazebo in the selected world."],
+      ["Monitor", "Watch position, altitude, cameras, and progress."],
     ],
-    workflowVisualLabel: "An automated closed loop from flight task to evidence-backed decision",
-    capabilitiesEyebrow: "BUILT FOR ITERATION",
-    capabilitiesTitle: "A local flight lab, not a parameter form.",
+    workflowVisualLabel: "An automated flow from natural-language request to monitored flight",
+    capabilitiesEyebrow: "ONE CONNECTED WORKSPACE",
+    capabilitiesTitle: "The map, aircraft, simulator, and live view stay together.",
     capabilities: [
-      ["Selective tuning", ["Choose one PX4 parameter or a curated control group.", "Set guarded search bounds and coupled dependencies.", "Explore the needed control surface; leave unrelated dimensions safely untouched."], "sliders"],
-      ["Seven optimizers", ["Match each optimizer to the geometry of the experiment.", "Combine constraints, fidelity, trust regions, and evolution.", "Verify every gain under the same independent suite before ranking the final winner."], "orbit"],
-      ["Isolated runtime", ["Run PX4, Gazebo, workers, and artifacts in dedicated WSL2.", "Keep each trial isolated from personal Linux files and processes.", "Diagnose and clean failed simulations before the next isolated trial begins safely."], "shield"],
-      ["Traceable reports", ["Link each candidate to its scenario, seed, and parameter snapshot.", "Preserve logs, metrics, artifacts, and the runtime manifest.", "Reproduce each decision from its complete, fully linked evidence trail."], "report"],
+      ["Map intelligence", ["Name buildings, entrances, and handoff points.", "Plan through usable corridors with practical clearance.", "Turn familiar place names into executable destinations."], "sliders"],
+      ["Aircraft & payloads", ["Select a verified airframe for the mission.", "Pair cameras, depth, LiDAR, gimbal, and payload tools.", "Keep vehicle capability visible before launch."], "orbit"],
+      ["Local runtime", ["Coordinate PX4, Gazebo, ROS 2, maps, and mission services.", "Keep the flight stack behind one desktop interface.", "Open the workspace when the required services are ready."], "shield"],
+      ["Live mission views", ["Switch between 2D route and camera views.", "See current position, altitude, speed, and mission phase.", "Open the larger Live workspace whenever needed."], "report"],
     ],
     capabilityOpen: "Open details for",
     capabilityBack: "Return to overview",
@@ -208,33 +208,28 @@ const content = {
     capabilityNext: "Next detail",
     capabilityDetails: [
       [
-        ["MPC_XY_P", "Turns horizontal position error into a velocity target; tune it with the velocity loop to avoid abrupt corrections."],
-        ["MPC_XY_VEL_P_ACC", "Turns horizontal velocity error into acceleration demand and strongly shapes tracking response and overshoot."],
-        ["MPC_Z_P", "Converts altitude error into climb-rate demand; coordinate it with vertical speed and acceleration limits."],
-        ["MC_ROLLRATE_P", "Sets proportional roll-rate correction and directly affects response speed, damping, and oscillation risk."],
-        ["MC_PITCHRATE_I", "Removes persistent pitch-rate bias while guarded bounds prevent integral windup during long maneuvers."],
+        ["Named buildings", "Give every building an English name, optional localized aliases, and a clear role so everyday requests resolve to the right place."],
+        ["Entrances", "Bind usable entrances and handoff points to the building geometry instead of stopping at an approximate center coordinate."],
+        ["Flight corridors", "Route between buildings with practical clearance and smooth corners rather than cutting straight across roofs."],
+        ["Mission places", "Connect pickup, inspection, delivery, and return actions to the places where those actions can actually happen."],
       ],
       [
-        ["Failure-aware constrained MOBO", "Models objectives, feasibility, and failed simulations together so unsafe regions consume less budget overall."],
-        ["Multi-fidelity constrained MOBO", "Splits budget between quick screening and full validation under hard constraints before expensive trials."],
-        ["TuRBO trust-region BO", "Searches coupled parameters in adaptive local regions that expand after verified gains and contract after setbacks."],
-        ["SAAS constrained BO", "Finds influential axes in high-dimensional spaces before spending full trials on weak or irrelevant dimensions."],
-        ["Surrogate-assisted CMA-ES", "Combines a response surrogate with covariance adaptation for continuous search across expensive trials."],
-        ["BIPOP CMA-ES", "Alternates restart populations to escape local optima and deceptive regions while preserving global exploration."],
-        ["Accuracy-first portfolio", "Allocates trials across six engines and ranks only independently verified gains under shared validation rules."],
+        ["Airframes", "Keep a focused set of working aircraft configurations instead of presenting unverified variants as ready to fly."],
+        ["Perception", "Choose forward cameras, depth cameras, gimbals, optical flow, or LiDAR for the scene and mission."],
+        ["Payload actions", "Represent pickup, carrying, inspection, and delivery as concrete steps in the mission plan."],
+        ["Import", "Bring in a new aircraft package with its model, configuration, and required assets through one guided dialog."],
       ],
       [
-        ["Dedicated WSL2", "Runs the DroneDream distribution independently and never reuses or modifies a personal Ubuntu environment."],
-        ["Trial isolation", "Assigns each PX4 / Gazebo run its own ports, process group, temporary files, and termination boundary safely."],
-        ["Pinned inputs", "Records firmware, model, world, route, parameters, seeds, and environment effects before repeatable execution."],
-        ["Recovery and cleanup", "Preserves failure evidence, then removes abandoned processes so the next isolated launch starts cleanly."],
+        ["Dedicated services", "Run PX4, Gazebo, ROS 2 bridges, planning tools, and live streams through the DroneDream Runtime."],
+        ["One launch path", "Start and check the required local services before opening the main workspace."],
+        ["Asset coordination", "Load the selected map, aircraft, sensors, and mission tools into the same execution context."],
+        ["Continuous execution", "Let a healthy aircraft complete the full mission while it corrects ordinary route deviations in flight."],
       ],
       [
-        ["Configuration snapshot", "Stores the vehicle, firmware, ranges, optimizer, constraints, and trial budget for every tested candidate."],
-        ["Scenario identity", "Links each result to its world, route, disturbances, seeds, and acceptance criteria for direct comparison."],
-        ["Logs and metrics", "Keeps telemetry, process logs, tracking metrics, failures, and artifacts together in one auditable result."],
-        ["Pareto evidence", "Shows feasible trade-offs across error, overshoot, settling, robustness, and cost without hiding constraints."],
-        ["Reproducibility manifest", "Records the runtime and hashes every critical input so another machine can reproduce the same decision."],
+        ["2D route", "Project the planned corridor onto the map with start, waypoint, destination, and current aircraft position."],
+        ["Camera views", "Move between simulation, forward-camera, and gimbal views without leaving the mission conversation."],
+        ["Flight state", "Keep altitude, speed, position, payload state, and mission phase visible while the simulation runs."],
+        ["Live workspace", "Open the larger Live page when the operator needs more room for cameras and telemetry."],
       ],
     ],
     manualEyebrow: "GET STARTED",
@@ -269,7 +264,7 @@ const content = {
     platform: "Platform",
     platformValue: "Windows x64",
     released: "Released",
-    footerLine: "Local-first PX4/Gazebo control-parameter tuning. Version 1.0.0 is available now.",
+    footerLine: "Local-first UAV planning, simulation, and mission control. Version 1.0.0 is available now.",
     codeSigningPolicy: "Code signing policy",
     privacyPolicy: "Privacy policy",
     communityGuidelines: "Community guidelines",
@@ -840,9 +835,10 @@ function StarflightIcon() {
 }
 
 export function SiteApp() {
-  const { locale, setLocale } = useI18n();
+  const { setLocale } = useI18n();
+  const locale = "en" as const;
   const auth = useAuthOrLocal();
-  const copy = content[locale];
+  const copy = content.en;
   const [release, setRelease] = useState<WebsiteRelease>(fallbackRelease);
   const [editionAvailability, setEditionAvailability] =
     useState<EditionAvailabilityDocument>(fallbackEditionAvailability);
@@ -869,6 +865,10 @@ export function SiteApp() {
     billingScope: "individual" | "business";
   } | null>(null);
   const reducedMotion = usePrefersReducedMotion();
+  useLayoutEffect(() => {
+    setLocale("en");
+    document.documentElement.lang = "en";
+  }, [setLocale]);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const downloadButtonRef = useRef<HTMLButtonElement>(null);
   const downloadMenuRef = useRef<HTMLDivElement>(null);
@@ -1474,15 +1474,6 @@ export function SiteApp() {
             <AccountIcon />
             <span>{auth.account ? copy.account : copy.signIn}</span>
           </button>
-          <button
-            type="button"
-            className="site-language"
-            aria-label={copy.languageLabel}
-            onClick={() => setLocale(locale === "en" ? "zh-CN" : "en")}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c2.7 2.4 4 5.4 4 9s-1.3 6.6-4 9c-2.7-2.4-4-5.4-4-9s1.3-6.6 4-9Z" /></svg>
-            <span className="site-language-label">{copy.language}</span>
-          </button>
           <div
             ref={downloadMenuRef}
             className={`site-download-picker${downloadMenuOpen ? " is-open" : ""}`}
@@ -1563,7 +1554,7 @@ export function SiteApp() {
         {sitePage === "manual" ? (
           <ManualPage locale={locale} />
         ) : sitePage === "product" ? (
-          <ProductPage availability={editionAvailability} locale={locale} />
+          <ProductPage availability={editionAvailability} locale={locale} release={release} />
         ) : sitePage === "pricing" ? (
           <PricingPage
             locale={locale}
