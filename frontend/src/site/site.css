@@ -4434,66 +4434,135 @@ body:has(.dd-site[data-page="home"]) {
   .site-products-card { animation: none; }
 }
 
-/* Light navigation treatment for the two light product-selection surfaces. */
-.dd-site[data-page="product"] .site-header,
-.dd-site[data-page="product"] .site-header.is-scrolled,
-.dd-site[data-page="pricing"] .site-header,
-.dd-site[data-page="pricing"] .site-header.is-scrolled {
-  background: linear-gradient(180deg, rgba(248, 251, 255, 0.98), rgba(248, 251, 255, 0.88) 72%, rgba(248, 251, 255, 0));
+/* One header system for every public route. The header and navigation tray do
+   not introduce a second surface: the current page background remains visible
+   through both. The tray keeps its complete rounded outline and active tab. */
+.dd-site {
+  --site-header-foreground: rgba(249, 252, 255, 0.9);
+  --site-nav-foreground: rgba(239, 246, 255, 0.72);
+  --site-nav-foreground-strong: #fff;
+  --site-nav-outline: rgba(184, 213, 245, 0.26);
+  --site-nav-hover: rgba(255, 255, 255, 0.08);
+  --site-nav-active-background: #f8fbff;
+  --site-nav-active-foreground: #0d1724;
+  --site-nav-active-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  --site-menu-surface: rgba(7, 16, 26, 0.96);
+  --site-menu-divider: rgba(255, 255, 255, 0.08);
+  --site-menu-muted: rgba(224, 233, 246, 0.58);
 }
 
-.dd-site[data-page="product"] .site-nav,
-.dd-site[data-page="pricing"] .site-nav,
-.dd-site[data-page="product"] .site-account-button,
-.dd-site[data-page="pricing"] .site-account-button {
-  border-color: rgba(53, 63, 91, 0.13);
-  color: #252a39;
-  background: rgba(255, 255, 255, 0.68);
-  box-shadow: 0 10px 30px rgba(45, 51, 78, 0.1), inset 0 1px rgba(255, 255, 255, 0.85);
+.dd-site[data-page="product"],
+.dd-site[data-page="pricing"],
+.dd-site[data-page="manual"],
+.dd-site[data-page="community"],
+.dd-site[data-page="organization"],
+.dd-site[data-page="oauth-consent"]:has(.site-oauth-auth-stage) {
+  --site-header-foreground: #252a39;
+  --site-nav-foreground: #696f7f;
+  --site-nav-foreground-strong: #181b28;
+  --site-nav-outline: rgba(53, 63, 91, 0.18);
+  --site-nav-hover: rgba(255, 255, 255, 0.54);
+  --site-nav-active-background: rgba(255, 255, 255, 0.9);
+  --site-nav-active-foreground: #171a27;
+  --site-nav-active-shadow: 0 4px 16px rgba(45, 51, 78, 0.12);
+  --site-menu-surface: rgba(247, 248, 252, 0.97);
+  --site-menu-divider: rgba(53, 63, 91, 0.12);
+  --site-menu-muted: #777d8f;
 }
 
-.dd-site[data-page="product"] .site-nav a,
-.dd-site[data-page="pricing"] .site-nav a {
-  color: #696f7f;
+.dd-site[data-page="manual"] { --site-menu-surface: rgba(255, 255, 255, 0.97); }
+
+.dd-site[data-page="organization"] {
+  background:
+    radial-gradient(circle at 76% 4%, rgba(236, 111, 218, 0.11), transparent 30%),
+    radial-gradient(circle at 18% 8%, rgba(91, 221, 255, 0.12), transparent 34%),
+    #f7f8fc;
 }
 
-.dd-site[data-page="product"] .site-nav a:hover,
-.dd-site[data-page="product"] .site-nav a:focus-visible,
-.dd-site[data-page="pricing"] .site-nav a:hover,
-.dd-site[data-page="pricing"] .site-nav a:focus-visible {
-  color: #181b28;
-  background: rgba(255, 255, 255, 0.72);
+.dd-site[data-page="organization"] .organization-page {
+  padding-top: calc(clamp(24px, 3.5vh, 42px) + clamp(68px, 8.5vh, 88px));
 }
 
-.dd-site[data-page="product"] .site-nav a[aria-current="page"],
-.dd-site[data-page="pricing"] .site-nav a[aria-current="page"] {
-  color: #171a27;
-  background: #fff;
-  box-shadow: 0 4px 16px rgba(45, 51, 78, 0.12);
-}
-
-.dd-site[data-page="product"] .site-account-button:hover,
-.dd-site[data-page="product"] .site-account-button:focus-visible,
-.dd-site[data-page="pricing"] .site-account-button:hover,
-.dd-site[data-page="pricing"] .site-account-button:focus-visible {
-  color: #111521;
-  border-color: rgba(104, 118, 167, 0.24);
-  background: rgba(255, 255, 255, 0.9);
-}
-
-.dd-site[data-page="product"] .site-menu-button,
-.dd-site[data-page="pricing"] .site-menu-button {
-  color: #252a39;
-}
-
-/* Keep the navigation items free-standing; only the active item carries a fill. */
-.dd-site .site-nav,
-.dd-site[data-page="product"] .site-nav,
-.dd-site[data-page="pricing"] .site-nav {
-  gap: 0.35rem;
-  padding: 0;
+.dd-site .site-header,
+.dd-site .site-header.is-scrolled {
   border-color: transparent;
   background: transparent;
   box-shadow: none;
+}
+
+.dd-site .site-nav {
+  gap: 0.15rem;
+  padding: 0.34rem;
+  border: 1px solid var(--site-nav-outline);
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
   backdrop-filter: none;
+}
+
+.dd-site .site-nav a { color: var(--site-nav-foreground); }
+
+.dd-site .site-nav a:hover,
+.dd-site .site-nav a:focus-visible {
+  color: var(--site-nav-foreground-strong);
+  background: var(--site-nav-hover);
+}
+
+.dd-site .site-nav a[aria-current="page"] {
+  color: var(--site-nav-active-foreground);
+  background: var(--site-nav-active-background);
+  box-shadow: var(--site-nav-active-shadow);
+}
+
+.dd-site .site-account-button {
+  border-color: var(--site-nav-outline);
+  color: var(--site-header-foreground);
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.dd-site .site-account-button:hover,
+.dd-site .site-account-button:focus-visible {
+  color: var(--site-nav-foreground-strong);
+  border-color: var(--site-nav-outline);
+  background: var(--site-nav-hover);
+}
+
+.dd-site .site-menu-button { color: var(--site-header-foreground); }
+
+.dd-site .site-account-menu {
+  border-color: var(--site-nav-outline);
+  color: var(--site-nav-foreground-strong);
+  background: var(--site-menu-surface);
+}
+
+.dd-site .site-account-menu-profile { border-bottom-color: var(--site-menu-divider); }
+.dd-site .site-account-menu-profile span { color: var(--site-menu-muted); }
+.dd-site .site-account-menu > button,
+.dd-site .site-account-menu > a { color: var(--site-nav-foreground); }
+.dd-site .site-account-menu > button:hover,
+.dd-site .site-account-menu > button:focus-visible,
+.dd-site .site-account-menu > a:hover,
+.dd-site .site-account-menu > a:focus-visible {
+  color: var(--site-nav-foreground-strong);
+  background: var(--site-nav-hover);
+}
+
+@media (min-width: 901px) and (max-width: 1160px) {
+  .dd-site .site-nav {
+    border-color: var(--site-nav-outline);
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .dd-site .site-nav {
+    border-color: var(--site-nav-outline);
+    border-radius: 20px;
+    color: var(--site-header-foreground);
+    background: var(--site-menu-surface);
+    box-shadow: 0 20px 50px rgba(24, 29, 51, 0.12);
+  }
 }
