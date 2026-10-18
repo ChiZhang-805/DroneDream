@@ -4285,7 +4285,7 @@ body:has(.dd-site[data-page="home"]) {
   display: grid;
   min-height: 0;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  align-items: stretch;
+  align-items: start;
   gap: clamp(10px, 1vw, 18px);
 }
 
@@ -4294,7 +4294,8 @@ body:has(.dd-site[data-page="home"]) {
   position: relative;
   display: grid;
   min-width: 0;
-  min-height: 0;
+  min-height: 500px;
+  height: clamp(500px, 62svh, 650px);
   grid-template-rows: 76px 4.65em minmax(0, 1fr) auto;
   gap: clamp(0.9rem, 1.55vh, 1.2rem);
   padding: clamp(1.2rem, 1.45vw, 1.75rem);
@@ -4422,7 +4423,11 @@ body:has(.dd-site[data-page="home"]) {
     scroll-snap-type: inline mandatory;
     scrollbar-width: thin;
   }
-  .site-products-card { scroll-snap-align: start; }
+  .site-products-card {
+    min-height: 0;
+    height: 100%;
+    scroll-snap-align: start;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
