@@ -51,8 +51,8 @@ describe("DroneDream public website", () => {
     expect(screen.getByText(/Turn everyday language into complete drone missions/i)).toBeVisible();
     expect(screen.getByRole("navigation", { name: "Primary navigation" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: "Product" })).toHaveAttribute("href", "/product/");
-    expect(screen.getByRole("link", { name: "Editions" })).toHaveAttribute("href", "/product/#editions");
+    expect(screen.getByRole("link", { name: "Products" })).toHaveAttribute("href", "/product/");
+    expect(screen.getByRole("link", { name: "Edition" })).toHaveAttribute("href", "/pricing/");
     expect(screen.getByRole("link", { name: "Manual" })).toHaveAttribute("href", "/manual/");
     expect(screen.getByRole("link", { name: "Community" })).toHaveAttribute("href", "/community/");
     expect(screen.getByRole("button", { name: "Sign in" })).toBeVisible();
@@ -107,21 +107,21 @@ describe("DroneDream public website", () => {
     expect(container.querySelector(".site-footer")).toBeNull();
   });
 
-  it("routes Product to the complete product overview and focused downloads", () => {
+  it("routes Products to the five-product family without the retired mission preview", () => {
     window.history.replaceState(null, "", "/product/");
 
     const { container } = renderSite();
 
-    expect(screen.getByRole("heading", { name: /Describe the mission/i })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Every layer of the mission stays connected." })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Start with the workspace that fits the flight." })).toBeVisible();
-    expect(container.querySelectorAll(".site-product-family-strip article")).toHaveLength(5);
-    expect(container.querySelectorAll(".site-product-edition")).toHaveLength(3);
-    expect(screen.getByRole("heading", { name: "DroneDream · SIM" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "DroneDream · LAB" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "DroneDream · FIELD" })).toBeVisible();
-    expect(container.querySelectorAll('[data-download-ready="false"]')).toHaveLength(3);
-    expect(screen.getAllByRole("button", { name: /Download unavailable/i })).toHaveLength(3);
+    expect(screen.getByRole("heading", { name: "One platform. Five ways to fly." })).toBeVisible();
+    expect(container.querySelectorAll(".site-products-card")).toHaveLength(5);
+    expect(screen.getByAltText("DroneDream Universal")).toBeVisible();
+    expect(screen.getByAltText("DroneDream SIM")).toBeVisible();
+    expect(screen.getByAltText("DroneDream LAB")).toBeVisible();
+    expect(screen.getByAltText("DroneDream FIELD")).toBeVisible();
+    expect(screen.getByAltText("DroneDream AGENT")).toBeVisible();
+    expect(container.querySelector(".site-product-flight-board")).toBeNull();
+    expect(screen.getAllByRole("button", { name: /download unavailable/i })).toHaveLength(4);
+    expect(screen.getByRole("link", { name: "Products" })).toHaveAttribute("aria-current", "page");
     expect(container.querySelector(".site-footer")).toBeNull();
   });
 
@@ -237,7 +237,7 @@ describe("DroneDream public website", () => {
     expect(document.title).toBe("DroneDream");
     expect(screen.queryByRole("button", { name: /Switch to Simplified Chinese/i })).toBeNull();
     expect(screen.getByRole("heading", { name: "Say the mission. Watch it fly." })).toBeVisible();
-    expect(screen.getByText("Product")).toBeVisible();
+    expect(screen.getByText("Products")).toBeVisible();
     expect(screen.getByRole("link", { name: "Download Universal" })).toBeVisible();
     expect(container.querySelectorAll(".site-home-card")).toHaveLength(11);
     expectContentLinksToUseIcons(container);

@@ -167,8 +167,8 @@ export function HomeExperience({ release }: { release: WebsiteRelease }) {
             {missionCards.map((card, index) => {
               const distance = Math.abs(index - activeCard);
               const style = {
-                "--card-scale": Math.max(0.9, 1.06 - (distance * 0.06)),
-                "--card-lift": `${Math.max(0, 18 - (distance * 7))}px`,
+                "--card-scale": 1,
+                "--card-lift": "0px",
                 "--card-brightness": Math.max(0.46, 1 - (distance * 0.18)),
                 zIndex: missionCards.length - distance,
               } as CSSProperties;

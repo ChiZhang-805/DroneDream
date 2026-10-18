@@ -14,7 +14,6 @@ import {
 } from "../features/auth/supabaseClient";
 import { useI18n } from "../i18n/I18nProvider";
 import { CommunityPage } from "./CommunityPage";
-import { headerDownloadCatalog } from "./downloadCatalog";
 import { HomeExperience } from "./HomeExperience";
 import { ManualPage } from "./ManualPage";
 import { OAuthConsentPage } from "./OAuthConsentPage";
@@ -29,7 +28,6 @@ import {
 } from "./editionAvailability";
 import {
   fallbackRelease,
-  formatBinarySize,
   isReleaseCandidateNonDowngrade,
   isWebsiteRelease,
   type WebsiteRelease,
@@ -474,14 +472,6 @@ const content = {
   },
 } as const;
 
-function DownloadIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 3v11m0 0 4-4m-4 4-4-4M5 20h14" />
-    </svg>
-  );
-}
-
 function DownloadChevronIcon() {
   return (
     <svg className="site-header-download-chevron" viewBox="0 0 16 16" aria-hidden="true">
@@ -516,7 +506,6 @@ export function SiteApp() {
   const [editionAvailability, setEditionAvailability] =
     useState<EditionAvailabilityDocument>(fallbackEditionAvailability);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
@@ -542,8 +531,6 @@ export function SiteApp() {
     document.documentElement.lang = "en";
   }, [setLocale]);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
-  const downloadButtonRef = useRef<HTMLButtonElement>(null);
-  const downloadMenuRef = useRef<HTMLDivElement>(null);
   const accountButtonRef = useRef<HTMLButtonElement>(null);
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const authDialogRef = useRef<HTMLElement>(null);
@@ -779,29 +766,6 @@ export function SiteApp() {
   }, [menuOpen]);
 
   useEffect(() => {
-    if (!downloadMenuOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      if (
-        event.target instanceof Node
-        && !downloadMenuRef.current?.contains(event.target)
-      ) {
-        setDownloadMenuOpen(false);
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      setDownloadMenuOpen(false);
-      downloadButtonRef.current?.focus();
-    };
-    window.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, [downloadMenuOpen]);
-
-  useEffect(() => {
     if (!accountMenuOpen) return;
     const onPointerDown = (event: PointerEvent) => {
       if (
@@ -826,7 +790,6 @@ export function SiteApp() {
 
   const closeMenu = () => {
     setMenuOpen(false);
-    setDownloadMenuOpen(false);
     setAccountMenuOpen(false);
   };
   const openAccount = useCallback((mode: AuthMode = "sign-in") => {
@@ -840,7 +803,6 @@ export function SiteApp() {
     setAuthError(null);
     setAuthNotice(null);
     setMenuOpen(false);
-    setDownloadMenuOpen(false);
     setAccountMenuOpen(false);
     setAuthOpen(true);
   }, []);
@@ -1117,15 +1079,24 @@ export function SiteApp() {
     || authMode === "register"
     || recoveryCodeMode
   );
-  const headerNavigation = sitePage === "home"
-    ? [
-        ["Home", "/"],
-        ["Product", "/product/"],
-        ["Editions", "/product/#editions"],
-        ["Manual", "/manual/"],
-        ["Community", "/community/"],
-      ]
-    : copy.nav;
+  const headerNavigation = [
+    ["Home", "/"],
+    ["Products", "/product/"],
+    ["Edition", "/pricing/"],
+    ["Manual", "/manual/"],
+    ["Community", "/community/"],
+  ] as const;
+  const currentNavigationTarget = sitePage === "home"
+    ? "/"
+    : sitePage === "product"
+      ? "/product/"
+      : sitePage === "pricing"
+        ? "/pricing/"
+        : sitePage === "manual"
+          ? "/manual/"
+          : sitePage === "community"
+            ? "/community/"
+            : null;
   const accountName = auth.account?.displayName.trim() || copy.account;
 
   return (
@@ -1144,18 +1115,12 @@ export function SiteApp() {
             <a
               key={target}
               href={target}
-              aria-current={sitePage === "home" && target === "/" ? "page" : undefined}
+              aria-current={target === currentNavigationTarget ? "page" : undefined}
               onClick={closeMenu}
             >
               {label}
             </a>
           ))}
-          {sitePage !== "home" && organizationAccess?.authorized ? (
-            <a href="/organization/" onClick={closeMenu}>{copy.organization}</a>
-          ) : null}
-          {sitePage !== "home" ? (
-            <button type="button" onClick={openConsole}>{copy.console}</button>
-          ) : null}
         </nav>
         <div className="site-header-actions">
           <div
@@ -1170,7 +1135,6 @@ export function SiteApp() {
               aria-expanded={auth.account ? accountMenuOpen : undefined}
               aria-controls={auth.account ? "site-account-menu" : undefined}
               onClick={() => {
-                setDownloadMenuOpen(false);
                 setMenuOpen(false);
                 if (!auth.account) {
                   openAccount("sign-in");
@@ -1250,66 +1214,6 @@ export function SiteApp() {
               </div>
             ) : null}
           </div>
-          {sitePage !== "home" ? (
-          <div
-            ref={downloadMenuRef}
-            className={`site-download-picker${downloadMenuOpen ? " is-open" : ""}`}
-          >
-            <button
-              ref={downloadButtonRef}
-              type="button"
-              className="site-header-download"
-              aria-expanded={downloadMenuOpen}
-              aria-haspopup="menu"
-              aria-controls="site-download-menu"
-              onClick={() => {
-                setMenuOpen(false);
-                setDownloadMenuOpen((open) => !open);
-              }}
-            >
-              <DownloadIcon />
-              <span className="site-header-download-label">{copy.downloadShort}</span>
-              <DownloadChevronIcon />
-            </button>
-            {downloadMenuOpen ? (
-              <div
-                id="site-download-menu"
-                className="site-download-menu"
-                role="menu"
-                aria-label={copy.downloadMenuTitle}
-              >
-                <div className="site-download-menu-heading">
-                  <strong>{copy.downloadMenuTitle}</strong>
-                  <span>{copy.downloadMenuHint}</span>
-                </div>
-                <div className="site-download-menu-options">
-                  {headerDownloadCatalog.map((download) => (
-                    <a
-                      key={download.id}
-                      className="site-download-option"
-                      href={download.downloadUrl}
-                      download={download.fileName}
-                      role="menuitem"
-                      data-edition={download.id}
-                      data-sha256={download.sha256}
-                      onClick={() => setDownloadMenuOpen(false)}
-                    >
-                      <img src={download.mark} alt="" aria-hidden="true" />
-                      <span className="site-download-option-copy">
-                        <strong>{download.label}</strong>
-                        <span>{copy.downloadDescriptions[download.id]}</span>
-                      </span>
-                      <span className="site-download-option-meta">
-                        {formatBinarySize(download.sizeBytes)}
-                        <DownloadIcon />
-                      </span>
-                    </a>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </div>
-          ) : null}
           <button
             ref={menuButtonRef}
             type="button"
@@ -1318,7 +1222,6 @@ export function SiteApp() {
             aria-expanded={menuOpen}
             aria-controls="site-navigation"
             onClick={() => {
-              setDownloadMenuOpen(false);
               setMenuOpen((open) => !open);
             }}
           >

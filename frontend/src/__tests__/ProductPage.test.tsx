@@ -28,22 +28,22 @@ function publishedSim(): EditionAvailabilityDocument {
 }
 
 describe("ProductPage", () => {
-  it("shows exactly SIM, LAB, and FIELD with fail-closed download actions", () => {
+  it("shows the complete five-product family with fail-closed focused downloads", () => {
     const { container } = render(
       <ProductPage availability={fallbackEditionAvailability} locale="en" />,
     );
 
-    expect(container.querySelectorAll(".site-product-edition")).toHaveLength(3);
-    expect(screen.getByText("Scenario setup")).toBeVisible();
-    expect(screen.getByText("Hardware-in-the-loop")).toBeVisible();
+    expect(container.querySelectorAll(".site-products-card")).toHaveLength(5);
+    expect(screen.getByAltText("DroneDream Universal")).toBeVisible();
+    expect(screen.getByText("Scenario replay")).toBeVisible();
+    expect(screen.getByText("Hardware in the loop")).toBeVisible();
     expect(screen.getByText("Vehicle setup")).toBeVisible();
-    expect(container.querySelectorAll(".site-product-edition li")).toHaveLength(9);
-    expect(container.querySelectorAll(".site-product-family-strip article")).toHaveLength(5);
-    expect(container.querySelector(".site-product-route-line")).not.toBeNull();
-    expect(container.querySelector(".site-product-map-aircraft")).not.toBeNull();
+    expect(screen.getByText("Natural language")).toBeVisible();
+    expect(container.querySelectorAll(".site-products-card li")).toHaveLength(15);
+    expect(container.querySelector(".site-product-flight-board")).toBeNull();
     expect(container).not.toHaveTextContent(/System requirements|Evidence and history|Who it is for|Validation workflow/i);
-    expect(screen.getAllByRole("button", { name: /Download unavailable/i })).toHaveLength(3);
-    expect(screen.queryByRole("link", { name: /DroneDream .* Download/i })).toBeNull();
+    expect(screen.getAllByRole("button", { name: /download unavailable/i })).toHaveLength(4);
+    expect(screen.queryByRole("link", { name: /Download DroneDream/i })).toBeNull();
   });
 
   it("enables only an edition backed by a complete validated release record", () => {
@@ -52,11 +52,11 @@ describe("ProductPage", () => {
 
     render(<ProductPage availability={availability} locale="en" />);
 
-    expect(screen.getByRole("link", { name: "DroneDream · SIM Download" }))
+    expect(screen.getByRole("link", { name: "Download DroneDream SIM" }))
       .toHaveAttribute("href", availability.editions[0].downloadUrl);
-    expect(screen.getByRole("button", { name: "DroneDream · LAB Download unavailable" }))
+    expect(screen.getByRole("button", { name: "DroneDream LAB download unavailable" }))
       .toBeDisabled();
-    expect(screen.getByRole("button", { name: "DroneDream · FIELD Download unavailable" }))
+    expect(screen.getByRole("button", { name: "DroneDream FIELD download unavailable" }))
       .toBeDisabled();
   });
 
@@ -86,13 +86,14 @@ describe("ProductPage", () => {
     expect(isEditionAvailabilityDocument(availability)).toBe(true);
   });
 
-  it("accepts AUTONOMY availability but keeps it hidden until a release is published", () => {
+  it("keeps AGENT visible and enables it only after a release is published", () => {
     const availability = structuredClone(fallbackEditionAvailability);
 
     expect(isEditionAvailabilityDocument(availability)).toBe(true);
     const { container, rerender } = render(<ProductPage availability={availability} locale="en" />);
-    expect(container.querySelectorAll(".site-product-edition")).toHaveLength(3);
-    expect(screen.queryByRole("heading", { name: "DroneDream · AGENT" })).toBeNull();
+    expect(container.querySelectorAll(".site-products-card")).toHaveLength(5);
+    expect(screen.getByAltText("DroneDream AGENT")).toBeVisible();
+    expect(screen.getByRole("button", { name: "DroneDream AGENT download unavailable" })).toBeDisabled();
 
     const releaseFamily = "desktop-autonomy-v1.0.0-build-1";
     const fileName = "DroneDream-Agent-1.0.0.exe";
@@ -113,17 +114,17 @@ describe("ProductPage", () => {
 
     expect(isEditionAvailabilityDocument(availability)).toBe(true);
     rerender(<ProductPage availability={availability} locale="en" />);
-    expect(container.querySelectorAll(".site-product-edition")).toHaveLength(4);
-    expect(screen.getByText("Natural-language planning")).toBeVisible();
-    expect(screen.getByRole("link", { name: "DroneDream · AGENT Download" }))
+    expect(container.querySelectorAll(".site-products-card")).toHaveLength(5);
+    expect(screen.getByText("Natural language")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Download DroneDream AGENT" }))
       .toHaveAttribute("href", availability.editions[3].downloadUrl);
   });
 
   it("keeps the public product surface in English for every stored interface locale", () => {
     render(<ProductPage availability={fallbackEditionAvailability} locale="zh-CN" />);
 
-    expect(screen.getByRole("heading", { name: /Describe the mission/i })).toBeVisible();
-    expect(screen.getByText("Scenario setup")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "One platform. Five ways to fly." })).toBeVisible();
+    expect(screen.getByText("Scenario replay")).toBeVisible();
     expect(screen.queryByText(/选择你的/)).toBeNull();
   });
 });
