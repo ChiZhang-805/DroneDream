@@ -52,7 +52,7 @@ describe("DroneDream public website", () => {
     expect(screen.getByRole("navigation", { name: "Primary navigation" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Products" })).toHaveAttribute("href", "/product/");
-    expect(screen.getByRole("link", { name: "Edition" })).toHaveAttribute("href", "/pricing/");
+    expect(screen.getByRole("link", { name: "Pricing" })).toHaveAttribute("href", "/pricing/");
     expect(screen.getByRole("link", { name: "Manual" })).toHaveAttribute("href", "/manual/");
     expect(screen.getByRole("link", { name: "Community" })).toHaveAttribute("href", "/community/");
     expect(screen.getByRole("button", { name: "Sign in" })).toBeVisible();
@@ -112,7 +112,7 @@ describe("DroneDream public website", () => {
 
     const { container } = renderSite();
 
-    expect(screen.getByRole("heading", { name: "One platform. Five ways to fly." })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "One platform for every stage of flight." })).toBeVisible();
     expect(container.querySelectorAll(".site-products-card")).toHaveLength(5);
     expect(screen.getByAltText("DroneDream Universal")).toBeVisible();
     expect(screen.getByAltText("DroneDream SIM")).toBeVisible();

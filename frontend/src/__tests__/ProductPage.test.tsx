@@ -123,7 +123,7 @@ describe("ProductPage", () => {
   it("keeps the public product surface in English for every stored interface locale", () => {
     render(<ProductPage availability={fallbackEditionAvailability} locale="zh-CN" />);
 
-    expect(screen.getByRole("heading", { name: "One platform. Five ways to fly." })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "One platform for every stage of flight." })).toBeVisible();
     expect(screen.getByText("Scenario replay")).toBeVisible();
     expect(screen.queryByText(/选择你的/)).toBeNull();
   });

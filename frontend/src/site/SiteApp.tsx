@@ -1082,7 +1082,7 @@ export function SiteApp() {
   const headerNavigation = [
     ["Home", "/"],
     ["Products", "/product/"],
-    ["Edition", "/pricing/"],
+    ["Pricing", "/pricing/"],
     ["Manual", "/manual/"],
     ["Community", "/community/"],
   ] as const;

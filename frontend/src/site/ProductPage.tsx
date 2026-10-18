@@ -22,31 +22,31 @@ const products: readonly ProductDefinition[] = [
   {
     id: "universal",
     name: "Universal",
-    summary: "The complete DroneDream workspace for teams that move between simulation, hardware, field work, and autonomous missions.",
+    summary: "Unite simulation, hardware, field operations, and autonomous missions in one workspace.",
     features: ["All five workspaces", "One local Runtime", "Shared aircraft and maps"],
   },
   {
     id: "sim",
     name: "SIM",
-    summary: "Build repeatable PX4 and Gazebo flights, compare control changes, and rerun the same scenario locally.",
+    summary: "Build repeatable PX4 and Gazebo flights, compare controls, and replay scenarios locally.",
     features: ["PX4 and Gazebo", "Scenario replay", "Parameter exploration"],
   },
   {
     id: "lab",
     name: "LAB",
-    summary: "Connect simulation with controlled hardware experiments and keep calibration work in one place.",
+    summary: "Connect simulation, hardware trials, sensor integration, and calibration in one workspace.",
     features: ["Hardware in the loop", "Sensor integration", "Model calibration"],
   },
   {
     id: "field",
     name: "FIELD",
-    summary: "Configure vehicles, follow live telemetry, and support real aircraft work from a field focused interface.",
+    summary: "Configure aircraft, follow live telemetry, and manage field operations in one workspace.",
     features: ["Vehicle setup", "Live telemetry", "Operator controls"],
   },
   {
     id: "autonomy",
     name: "AGENT",
-    summary: "Describe a mission in everyday language, plan it against a map, and follow the aircraft through execution.",
+    summary: "Describe missions in everyday language, map each route, and follow the aircraft live.",
     features: ["Natural language", "Map aware planning", "Live mission views"],
   },
 ] as const;
@@ -115,12 +115,7 @@ export function ProductPage({
     <section className="site-products-page" aria-labelledby="site-products-title">
       <div className="site-products-shell">
         <header className="site-products-intro">
-          <p>DRONEDREAM PRODUCTS</p>
-          <h1 id="site-products-title">One platform. Five ways to fly.</h1>
-          <span>
-            Choose the workspace that matches the work. Every product uses the same
-            aircraft, maps, Runtime, and account.
-          </span>
+          <h1 id="site-products-title">One platform for every stage of flight.</h1>
         </header>
 
         <div className="site-products-grid">
@@ -135,7 +130,6 @@ export function ProductPage({
                 style={{ "--product-order": index } as CSSProperties}
                 key={product.id}
               >
-                <div className="site-products-card-number">0{index + 1}</div>
                 <img src={logo} alt={`DroneDream ${product.name}`} />
                 <p>{product.summary}</p>
                 <ul>
