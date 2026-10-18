@@ -17,9 +17,15 @@ const policySections: Array<{
   id: PolicySection;
   label: string;
   source: string;
+  sourcePath: "PRIVACY.md" | "CODE_SIGNING_POLICY.md";
 }> = [
-  { id: "privacy", label: "Privacy", source: privacyPolicy },
-  { id: "code-signing", label: "Code signing", source: codeSigningPolicy },
+  { id: "privacy", label: "Privacy", source: privacyPolicy, sourcePath: "PRIVACY.md" },
+  {
+    id: "code-signing",
+    label: "Code signing",
+    source: codeSigningPolicy,
+    sourcePath: "CODE_SIGNING_POLICY.md",
+  },
 ];
 
 function policyBody(source: string): string {
@@ -106,6 +112,7 @@ export default function PolicyDialog({ onClose }: PolicyDialogProps) {
           className="site-policy-content"
           role="tabpanel"
           aria-labelledby={`site-policy-tab-${selectedPolicy.id}`}
+          data-source-path={selectedPolicy.sourcePath}
           tabIndex={0}
         >
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: PolicyLink }}>
