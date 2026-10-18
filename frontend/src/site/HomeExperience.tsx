@@ -136,7 +136,7 @@ export function HomeExperience({ release }: { release: WebsiteRelease }) {
     >
       <div className="site-home-backdrop" aria-hidden="true" />
       <div className="site-home-copy">
-        <h1 id="home-experience-title">Say the mission. Watch it fly.</h1>
+        <h1 id="home-experience-title">Give Every Mission a Flight Agent.</h1>
         <p>
           Turn everyday language into complete drone missions.<br />{" "}
           Plan the route, choose the aircraft, and follow every move.

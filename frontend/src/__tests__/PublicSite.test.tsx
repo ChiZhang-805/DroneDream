@@ -47,7 +47,7 @@ describe("DroneDream public website", () => {
     const { container } = renderSite();
 
     expect(document.title).toBe("DroneDream");
-    expect(screen.getByRole("heading", { name: "Say the mission. Watch it fly." })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Give Every Mission a Flight Agent." })).toBeVisible();
     expect(screen.getByText(/Turn everyday language into complete drone missions/i)).toBeVisible();
     expect(screen.getByRole("navigation", { name: "Primary navigation" })).toBeVisible();
     expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "page");
@@ -236,7 +236,7 @@ describe("DroneDream public website", () => {
     expect(document.documentElement).toHaveAttribute("lang", "en");
     expect(document.title).toBe("DroneDream");
     expect(screen.queryByRole("button", { name: /Switch to Simplified Chinese/i })).toBeNull();
-    expect(screen.getByRole("heading", { name: "Say the mission. Watch it fly." })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Give Every Mission a Flight Agent." })).toBeVisible();
     expect(screen.getByText("Products")).toBeVisible();
     expect(screen.getByRole("link", { name: "Download Universal" })).toBeVisible();
     expect(container.querySelectorAll(".site-home-card")).toHaveLength(11);
@@ -247,7 +247,7 @@ describe("DroneDream public website", () => {
     window.history.replaceState(null, "", "/#%E0%A4%A");
 
     expect(() => renderSite()).not.toThrow();
-    expect(screen.getByRole("heading", { name: /Say the mission/i })).toBeVisible();
+    expect(screen.getByRole("heading", { name: /Give Every Mission a Flight Agent/i })).toBeVisible();
   });
 
   it("keeps the full mission gallery available when the operating system requests reduced motion", () => {
