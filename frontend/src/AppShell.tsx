@@ -4647,7 +4647,7 @@ function AppShellContent() {
 
   return (
     <EditionThemeProvider edition={activeThemeEdition}>
-      <div className={`app-shell${experimentWizardMode ? " app-shell-wizard" : ""}${publicDemoConsole ? " app-shell-public-demo" : ""}`}>
+      <div className={`app-shell${experimentWizardMode ? " app-shell-wizard" : ""}`}>
       <a
         className="skip-link"
         href="#main-content"

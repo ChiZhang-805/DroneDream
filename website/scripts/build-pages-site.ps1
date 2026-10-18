@@ -127,7 +127,11 @@ $consoleRoutes = @(
     "desktop\setup",
     "lab",
     "lab\hardware",
+    "lab\validation",
     "field",
+    "field\device",
+    "field\tuning",
+    "field\operations",
     "sim"
 )
 foreach ($route in $consoleRoutes) {

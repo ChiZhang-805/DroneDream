@@ -8,6 +8,7 @@ import type { RouteObject } from "react-router-dom";
 
 import { AppShell } from "./AppShell";
 import { isDesktopRuntime } from "./desktop/bridge";
+import { restoredHostedConsolePath } from "./hostedConsoleRouting";
 import { getDesktopStartupGateSession } from "./desktop/startupGate";
 import {
   BUILD_HAS_FIELD_WORKSPACE,
@@ -217,6 +218,13 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
 }
 
 export function createAppRouter(desktopRuntime = isDesktopRuntime()) {
+  if (!desktopRuntime) {
+    const restoredPath = restoredHostedConsolePath(
+      window.location.pathname,
+      window.location.search,
+    );
+    if (restoredPath) window.history.replaceState(null, "", restoredPath);
+  }
   const routes = appRoutes(desktopRuntime);
   // A packaged Tauri app has no HTTP server to resolve a console route after a
   // WebView reload. Hash history keeps every asset request on index.html while

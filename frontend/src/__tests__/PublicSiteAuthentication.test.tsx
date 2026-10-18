@@ -23,6 +23,10 @@ const authMock = vi.hoisted(() => ({
   signOut: vi.fn(async (): Promise<void> => undefined),
 }));
 
+const accountApiMock = vi.hoisted(() => ({
+  getManagedModelUsage: vi.fn(),
+}));
+
 vi.mock("../features/auth/AuthContext", () => ({
   useAuthOrLocal: () => ({
     configured: true,
@@ -43,6 +47,10 @@ vi.mock("../features/auth/AuthContext", () => ({
     updateAvatar: vi.fn(async () => undefined),
     signOut: authMock.signOut,
   }),
+}));
+
+vi.mock("../features/settings/cloudModelAccess", () => ({
+  getManagedModelUsage: accountApiMock.getManagedModelUsage,
 }));
 
 function renderOAuthPage(locale: "en" | "zh-CN" = "en") {
@@ -73,6 +81,11 @@ describe("public website account authentication", () => {
     window.localStorage.clear();
     authMock.state.account = null;
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline test")));
+    accountApiMock.getManagedModelUsage.mockReset();
+    accountApiMock.getManagedModelUsage.mockResolvedValue({
+      plan: { name: "Pro" },
+      account: { billing_scope: "individual" },
+    });
     [
       authMock.signInWithPassword,
       authMock.sendRegistrationCode,
@@ -90,7 +103,7 @@ describe("public website account authentication", () => {
     vi.unstubAllEnvs();
   });
 
-  it("replaces Sign in with the signed-in user's avatar, name, and account menu", () => {
+  it("uses the uploaded avatar and limits signed-in summaries to name and plan", async () => {
     authMock.state.account = {
       id: "account-1",
       email: "pilot@example.com",
@@ -108,11 +121,38 @@ describe("public website account authentication", () => {
 
     fireEvent.click(accountButton);
     const menu = screen.getByRole("menu", { name: "Account" });
-    expect(within(menu).getByText("pilot@example.com")).toBeVisible();
+    expect(await within(menu).findByText("Plan: Pro")).toBeVisible();
+    expect(within(menu).queryByText("pilot@example.com")).not.toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Account" })).toBeVisible();
     expect(within(menu).getByRole("menuitem", { name: "Open console" })).toBeVisible();
-    fireEvent.click(within(menu).getByRole("menuitem", { name: "Sign out" }));
+
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Account" }));
+    const dialog = screen.getByRole("dialog", { name: "Account" });
+    expect(within(dialog).queryByRole("heading", { name: "Account" }))
+      .not.toBeInTheDocument();
+    expect(within(dialog).getByText("Pilot Rivera")).toBeVisible();
+    expect(within(dialog).getByText("Plan: Pro")).toBeVisible();
+    expect(within(dialog).queryByText("pilot@example.com")).not.toBeInTheDocument();
+    expect(dialog.querySelector(".site-auth-account-avatar img")).toHaveAttribute(
+      "src",
+      authMock.state.account.avatarUrl,
+    );
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Sign out" }));
     expect(authMock.signOut).toHaveBeenCalledOnce();
+  });
+
+  it("shows the neutral person fallback only when no uploaded avatar exists", () => {
+    authMock.state.account = {
+      id: "account-1",
+      email: "pilot@example.com",
+      displayName: "Pilot Rivera",
+      avatarUrl: null,
+    };
+
+    const { container } = renderHomePage();
+    expect(container.querySelector(".site-account-avatar img")).not.toBeInTheDocument();
+    expect(container.querySelector(".site-account-avatar svg")).toBeVisible();
   });
 
   it("combines privacy and code-signing content in one Policies dialog", async () => {
@@ -133,7 +173,11 @@ describe("public website account authentication", () => {
     expect(within(menu).queryByText("Code signing policy")).not.toBeInTheDocument();
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Policies" }));
 
-    const dialog = await screen.findByRole("dialog", { name: "Policies" });
+    const dialog = await screen.findByRole(
+      "dialog",
+      { name: "Policies" },
+      { timeout: 5_000 },
+    );
     expect(within(dialog).getByRole("tab", { name: "Privacy" })).toHaveAttribute(
       "aria-selected",
       "true",

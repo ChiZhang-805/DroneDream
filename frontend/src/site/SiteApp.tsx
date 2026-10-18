@@ -501,6 +501,34 @@ function AccountIcon() {
   );
 }
 
+function SiteAccountAvatar({
+  avatarUrl,
+  className,
+}: {
+  avatarUrl: string | null;
+  className: string;
+}) {
+  const [avatarFailed, setAvatarFailed] = useState(false);
+
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [avatarUrl]);
+
+  return (
+    <span className={className} aria-hidden="true">
+      {avatarUrl && !avatarFailed ? (
+        <img
+          src={avatarUrl}
+          alt=""
+          onError={() => setAvatarFailed(true)}
+        />
+      ) : (
+        <AccountIcon />
+      )}
+    </span>
+  );
+}
+
 export function SiteApp() {
   const { setLocale } = useI18n();
   const locale = "en" as const;
@@ -1083,6 +1111,11 @@ export function SiteApp() {
     || authMode === "recovery-password"
     || authMode === "reset-update";
   const showVerificationCode = authMode === "register" || recoveryCodeMode;
+  const showSignedInAccount = Boolean(
+    auth.account
+    && authMode !== "reset-update"
+    && (!hasValidOAuthAuthorizationId || desktopOAuthFreshAuthReady),
+  );
   const showCaptcha = captchaProtectionConfigured && (
     authMode === "sign-in"
     || authMode === "register"
@@ -1152,13 +1185,10 @@ export function SiteApp() {
                 setAccountMenuOpen((open) => !open);
               }}
             >
-              <span className="site-account-avatar" aria-hidden="true">
-                {auth.account?.avatarUrl ? (
-                  <img src={auth.account.avatarUrl} alt="" />
-                ) : (
-                  <AccountIcon />
-                )}
-              </span>
+              <SiteAccountAvatar
+                className="site-account-avatar"
+                avatarUrl={auth.account?.avatarUrl ?? null}
+              />
               <span>{auth.account ? accountName : copy.signIn}</span>
               {auth.account ? <DownloadChevronIcon /> : null}
             </button>
@@ -1171,7 +1201,11 @@ export function SiteApp() {
               >
                 <div className="site-account-menu-profile">
                   <strong>{accountName}</strong>
-                  <span>{auth.account.email}</span>
+                  <span>
+                    {copy.accountPlan}: {accountPlan
+                      ? `${accountPlan.billingScope === "business" ? `${copy.businessPlan} ` : ""}${accountPlan.name}`
+                      : "—"}
+                  </span>
                 </div>
                 <button
                   type="button"
@@ -1313,7 +1347,8 @@ export function SiteApp() {
             className={`site-auth-dialog${oauthAuthPage ? " is-oauth-page" : ""}`}
             role="dialog"
             aria-modal="true"
-            aria-labelledby="site-auth-title"
+            aria-labelledby={showSignedInAccount ? undefined : "site-auth-title"}
+            aria-label={showSignedInAccount ? copy.account : undefined}
           >
             <header className="site-auth-header">
               <div className="site-auth-brand" role="img" aria-label="DroneDream">
@@ -1352,19 +1387,19 @@ export function SiteApp() {
               ) : null}
               </div>
             </header>
-            <h2 id="site-auth-title">{authTitle}</h2>
-            {auth.account
-              && authMode !== "reset-update"
-              && (!hasValidOAuthAuthorizationId || desktopOAuthFreshAuthReady) ? (
+            {!showSignedInAccount ? <h2 id="site-auth-title">{authTitle}</h2> : null}
+            {showSignedInAccount && auth.account ? (
               <div className="site-auth-account">
-                <AccountIcon />
+                <SiteAccountAvatar
+                  className="site-auth-account-avatar"
+                  avatarUrl={auth.account.avatarUrl}
+                />
                 <strong>{auth.account.displayName}</strong>
-                <span>{auth.account.email}</span>
-                {accountPlan ? (
-                  <span className="site-auth-plan">
-                    {copy.accountPlan}: {accountPlan.billingScope === "business" ? `${copy.businessPlan} ` : ""}{accountPlan.name}
-                  </span>
-                ) : null}
+                <span className="site-auth-plan">
+                  {copy.accountPlan}: {accountPlan
+                    ? `${accountPlan.billingScope === "business" ? `${copy.businessPlan} ` : ""}${accountPlan.name}`
+                    : "—"}
+                </span>
                 <a className="site-button site-button-primary" href="/console/">
                   {copy.openConsole}
                   <ArrowRightIcon />

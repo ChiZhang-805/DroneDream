@@ -4,18 +4,6 @@
   padding: 0;
 }
 
-.app-shell-public-demo:has(.lab-page),
-.app-shell-public-demo:has(.lab-page) .app-body {
-  height: 100dvh;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.app-shell-public-demo .app-main:has(.lab-page) {
-  min-height: 0;
-  overflow: auto;
-}
-
 .lab-page {
   --lab-lime: #a7e84a;
   --lab-green: #20c77a;

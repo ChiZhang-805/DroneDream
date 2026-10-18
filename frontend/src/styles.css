@@ -2743,45 +2743,6 @@ code {
   min-height: 100vh;
 }
 
-html:has(.app-shell-public-demo),
-body:has(.app-shell-public-demo),
-#root:has(.app-shell-public-demo) {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.app-shell-public-demo {
-  width: 100%;
-  height: 100dvh;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.app-shell-public-demo .app-sidebar,
-.app-shell-public-demo .app-body {
-  min-height: 0;
-}
-
-.app-shell-public-demo .app-body {
-  height: 100%;
-  overflow: hidden;
-}
-
-.app-shell-public-demo .app-main {
-  min-height: 0;
-  overflow: auto;
-}
-
-.app-shell-public-demo .app-footer {
-  display: none;
-}
-
-.app-shell-public-demo .app-main:has(.dashboard-page) {
-  overflow: hidden;
-}
-
 .app-sidebar {
   display: flex;
   flex-direction: column;
@@ -5920,10 +5881,6 @@ a {
   min-height: 0;
   max-width: none;
   padding: clamp(0.75rem, 1.15vw, 1.1rem);
-  overflow: hidden;
-}
-
-.app-shell-public-demo .app-main:has(.autonomy-lab-page) {
   overflow: hidden;
 }
 
@@ -15754,21 +15711,6 @@ a {
       transparent 30rem
     ),
     color-mix(in srgb, var(--dd-brand-light-surface) 92%, #ffffff);
-}
-
-.app-shell-public-demo .app-main:has(> .fixed-scenarios-page),
-.app-shell-public-demo .app-main:has(> .field-app-embedded-console) {
-  max-width: none;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.app-shell-public-demo .app-main:has(> .fixed-scenarios-page) {
-  padding: 0.85rem 1rem;
-}
-
-.app-shell-public-demo .app-main:has(> .field-app-embedded-console) {
-  padding: 0;
 }
 
 html[data-brand-edition="lab"] .app-main:has(.experiment-assistant-page) {

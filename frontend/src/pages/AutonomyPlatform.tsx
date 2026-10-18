@@ -2142,6 +2142,7 @@ export function AutonomyAircraft() {
 
   return (
     <section className="autonomy-repository-page">
+      <h1 className="sr-only">{chinese ? "无人机" : "Aircraft"}</h1>
       <div className="autonomy-repository-toolbar">
         <p>{chinese ? "双击卡片查看详情" : "Double-click a card for details"}</p>
         <AutonomyAssetConnectorPanel kind="vehicle" chinese={chinese} compact />
@@ -2216,6 +2217,7 @@ export function AutonomyMaps() {
 
   return (
     <section className="autonomy-repository-page">
+      <h1 className="sr-only">{chinese ? "地图" : "Maps"}</h1>
       <div className="autonomy-repository-toolbar">
         <p>{chinese ? "双击卡片查看详情" : "Double-click a card for details"}</p>
         <AutonomyAssetConnectorPanel kind="map" chinese={chinese} compact />
@@ -2767,6 +2769,7 @@ export function AutonomyLive() {
 
   return (
     <section className="autonomy-live-viewer">
+      <h1 className="sr-only">{chinese ? "实时画面" : "Live"}</h1>
       <div className="autonomy-live-player">
         <div className="autonomy-live-screen" data-playing={playing}>
           {playing && selectedSource?.transport === "agent-core-frame" ? <canvas ref={canvasRef} aria-label={selectedSource.label} /> : null}
