@@ -115,6 +115,41 @@ describe("public website account authentication", () => {
     expect(authMock.signOut).toHaveBeenCalledOnce();
   });
 
+  it("combines privacy and code-signing content in one Policies dialog", async () => {
+    authMock.state.account = {
+      id: "account-1",
+      email: "pilot@example.com",
+      displayName: "Pilot Rivera",
+      avatarUrl: null,
+    };
+
+    renderHomePage();
+    const accountButton = screen.getByRole("button", { name: "Pilot Rivera" });
+    fireEvent.click(accountButton);
+
+    const menu = screen.getByRole("menu", { name: "Account" });
+    expect(within(menu).getAllByRole("menuitem", { name: "Policies" })).toHaveLength(1);
+    expect(within(menu).queryByText("Privacy policy")).not.toBeInTheDocument();
+    expect(within(menu).queryByText("Code signing policy")).not.toBeInTheDocument();
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Policies" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Policies" });
+    expect(within(dialog).getByRole("tab", { name: "Privacy" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(within(dialog).getByText("Effective date: July 20, 2026")).toBeVisible();
+
+    fireEvent.click(within(dialog).getByRole("tab", { name: "Code signing" }));
+    expect(within(dialog).getByText(/Status: preparation/)).toBeVisible();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close policies" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Policies" })).not.toBeInTheDocument();
+      expect(accountButton).toHaveFocus();
+    });
+  });
+
   it("opens a branded non-closable sign-in page directly for desktop OAuth", async () => {
     const { container } = renderOAuthPage();
 

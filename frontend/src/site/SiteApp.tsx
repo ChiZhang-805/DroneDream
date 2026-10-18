@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { BrandLockup } from "../components/BrandLockup";
 import { AuthCaptcha } from "../features/auth/AuthCaptcha";
@@ -33,9 +41,7 @@ import {
   type WebsiteRelease,
 } from "./release";
 
-const GITHUB_URL = "https://github.com/ChiZhang-805/DroneDream";
-const CODE_SIGNING_POLICY_URL = `${GITHUB_URL}/blob/main/CODE_SIGNING_POLICY.md`;
-const PRIVACY_POLICY_URL = `${GITHUB_URL}/blob/main/PRIVACY.md`;
+const PolicyDialog = lazy(() => import("./PolicyDialog"));
 
 type AuthMode =
   | "sign-in"
@@ -252,8 +258,7 @@ const content = {
     platformValue: "Windows x64",
     released: "Released",
     footerLine: "Local-first UAV planning, simulation, and mission control. Version 1.0.0 is available now.",
-    codeSigningPolicy: "Code signing policy",
-    privacyPolicy: "Privacy policy",
+    policies: "Policies",
     communityGuidelines: "Community guidelines",
   },
   "zh-CN": {
@@ -466,8 +471,7 @@ const content = {
     platformValue: "Windows x64",
     released: "发布日期",
     footerLine: "本地优先的 PX4/Gazebo 控制参数调优平台；1.0.0 正式版已经发布，代码签名正在按公开流程准备。",
-    codeSigningPolicy: "代码签名政策",
-    privacyPolicy: "隐私政策",
+    policies: "政策",
     communityGuidelines: "社区规范",
   },
 } as const;
@@ -507,6 +511,7 @@ export function SiteApp() {
     useState<EditionAvailabilityDocument>(fallbackEditionAvailability);
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [policyOpen, setPolicyOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [authOpen, setAuthOpen] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>("sign-in");
@@ -535,6 +540,10 @@ export function SiteApp() {
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const authDialogRef = useRef<HTMLElement>(null);
   const authCloseRef = useRef<HTMLButtonElement>(null);
+  const closePolicies = useCallback(() => {
+    setPolicyOpen(false);
+    requestAnimationFrame(() => accountButtonRef.current?.focus());
+  }, []);
   const path = window.location.pathname.replace(/\/+$/u, "") || "/";
   const sitePage = path === "/manual"
     ? "manual"
@@ -1179,24 +1188,16 @@ export function SiteApp() {
                     {copy.organization}
                   </a>
                 ) : null}
-                <a
-                  href={PRIVACY_POLICY_URL}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  type="button"
                   role="menuitem"
-                  onClick={closeMenu}
+                  onClick={() => {
+                    setAccountMenuOpen(false);
+                    setPolicyOpen(true);
+                  }}
                 >
-                  {copy.privacyPolicy}
-                </a>
-                <a
-                  href={CODE_SIGNING_POLICY_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  role="menuitem"
-                  onClick={closeMenu}
-                >
-                  {copy.codeSigningPolicy}
-                </a>
+                  {copy.policies}
+                </button>
                 <button
                   type="button"
                   role="menuitem"
@@ -1281,6 +1282,18 @@ export function SiteApp() {
           <HomeExperience release={release} />
         )}
       </main>
+
+      {policyOpen ? (
+        <Suspense
+          fallback={(
+            <div className="site-policy-backdrop" aria-hidden="true">
+              <div className="site-policy-dialog site-policy-loading">Loading policies…</div>
+            </div>
+          )}
+        >
+          <PolicyDialog onClose={closePolicies} />
+        </Suspense>
+      ) : null}
 
       {authOpen ? (
         <div

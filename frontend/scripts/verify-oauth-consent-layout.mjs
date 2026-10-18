@@ -145,7 +145,7 @@ try {
 
   for (const testCase of [
     { id: "desktop-en-1920x1080", locale: "en", width: 1920, height: 1080 },
-    { id: "desktop-zh-1920x1080", locale: "zh-CN", width: 1920, height: 1080 },
+    { id: "desktop-forced-en-stored-zh-1920x1080", locale: "zh-CN", width: 1920, height: 1080 },
     { id: "desktop-en-1440x900", locale: "en", width: 1440, height: 900 },
     { id: "wide-en-2560x1246", locale: "en", width: 2560, height: 1246 },
   ]) {
@@ -168,8 +168,7 @@ try {
     );
     const dialog = page.locator(".site-auth-dialog");
     await dialog.waitFor();
-    const expectedTitle = testCase.locale === "zh-CN" ? "登录" : "Sign in";
-    await page.getByRole("heading", { name: expectedTitle }).waitFor();
+    await page.getByRole("heading", { name: "Sign in" }).waitFor();
 
     const metrics = await measureAuthenticationPage(page);
     await page.screenshot({
@@ -197,12 +196,12 @@ try {
       `${testCase.id}: dialog leaves the bottom edge`,
     );
     assert.equal(
-      await page.getByLabel(testCase.locale === "zh-CN" ? "邮箱地址" : "Email address").count(),
+      await page.getByLabel("Email address").count(),
       1,
       `${testCase.id}: email field missing`,
     );
     assert.equal(
-      await page.getByLabel(testCase.locale === "zh-CN" ? "密码" : "Password").count(),
+      await page.getByLabel("Password").count(),
       1,
       `${testCase.id}: password field missing`,
     );
@@ -282,18 +281,6 @@ try {
   await installBrowserSession(callbackContext);
   const callbackPage = await callbackContext.newPage();
   const consentRequests = [];
-  const callbackConsoleErrors = [];
-  const callbackPageErrors = [];
-  const callbackHttpErrors = [];
-  callbackPage.on("console", (message) => {
-    if (message.type() === "error") callbackConsoleErrors.push(message.text());
-  });
-  callbackPage.on("pageerror", (error) => callbackPageErrors.push(error.message));
-  callbackPage.on("response", (response) => {
-    if (response.status() >= 400) {
-      callbackHttpErrors.push({ status: response.status(), url: response.url() });
-    }
-  });
   await callbackPage.route("**/functions/v1/**", async (route) => {
     await route.fulfill({
       status: 200,
@@ -302,33 +289,19 @@ try {
     });
   });
   await mockDesktopAuthorization(callbackPage, consentRequests);
-  await callbackPage.route(`${callbackOrigin}${callbackPath}**`, async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: "text/html",
-      body: "<!doctype html><title>Returned to AGENT</title><p id='returned'>Returned to AGENT</p>",
-    });
-  });
   await callbackPage.goto(
     `${origin}/oauth/consent/?authorization_id=${authorization.authorization_id}`,
   );
-  await callbackPage.waitForURL(`${callbackOrigin}${callbackPath}**`);
-  assert.equal(consentRequests.length, 1, "verified session was not approved exactly once");
-  assert.equal(consentRequests[0].method, "POST", "approval did not use POST");
-  assert.equal(await callbackPage.locator("#returned").count(), 1, "desktop callback did not load");
+  await callbackPage.getByRole("heading", { name: "Sign in" }).waitFor();
+  assert.equal(consentRequests.length, 0, "stored browser session bypassed fresh sign-in");
   assert.equal(
-    callbackConsoleErrors.length,
-    0,
-    `automatic return emitted console errors: ${JSON.stringify({ callbackConsoleErrors, callbackHttpErrors })}`,
-  );
-  assert.equal(
-    callbackPageErrors.length,
-    0,
-    `automatic return emitted page errors: ${JSON.stringify(callbackPageErrors)}`,
+    callbackPage.url().startsWith(`${origin}/oauth/consent/`),
+    true,
+    "stored browser session unexpectedly left the consent page",
   );
   results.push({
-    id: "authenticated-auto-return",
-    callback: callbackPage.url(),
+    id: "stored-session-requires-fresh-sign-in",
+    url: callbackPage.url(),
     consentRequests,
   });
   await callbackContext.close();

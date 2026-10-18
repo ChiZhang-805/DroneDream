@@ -177,7 +177,7 @@ try {
 
   for (const testCase of [
     { id: "recent-en", locale: "en", path: "/community/?docsPreview=1", viewport: { width: 1440, height: 900 }, expectedCards: 5 },
-    { id: "all-zh", locale: "zh-CN", path: "/community/?view=all&docsPreview=1", viewport: { width: 1920, height: 1080 }, expectedCards: 10 },
+    { id: "all-en", locale: "en", path: "/community/?view=all&docsPreview=1", viewport: { width: 1920, height: 1080 }, expectedCards: 10 },
     { id: "all-en-short", locale: "en", path: "/community/?view=all&docsPreview=1", viewport: { width: 1920, height: 768 }, expectedCards: 10 },
     { id: "all-en-wide", locale: "en", path: "/community/?view=all&docsPreview=1", viewport: { width: 2560, height: 1246 }, expectedCards: 10, minShortCardRowGap: 8 },
     { id: "all-en-breakpoint", locale: "en", path: "/community/?view=all&docsPreview=1", viewport: { width: 1024, height: 900 }, expectedCards: 10, minShortCardRowGap: 8 },
@@ -215,7 +215,7 @@ try {
         };
       });
     }
-    if (testCase.id === "all-zh") {
+    if (testCase.id === "all-en") {
       await page.locator(".community-topic-grid article").first().locator(".community-topic-cover").click();
       await page.locator(".community-topic-dialog").waitFor();
       shortTitleParity = await page.evaluate(() => {
@@ -268,12 +268,12 @@ try {
             && !artwork.classList.contains("is-long"),
         };
       });
-      await page.screenshot({ path: path.join(outputRoot, "short-title-parity-zh.png") });
+      await page.screenshot({ path: path.join(outputRoot, "short-title-parity-en.png") });
       await page.locator(".community-dialog-close").click();
-      await page.getByRole("button", { name: "第 2" }).click();
+      await page.getByRole("button", { name: "Page 2" }).click();
       await page.locator(".community-topic-grid article.is-long").first().waitFor();
       mixedPage = await measure(page);
-      await page.screenshot({ path: path.join(outputRoot, "all-zh-mixed.png") });
+      await page.screenshot({ path: path.join(outputRoot, "all-en-mixed.png") });
       await page.locator(".community-topic-grid article.is-long .community-topic-cover").click();
       await page.locator(".community-topic-dialog").waitFor();
       longDialog = await page.evaluate(() => {

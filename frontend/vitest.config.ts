@@ -9,6 +9,11 @@ export default defineConfig({
       process.env.VITE_DRONEDREAM_EDITION ?? "universal",
     ),
   },
+  server: {
+    fs: {
+      allow: [".."],
+    },
+  },
   test: {
     environment: "jsdom",
     globals: true,
