@@ -16,6 +16,29 @@
   .dd-site[data-page="community"] .site-header.is-scrolled {
     height: 78px;
   }
+
+  .dd-site[data-page="manual"] .site-header.is-scrolled .site-nav {
+    border-color: rgba(76, 83, 112, 0.12);
+    background: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 12px 34px rgba(44, 50, 78, 0.14);
+    backdrop-filter: blur(18px) saturate(145%);
+  }
+
+  .dd-site[data-page="manual"] .site-header.is-scrolled .site-nav a {
+    color: #676d7d;
+  }
+
+  .dd-site[data-page="manual"] .site-header.is-scrolled .site-nav a:hover,
+  .dd-site[data-page="manual"] .site-header.is-scrolled .site-nav a:focus-visible {
+    color: #1d2130;
+    background: rgba(99, 86, 191, 0.08);
+  }
+
+  .dd-site[data-page="manual"] .site-header.is-scrolled .site-nav a[aria-current="page"] {
+    color: #fff;
+    background: linear-gradient(112deg, #55d8ee 0%, #7b5cf0 52%, #e44ac4 100%);
+    box-shadow: 0 7px 20px rgba(117, 78, 216, 0.25);
+  }
 }
 
 .site-manual-page {

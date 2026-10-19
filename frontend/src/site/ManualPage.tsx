@@ -324,42 +324,50 @@ export function ManualPage({ locale }: ManualPageProps) {
     if (hashId && initialHeading.id === hashId) pendingHeadingIdRef.current = hashId;
 
     const root = articleRef.current;
-    if (!root || typeof IntersectionObserver === "undefined") return;
-    let observer: IntersectionObserver | undefined;
-    let observedSignature = "";
+    if (!root) return;
+    let frame = 0;
 
-    const connect = () => {
+    const updateActiveHeading = () => {
+      frame = 0;
+      if (pendingHeadingIdRef.current) return;
       const observed = Array.from(
         root.querySelectorAll<HTMLElement>("[data-manual-heading='true']"),
       );
-      const signature = observed.map((heading) => heading.id).join("|");
-      if (!observed.length || signature === observedSignature) return;
-      observer?.disconnect();
-      observedSignature = signature;
-      observer = new IntersectionObserver(
-        (entries) => {
-          const visible = entries
-            .filter((entry) => entry.isIntersecting)
-            .sort((left, right) => left.boundingClientRect.top - right.boundingClientRect.top);
-          const first = visible[0]?.target;
-          if (first instanceof HTMLElement && !pendingHeadingIdRef.current) {
-            setActiveId(first.id);
-          }
-        },
-        { rootMargin: "-18% 0px -70% 0px", threshold: [0, 1] },
-      );
-      observed.forEach((heading) => observer?.observe(heading));
+      if (!observed.length) return;
+
+      const headerHeight = document.querySelector<HTMLElement>(".site-header")?.offsetHeight ?? 78;
+      const readingLine = headerHeight + 56;
+      let currentHeading = observed[0];
+      for (const heading of observed) {
+        if (heading.getBoundingClientRect().top <= readingLine) currentHeading = heading;
+        else break;
+      }
+
+      setActiveId((current) => {
+        if (current === currentHeading.id) return current;
+        window.history.replaceState(null, "", `#${currentHeading.id}`);
+        return currentHeading.id;
+      });
     };
 
-    connect();
-    const mutationObserver = new MutationObserver(connect);
+    const scheduleUpdate = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(updateActiveHeading);
+    };
+
+    scheduleUpdate();
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
+    const mutationObserver = new MutationObserver(scheduleUpdate);
     mutationObserver.observe(root, { childList: true, subtree: true });
 
     return () => {
+      window.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+      window.cancelAnimationFrame(frame);
       mutationObserver.disconnect();
-      observer?.disconnect();
     };
-  }, [headings, state]);
+  }, [activeChapterIndex, headings, state]);
 
   useEffect(() => {
     if (state !== "ready" || !pendingHeadingIdRef.current) return;
