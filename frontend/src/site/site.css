@@ -16,6 +16,24 @@ body:has(#site-root) {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Keep every site surface scrollable without exposing browser scroll tracks. */
+:root:has(#site-root),
+body:has(#site-root),
+.dd-site,
+.dd-site * {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none;
+}
+
+:root:has(#site-root)::-webkit-scrollbar,
+body:has(#site-root)::-webkit-scrollbar,
+.dd-site::-webkit-scrollbar,
+.dd-site *::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
 body:has(#site-root) button,
 body:has(#site-root) a {
   font-family: inherit;

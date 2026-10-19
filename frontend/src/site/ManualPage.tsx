@@ -1,5 +1,4 @@
 import {
-  BookOpen,
   ChevronRight,
   FileDown,
   FileText,
@@ -256,6 +255,18 @@ export function ManualPage({ locale }: ManualPageProps) {
   }, [copy.wizard, headings, locale, query]);
 
   useEffect(() => {
+    if (!navigationChapters.length) return;
+    setExpandedChapterIds((current) => {
+      if (current.size) return current;
+      const expanded = new Set<string>();
+      navigationChapters.forEach((item) => {
+        expanded.add(item.kind === "group" ? item.id : item.heading.id);
+      });
+      return expanded;
+    });
+  }, [navigationChapters]);
+
+  useEffect(() => {
     if (!headings.length) return;
     setActiveId((current) => current || headings[0].id);
 
@@ -315,7 +326,6 @@ export function ManualPage({ locale }: ManualPageProps) {
     <div className={`site-portal site-manual-page${sidebarOpen ? "" : " is-sidebar-collapsed"}`}>
       <aside className="manual-sidebar" aria-label={copy.ariaLabel}>
         <header className="manual-sidebar-title">
-          <BookOpen aria-hidden="true" />
           <strong>{copy.contents}</strong>
           <button
             type="button"
@@ -535,7 +545,7 @@ export function ManualPage({ locale }: ManualPageProps) {
           ) : null}
           {state === "error" ? (
             <div className="manual-reader-state" role="alert">
-              <BookOpen aria-hidden="true" />
+              <FileText aria-hidden="true" />
               <p>{copy.error}</p>
               <button type="button" onClick={() => setLoadAttempt((value) => value + 1)}>
                 <RotateCw aria-hidden="true" />

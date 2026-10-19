@@ -105,24 +105,24 @@ function prepareManualWebSource(source: string): string {
 }
 
 export default function ManualDocument({ source, headings }: ManualDocumentProps) {
-  let headingCursor = 0;
+  const headingBySignature = new Map(
+    headings.map((heading) => [
+      `${heading.level}:${heading.plainLabel}`,
+      heading,
+    ]),
+  );
 
   const nextHeading = (level: 1 | 2 | 3, children: ReactNode) => {
-    const expected = headings[headingCursor];
     const plainLabel = textFromReactNode(children).trim();
-    if (expected?.level === level && expected.plainLabel === plainLabel) {
-      headingCursor += 1;
-      return expected;
-    }
-    const fallback: ManualHeading = {
-      id: `manual-heading-runtime-${headingCursor}`,
+    const expected = headingBySignature.get(`${level}:${plainLabel}`);
+    if (expected) return expected;
+    return {
+      id: `manual-heading-runtime-${plainLabel.toLocaleLowerCase().replace(/[^a-z0-9]+/gu, "-")}`,
       level,
       label: plainLabel,
       plainLabel,
-      majorIndex: Math.max(0, expected?.majorIndex ?? 0),
+      majorIndex: 0,
     };
-    headingCursor += 1;
-    return fallback;
   };
 
   const headingProps = (heading: ManualHeading) => ({
@@ -187,10 +187,14 @@ export default function ManualDocument({ source, headings }: ManualDocumentProps
             );
           },
           img({ src, alt }) {
+            const resolvedSrc = resolveManualImage(src);
+            const figureKind = src?.includes("story-")
+              ? " is-story-art"
+              : " is-interface-capture";
             return (
-              <figure className="manual-native-figure">
+              <figure className={`manual-native-figure${figureKind}`}>
                 <img
-                  src={resolveManualImage(src)}
+                  src={resolvedSrc}
                   alt={alt ?? ""}
                   loading="lazy"
                 />
@@ -208,7 +212,7 @@ export default function ManualDocument({ source, headings }: ManualDocumentProps
           blockquote({ children }) {
             return (
               <blockquote>
-                <ShieldCheck aria-hidden="true" />
+                <Sparkles aria-hidden="true" />
                 <div>{children}</div>
               </blockquote>
             );
