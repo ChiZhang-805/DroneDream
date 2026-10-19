@@ -23,7 +23,7 @@ const products: readonly ProductDefinition[] = [
   {
     id: "universal",
     name: "Universal",
-    summary: "Move from repeatable simulation to hardware validation, field operations, and natural-language missions without leaving the same workspace.",
+    summary: "Move from repeatable simulation to hardware validation, field operations, and natural-language missions without leaving the same workspace. Keep aircraft, maps, Runtime services, project state, and mission history synchronized across the complete DroneDream suite.",
     features: [
       "All five workspaces",
       "One local Runtime",

@@ -44,6 +44,7 @@ describe("ProductPage", () => {
     expect(screen.getByText("Natural language")).toBeVisible();
     expect(container.querySelectorAll(".site-products-card li")).toHaveLength(19);
     expect(screen.getByText("One installer for the complete suite")).toBeVisible();
+    expect(screen.getByText(/Keep aircraft, maps, Runtime services/)).toBeVisible();
     expect(container.querySelector(".site-products-card.is-universal .site-products-visual")).toBeNull();
     expect(container.querySelector(".site-product-flight-board")).toBeNull();
     expect(container).not.toHaveTextContent(/System requirements|Evidence and history|Who it is for|Validation workflow/i);
