@@ -2531,18 +2531,38 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
 .manual-reader-document { padding-bottom: 7rem; }
 
 .manual-markdown {
+  width: min(100%, 76ch);
   font-size: clamp(1rem, 1.08vw, 1.09rem);
 }
 
 .manual-markdown p {
-  max-width: 76ch;
+  max-width: none;
   color: #485569;
   line-height: 1.88;
 }
 
+.manual-markdown h1 {
+  grid-template-columns: 32px max-content minmax(40px, 1fr);
+  gap: 0.7rem;
+}
+
+.manual-chapter-icon {
+  width: 32px;
+  height: 44px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.manual-chapter-icon svg {
+  width: 27px;
+  height: 27px;
+}
+
 .manual-native-figure {
   width: 100%;
-  max-width: 76ch;
+  max-width: none;
   margin: clamp(1.5rem, 3vw, 2.4rem) 0 clamp(2rem, 4vw, 3.2rem);
 }
 
@@ -2619,6 +2639,18 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
     border-color: rgba(74, 83, 112, 0.12);
     color: #656a7a;
     background: rgba(255, 255, 255, 0.58);
+  }
+  .manual-markdown h1 {
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 0.55rem;
+  }
+  .manual-chapter-icon {
+    width: 30px;
+    height: 40px;
+  }
+  .manual-chapter-icon svg {
+    width: 24px;
+    height: 24px;
   }
 }
 
