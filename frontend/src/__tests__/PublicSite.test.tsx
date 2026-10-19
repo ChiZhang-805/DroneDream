@@ -105,17 +105,12 @@ describe("DroneDream public website", () => {
 
     const { container } = renderSite();
 
-    expect(screen.getByRole("heading", { name: "DroneDream 1.0.0 User Manual" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "DroneDream Manual" })).toBeVisible();
     expect(screen.getByRole("complementary", { name: "DroneDream manual contents" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Hide manual contents" })).toBeVisible();
     expect(screen.getByRole("searchbox", { name: "Search chapters" })).toBeVisible();
-    expect(screen.getByRole("link", { name: "Markdown" })).toHaveAttribute(
-      "href",
-      "/docs/downloads/DroneDream-Manual-en.md",
-    );
-    expect(screen.getByRole("link", { name: "PDF" })).toHaveAttribute(
-      "href",
-      "/docs/downloads/DroneDream-Manual-en.pdf",
-    );
+    expect(screen.getByRole("button", { name: "Markdown" })).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("button", { name: "PDF" })).toHaveAttribute("aria-disabled", "true");
     expect(container.querySelector(".manual-sidebar")).not.toBeNull();
     expect(container.querySelector(".manual-reader")).not.toBeNull();
     expect(screen.queryByRole("dialog", { name: /manual/i })).toBeNull();

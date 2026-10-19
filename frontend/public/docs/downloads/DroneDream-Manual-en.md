@@ -1,193 +1,144 @@
-# DroneDream Manual
+# 1. DroneDream Overview
 
-**Version 1.0.0 · Windows 10/11 x64**
+DroneDream is a desktop flight workspace that connects natural-language missions, simulation, tuning, laboratory work, and field operations. It was designed so one idea can move from a sentence to a completed drone task without rebuilding the project in separate tools.
 
-DroneDream is a local-first workspace for configuring, simulating, and comparing PX4 controller parameters. Language models clarify intent and prepare reviewable drafts; deterministic validation, constraints, acceptance rules, and human review keep every experiment reproducible.
+## 1.1 Purpose
 
-> **Engineering boundary**
->
-> DroneDream can propose and compare candidates, but it never turns simulation output into automatic approval for hardware flight. Independently validate every selected parameter set in SITL before considering real hardware.
+Drone work is often split across chat windows, map tools, simulators, parameter editors, and live vehicle consoles. DroneDream brings those decisions into one place and keeps the operator focused on the mission.
 
-## Contents
+- Replace scattered tools with one workspace.
+- Keep maps, aircraft, and missions connected.
+- Let intent guide each flight decision.
 
-- [1. Start here](#1-start-here)
-- [2. Install and prepare](#2-install-and-prepare)
-- [3. Create with Tuning Chat](#3-create-with-tuning-chat)
-- [4. Complete the five-step experiment](#4-complete-the-five-step-experiment)
-- [5. Edit a custom flight track](#5-edit-a-custom-flight-track)
-- [6. Review history and evidence](#6-review-history-and-evidence)
-- [7. Accounts, data, and safety](#7-accounts-data-and-safety)
+## 1.2 Workspaces
 
-## 1. Start here
+Universal provides the complete workspace. SIM, LAB, FIELD, and AGENT focus the interface on simulation, connected hardware, field flight, and natural-language missions while sharing the same account, aircraft, maps, projects, and Runtime.
 
-DroneDream keeps experiment design, parameter bounds, scenario definitions, optimization budgets, and result evidence in one reviewable workflow. The language model may clarify a request and prepare a draft, while schema validation, coupling rules, simulation, and acceptance checks retain authority over every run.
+- Universal connects every DroneDream workspace.
+- SIM builds repeatable virtual flights.
+- LAB connects sensors and test hardware.
+- FIELD prepares and follows real aircraft.
+- AGENT turns language into complete missions.
 
-Before opening the tuning workspace:
+## 1.3 Workflow
 
-- Use Windows 10 or Windows 11 on an x64 computer.
-- Reserve at least 52 GiB on a writable NTFS drive for the isolated runtime.
-- Create a DroneDream account so drafts and account settings remain associated with the correct user.
-- Configure a model only when you want Tuning Chat or an LLM-guided optimization strategy.
-- Keep the application open while an experiment is running unless the run detail explicitly shows a safe terminal state.
+Every workflow begins with a goal, turns that goal into explicit settings, runs through the appropriate environment, and returns a result the operator can understand and reuse.
 
-## 2. Install and prepare
+- Describe the outcome in ordinary language.
+- Confirm aircraft, location, route, and payload.
+- Run the mission in the chosen workspace.
+- Follow progress and reuse completed projects.
 
-### 2.1 Download and install
+# 2. Flight Agent
 
-Download the current installer from [getdronedream.com](https://getdronedream.com). Run the installer, choose an eligible local drive, and keep the recommended application directory unless the computer has a specific storage policy.
+The Flight Agent converts an everyday request into a complete mission. It uses available map locations, aircraft capabilities, payload needs, and current mission state to choose the next useful action.
 
-### 2.2 Prepare the local runtime
+## 2.1 Mission
 
-On first launch, DroneDream prepares a dedicated WSL2 distribution containing PX4, Gazebo, workers, and experiment artifacts. It does not reuse or modify a personal Ubuntu distribution.
+State the destination, task, payload, timing, or operating preference in one clear request. The Agent can resolve ordinary building names and practical phrases without requiring coordinates or rigid command syntax.
 
-The preparation screen passes through four visible states:
+- Name the place and intended result.
+- Add payload or return requirements.
+- Mention speed, timing, or route preferences.
 
-1. **Checking** — host capabilities and disk requirements are being verified.
-2. **Preparing** — the isolated runtime is being imported and configured.
-3. **Verifying** — required services and manifests are checked.
-4. **Checked** — the status light is green and the workspace button becomes available.
+## 2.2 Maps
 
-> Do not open the tuning workspace while the status still reads **Checking**. The progress indicator reaches 100% only after the environment state becomes **Checked**.
+Choose the relevant map before sending the request. The Agent matches named destinations to the map, plans through connected routes, and keeps the mission anchored to recognizable places.
 
-### 2.3 Recheck only when requested
+- Select the campus or operating map.
+- Use natural building and landmark names.
+- Inspect the planned route before starting.
 
-Opening the workspace does not start another environment check. To run the check again, open **Settings**, find **Local runtime**, and select **Check environment**.
+## 2.3 Aircraft and Payload
 
-## 3. Create with Tuning Chat
+Select an aircraft whose capabilities match the mission. When a task includes delivery or collection, the payload becomes part of the plan and remains visible throughout the run.
 
-Tuning Chat turns an ordinary description into a structured experiment draft. It is designed for users who know the behavior they want but do not want to fill every field before receiving useful guidance.
+- Confirm the active aircraft and configuration.
+- Describe the item being carried or collected.
+- Check payload attachment before returning home.
 
-![Tuning Chat](https://getdronedream.com/docs/en/tuning-chat.png)
+## 2.4 Route and Motion
 
-### 3.1 Describe the experiment
+The Agent uses open straight segments for faster travel and reduces speed before turns, approaches, pickup points, and landing. Control changes are progressive so motion remains continuous instead of jumping between unrelated speeds.
 
-Include as many of these details as you already know:
+- Cruise faster when the route is clear.
+- Slow progressively before corners and approaches.
+- Keep moving through small route deviations.
+- Stop only when continued flight is impossible.
 
-- aircraft and PX4 version;
-- route shape, dimensions, altitude, and start position;
-- target behavior and the relative importance of tracking, speed, smoothness, and robustness;
-- wind, sensor noise, payload, battery, or holdout conditions;
-- preferred optimization strategy, trial budget, and acceptance thresholds.
+## 2.5 Live Mission
 
-**Example**
+Start the mission after reviewing its destination and sequence. The live view shows position, route progress, altitude, speed, payload state, return progress, and final landing status.
 
-> Tune an x500 quadrotor on a 5 m circular track at 3 m altitude. Prioritize tracking accuracy, include moderate sensor noise, and keep the experiment within 180 trials.
+- Start once the complete plan is ready.
+- Follow position, altitude, speed, and payload.
+- Switch among available mission camera views.
+- Let recoverable deviations continue toward completion.
 
-### 3.2 Review the extracted intent
+## 2.6 Return and Reuse
 
-The assistant responds with:
+A mission is complete after the requested work, return, and landing have all finished. The completed run remains available so another request can reuse the same aircraft, map, or destination.
 
-- a concise experiment summary;
-- fields it can fill directly from the request;
-- missing or ambiguous decisions that still need confirmation;
-- a button that opens the reviewable experiment draft.
+- Finish the requested pickup or delivery.
+- Return to the selected landing point.
+- Confirm landing and final mission status.
+- Reuse successful setups for new requests.
 
-The assistant may update a draft, but it cannot create a running job or start simulation by itself. The user must review the five-step configuration and explicitly create the experiment.
+# 3. Build and Fly
 
-### 3.3 Voice and attachments
+DroneDream supports the full path from virtual flight behavior to connected hardware and field operation. Each focused workspace exposes the controls needed for that stage while preserving shared project context.
 
-Use the microphone button to dictate a request. The plus menu can open the manual workflow or attach supporting JSON, text, CSV, log, and image files. Attachments provide context to the assistant; they do not bypass field validation.
+## 3.1 Workspace Choice
 
-## 4. Complete the five-step experiment
+Use Universal when work spans several stages. Open SIM for virtual flights, LAB for controlled hardware sessions, FIELD for live vehicle operation, and AGENT for natural-language missions.
 
-The manual workflow gives direct control over every field. Each stage validates its own inputs and records the current position, so reopening a draft returns to the same experiment and stage.
+- Universal coordinates the complete product family.
+- SIM focuses on virtual flight behavior.
+- LAB focuses on connected hardware work.
+- FIELD focuses on operational aircraft control.
+- AGENT focuses on language-driven missions.
 
-![Flight Setup](https://getdronedream.com/docs/en/flight-setup.png)
+## 3.2 Simulation
 
-### 4.1 Flight Setup
+Choose the PX4 version, airframe, Gazebo vehicle, world, route, environment, and rendering mode. Keep the scenario close to the behavior you want to understand or improve.
 
-Choose the experience level, PX4 version, airframe, Gazebo model, world, rendering mode, objective profile, objective weights, and flight track. Use a predefined route for common studies or choose custom waypoints when exact coordinates are required.
+- Select the airframe and virtual world.
+- Define route, altitude, and starting position.
+- Add wind, payload, or sensor conditions.
+- Run the complete flight from start to landing.
 
-### 4.2 Parameters
+## 3.3 Tuning
 
-Select only the controller parameters that should change. Every selected row contains:
+Select the PX4 parameters that should change, set meaningful ranges, choose an optimization method, and define the flight behavior that matters for this project.
 
-- the PX4 parameter name and readable full name;
-- the baseline value;
-- the search minimum;
-- the search maximum;
-- any related or coupled parameter.
+- Tune only parameters related to the goal.
+- Keep search ranges physically meaningful.
+- Balance tracking, speed, and smoothness.
+- Compare candidates under consistent scenarios.
 
-Keep the search interval physically meaningful and narrow enough to support the available trial budget. Selecting more parameters expands the search space and usually requires more evidence.
+## 3.4 Lab Hardware
 
-### 4.3 Scenarios
+LAB joins simulation with sensors, controllers, and controlled test equipment. Use it to check communication, calibration, timing, and model behavior before moving to a field aircraft.
 
-Define nominal search, stressed search, nominal holdout, and combined-stress holdout cases. Configure wind, sensor noise, random seeds, payload, battery, signal dropout, gusts, and obstacle settings as required.
+- Connect supported sensors and control hardware.
+- Confirm streams, units, timing, and calibration.
+- Compare measured behavior with the model.
+- Save the validated configuration with the project.
 
-Use search cases to guide optimization and holdout cases to evaluate whether a candidate generalizes beyond the conditions that produced it.
+## 3.5 Field Flight
 
-### 4.4 Constraints and budget
+FIELD keeps vehicle setup, live telemetry, operator controls, and mission state in one focused view. Confirm the aircraft connection and operating area before beginning the requested work.
 
-Select the simulator backend and optimization strategy, then set:
+- Select the intended aircraft and connection.
+- Confirm position, battery, and communication.
+- Review route and mission controls together.
+- Follow live state through landing completion.
 
-- maximum iterations;
-- trials per candidate;
-- maximum total trials;
-- target RMSE and target maximum error;
-- minimum pass rate.
+## 3.6 Runtime
 
-The strategy card explains the selected algorithm as a vertical process. The model provider and API key are configured once in **Settings**, not inside the experiment.
+DroneDream Runtime supplies local services for PX4, Gazebo, mission execution, and project work. Install it once, let the application manage it, and keep its storage separate from ordinary source files.
 
-### 4.5 Review
-
-The review page summarizes the preceding four stages. Inspect the vehicle, search objective, scenarios, budget, and selected PX4 parameter ranges before choosing **Create Experiment**.
-
-Click **Selected PX4 parameters** to inspect the complete list when more parameters are selected than can fit on one line.
-
-## 5. Edit a custom flight track
-
-The custom track editor combines a plot with an editable coordinate table. The plot and table remain aligned at equal height, while each table row exposes the full X, Y, and Z values.
-
-### 5.1 Change the view
-
-Use the control in the plot’s upper-right corner to switch among XY, XZ, YZ, and 3D views. The 3D ground grid preserves equal real-world units on both axes; expanding a route adds square cells rather than stretching the existing grid.
-
-### 5.2 Edit points precisely
-
-- Select a row to highlight the corresponding waypoint.
-- Edit X, Y, or Z directly in the table.
-- Add a waypoint with the plus button.
-- Undo the latest supported change with the undo button.
-- Delete the selected point or use the row action for a specific point.
-
-### 5.3 Import or export JSON
-
-Use the import/export button above the table to exchange the current coordinate list with an external path-generation tool. Validate imported values before leaving the editor.
-
-## 6. Review history and evidence
-
-Dashboard and Run History summarize experiments without hiding failed or cancelled runs. Filters can narrow the list by status, track type, objective, optimization strategy, and date.
-
-![Dashboard](https://getdronedream.com/docs/en/dashboard.png)
-
-For each completed experiment, keep three evidence layers together:
-
-- **Configuration** — vehicle, firmware, route, parameter ranges, constraints, strategy, and budget.
-- **Execution** — scenario identity, random seeds, runtime manifest, process logs, and simulation artifacts.
-- **Decision** — feasibility, tracking error, overshoot, settling time, robustness, and Pareto trade-offs.
-
-Compare only experiments whose scenario and metric contracts are compatible. A lower score is not meaningful when the underlying validation conditions differ.
-
-## 7. Accounts, data, and safety
-
-### 7.1 Account isolation
-
-DroneDream uses Supabase identity and row-level security policies for cloud account isolation. Public community topics are intentionally shared, while account settings and user-owned cloud records remain scoped to their owner.
-
-### 7.2 Local drafts
-
-Experiment drafts are preserved while the application remains open and can be reopened from the sidebar. If a user closes the application with an unfinished draft, DroneDream warns that the draft will be discarded after exit.
-
-### 7.3 Model credentials
-
-The provider, model name, and compatible base URL may be stored on the device. The API key remains only in the current application session and is not written into local storage or experiment drafts.
-
-### 7.4 Before hardware flight
-
-Treat a successful optimization run as evidence for further validation, not as deployment approval. Reproduce the winning configuration in an independent SITL run, inspect the full logs and failure cases, confirm hardware-specific limits, and follow the aircraft operator’s safety process.
-
----
-
-**Website:** [getdronedream.com](https://getdronedream.com)<br>
-**Version:** 1.0.0<br>
-**Author:** Chi Zhang
+- Install Runtime through DroneDream setup.
+- Wait until environment preparation finishes.
+- Keep the selected installation drive available.
+- Recheck Runtime from settings when needed.

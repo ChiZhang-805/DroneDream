@@ -9,9 +9,7 @@ import {
   Gauge,
   Heart,
   ImagePlus,
-  Maximize2,
   MessageCircle,
-  Minimize2,
   PenLine,
   Reply,
   Search,
@@ -64,11 +62,8 @@ export interface CommunityTopic {
   comment_count: number;
   like_count: number;
   liked_by_viewer: boolean;
-  card_variant?: CommunityCardVariant;
   author_avatar_url?: string | null;
 }
-
-type CommunityCardVariant = "auto" | "short" | "long";
 
 interface CommunityComment {
   id: string;
@@ -84,33 +79,11 @@ interface CommunityComment {
 }
 
 const RECENT_TOPIC_POOL_SIZE = 24;
-const DISCOVERY_PAGE_SIZE = 10;
+const COMMUNITY_PAGE_SIZE = 5;
 const DISCOVERY_BATCH_SIZE = 50;
-const RECENT_TOPIC_COUNT = 5;
 const COMMENT_PAGE_SIZE = 100;
-const CHINESE_TOPIC_TITLE_LIMIT = 18;
-const ENGLISH_TOPIC_TITLE_LIMIT = 28;
-const HAN_CHARACTER_PATTERN = /\p{Script=Han}/u;
 const COMMUNITY_OWNER_DISPLAY_NAME = "Chi Zhang";
 const COMMUNITY_OWNER_AUTHOR_ID = "bc77348a-90e9-4c0c-92eb-9db31301cdbd";
-
-// Exported for deterministic layout tests that guard the rendered community grid.
-// eslint-disable-next-line react-refresh/only-export-components
-export function isLongCommunityTopicTitle(value: string): boolean {
-  const normalizedValue = value.trim();
-  const explicitLineCount = normalizedValue.split(/\r?\n/u).length;
-  if (explicitLineCount > 2) return true;
-  const limit = HAN_CHARACTER_PATTERN.test(normalizedValue)
-    ? CHINESE_TOPIC_TITLE_LIMIT
-    : ENGLISH_TOPIC_TITLE_LIMIT;
-  return Array.from(normalizedValue.replace(/\s/gu, "")).length > limit;
-}
-
-function isLongCommunityTopic(topic: CommunityTopic): boolean {
-  if (topic.card_variant === "long") return true;
-  if (topic.card_variant === "short") return false;
-  return isLongCommunityTopicTitle(topic.title);
-}
 
 function resolveCommunityTopicAuthor(
   topic: CommunityTopic,
@@ -128,54 +101,18 @@ function resolveCommunityTopicAuthor(
   };
 }
 
-export interface CommunityTopicPlacement {
-  topic: CommunityTopic;
-  isLong: boolean;
-}
-
-// Exported for deterministic layout tests that guard the rendered community grid.
+// Exported for deterministic pagination tests shared by both community views.
 // eslint-disable-next-line react-refresh/only-export-components
-export function packCommunityTopicPages(
+export function paginateCommunityTopics(
   topics: CommunityTopic[],
-): CommunityTopicPlacement[][] {
-  if (topics.length === 0) return [];
-
-  const pages: CommunityTopicPlacement[][] = [
-    topics.slice(0, DISCOVERY_PAGE_SIZE).map((topic) => ({ topic, isLong: false })),
-  ];
-  const remaining = topics.slice(DISCOVERY_PAGE_SIZE).map((topic) => ({
-    topic,
-    isLong: isLongCommunityTopic(topic),
-  }));
-
-  while (remaining.length > 0) {
-    const page: CommunityTopicPlacement[] = [];
-    let visualUnits = 0;
-
-    // The first five placements form the top row. A long card may safely span
-    // downward from any of those positions without changing ranked order.
-    while (remaining.length > 0 && page.length < 5) {
-      const placement = remaining.shift()!;
-      page.push(placement);
-      visualUnits += placement.isLong ? 2 : 1;
-    }
-
-    // Long cards must start in the top row. Fill any remaining lower-row slots
-    // with the next short cards and carry later long cards to the next page.
-    for (let index = 0; index < remaining.length && visualUnits < DISCOVERY_PAGE_SIZE;) {
-      const nextPlacement = remaining[index];
-      if (nextPlacement.isLong) {
-        index += 1;
-        continue;
-      }
-      page.push(...remaining.splice(index, 1));
-      visualUnits += 1;
-    }
-
-    pages.push(page);
-  }
-
-  return pages;
+): CommunityTopic[][] {
+  return Array.from(
+    { length: Math.ceil(topics.length / COMMUNITY_PAGE_SIZE) },
+    (_, pageIndex) => topics.slice(
+      pageIndex * COMMUNITY_PAGE_SIZE,
+      (pageIndex + 1) * COMMUNITY_PAGE_SIZE,
+    ),
+  );
 }
 
 const tagOptions = {
@@ -204,7 +141,7 @@ const communityContent = {
     allTopics: "All topics",
     more: "More topics",
     back: "Back to recent topics",
-    empty: "No topic matches this view. Start the first evidence-backed discussion.",
+    empty: "No topics yet. New English community cards will appear here.",
     loading: "Loading community topics…",
     unavailable: "The community connection is temporarily unavailable.",
     titleLabel: "Topic title",
@@ -263,7 +200,7 @@ const communityContent = {
     allTopics: "全部话题",
     more: "查看更多",
     back: "返回近期话题",
-    empty: "当前视图没有匹配的话题；你可以发起第一场有证据的讨论。",
+    empty: "No topics yet. New English community cards will appear here.",
     loading: "正在加载社区话题……",
     unavailable: "社区连接暂时不可用。",
     titleLabel: "话题标题",
@@ -387,13 +324,11 @@ function topicCoverPresentation(
 function TopicCoverArtwork({
   topic,
   locale,
-  isLong = false,
   heading = false,
   dialog = false,
 }: {
   topic: CommunityTopic;
   locale: SiteLocale;
-  isLong?: boolean;
   heading?: boolean;
   dialog?: boolean;
 }) {
@@ -401,7 +336,7 @@ function TopicCoverArtwork({
   const Icon = presentation.icon;
   return (
     <div
-      className={`community-cover-art is-${presentation.template}${isLong ? " is-long" : ""}${dialog ? " is-dialog" : ""}`}
+      className={`community-cover-art is-${presentation.template}${dialog ? " is-dialog" : ""}`}
       data-template={presentation.template}
     >
       <span className="community-cover-shape is-secondary" aria-hidden="true" />
@@ -434,23 +369,6 @@ function TopicCoverArtwork({
   );
 }
 
-function selectRecentTopics(topics: CommunityTopic[], seed: number): CommunityTopic[] {
-  if (topics.length <= RECENT_TOPIC_COUNT) return topics;
-
-  const [newest, ...remaining] = topics;
-  const ranked = remaining
-    .map((topic) => {
-      let rank = 2166136261 ^ seed;
-      for (const character of topic.id) {
-        rank ^= character.charCodeAt(0);
-        rank = Math.imul(rank, 16777619);
-      }
-      return { rank: rank >>> 0, topic };
-    })
-    .sort((left, right) => left.rank - right.rank);
-  return [newest, ...ranked.slice(0, RECENT_TOPIC_COUNT - 1).map(({ topic }) => topic)];
-}
-
 export function CommunityPage({
   locale,
   account,
@@ -474,16 +392,9 @@ export function CommunityPage({
   const [query, setQuery] = useState("");
   const [settledQuery, setSettledQuery] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [recentSampleSeed] = useState(() => {
-    const value = new Uint32Array(1);
-    globalThis.crypto?.getRandomValues(value);
-    return value[0];
-  });
   const [composerOpen, setComposerOpen] = useState(false);
   const [selectedTopic, setSelectedTopic] = useState<CommunityTopic | null>(null);
-  const [selectedTopicIsLong, setSelectedTopicIsLong] = useState(false);
   const [title, setTitle] = useState("");
-  const [cardVariant, setCardVariant] = useState<Exclude<CommunityCardVariant, "auto">>("short");
   const [body, setBody] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [customTag, setCustomTag] = useState("");
@@ -510,8 +421,6 @@ export function CommunityPage({
     onClose: () => setSelectedTopic(null),
   });
 
-  const titleNeedsLongCard = isLongCommunityTopicTitle(title);
-  const effectiveCardVariant = titleNeedsLongCard ? "long" : cardVariant;
   const previewTopic = useMemo<CommunityTopic>(() => ({
     id: "community-composer-preview",
     author_id: account?.id ?? "community-preview",
@@ -525,8 +434,7 @@ export function CommunityPage({
     comment_count: 0,
     like_count: 0,
     liked_by_viewer: false,
-    card_variant: effectiveCardVariant,
-  }), [account, body, copy.bodyPlaceholder, copy.titlePlaceholder, effectiveCardVariant, tags, title]);
+  }), [account, body, copy.bodyPlaceholder, copy.titlePlaceholder, tags, title]);
 
   const loadTopics = useCallback(async () => {
     if (!supabaseClient) {
@@ -654,32 +562,18 @@ export function CommunityPage({
     }
   }, [copy.unavailable]);
 
-  const discoveryPages = useMemo(
-    () => allTopicsView ? packCommunityTopicPages(topics) : [],
-    [allTopicsView, topics],
-  );
-
-  const visibleTopicPlacements = useMemo(
-    () => allTopicsView
-      ? (discoveryPages[topicPage] ?? [])
-      : selectRecentTopics(topics, recentSampleSeed).map((topic) => ({
-          topic,
-          isLong: false,
-        })),
-    [allTopicsView, discoveryPages, recentSampleSeed, topicPage, topics],
-  );
+  const topicPages = useMemo(() => paginateCommunityTopics(topics), [topics]);
 
   const visibleTopics = useMemo(
-    () => visibleTopicPlacements.map(({ topic }) => topic),
-    [visibleTopicPlacements],
+    () => topicPages[topicPage] ?? [],
+    [topicPage, topicPages],
   );
 
   const totalPages = useMemo(() => {
-    if (!allTopicsView) return 1;
-    if (discoveryPages.length > 0) return discoveryPages.length;
-    if (totalTopicCount !== null) return Math.max(1, Math.ceil(totalTopicCount / DISCOVERY_PAGE_SIZE));
+    if (topicPages.length > 0) return topicPages.length;
+    if (totalTopicCount !== null) return Math.max(1, Math.ceil(totalTopicCount / COMMUNITY_PAGE_SIZE));
     return Math.max(1, topicPage + 1 + (hasMoreTopics ? 1 : 0));
-  }, [allTopicsView, discoveryPages.length, hasMoreTopics, topicPage, totalTopicCount]);
+  }, [hasMoreTopics, topicPage, topicPages.length, totalTopicCount]);
 
   useEffect(() => {
     if (topicPage >= totalPages) setTopicPage(Math.max(0, totalPages - 1));
@@ -692,11 +586,10 @@ export function CommunityPage({
     return Array.from({ length: end - start }, (_, index) => start + index);
   }, [topicPage, totalPages]);
 
-  const openTopic = (topic: CommunityTopic, isLong: boolean) => {
+  const openTopic = (topic: CommunityTopic) => {
     captureTopicTrigger();
     setDialogError(null);
     setSelectedTopic(topic);
-    setSelectedTopicIsLong(isLong);
     setComments([]);
     setHasMoreComments(false);
     void loadComments(topic.id);
@@ -825,7 +718,7 @@ export function CommunityPage({
       };
       let { error: requestError } = await supabaseClient.from("community_topics").insert({
         ...baseTopic,
-        card_variant: effectiveCardVariant,
+        card_variant: "long",
       });
       const missingCardVariant = Boolean(
         requestError
@@ -834,14 +727,11 @@ export function CommunityPage({
           || requestError.message?.includes("card_variant")
         )
       );
-      if (missingCardVariant && effectiveCardVariant === (titleNeedsLongCard ? "long" : "short")) {
+      if (missingCardVariant) {
         ({ error: requestError } = await supabaseClient.from("community_topics").insert(baseTopic));
-      } else if (missingCardVariant) {
-        throw new Error(copy.layoutUnavailable);
       }
       if (requestError) throw requestError;
       setTitle("");
-      setCardVariant("short");
       setBody("");
       setTags([]);
       setFiles([]);
@@ -1088,19 +978,15 @@ export function CommunityPage({
         ) : null}
 
         <div className="community-topic-grid">
-          {visibleTopicPlacements.map(({ topic, isLong }) => {
+          {visibleTopics.map((topic) => {
             const liked = Boolean(account && topic.liked_by_viewer);
             const topicAuthor = resolveCommunityTopicAuthor(topic, account);
-            const renderedAsLongCard = allTopicsView ? isLong : true;
             return (
-              <article
-                key={topic.id}
-                className={renderedAsLongCard ? "is-long" : "is-short"}
-              >
+              <article key={topic.id}>
                 <button
                   type="button"
                   className="community-topic-cover"
-                  onClick={() => openTopic(topic, renderedAsLongCard)}
+                  onClick={() => openTopic(topic)}
                   aria-label={`${copy.open}: ${topic.title}`}
                 >
                   {topic.image_urls[0] ? (
@@ -1114,8 +1000,7 @@ export function CommunityPage({
                     <TopicCoverArtwork
                       topic={topic}
                       locale={locale}
-                      isLong={renderedAsLongCard}
-                      heading={allTopicsView}
+                      heading
                     />
                   )}
                 </button>
@@ -1133,7 +1018,6 @@ export function CommunityPage({
                       <time dateTime={topic.created_at}>{dateLabel(locale, topic.created_at)}</time>
                     </div>
                   </div>
-                  {!allTopicsView ? <h3>{topic.title}</h3> : null}
                   <p>{topic.body}</p>
                   <div className="community-topic-tags">
                     {topic.tags.slice(0, 3).map((tagName) => (
@@ -1155,7 +1039,7 @@ export function CommunityPage({
                     <button
                       type="button"
                       aria-label={`${topic.comment_count} ${copy.comments}`}
-                      onClick={() => openTopic(topic, renderedAsLongCard)}
+                      onClick={() => openTopic(topic)}
                     >
                       <MessageCircle aria-hidden="true" />
                       {topic.comment_count}
@@ -1177,7 +1061,7 @@ export function CommunityPage({
                     ) : null}
                     <button
                       type="button"
-                      onClick={() => openTopic(topic, renderedAsLongCard)}
+                      onClick={() => openTopic(topic)}
                     >
                       {copy.open}
                       <ArrowUpRight aria-hidden="true" />
@@ -1189,12 +1073,14 @@ export function CommunityPage({
           })}
         </div>
 
-        {!loading && !feedError && allTopicsView && visibleTopics.length > 0 ? (
+        {!loading && !feedError && visibleTopics.length > 0 ? (
           <nav className="community-pagination" aria-label={copy.allTopics}>
-            <a className="community-pagination-back" href="/community/">
-              <ArrowLeft aria-hidden="true" />
-              {copy.back}
-            </a>
+            {allTopicsView ? (
+              <a className="community-pagination-back" href="/community/">
+                <ArrowLeft aria-hidden="true" />
+                {copy.back}
+              </a>
+            ) : null}
             <div>
               <button
                 type="button"
@@ -1259,15 +1145,14 @@ export function CommunityPage({
               <section className="community-composer-preview" aria-label={copy.preview}>
                 <header>
                   <span>{copy.preview}</span>
-                  <strong>{effectiveCardVariant === "long" ? copy.longCard : copy.shortCard}</strong>
+                  <strong>Standard card</strong>
                 </header>
                 <div className="community-composer-preview-stage">
-                  <article className={effectiveCardVariant === "long" ? "is-long" : "is-short"}>
+                  <article>
                     <div className="community-topic-cover" aria-hidden="true">
                       <TopicCoverArtwork
                         topic={previewTopic}
                         locale={locale}
-                        isLong={effectiveCardVariant === "long"}
                       />
                     </div>
                     <div className="community-topic-card-body">
@@ -1295,30 +1180,7 @@ export function CommunityPage({
 
               <div className="community-composer-fields">
                 <div className="community-composer-title-field">
-                  <div>
-                    <label htmlFor="community-topic-title-input">{copy.titleLabel}</label>
-                    <div className="community-card-variant" role="group" aria-label={copy.titleLabel}>
-                      <button
-                        type="button"
-                        className={effectiveCardVariant === "short" ? "is-active" : ""}
-                        aria-label={copy.shortCard}
-                        aria-pressed={effectiveCardVariant === "short"}
-                        disabled={titleNeedsLongCard}
-                        onClick={() => setCardVariant("short")}
-                      >
-                        <Minimize2 aria-hidden="true" />
-                      </button>
-                      <button
-                        type="button"
-                        className={effectiveCardVariant === "long" ? "is-active" : ""}
-                        aria-label={copy.longCard}
-                        aria-pressed={effectiveCardVariant === "long"}
-                        onClick={() => setCardVariant("long")}
-                      >
-                        <Maximize2 aria-hidden="true" />
-                      </button>
-                    </div>
-                  </div>
+                  <label htmlFor="community-topic-title-input">{copy.titleLabel}</label>
                   <textarea
                     id="community-topic-title-input"
                     ref={composerTitleRef}
@@ -1327,13 +1189,8 @@ export function CommunityPage({
                     maxLength={120}
                     value={title}
                     placeholder={copy.titlePlaceholder}
-                    onChange={(event) => {
-                      const nextTitle = event.target.value;
-                      setTitle(nextTitle);
-                      if (isLongCommunityTopicTitle(nextTitle)) setCardVariant("long");
-                    }}
+                    onChange={(event) => setTitle(event.target.value)}
                   />
-                  {titleNeedsLongCard ? <small>{copy.longCardRequired}</small> : null}
                 </div>
                 <label>
                   <span>{copy.bodyLabel}</span>
@@ -1500,7 +1357,6 @@ export function CommunityPage({
                 <TopicCoverArtwork
                   topic={selectedTopic}
                   locale={locale}
-                  isLong={selectedTopicIsLong}
                   dialog
                 />
               )}

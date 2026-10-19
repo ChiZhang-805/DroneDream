@@ -250,11 +250,11 @@ export default function ManualDocument({ source, headings }: ManualDocumentProps
       </ReactMarkdown>
       <footer className="manual-document-end">
         <PlayCircle aria-hidden="true" />
-        <span>DroneDream 1.0.0</span>
+        <span>DroneDream Manual</span>
         <Bot aria-hidden="true" />
-        <span>AURORA Harness</span>
+        <span>Natural-language missions</span>
         <History aria-hidden="true" />
-        <span>Reproducible evidence</span>
+        <span>Simulation to field</span>
       </footer>
     </div>
   );

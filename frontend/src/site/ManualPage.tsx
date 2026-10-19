@@ -5,6 +5,8 @@ import {
   FileText,
   Languages,
   LoaderCircle,
+  PanelLeftClose,
+  PanelLeftOpen,
   RotateCw,
   Search,
 } from "lucide-react";
@@ -47,7 +49,7 @@ const manualCopy = {
     markdown: "Markdown",
     pdf: "PDF",
     online: "ONLINE MANUAL",
-    title: "DroneDream 1.0.0 User Manual",
+    title: "DroneDream Manual",
     wizard: "Five-step workflow",
     loading: "Preparing the complete manual…",
     error: "The manual document could not be loaded.",
@@ -55,6 +57,8 @@ const manualCopy = {
     noMatches: "No chapter title matches this search.",
     expandChapter: "Expand chapter",
     collapseChapter: "Collapse chapter",
+    hideContents: "Hide manual contents",
+    showContents: "Show manual contents",
   },
   "zh-CN": {
     ariaLabel: "DroneDream 说明书目录",
@@ -65,7 +69,7 @@ const manualCopy = {
     markdown: "Markdown",
     pdf: "PDF",
     online: "在线说明书",
-    title: "DroneDream 1.0.0 用户说明书",
+    title: "DroneDream Manual",
     wizard: "五步实验流程",
     loading: "正在准备完整说明书……",
     error: "说明书正文加载失败。",
@@ -73,6 +77,8 @@ const manualCopy = {
     noMatches: "没有与搜索内容匹配的章节标题。",
     expandChapter: "展开章节",
     collapseChapter: "收起章节",
+    hideContents: "收起说明书目录",
+    showContents: "展开说明书目录",
   },
 } as const;
 
@@ -81,10 +87,6 @@ function normalizeSearch(value: string, locale: SiteLocale): string {
 }
 
 function manualNavigationLabel(heading: ManualHeading, locale: SiteLocale): string {
-  if (/^2\.2(?:\s|$)/u.test(heading.plainLabel)) {
-    return locale === "zh-CN" ? "账户与数据" : "Accounts and data";
-  }
-
   const withoutNumber = heading.plainLabel
     .replace(/^\d+(?:\.\d+)*\.?\s+/u, "")
     .replace(/^Appendix\s+[A-Z]\s*[—-]\s*/u, "")
@@ -131,6 +133,7 @@ export function ManualPage({ locale }: ManualPageProps) {
     () => new Set(),
   );
   const [loadAttempt, setLoadAttempt] = useState(0);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const articleRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -299,11 +302,20 @@ export function ManualPage({ locale }: ManualPageProps) {
   };
 
   return (
-    <div className="site-portal site-manual-page">
+    <div className={`site-portal site-manual-page${sidebarOpen ? "" : " is-sidebar-collapsed"}`}>
       <aside className="manual-sidebar" aria-label={copy.ariaLabel}>
         <header className="manual-sidebar-title">
           <BookOpen aria-hidden="true" />
           <strong>{copy.contents}</strong>
+          <button
+            type="button"
+            className="manual-sidebar-toggle"
+            aria-label={sidebarOpen ? copy.hideContents : copy.showContents}
+            aria-expanded={sidebarOpen}
+            onClick={() => setSidebarOpen((current) => !current)}
+          >
+            {sidebarOpen ? <PanelLeftClose aria-hidden="true" /> : <PanelLeftOpen aria-hidden="true" />}
+          </button>
         </header>
 
         <label className="manual-search">
@@ -320,14 +332,14 @@ export function ManualPage({ locale }: ManualPageProps) {
         <div className="manual-downloads" role="group" aria-label={copy.downloads}>
           <strong>{copy.downloads}</strong>
           <div>
-            <a href={`${documentRoot}.md`} download>
+            <button type="button" aria-disabled="true">
               <FileText aria-hidden="true" />
               {copy.markdown}
-            </a>
-            <a href={`${documentRoot}.pdf`} download>
+            </button>
+            <button type="button" aria-disabled="true">
               <FileDown aria-hidden="true" />
               {copy.pdf}
-            </a>
+            </button>
           </div>
         </div>
 

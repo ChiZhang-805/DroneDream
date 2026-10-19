@@ -27,8 +27,7 @@ vi.mock("../features/auth/supabaseClient", () => ({
 
 import {
   CommunityPage,
-  isLongCommunityTopicTitle,
-  packCommunityTopicPages,
+  paginateCommunityTopics,
   type CommunityTopic,
 } from "../site/CommunityPage";
 
@@ -120,11 +119,11 @@ describe("CommunityPage public data loading", () => {
     await screen.findByRole("heading", { name: "Evidence topic 1" });
     fireEvent.click(screen.getByRole("button", { name: "Page 2" }));
 
-    expect(await screen.findByRole("heading", { name: "Evidence topic 11" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Evidence topic 6" })).toBeVisible();
     expect(screen.queryByRole("heading", { name: "Evidence topic 1" })).not.toBeInTheDocument();
   });
 
-  it("shows exactly five featured cards on the community landing page", async () => {
+  it("shows five uniform cards and pagination on the community landing page", async () => {
     window.history.replaceState(null, "", "/community/");
     const featuredTopics = Array.from({ length: 7 }, (_, index) => ({
       id: `00000000-0000-0000-0000-${String(index + 1).padStart(12, "0")}`,
@@ -150,6 +149,7 @@ describe("CommunityPage public data loading", () => {
 
     await screen.findByRole("button", { name: "Open card: Featured topic 1" });
     expect(container.querySelectorAll(".community-topic-grid article")).toHaveLength(5);
+    expect(screen.getByRole("button", { name: "Page 2" })).toBeVisible();
   });
 
   it("loads only the selected topic's comments when opening a discussion", async () => {
@@ -203,32 +203,13 @@ describe("CommunityPage public data loading", () => {
     expect(customTag).toHaveValue("");
   });
 
-  it("classifies long titles and packs them as two visual units after page one", () => {
-    expect(isLongCommunityTopicTitle("一二三四五六七八九十一二三四五六七八")).toBe(false);
-    expect(isLongCommunityTopicTitle("一二三四五六七八九十一二三四五六七八九")).toBe(true);
-    expect(isLongCommunityTopicTitle("1234567890123456789012345678")).toBe(false);
-    expect(isLongCommunityTopicTitle("12345678901234567890123456789")).toBe(true);
-    expect(isLongCommunityTopicTitle("One\nTwo")).toBe(false);
-    expect(isLongCommunityTopicTitle("One\nTwo\nThree")).toBe(true);
-
-    const topics = [
-      ...Array.from({ length: 10 }, (_, index) => makeTopic(index + 1, `First page ${index + 1}`)),
-      makeTopic(11, "Short ranked first"),
-      makeTopic(12, "This title is deliberately longer than twenty eight characters"),
-      ...Array.from({ length: 7 }, (_, index) => makeTopic(index + 13, `Short ${index + 2}`)),
-    ];
-    const pages = packCommunityTopicPages(topics);
+  it("paginates every topic into the same five-card row", () => {
+    const topics = Array.from({ length: 10 }, (_, index) => makeTopic(index + 1));
+    const pages = paginateCommunityTopics(topics);
 
     expect(pages).toHaveLength(2);
-    expect(pages[0]).toHaveLength(10);
-    expect(pages[0].every(({ isLong }) => !isLong)).toBe(true);
-    expect(pages[1]).toHaveLength(9);
-    expect(pages[1].map(({ topic }) => topic.id)).toEqual(
-      topics.slice(10).map(({ id }) => id),
-    );
-    expect(pages[1][0].isLong).toBe(false);
-    expect(pages[1][1].isLong).toBe(true);
-    expect(pages[1].reduce((units, topic) => units + (topic.isLong ? 2 : 1), 0)).toBe(10);
+    expect(pages.map((page) => page.length)).toEqual([5, 5]);
+    expect(pages.flat().map(({ id }) => id)).toEqual(topics.map(({ id }) => id));
   });
 
   it("uses the signed-in author's avatar and does not render a redundant owner badge", async () => {
