@@ -1,4 +1,5 @@
 import {
+  ChevronLeft,
   ChevronRight,
   FileDown,
   FileText,
@@ -11,7 +12,11 @@ import {
 } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
-import { extractManualHeadings, type ManualHeading } from "./manualParser";
+import {
+  extractManualHeadings,
+  stripManualFrontmatter,
+  type ManualHeading,
+} from "./manualParser";
 
 const ManualDocument = lazy(() => import("./ManualDocument"));
 
@@ -65,6 +70,11 @@ const manualCopy = {
     collapseChapter: "Collapse chapter",
     hideContents: "Hide manual contents",
     showContents: "Show manual contents",
+    chapterNavigation: "Chapter navigation",
+    previousChapter: "Previous chapter",
+    nextChapter: "Next chapter",
+    beginning: "Beginning",
+    ending: "End of manual",
   },
   "zh-CN": {
     ariaLabel: "DroneDream 说明书目录",
@@ -85,6 +95,11 @@ const manualCopy = {
     collapseChapter: "收起章节",
     hideContents: "收起说明书目录",
     showContents: "展开说明书目录",
+    chapterNavigation: "章节导航",
+    previousChapter: "上一章",
+    nextChapter: "下一章",
+    beginning: "手册开篇",
+    ending: "手册结尾",
   },
 } as const;
 
@@ -126,6 +141,22 @@ function isWizardStep(heading: ManualHeading, locale: SiteLocale): boolean {
     : /^\d+\.\s*Step\s+[1-5]\b/u.test(heading.plainLabel);
 }
 
+function extractManualChapterSource(source: string, chapterIndex: number): string {
+  const body = stripManualFrontmatter(source);
+  const lines = body.split(/\r?\n/);
+  const chapterStarts = lines.flatMap((line, index) => (
+    /^#\s+\S/u.test(line) ? [index] : []
+  ));
+  const start = chapterStarts[chapterIndex];
+  if (start === undefined) return "";
+  const end = chapterStarts[chapterIndex + 1] ?? lines.length;
+  return lines
+    .slice(start, end)
+    .join("\n")
+    .replace(/\n---\s*$/u, "")
+    .trim();
+}
+
 export function ManualPage({ locale }: ManualPageProps) {
   const copy = manualCopy[locale];
   const documentRoot = locale === "en"
@@ -135,12 +166,14 @@ export function ManualPage({ locale }: ManualPageProps) {
   const [state, setState] = useState<LoadState>("loading");
   const [query, setQuery] = useState("");
   const [activeId, setActiveId] = useState("");
+  const [activeChapterIndex, setActiveChapterIndex] = useState(0);
   const [expandedChapterIds, setExpandedChapterIds] = useState<Set<string>>(
     () => new Set(),
   );
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const articleRef = useRef<HTMLElement>(null);
+  const pendingHeadingIdRef = useRef("");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -148,6 +181,8 @@ export function ManualPage({ locale }: ManualPageProps) {
     setSource("");
     setQuery("");
     setActiveId("");
+    setActiveChapterIndex(0);
+    pendingHeadingIdRef.current = "";
     setExpandedChapterIds(new Set());
 
     void fetch(
@@ -174,6 +209,20 @@ export function ManualPage({ locale }: ManualPageProps) {
   }, [documentRoot, loadAttempt]);
 
   const headings = useMemo(() => extractManualHeadings(source), [source]);
+  const manualChapters = useMemo(
+    () => headings.filter((heading) => heading.level === 1),
+    [headings],
+  );
+  const activeChapterHeadings = useMemo(
+    () => headings.filter((heading) => heading.majorIndex === activeChapterIndex),
+    [activeChapterIndex, headings],
+  );
+  const activeChapterSource = useMemo(
+    () => extractManualChapterSource(source, activeChapterIndex),
+    [activeChapterIndex, source],
+  );
+  const previousChapter = manualChapters[activeChapterIndex - 1];
+  const nextChapter = manualChapters[activeChapterIndex + 1];
   const navigationChapters = useMemo(() => {
     const normalized = normalizeSearch(query, locale);
     const chapters: ManualNavigationChapter[] = [];
@@ -268,27 +317,34 @@ export function ManualPage({ locale }: ManualPageProps) {
 
   useEffect(() => {
     if (!headings.length) return;
-    setActiveId((current) => current || headings[0].id);
+    const hashId = decodeURIComponent(window.location.hash.replace(/^#/u, ""));
+    const initialHeading = headings.find((heading) => heading.id === hashId) ?? headings[0];
+    setActiveId((current) => current || initialHeading.id);
+    setActiveChapterIndex(initialHeading.majorIndex);
+    if (hashId && initialHeading.id === hashId) pendingHeadingIdRef.current = hashId;
 
     const root = articleRef.current;
     if (!root || typeof IntersectionObserver === "undefined") return;
     let observer: IntersectionObserver | undefined;
-    let observedCount = 0;
+    let observedSignature = "";
 
     const connect = () => {
       const observed = Array.from(
         root.querySelectorAll<HTMLElement>("[data-manual-heading='true']"),
       );
-      if (!observed.length || observed.length === observedCount) return;
+      const signature = observed.map((heading) => heading.id).join("|");
+      if (!observed.length || signature === observedSignature) return;
       observer?.disconnect();
-      observedCount = observed.length;
+      observedSignature = signature;
       observer = new IntersectionObserver(
         (entries) => {
           const visible = entries
             .filter((entry) => entry.isIntersecting)
             .sort((left, right) => left.boundingClientRect.top - right.boundingClientRect.top);
           const first = visible[0]?.target;
-          if (first instanceof HTMLElement) setActiveId(first.id);
+          if (first instanceof HTMLElement && !pendingHeadingIdRef.current) {
+            setActiveId(first.id);
+          }
         },
         { rootMargin: "-18% 0px -70% 0px", threshold: [0, 1] },
       );
@@ -305,12 +361,47 @@ export function ManualPage({ locale }: ManualPageProps) {
     };
   }, [headings, state]);
 
+  useEffect(() => {
+    if (state !== "ready" || !pendingHeadingIdRef.current) return;
+    let frame = 0;
+    let releaseTimer = 0;
+    let attempts = 0;
+    const scrollToPendingHeading = () => {
+      const target = document.getElementById(pendingHeadingIdRef.current);
+      if (!target && attempts < 12) {
+        attempts += 1;
+        frame = window.requestAnimationFrame(scrollToPendingHeading);
+        return;
+      }
+      if (!target) return;
+      target.scrollIntoView({ behavior: "auto", block: "start" });
+      releaseTimer = window.setTimeout(() => {
+        pendingHeadingIdRef.current = "";
+      }, 650);
+    };
+    frame = window.requestAnimationFrame(scrollToPendingHeading);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(releaseTimer);
+    };
+  }, [activeChapterIndex, activeChapterSource, state]);
+
   const navigateToHeading = (heading: ManualHeading) => {
+    pendingHeadingIdRef.current = heading.id;
+    setActiveChapterIndex(heading.majorIndex);
     setActiveId(heading.id);
-    const target = document.getElementById(heading.id);
-    if (!target) return;
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
     window.history.replaceState(null, "", `#${heading.id}`);
+    if (heading.majorIndex === activeChapterIndex) {
+      window.requestAnimationFrame(() => {
+        document.getElementById(heading.id)?.scrollIntoView({
+          behavior: "auto",
+          block: "start",
+        });
+        window.setTimeout(() => {
+          pendingHeadingIdRef.current = "";
+        }, 650);
+      });
+    }
   };
 
   const toggleChapter = (chapterId: string) => {
@@ -562,7 +653,45 @@ export function ManualPage({ locale }: ManualPageProps) {
                 </div>
               )}
             >
-              <ManualDocument source={source} headings={headings} />
+              <div className="manual-chapter-view">
+                <ManualDocument
+                  source={activeChapterSource}
+                  headings={activeChapterHeadings}
+                />
+                <nav className="manual-chapter-pager" aria-label={copy.chapterNavigation}>
+                  <button
+                    type="button"
+                    disabled={!previousChapter}
+                    onClick={() => previousChapter && navigateToHeading(previousChapter)}
+                  >
+                    <ChevronLeft aria-hidden="true" />
+                    <span>
+                      <small>{copy.previousChapter}</small>
+                      <strong>
+                        {previousChapter
+                          ? manualNavigationLabel(previousChapter, locale)
+                          : copy.beginning}
+                      </strong>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="is-next"
+                    disabled={!nextChapter}
+                    onClick={() => nextChapter && navigateToHeading(nextChapter)}
+                  >
+                    <span>
+                      <small>{copy.nextChapter}</small>
+                      <strong>
+                        {nextChapter
+                          ? manualNavigationLabel(nextChapter, locale)
+                          : copy.ending}
+                      </strong>
+                    </span>
+                    <ChevronRight aria-hidden="true" />
+                  </button>
+                </nav>
+              </div>
             </Suspense>
           ) : null}
         </article>

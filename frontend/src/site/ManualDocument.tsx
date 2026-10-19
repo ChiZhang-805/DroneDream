@@ -1,18 +1,15 @@
 import {
   BarChart3,
   BookOpen,
-  Bot,
   CheckSquare2,
   CircleHelp,
   ClipboardCheck,
   CloudCog,
   FileCheck2,
   Gauge,
-  History,
   LayoutDashboard,
   ListChecks,
   MessageSquareText,
-  PlayCircle,
   Route,
   Settings2,
   ShieldCheck,
@@ -252,14 +249,6 @@ export default function ManualDocument({ source, headings }: ManualDocumentProps
       >
         {prepareManualWebSource(source)}
       </ReactMarkdown>
-      <footer className="manual-document-end">
-        <PlayCircle aria-hidden="true" />
-        <span>DroneDream Manual</span>
-        <Bot aria-hidden="true" />
-        <span>Natural-language missions</span>
-        <History aria-hidden="true" />
-        <span>Simulation to field</span>
-      </footer>
     </div>
   );
 }
