@@ -4438,7 +4438,7 @@ body:has(.dd-site[data-page="home"]) {
 .site-products-flightline {
   position: relative;
   width: 100%;
-  height: clamp(52px, 4.6vw, 84px);
+  height: clamp(58px, 5vw, 92px);
   min-height: 0;
   overflow: hidden;
 }
@@ -4452,8 +4452,13 @@ body:has(.dd-site[data-page="home"]) {
 
 .site-products-flightline-guide,
 .site-products-flightline-route,
+.site-products-flightline-landmark,
 .site-products-flightline-detail,
-.site-products-flightline-drone {
+.site-products-flightline-drone-arm,
+.site-products-flightline-drone-shell,
+.site-products-flightline-drone-gear,
+.site-products-flightline-camera,
+.site-products-flightline-rotors {
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -4468,14 +4473,23 @@ body:has(.dd-site[data-page="home"]) {
 
 .site-products-flightline-route {
   stroke: url("#product-flightline-gradient");
-  stroke-width: 2.25;
-  stroke-dasharray: 7 5;
+  stroke-width: 1.85;
+  stroke-dasharray: 5 5;
   filter: url("#product-flightline-glow");
 }
 
+.site-products-flightline-landmark {
+  fill: none;
+  stroke: url("#product-flightline-gradient");
+  stroke-width: 1.45;
+  opacity: 0.82;
+}
+
 .site-products-flightline-detail {
-  stroke: rgba(66, 75, 103, 0.42);
-  stroke-width: 1.4;
+  fill: rgba(255, 255, 255, 0.24);
+  stroke: url("#product-flightline-gradient");
+  stroke-width: 1.05;
+  opacity: 0.68;
 }
 
 .site-products-flightline-node {
@@ -4485,9 +4499,33 @@ body:has(.dd-site[data-page="home"]) {
   vector-effect: non-scaling-stroke;
 }
 
+.site-products-flightline-rotors {
+  stroke: #ef4c94;
+  stroke-width: 1.45;
+}
+
+.site-products-flightline-drone-arm,
+.site-products-flightline-drone-shell,
+.site-products-flightline-drone-gear,
+.site-products-flightline-camera {
+  stroke: #b145af;
+  stroke-width: 1.55;
+}
+
+.site-products-flightline-drone-body {
+  fill: url("#product-flightline-drone-fill");
+  stroke: rgba(87, 49, 139, 0.75);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.site-products-flightline-camera circle:last-child {
+  fill: #3f285f;
+  stroke: none;
+}
+
 .site-products-flightline-drone {
-  stroke: #eb4e92;
-  stroke-width: 2;
   filter: url("#product-flightline-glow");
 }
 
@@ -4774,7 +4812,7 @@ body:has(.dd-site[data-page="home"]) {
 }
 
 @media (min-width: 761px) and (max-height: 820px) {
-  .site-products-flightline { height: clamp(44px, 6.2vh, 52px); }
+  .site-products-flightline { height: clamp(50px, 7vh, 58px); }
   .site-products-card {
     gap: 0.5rem;
     padding: clamp(0.78rem, 1vw, 0.92rem);
@@ -4790,7 +4828,7 @@ body:has(.dd-site[data-page="home"]) {
 }
 
 @media (max-width: 760px) {
-  .site-products-flightline { height: 46px; }
+  .site-products-flightline { height: 52px; }
   .site-products-layout {
     grid-template-columns: minmax(280px, 84vw) minmax(560px, 158vw);
     padding-bottom: 4px;
