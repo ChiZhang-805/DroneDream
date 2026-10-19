@@ -29,6 +29,8 @@ vi.mock("../features/auth/AuthContext", () => ({
       avatarUrl: null,
     },
     googleEnabled: false,
+    githubEnabled: false,
+    slackEnabled: false,
     appleEnabled: false,
     signInWithPassword: vi.fn(),
     sendRegistrationCode: vi.fn(),

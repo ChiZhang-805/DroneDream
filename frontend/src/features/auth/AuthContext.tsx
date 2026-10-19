@@ -26,7 +26,9 @@ import {
   appleAuthEnabled,
   browserAuthConfiguration,
   cloudAuthConfigured,
+  githubAuthEnabled,
   googleAuthEnabled,
+  slackAuthEnabled,
   supabaseClient,
 } from "./supabaseClient";
 
@@ -43,6 +45,8 @@ interface AuthContextValue {
   passwordRecovery: boolean;
   account: DroneDreamAccount | null;
   googleEnabled: boolean;
+  githubEnabled: boolean;
+  slackEnabled: boolean;
   appleEnabled: boolean;
   signInWithPassword: (
     email: string,
@@ -72,7 +76,9 @@ interface AuthContextValue {
     captchaToken?: string,
   ) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
-  signInWithProvider: (provider: "google" | "apple") => Promise<void>;
+  signInWithProvider: (
+    provider: "google" | "github" | "slack_oidc" | "apple",
+  ) => Promise<void>;
   updateDisplayName: (displayName: string) => Promise<void>;
   updateAvatar: (avatarDataUrl: string | null) => Promise<void>;
   signOut: () => Promise<void>;
@@ -88,6 +94,8 @@ const OPTIONAL_AUTH_FALLBACK: AuthContextValue = {
   passwordRecovery: false,
   account: null,
   googleEnabled: false,
+  githubEnabled: false,
+  slackEnabled: false,
   appleEnabled: false,
   signInWithPassword: unavailableAuthAction,
   sendRegistrationCode: unavailableAuthAction,
@@ -523,7 +531,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signInWithProvider = useCallback(
-    async (provider: "google" | "apple") => {
+    async (provider: "google" | "github" | "slack_oidc" | "apple") => {
       // Desktop uses the native browser ceremony; do not start a WebView OAuth flow.
       if (isDesktopRuntime()) {
         throw new Error(
@@ -766,6 +774,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       passwordRecovery,
       account,
       googleEnabled: googleAuthEnabled && !isDesktopRuntime(),
+      githubEnabled: githubAuthEnabled && !isDesktopRuntime(),
+      slackEnabled: slackAuthEnabled && !isDesktopRuntime(),
       appleEnabled: appleAuthEnabled && !isDesktopRuntime(),
       signInWithPassword,
       sendRegistrationCode,

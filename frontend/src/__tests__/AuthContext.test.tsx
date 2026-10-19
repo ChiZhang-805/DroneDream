@@ -87,7 +87,9 @@ vi.mock("../features/auth/supabaseClient", () => ({
     publishableKey: "public-browser-key",
   }),
   cloudAuthConfigured: true,
+  githubAuthEnabled: false,
   googleAuthEnabled: false,
+  slackAuthEnabled: false,
   supabaseClient: {
     auth: {
       getSession: authMock.getSession,

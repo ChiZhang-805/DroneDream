@@ -2874,6 +2874,8 @@ const ACCOUNT_COPY = {
     codeRequired: "Send and enter the verification code before creating the account.",
     completeCaptcha: "Complete the security check before continuing.",
     google: "Continue with Google",
+    github: "Continue with GitHub",
+    slack: "Continue with Slack",
     apple: "Continue with Apple",
     username: "Username",
     usernamePlaceholder: "Choose a username",
@@ -2952,6 +2954,8 @@ const ACCOUNT_COPY = {
     codeRequired: "请先发送并填写邮箱验证码，再创建账号。",
     completeCaptcha: "请先完成安全验证，再继续。",
     google: "使用 Google 登录",
+    github: "使用 GitHub 登录",
+    slack: "使用 Slack 登录",
     apple: "使用 Apple 登录",
     username: "用户名",
     usernamePlaceholder: "输入用户名",
@@ -3827,8 +3831,23 @@ export function AccountDialog({
               ? copy.registerNow
               : copy.backToSignIn}
           </button>
-          {auth.googleEnabled || auth.appleEnabled ? (
+          {auth.googleEnabled || auth.githubEnabled || auth.slackEnabled || auth.appleEnabled ? (
             <div className="account-social-actions">
+              {auth.githubEnabled ? (
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={pending}
+                  onClick={() =>
+                    void run(() => auth.signInWithProvider("github"))
+                  }
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path fill="currentColor" d="M12 .7a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2.23c-3.22.7-3.9-1.37-3.9-1.37-.52-1.34-1.29-1.69-1.29-1.69-1.05-.72.08-.71.08-.71 1.17.08 1.78 1.2 1.78 1.2 1.04 1.78 2.72 1.27 3.39.97.1-.75.4-1.27.74-1.56-2.57-.29-5.27-1.28-5.27-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.47.11-3.05 0 0 .97-.31 3.16 1.18a10.98 10.98 0 0 1 5.76 0c2.19-1.49 3.15-1.18 3.15-1.18.63 1.58.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.71 5.38-5.29 5.67.42.36.79 1.06.79 2.15v3.2c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .7Z" />
+                  </svg>
+                  {copy.github}
+                </button>
+              ) : null}
               {auth.googleEnabled ? (
                 <button
                   type="button"
@@ -3840,6 +3859,24 @@ export function AccountDialog({
                 >
                   <LogIn aria-hidden="true" strokeWidth={1.8} />
                   {copy.google}
+                </button>
+              ) : null}
+              {auth.slackEnabled ? (
+                <button
+                  type="button"
+                  className="btn"
+                  disabled={pending}
+                  onClick={() =>
+                    void run(() => auth.signInWithProvider("slack_oidc"))
+                  }
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path fill="#e01e5a" d="M5.04 15.16a2.52 2.52 0 1 1-2.52-2.52h2.52v2.52Zm1.27 0a2.53 2.53 0 0 1 5.05 0v6.32a2.53 2.53 0 0 1-5.05 0v-6.32Z" />
+                    <path fill="#36c5f0" d="M8.84 5.04a2.52 2.52 0 1 1 2.52-2.52v2.52H8.84Zm0 1.27a2.53 2.53 0 0 1 0 5.05H2.52a2.53 2.53 0 0 1 0-5.05h6.32Z" />
+                    <path fill="#2eb67d" d="M18.96 8.84a2.52 2.52 0 1 1 2.52 2.52h-2.52V8.84Zm-1.27 0a2.53 2.53 0 0 1-5.05 0V2.52a2.53 2.53 0 0 1 5.05 0v6.32Z" />
+                    <path fill="#ecb22e" d="M15.16 18.96a2.52 2.52 0 1 1-2.52 2.52v-2.52h2.52Zm0-1.27a2.53 2.53 0 0 1 0-5.05h6.32a2.53 2.53 0 0 1 0 5.05h-6.32Z" />
+                  </svg>
+                  {copy.slack}
                 </button>
               ) : null}
               {auth.appleEnabled ? (

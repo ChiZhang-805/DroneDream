@@ -50,6 +50,8 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_AUTH_GOOGLE_ENABLED: ${{ vars.VITE_AUTH_GOOGLE_ENABLED }}
+          VITE_AUTH_GITHUB_ENABLED: ${{ vars.VITE_AUTH_GITHUB_ENABLED }}
+          VITE_AUTH_SLACK_ENABLED: ${{ vars.VITE_AUTH_SLACK_ENABLED }}
         run: ./website/scripts/build-pages-site.ps1
 
       - name: Configure GitHub Pages

@@ -97,7 +97,10 @@ const content = {
     resendCode: "Resend code",
     signInAction: "Sign in",
     continueWithGoogle: "Continue with Google",
+    continueWithGitHub: "Continue with GitHub",
+    continueWithSlack: "Continue with Slack",
     continueWithEmail: "Or continue with email",
+    socialSignIn: "Social sign-in options",
     createAccount: "Create account",
     passwordTooShort: "Password must contain at least 8 characters.",
     passwordMismatch: "The two passwords do not match.",
@@ -308,7 +311,10 @@ const content = {
     resendCode: "重新发送",
     signInAction: "登录",
     continueWithGoogle: "使用 Google 继续",
+    continueWithGitHub: "使用 GitHub 继续",
+    continueWithSlack: "使用 Slack 继续",
     continueWithEmail: "或使用邮箱继续",
+    socialSignIn: "快捷登录方式",
     createAccount: "创建账号",
     passwordTooShort: "密码至少需要 8 个字符。",
     passwordMismatch: "两次输入的密码不一致。",
@@ -1460,37 +1466,6 @@ export function SiteApp() {
                 {authMode === "reset-update" ? (
                   <p className="site-auth-guidance">{copy.resetUpdateBody}</p>
                 ) : null}
-                {auth.googleEnabled && (
-                  authMode === "sign-in" || authMode === "register"
-                ) ? (
-                  <>
-                    <button
-                      type="button"
-                      className="site-auth-provider"
-                      disabled={authPending || auth.loading}
-                      onClick={() => {
-                        setAuthPending(true);
-                        setAuthError(null);
-                        void auth.signInWithProvider("google")
-                          .catch((reason: unknown) => {
-                            setAuthError(localizedAuthError(reason));
-                          })
-                          .finally(() => setAuthPending(false));
-                      }}
-                    >
-                      <svg viewBox="0 0 18 18" aria-hidden="true">
-                        <path fill="#4285f4" d="M17.64 9.205c0-.638-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.797 2.716v2.258h2.909c1.703-1.568 2.684-3.879 2.684-6.614Z" />
-                        <path fill="#34a853" d="M9 18c2.43 0 4.468-.806 5.956-2.182l-2.909-2.258c-.806.54-1.836.86-3.047.86-2.344 0-4.328-1.585-5.037-3.714H.956v2.332A9 9 0 0 0 9 18Z" />
-                        <path fill="#fbbc05" d="M3.963 10.706A5.42 5.42 0 0 1 3.682 9c0-.592.102-1.168.281-1.706V4.962H.956A9 9 0 0 0 0 9c0 1.452.347 2.827.956 4.038l3.007-2.332Z" />
-                        <path fill="#ea4335" d="M9 3.58c1.321 0 2.507.454 3.441 1.346l2.581-2.581C13.464.892 11.43 0 9 0A9 9 0 0 0 .956 4.962l3.007 2.332C4.672 5.165 6.656 3.58 9 3.58Z" />
-                      </svg>
-                      <span>{copy.continueWithGoogle}</span>
-                    </button>
-                    <div className="site-auth-divider">
-                      <span>{copy.continueWithEmail}</span>
-                    </div>
-                  </>
-                ) : null}
                 <form className="site-auth-form" onSubmit={(event) => void submitAuth(event)}>
                   {showEmailField ? (
                     <label>
@@ -1612,6 +1587,90 @@ export function SiteApp() {
                     </button>
                   </div>
                 ) : null}
+                {(authMode === "sign-in" || authMode === "register")
+                  && (auth.googleEnabled || auth.githubEnabled || auth.slackEnabled) ? (
+                    <div className="site-auth-social">
+                      <div className="site-auth-social-divider" aria-hidden="true" />
+                      <div
+                        className="site-auth-social-actions"
+                        role="group"
+                        aria-label={copy.socialSignIn}
+                      >
+                        {auth.githubEnabled ? (
+                          <button
+                            type="button"
+                            className="site-auth-provider-icon is-github"
+                            aria-label={copy.continueWithGitHub}
+                            title={copy.continueWithGitHub}
+                            disabled={authPending || auth.loading}
+                            onClick={() => {
+                              setAuthPending(true);
+                              setAuthError(null);
+                              void auth.signInWithProvider("github")
+                                .catch((reason: unknown) => {
+                                  setAuthError(localizedAuthError(reason));
+                                })
+                                .finally(() => setAuthPending(false));
+                            }}
+                          >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                              <path d="M12 .7a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2.23c-3.22.7-3.9-1.37-3.9-1.37-.52-1.34-1.29-1.69-1.29-1.69-1.05-.72.08-.71.08-.71 1.17.08 1.78 1.2 1.78 1.2 1.04 1.78 2.72 1.27 3.39.97.1-.75.4-1.27.74-1.56-2.57-.29-5.27-1.28-5.27-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.47.11-3.05 0 0 .97-.31 3.16 1.18a10.98 10.98 0 0 1 5.76 0c2.19-1.49 3.15-1.18 3.15-1.18.63 1.58.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.71 5.38-5.29 5.67.42.36.79 1.06.79 2.15v3.2c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .7Z" />
+                            </svg>
+                          </button>
+                        ) : null}
+                        {auth.googleEnabled ? (
+                          <button
+                            type="button"
+                            className="site-auth-provider-icon is-google"
+                            aria-label={copy.continueWithGoogle}
+                            title={copy.continueWithGoogle}
+                            disabled={authPending || auth.loading}
+                            onClick={() => {
+                              setAuthPending(true);
+                              setAuthError(null);
+                              void auth.signInWithProvider("google")
+                                .catch((reason: unknown) => {
+                                  setAuthError(localizedAuthError(reason));
+                                })
+                                .finally(() => setAuthPending(false));
+                            }}
+                          >
+                            <svg viewBox="0 0 18 18" aria-hidden="true">
+                              <path fill="#4285f4" d="M17.64 9.205c0-.638-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.797 2.716v2.258h2.909c1.703-1.568 2.684-3.879 2.684-6.614Z" />
+                              <path fill="#34a853" d="M9 18c2.43 0 4.468-.806 5.956-2.182l-2.909-2.258c-.806.54-1.836.86-3.047.86-2.344 0-4.328-1.585-5.037-3.714H.956v2.332A9 9 0 0 0 9 18Z" />
+                              <path fill="#fbbc05" d="M3.963 10.706A5.42 5.42 0 0 1 3.682 9c0-.592.102-1.168.281-1.706V4.962H.956A9 9 0 0 0 0 9c0 1.452.347 2.827.956 4.038l3.007-2.332Z" />
+                              <path fill="#ea4335" d="M9 3.58c1.321 0 2.507.454 3.441 1.346l2.581-2.581C13.464.892 11.43 0 9 0A9 9 0 0 0 .956 4.962l3.007 2.332C4.672 5.165 6.656 3.58 9 3.58Z" />
+                            </svg>
+                          </button>
+                        ) : null}
+                        {auth.slackEnabled ? (
+                          <button
+                            type="button"
+                            className="site-auth-provider-icon is-slack"
+                            aria-label={copy.continueWithSlack}
+                            title={copy.continueWithSlack}
+                            disabled={authPending || auth.loading}
+                            onClick={() => {
+                              setAuthPending(true);
+                              setAuthError(null);
+                              void auth.signInWithProvider("slack_oidc")
+                                .catch((reason: unknown) => {
+                                  setAuthError(localizedAuthError(reason));
+                                })
+                                .finally(() => setAuthPending(false));
+                            }}
+                          >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                              <path fill="#e01e5a" d="M5.04 15.16a2.52 2.52 0 1 1-2.52-2.52h2.52v2.52Zm1.27 0a2.53 2.53 0 0 1 5.05 0v6.32a2.53 2.53 0 0 1-5.05 0v-6.32Z" />
+                              <path fill="#36c5f0" d="M8.84 5.04a2.52 2.52 0 1 1 2.52-2.52v2.52H8.84Zm0 1.27a2.53 2.53 0 0 1 0 5.05H2.52a2.53 2.53 0 0 1 0-5.05h6.32Z" />
+                              <path fill="#2eb67d" d="M18.96 8.84a2.52 2.52 0 1 1 2.52 2.52h-2.52V8.84Zm-1.27 0a2.53 2.53 0 0 1-5.05 0V2.52a2.53 2.53 0 0 1 5.05 0v6.32Z" />
+                              <path fill="#ecb22e" d="M15.16 18.96a2.52 2.52 0 1 1-2.52 2.52v-2.52h2.52Zm0-1.27a2.53 2.53 0 0 1 0-5.05h6.32a2.53 2.53 0 0 1 0 5.05h-6.32Z" />
+                            </svg>
+                          </button>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
               </>
             )}
             {authNotice ? <div className="site-auth-notice" role="status">{authNotice}</div> : null}

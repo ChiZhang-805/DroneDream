@@ -48,7 +48,7 @@ The frontend now has an optional Supabase account layer:
   never persists the grant in browser storage;
 - a failed WebView adoption clears only that edition's unusable vault entry so
   a later explicit sign-in cannot loop on stale credentials; and
-- Google and Apple buttons remain browser-deployment build flags. Desktop
+- Google, GitHub, Slack, and Apple buttons remain browser-deployment build flags. Desktop
   sign-in delegates provider interaction to the system browser instead of
   embedding provider credentials in the WebView.
 
@@ -63,6 +63,8 @@ Frontend build variables:
 VITE_SUPABASE_URL=https://PROJECT_REF.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 VITE_AUTH_GOOGLE_ENABLED=false
+VITE_AUTH_GITHUB_ENABLED=false
+VITE_AUTH_SLACK_ENABLED=false
 VITE_AUTH_APPLE_ENABLED=false
 ```
 
@@ -113,9 +115,10 @@ password, or any signing key in frontend variables or the repository.
    secrets. Configure the backend OIDC values above in server secrets.
 6. Confirm the project uses an asymmetric signing key compatible with the
    JWKS verifier, then run the cross-user isolation acceptance tests.
-7. If Google login is wanted, create a Google OAuth web client, register the
-   Supabase callback URL, add its client ID and secret in Supabase, then set
-   `VITE_AUTH_GOOGLE_ENABLED=true` for the browser build.
+7. For each enabled social login, create the provider application, register the
+   Supabase callback URL, and save its client ID and secret only in Supabase.
+   Set the matching browser-build flag for Google, GitHub, or Slack. Slack must
+   use the OIDC provider and only the `openid`, `profile`, and `email` scopes.
 8. Defer Apple login until an Apple Developer account, Services ID, verified
    domain, redirect URL, and secret-rotation owner are ready.
 9. Register the four public desktop OAuth clients with their exact edition

@@ -12,6 +12,8 @@ interface ImportMetaEnv {
   readonly VITE_BILLING_CHECKOUT_URL?: string;
   readonly VITE_TURNSTILE_SITE_KEY?: string;
   readonly VITE_AUTH_GOOGLE_ENABLED?: "true" | "false";
+  readonly VITE_AUTH_GITHUB_ENABLED?: "true" | "false";
+  readonly VITE_AUTH_SLACK_ENABLED?: "true" | "false";
   readonly VITE_AUTH_APPLE_ENABLED?: "true" | "false";
   readonly VITE_DESKTOP_VISUAL_QA?: "true" | "false";
   readonly VITE_PUBLIC_DEMO_CONSOLE?: string;

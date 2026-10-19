@@ -33,6 +33,8 @@ vi.mock("../features/auth/AuthContext", () => ({
     loading: false,
     account: null,
     googleEnabled: false,
+    githubEnabled: false,
+    slackEnabled: false,
     appleEnabled: false,
     signInWithPassword: authMock.signInWithPassword,
     sendRegistrationCode: authMock.sendRegistrationCode,

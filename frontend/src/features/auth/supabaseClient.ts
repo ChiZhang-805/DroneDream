@@ -150,6 +150,10 @@ export const supabaseClient: SupabaseClient | null = cloudAuthConfigured
 
 export const googleAuthEnabled =
   import.meta.env.VITE_AUTH_GOOGLE_ENABLED === "true";
+export const githubAuthEnabled =
+  import.meta.env.VITE_AUTH_GITHUB_ENABLED === "true";
+export const slackAuthEnabled =
+  import.meta.env.VITE_AUTH_SLACK_ENABLED === "true";
 export const appleAuthEnabled =
   import.meta.env.VITE_AUTH_APPLE_ENABLED === "true";
 

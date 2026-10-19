@@ -78,6 +78,8 @@ vi.mock("../features/auth/AuthContext", async (importOriginal) => {
       loading: false,
       account: authMock.account,
       googleEnabled: false,
+      githubEnabled: false,
+      slackEnabled: false,
       appleEnabled: false,
       signInWithPassword: unavailable,
       sendRegistrationCode: unavailable,

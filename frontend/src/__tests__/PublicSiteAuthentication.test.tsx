@@ -13,6 +13,8 @@ const authMock = vi.hoisted(() => ({
       avatarUrl: string | null;
     } | null,
     googleEnabled: false,
+    githubEnabled: false,
+    slackEnabled: false,
   },
   signInWithPassword: vi.fn(async (): Promise<void> => undefined),
   sendRegistrationCode: vi.fn(async (): Promise<void> => undefined),
@@ -36,6 +38,8 @@ vi.mock("../features/auth/AuthContext", () => ({
     passwordRecovery: false,
     account: authMock.state.account,
     googleEnabled: authMock.state.googleEnabled,
+    githubEnabled: authMock.state.githubEnabled,
+    slackEnabled: authMock.state.slackEnabled,
     appleEnabled: false,
     signInWithPassword: authMock.signInWithPassword,
     sendRegistrationCode: authMock.sendRegistrationCode,
@@ -83,6 +87,8 @@ describe("public website account authentication", () => {
     window.localStorage.clear();
     authMock.state.account = null;
     authMock.state.googleEnabled = false;
+    authMock.state.githubEnabled = false;
+    authMock.state.slackEnabled = false;
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline test")));
     accountApiMock.getManagedModelUsage.mockReset();
     accountApiMock.getManagedModelUsage.mockResolvedValue({
@@ -102,12 +108,26 @@ describe("public website account authentication", () => {
     ].forEach((mock) => mock.mockClear());
   });
 
-  it("starts Google sign-in from the public account dialog when enabled", async () => {
+  it("starts Google, GitHub, and Slack sign-in from circular provider buttons", async () => {
     authMock.state.googleEnabled = true;
+    authMock.state.githubEnabled = true;
+    authMock.state.slackEnabled = true;
     renderHomePage();
 
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
     const dialog = await screen.findByRole("dialog", { name: "Sign in" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Continue with GitHub" }));
+
+    await waitFor(() => {
+      expect(authMock.signInWithProvider).toHaveBeenCalledWith("github");
+    });
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Continue with Slack" }));
+
+    await waitFor(() => {
+      expect(authMock.signInWithProvider).toHaveBeenCalledWith("slack_oidc");
+    });
+
     fireEvent.click(within(dialog).getByRole("button", { name: "Continue with Google" }));
 
     await waitFor(() => {

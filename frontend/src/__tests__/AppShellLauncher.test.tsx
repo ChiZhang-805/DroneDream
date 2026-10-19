@@ -26,6 +26,8 @@ vi.mock("../features/auth/AuthContext", async (importOriginal) => {
     useAuth: () => ({
       ...launcherAuthState.current,
       googleEnabled: false,
+      githubEnabled: false,
+      slackEnabled: false,
       appleEnabled: false,
       signInWithPassword: unavailable,
       sendRegistrationCode: unavailable,
