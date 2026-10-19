@@ -42,6 +42,8 @@ export default defineConfig(({ mode, isPreview }) => {
           manual: `${projectRoot}manual/index.html`,
           pricing: `${projectRoot}pricing/index.html`,
           community: `${projectRoot}community/index.html`,
+          privacy: `${projectRoot}privacy/index.html`,
+          terms: `${projectRoot}terms/index.html`,
           organization: `${projectRoot}organization/index.html`,
           oauthConsent: `${projectRoot}oauth/consent/index.html`,
         },

@@ -1,84 +1,156 @@
-# DroneDream privacy policy
+# DroneDream Privacy Policy
 
-Effective date: July 20, 2026
+Effective date: October 20, 2026
 
-DroneDream is a local-first, open-source PX4 and Gazebo experiment application.
-The desktop application does not include first-party advertising, behavioral
-analytics, crash-reporting telemetry, or a DroneDream cloud account. Local use
-does not automatically transmit experiment results to the project maintainer.
+This Privacy Policy explains how DroneDream handles information when you use
+the DroneDream website, account services, community features, cloud features,
+or official desktop applications. Questions and deletion requests may be sent
+to **cz005623@gmail.com**.
 
-## Data kept on the user's computer
+## Information we collect
 
-DroneDream may keep the following data on the computer where it runs:
+### Account and sign-in information
 
-- application language, model-provider name, model name, and compatible API
-  base URL;
-- active-session experiment drafts, excluding model API keys;
-- jobs, parameters, tracks, scenarios, metrics, run history, logs, simulation
-  telemetry, reports, and other experiment artifacts;
-- local Runtime installation state, diagnostics, and application/WebView
-  caches; and
-- a model-provider API key during the current application session and, when a
-  model-guided job is created, an encrypted per-job copy in the local backend
-  database until that job reaches a terminal state.
+When you create or use a DroneDream account, we may process your email address,
+account identifier, display name, profile image, authentication provider, and
+sign-in timestamps. If you use Google, GitHub, or Slack to sign in, DroneDream
+requests only the basic identity information needed to authenticate you: your
+provider account identifier, email address, name, and profile image when the
+provider makes them available.
 
-Experiment drafts use session storage and are discarded when the application
-session ends. Provider, model, and base-URL preferences may persist between
-sessions. Model API keys are excluded from drafts and persistent preference
-storage. The backend removes the encrypted per-job API key when the job
-finishes, fails, or is cancelled.
+DroneDream does not request access to Google Drive, Gmail, Google Calendar,
+GitHub repositories, Slack messages, contacts, or files through these sign-in
+flows.
 
-## Network connections
+### Content and cloud-service information
 
-DroneDream transfers information to another networked system only for an
-operation requested or configured by the user or person installing the
-software. Depending on the selected features, those connections may include:
+Depending on the features you choose, we may process:
 
-- GitHub Releases, to check for application updates and to download the signed
-  DroneDreamRuntime release manifest and Runtime files;
-- Microsoft, to install the WebView2 runtime when it is missing from the
-  Windows computer;
-- OpenAI or another OpenAI-compatible provider selected by the user, when the
-  user chooses an LLM-guided optimizer; the request contains the engineering
-  context needed to propose parameters and is governed by that provider's own
-  terms and privacy policy;
-- a backend, object store, identity provider, or Gazebo/noVNC endpoint
-  explicitly configured by the operator for a non-local deployment; and
-- external documentation or course pages that the user chooses to open.
+- community topics, comments, reactions, uploaded images, and the public name
+  or profile image shown with that content;
+- organization membership, software entitlements, plan and allowance status,
+  and payment-order status;
+- cloud-hosted assistant conversations, uploaded files, generated artifacts,
+  workspace preferences, and model-usage records; and
+- support messages and other information you deliberately send to us.
 
-Local application traffic normally stays on the loopback interface between
-the desktop UI and the local DroneDream backend. The project website fetches
-release metadata from its own server and does not use first-party analytics.
+Payment providers process payment credentials under their own privacy policies.
+DroneDream records the information needed to confirm an order and activate the
+corresponding plan, but does not store full payment-card details.
 
-## User control and deletion
+### Technical information
 
-Users can avoid third-party model-provider traffic by selecting a keyless
-optimizer. Cancelling or completing an LLM-guided job purges its encrypted API
-key. Run history and artifacts can be deleted through the application where
-the corresponding controls are available, or by deleting the local
-DroneDream data directories.
+Our hosting, authentication, storage, and security providers may process IP
+addresses, browser or device information, request timestamps, security events,
+and service logs needed to deliver and protect the service. DroneDream does not
+use first-party behavioral advertising or sell personal information.
 
-Uninstalling the desktop application removes the installed program but may
-preserve diagnostics, experiment data, and the independently installed
-DroneDreamRuntime so an accidental uninstall does not destroy user work.
-Users who want complete removal must also delete the DroneDream application
-data and explicitly remove the dedicated `DroneDreamRuntime` WSL distribution.
-The installer never unregisters an unrelated Ubuntu or WSL distribution.
+## How we use information
 
-## Remote deployments
+We use information to:
 
-People who operate a shared or public DroneDream deployment are independent
-operators responsible for authentication, access control, retention,
-encryption, backups, user notices, and compliance for that deployment. This
-repository does not claim that an operator's deployment follows this local
-desktop policy.
+- create and secure accounts, complete sign-in, and keep sessions active;
+- show your chosen name and profile image across DroneDream products;
+- provide community, organization, subscription, assistant, and storage
+  features you request;
+- operate, troubleshoot, secure, and improve the service; and
+- comply with applicable law and enforce the Terms of Service.
+
+## Google user data
+
+When you choose **Continue with Google**, Google sends DroneDream the basic
+identity fields authorized on the consent screen. We use those fields only to
+create or match your DroneDream account, authenticate your session, and display
+your account name or image.
+
+The account identifier and available profile fields may be stored with your
+DroneDream account by our authentication and database provider. We do not use
+Google user data for advertising, sell it, or disclose it to unrelated third
+parties. It is shared only with service providers acting on our behalf, when
+you direct us to share it, or when disclosure is legally required.
+
+You can disconnect DroneDream from your Google Account and can request deletion
+of the corresponding DroneDream account data. Revoking Google access stops new
+Google sign-ins but does not by itself delete information already stored in
+your DroneDream account.
+
+## Local desktop data
+
+DroneDream is designed to keep flight and engineering work local when local
+features are used. The desktop applications may store settings, session drafts,
+jobs, parameters, tracks, scenarios, metrics, run history, logs, simulation
+telemetry, reports, Runtime installation state, and application caches on your
+computer.
+
+Model-provider API keys are excluded from persistent preference storage. A key
+may be held during the current session and, when a model-guided local job needs
+it, an encrypted per-job copy may remain in the local backend database until
+that job reaches a terminal state.
+
+Local application traffic normally stays on the loopback interface between the
+desktop UI and the local DroneDream backend. Information leaves the computer
+only when you use or configure a networked feature, such as account sign-in,
+community publishing, cloud storage, software updates, a model provider, or a
+remote deployment.
+
+## Cookies and local storage
+
+DroneDream and its authentication provider use browser or application storage
+to maintain signed-in sessions, remember interface preferences, and protect
+account flows. These items are functional rather than advertising cookies. You
+can clear them through your browser or application settings, although doing so
+may sign you out.
+
+## Service providers and disclosure
+
+We use service providers for authentication, database hosting, file storage,
+website hosting, email delivery, security, payment processing, and optional
+model access. These providers process information under their own terms and our
+configuration of their services. Google, GitHub, and Slack also process the
+information involved when you choose their sign-in option.
+
+We may disclose information when reasonably necessary to comply with law,
+protect users and the service, investigate abuse, or complete a business
+transfer. We do not sell personal information.
+
+## Retention, access, and deletion
+
+We keep account and cloud information for as long as needed to provide the
+service, meet legal obligations, resolve disputes, and protect the service.
+Public community content may remain visible until it is deleted or moderated.
+Security and transaction records may be retained for a limited period after an
+account is closed where required for fraud prevention, accounting, or law.
+
+You may update available profile information in DroneDream. To request access,
+correction, export, or deletion, email **cz005623@gmail.com** from the address
+associated with your account. We may need to verify the request before acting.
+
+Uninstalling a desktop application removes the installed program but may
+preserve local diagnostics, experiment data, and the independently installed
+DroneDreamRuntime to avoid destroying user work. Complete local removal also
+requires deleting DroneDream application data and explicitly removing the
+dedicated `DroneDreamRuntime` WSL distribution.
 
 ## Security
 
-API keys and other credentials must not be committed to the repository or
-included in reports. Network-accessible deployments must use authentication
-and TLS. Security issues should be reported according to the
-[Security policy](SECURITY.md).
+We use access controls, encrypted network connections, scoped credentials, and
+other safeguards appropriate to the service. No method of transmission or
+storage is completely secure. Security issues should be reported according to
+the [Security Policy](SECURITY.md).
 
-Questions or deletion guidance requests may be sent to
-**cz005623@gmail.com**.
+## Children's privacy
+
+DroneDream is not directed to children under 13, and we do not knowingly create
+accounts for children under 13 without any consent required by applicable law.
+
+## International processing
+
+Service providers may process information in countries other than the one in
+which you live. Where required, we use available contractual and technical
+measures intended to protect that information.
+
+## Changes to this policy
+
+We may update this policy as DroneDream changes. The effective date at the top
+identifies the latest published version. Material changes will be presented
+through the website, application, or another appropriate notice.

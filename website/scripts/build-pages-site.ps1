@@ -6,9 +6,13 @@ $frontendRoot = Join-Path $repositoryRoot "frontend"
 $releaseConfigPath = Join-Path $repositoryRoot "website\pages-release.json"
 $tauriConfigPath = Join-Path $repositoryRoot "desktop\src-tauri\tauri.conf.json"
 $codeSigningPolicyPath = Join-Path $repositoryRoot "CODE_SIGNING_POLICY.md"
+$privacyPolicyPath = Join-Path $repositoryRoot "PRIVACY.md"
+$termsOfServicePath = Join-Path $repositoryRoot "TERMS.md"
 $release = Get-Content -LiteralPath $releaseConfigPath -Raw | ConvertFrom-Json
 $tauriConfig = Get-Content -LiteralPath $tauriConfigPath -Raw | ConvertFrom-Json
 $codeSigningPolicy = Get-Content -LiteralPath $codeSigningPolicyPath -Raw
+$privacyPolicy = Get-Content -LiteralPath $privacyPolicyPath -Raw
+$termsOfService = Get-Content -LiteralPath $termsOfServicePath -Raw
 
 $version = [string]$release.version
 $fileName = [string]$release.fileName
@@ -159,6 +163,14 @@ $oauthConsentHtml = Join-Path $outputDirectory "oauth\consent\index.html"
 if (-not (Test-Path -LiteralPath $oauthConsentHtml -PathType Leaf)) {
     throw "The site build completed without producing the desktop OAuth consent route."
 }
+$privacyHtml = Join-Path $outputDirectory "privacy\index.html"
+if (-not (Test-Path -LiteralPath $privacyHtml -PathType Leaf)) {
+    throw "The site build completed without producing the public privacy route."
+}
+$termsHtml = Join-Path $outputDirectory "terms\index.html"
+if (-not (Test-Path -LiteralPath $termsHtml -PathType Leaf)) {
+    throw "The site build completed without producing the public terms route."
+}
 
 $builtJavaScript = @(
     Get-ChildItem -LiteralPath $assetDirectory -Filter "*.js" -File |
@@ -169,10 +181,30 @@ foreach ($marker in @(
     $sha256,
     $publishedAt,
     "CODE_SIGNING_POLICY.md",
-    "PRIVACY.md"
+    "PRIVACY.md",
+    "TERMS.md",
+    "Google user data",
+    "DroneDream Terms of Service"
 )) {
     if ($builtJavaScript.IndexOf([string]$marker, [StringComparison]::Ordinal) -lt 0) {
         throw "The Pages build did not embed required marker: $marker"
+    }
+}
+
+foreach ($requiredPolicyText in @(
+    "Google user data",
+    "cz005623@gmail.com"
+)) {
+    if ($privacyPolicy.IndexOf($requiredPolicyText, [StringComparison]::Ordinal) -lt 0) {
+        throw "The privacy policy is missing required disclosure text: $requiredPolicyText"
+    }
+}
+foreach ($requiredTermsText in @(
+    "DroneDream Terms of Service",
+    "Responsible use"
+)) {
+    if ($termsOfService.IndexOf($requiredTermsText, [StringComparison]::Ordinal) -lt 0) {
+        throw "The terms of service are missing required text: $requiredTermsText"
     }
 }
 

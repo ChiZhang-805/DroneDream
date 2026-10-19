@@ -4,8 +4,9 @@ import remarkGfm from "remark-gfm";
 
 import codeSigningPolicy from "../../../CODE_SIGNING_POLICY.md?raw";
 import privacyPolicy from "../../../PRIVACY.md?raw";
+import termsOfService from "../../../TERMS.md?raw";
 
-type PolicySection = "privacy" | "code-signing";
+type PolicySection = "privacy" | "terms" | "code-signing";
 
 interface PolicyDialogProps {
   onClose: () => void;
@@ -17,9 +18,10 @@ const policySections: Array<{
   id: PolicySection;
   label: string;
   source: string;
-  sourcePath: "PRIVACY.md" | "CODE_SIGNING_POLICY.md";
+  sourcePath: "PRIVACY.md" | "TERMS.md" | "CODE_SIGNING_POLICY.md";
 }> = [
   { id: "privacy", label: "Privacy", source: privacyPolicy, sourcePath: "PRIVACY.md" },
+  { id: "terms", label: "Terms", source: termsOfService, sourcePath: "TERMS.md" },
   {
     id: "code-signing",
     label: "Code signing",

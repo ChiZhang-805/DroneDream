@@ -22,7 +22,7 @@ function renderSite() {
 
 function expectContentLinksToUseIcons(container: HTMLElement) {
   const contentLinks = Array.from(container.querySelectorAll<HTMLAnchorElement>("a[href]"))
-    .filter((link) => !link.matches(".site-skip-link, .site-nav a"));
+    .filter((link) => !link.matches(".site-skip-link, .site-nav a, .site-footer a"));
   contentLinks.forEach((link) => {
     expect(link.querySelector("svg, img"), `Expected an icon in ${link.className || link.href}`).not.toBeNull();
     expect(link).toHaveAccessibleName();
@@ -57,7 +57,15 @@ describe("DroneDream public website", () => {
     expect(screen.getByRole("link", { name: "Community" })).toHaveAttribute("href", "/community/");
     expect(screen.getByRole("button", { name: "Sign in" })).toBeVisible();
     expect(container.querySelector(".site-account-avatar")).toBeVisible();
-    expect(container.querySelector(".site-footer")).toBeNull();
+    expect(container.querySelector(".site-footer")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute(
+      "href",
+      "/privacy/",
+    );
+    expect(screen.getByRole("link", { name: "Terms of Service" })).toHaveAttribute(
+      "href",
+      "/terms/",
+    );
     expect(container.querySelectorAll('.site-home-card[data-home-card-copy="1"]')).toHaveLength(11);
     expect(container.querySelectorAll(".site-home-card")).toHaveLength(33);
     expect(screen.getByRole("region", { name: "Mission examples" })).toBeVisible();
@@ -76,6 +84,24 @@ describe("DroneDream public website", () => {
       "/downloads/latest.json",
       expect.objectContaining({ cache: "no-cache" }),
     ));
+  });
+
+  it("publishes direct privacy and terms pages for OAuth review", () => {
+    window.history.replaceState(null, "", "/privacy/");
+    const privacy = renderSite();
+
+    expect(document.title).toBe("DroneDream Privacy Policy");
+    expect(screen.getByRole("heading", { name: "DroneDream Privacy Policy" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Google user data" })).toBeVisible();
+    expect(screen.getByText("Effective date: October 20, 2026")).toBeVisible();
+    privacy.unmount();
+
+    window.history.replaceState(null, "", "/terms/");
+    renderSite();
+
+    expect(document.title).toBe("DroneDream Terms of Service");
+    expect(screen.getByRole("heading", { name: "DroneDream Terms of Service" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "3. Responsible use" })).toBeVisible();
   });
 
   it("selects a mission card without tilting or navigating away", () => {

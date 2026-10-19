@@ -2997,6 +2997,80 @@ html[lang="zh-CN"] .site-hero h1 {
 @keyframes site-dialog-backdrop { from { opacity: 0; } }
 @keyframes site-dialog-in { from { transform: translateY(24px) scale(.98); opacity: 0; } }
 
+.site-legal-page {
+  min-height: calc(100vh - 78px);
+  padding: clamp(124px, 10vw, 164px) var(--site-gutter) clamp(72px, 8vw, 120px);
+  background:
+    radial-gradient(circle at 15% 8%, rgba(104, 232, 255, .09), transparent 32%),
+    radial-gradient(circle at 88% 16%, rgba(241, 102, 216, .1), transparent 30%),
+    #070913;
+}
+
+.site-legal-document {
+  width: min(920px, 100%);
+  margin: 0 auto;
+  color: rgba(235, 238, 250, .78);
+  font-size: clamp(.95rem, 1.05vw, 1.08rem);
+  line-height: 1.78;
+}
+
+.site-legal-document > .site-eyebrow {
+  margin: 0 0 1rem;
+  color: var(--site-cyan);
+  font-size: .74rem;
+  font-weight: 760;
+  letter-spacing: .2em;
+}
+
+.site-legal-document h1 {
+  margin: 0 0 .65rem;
+  color: #fff;
+  font-size: clamp(2.65rem, 6vw, 5.2rem);
+  line-height: .98;
+  letter-spacing: -.06em;
+}
+
+.site-legal-document h2 {
+  margin: 3.2rem 0 .8rem;
+  padding-top: .65rem;
+  border-top: 1px solid rgba(255, 255, 255, .09);
+  color: #f7f8ff;
+  font-size: clamp(1.25rem, 2.1vw, 1.65rem);
+  line-height: 1.2;
+  letter-spacing: -.025em;
+}
+
+.site-legal-document h3 {
+  margin: 2rem 0 .5rem;
+  color: #f5f6ff;
+  font-size: 1.05rem;
+}
+
+.site-legal-document p { margin: 0 0 1.15rem; }
+.site-legal-document ul { display: grid; gap: .55rem; margin: 0 0 1.35rem; padding-left: 1.3rem; }
+.site-legal-document strong { color: #fff; }
+.site-legal-document a { color: #9defff; text-underline-offset: .2em; }
+.site-legal-document code { color: #f4c6ec; }
+.site-legal-document-links {
+  display: flex;
+  gap: .75rem;
+  margin-top: 3.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, .09);
+}
+.site-legal-document-links a {
+  padding: .65rem .9rem;
+  border: 1px solid rgba(255, 255, 255, .11);
+  border-radius: 999px;
+  color: rgba(241, 244, 255, .76);
+  text-decoration: none;
+}
+.site-legal-document-links a[aria-current="page"] {
+  border-color: rgba(104, 232, 255, .5);
+  color: #fff;
+  background: rgba(104, 232, 255, .08);
+}
+
 .site-footer { padding: 2.4rem 0; border-top: 1px solid rgba(255,255,255,.07); color: rgba(232,235,246,.7); background: #070913; }
 .site-footer .site-shell { display: grid; align-items: center; grid-template-columns: auto 1fr auto auto; gap: 1.4rem; }
 .site-footer-brand { display: flex; align-items: center; gap: .72rem; color: #f4f6ff; }

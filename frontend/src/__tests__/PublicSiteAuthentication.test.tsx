@@ -219,7 +219,10 @@ describe("public website account authentication", () => {
       "aria-selected",
       "true",
     );
-    expect(within(dialog).getByText("Effective date: July 20, 2026")).toBeVisible();
+    expect(within(dialog).getByText("Effective date: October 20, 2026")).toBeVisible();
+
+    fireEvent.click(within(dialog).getByRole("tab", { name: "Terms" }));
+    expect(within(dialog).getByText(/These Terms of Service govern/)).toBeVisible();
 
     fireEvent.click(within(dialog).getByRole("tab", { name: "Code signing" }));
     expect(within(dialog).getByText(/Status: preparation/)).toBeVisible();

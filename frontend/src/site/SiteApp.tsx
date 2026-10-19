@@ -23,6 +23,7 @@ import {
 import { useI18n } from "../i18n/I18nProvider";
 import { CommunityPage } from "./CommunityPage";
 import { HomeExperience } from "./HomeExperience";
+import { LegalPage } from "./LegalPage";
 import { ManualPage } from "./ManualPage";
 import { OAuthConsentPage } from "./OAuthConsentPage";
 import { authorizationIdFromLocation } from "./oauthConsentPolicy";
@@ -593,6 +594,10 @@ export function SiteApp() {
         ? "organization"
       : path === "/community"
         ? "community"
+        : path === "/privacy"
+          ? "privacy"
+          : path === "/terms"
+            ? "terms"
          : path === "/oauth/consent"
            ? "oauth-consent"
          : "home";
@@ -633,15 +638,27 @@ export function SiteApp() {
     return () => { active = false; };
   }, [auth.account]);
 
+  const pageMetadata = sitePage === "privacy"
+    ? {
+        title: "DroneDream Privacy Policy",
+        description: "How DroneDream accesses, uses, stores, and shares account and service information.",
+      }
+    : sitePage === "terms"
+      ? {
+          title: "DroneDream Terms of Service",
+          description: "Terms governing use of the DroneDream website, accounts, cloud features, and official applications.",
+        }
+      : { title: copy.metaTitle, description: copy.metaDescription };
+
   useEffect(() => {
-    document.title = copy.metaTitle;
+    document.title = pageMetadata.title;
     document.querySelector<HTMLMetaElement>('meta[name="description"]')
-      ?.setAttribute("content", copy.metaDescription);
+      ?.setAttribute("content", pageMetadata.description);
     document.querySelector<HTMLMetaElement>('meta[property="og:title"]')
-      ?.setAttribute("content", copy.metaTitle);
+      ?.setAttribute("content", pageMetadata.title);
     document.querySelector<HTMLMetaElement>('meta[property="og:description"]')
-      ?.setAttribute("content", copy.metaDescription);
-  }, [copy.metaDescription, copy.metaTitle]);
+      ?.setAttribute("content", pageMetadata.description);
+  }, [pageMetadata.description, pageMetadata.title]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1295,6 +1312,10 @@ export function SiteApp() {
             account={auth.account}
             onRequireAccount={() => openAccount("sign-in")}
           />
+        ) : sitePage === "privacy" ? (
+          <LegalPage document="privacy" />
+        ) : sitePage === "terms" ? (
+          <LegalPage document="terms" />
         ) : sitePage === "oauth-consent" && (
           !hasValidOAuthAuthorizationId
           ||
@@ -1326,6 +1347,21 @@ export function SiteApp() {
           <HomeExperience release={release} />
         )}
       </main>
+
+      {sitePage === "home" || sitePage === "privacy" || sitePage === "terms" ? (
+        <footer className="site-footer">
+          <div className="site-shell">
+            <a className="site-footer-brand" href="/" aria-label="DroneDream home">
+              <BrandLockup />
+            </a>
+            <p>{copy.footerLine}</p>
+            <nav className="site-footer-policy-links" aria-label="Legal documents">
+              <a href="/privacy/">Privacy Policy</a>
+              <a href="/terms/">Terms of Service</a>
+            </nav>
+          </div>
+        </footer>
+      ) : null}
 
       {policyOpen ? (
         <Suspense
