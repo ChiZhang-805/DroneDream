@@ -36,7 +36,7 @@
 
   .dd-site[data-page="manual"] .site-header.is-scrolled .site-nav a[aria-current="page"] {
     color: #fff;
-    background: linear-gradient(112deg, #55d8ee 0%, #7b5cf0 52%, #e44ac4 100%);
+    background: linear-gradient(112deg, #e44ac4 0%, #7b5cf0 52%, #55d8ee 100%);
     box-shadow: 0 7px 20px rgba(117, 78, 216, 0.25);
   }
 }
