@@ -58,7 +58,8 @@ describe("DroneDream public website", () => {
     expect(screen.getByRole("button", { name: "Sign in" })).toBeVisible();
     expect(container.querySelector(".site-account-avatar")).toBeVisible();
     expect(container.querySelector(".site-footer")).toBeNull();
-    expect(container.querySelectorAll(".site-home-card")).toHaveLength(11);
+    expect(container.querySelectorAll('.site-home-card[data-home-card-copy="1"]')).toHaveLength(11);
+    expect(container.querySelectorAll(".site-home-card")).toHaveLength(33);
     expect(screen.getByRole("region", { name: "Mission examples" })).toBeVisible();
     expectContentLinksToUseIcons(container);
 
@@ -83,6 +84,20 @@ describe("DroneDream public website", () => {
     const card = screen.getByRole("button", { name: /Emergency search, card 9 of 11/i });
     fireEvent.click(card);
     expect(card).toHaveAttribute("aria-current", "true");
+  });
+
+  it("loops mission cards in both directions from the mouse wheel", () => {
+    renderSite();
+
+    const carousel = screen.getByRole("region", { name: "Mission examples" });
+    const lastCard = screen.getByRole("button", { name: /Coastal wind test, card 11 of 11/i });
+    fireEvent.click(lastCard);
+    fireEvent.wheel(carousel, { deltaY: 100, deltaMode: 0 });
+    expect(screen.getByRole("button", { name: /Campus delivery, card 1 of 11/i }))
+      .toHaveAttribute("aria-current", "true");
+
+    fireEvent.wheel(carousel, { deltaY: -100, deltaMode: 0 });
+    expect(lastCard).toHaveAttribute("aria-current", "true");
   });
 
   it("renders the production manual reader with its chapter sidebar and offline editions", () => {
@@ -239,7 +254,7 @@ describe("DroneDream public website", () => {
     expect(screen.getByRole("heading", { name: "Give Every Mission a Flight Agent." })).toBeVisible();
     expect(screen.getByText("Products")).toBeVisible();
     expect(screen.getByRole("link", { name: "Download Universal" })).toBeVisible();
-    expect(container.querySelectorAll(".site-home-card")).toHaveLength(11);
+    expect(container.querySelectorAll('.site-home-card[data-home-card-copy="1"]')).toHaveLength(11);
     expectContentLinksToUseIcons(container);
   });
 
@@ -260,7 +275,7 @@ describe("DroneDream public website", () => {
     renderSite();
 
     expect(screen.queryByRole("button", { name: /begin a starflight/i })).toBeNull();
-    expect(document.querySelectorAll(".site-home-card")).toHaveLength(11);
+    expect(document.querySelectorAll('.site-home-card[data-home-card-copy="1"]')).toHaveLength(11);
   });
 
   it("validates release metadata and formats binary sizes", () => {

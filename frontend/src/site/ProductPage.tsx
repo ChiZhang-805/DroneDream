@@ -22,8 +22,16 @@ const products: readonly ProductDefinition[] = [
   {
     id: "universal",
     name: "Universal",
-    summary: "Unite simulation, hardware, field operations, and autonomous missions in one workspace.",
-    features: ["All five workspaces", "One local Runtime", "Shared aircraft and maps"],
+    summary: "Move from repeatable simulation to hardware validation, field operations, and natural-language missions without leaving the same workspace.",
+    features: [
+      "All five workspaces",
+      "One local Runtime",
+      "Shared aircraft and maps",
+      "Shared projects and run history",
+      "Consistent account and settings",
+      "Edition-aware updates and downloads",
+      "One installer for the complete suite",
+    ],
   },
   {
     id: "sim",
@@ -132,20 +140,11 @@ export function ProductPage({
           <span>{isUniversal ? "Complete suite" : "Focused workspace"}</span>
         </div>
 
-        <div className="site-products-visual" aria-hidden="true">
-          {isUniversal ? (
-            <div className="site-products-suite-marks">
-              {focusedProducts.map((edition) => (
-                <span key={edition.id}>
-                  <img src={editionBrandAssets[edition.id as EditionAvailabilityId].mark} alt="" />
-                  {edition.name}
-                </span>
-              ))}
-            </div>
-          ) : (
+        {!isUniversal && (
+          <div className="site-products-visual" aria-hidden="true">
             <img src={editionBrandAssets[product.id as EditionAvailabilityId].mark} alt="" />
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="site-products-copy">
           <p>{product.summary}</p>

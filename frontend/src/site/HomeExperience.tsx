@@ -39,6 +39,11 @@ const missionCards = [
 ] as const;
 
 const initialCard = 5;
+const loopCopies = [0, 1, 2] as const;
+
+function getCenteredScrollLeft(viewport: HTMLElement, card: HTMLElement) {
+  return card.offsetLeft - ((viewport.clientWidth - card.offsetWidth) / 2);
+}
 
 function DownloadIcon() {
   return (
@@ -51,32 +56,87 @@ function DownloadIcon() {
 export function HomeExperience({ release }: { release: WebsiteRelease }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const scrollFrameRef = useRef<number | null>(null);
+  const activeCardRef = useRef(initialCard);
+  const wheelAccumulatorRef = useRef(0);
   const [activeCard, setActiveCard] = useState(initialCard);
 
-  const centerCard = useCallback((index: number, behavior: ScrollBehavior) => {
+  const centerCard = useCallback((
+    index: number,
+    behavior: ScrollBehavior,
+    direction: -1 | 0 | 1 = 0,
+    requestedCopy?: number,
+  ) => {
     const viewport = viewportRef.current;
-    const card = viewport?.querySelector<HTMLElement>(`[data-home-card-index="${index}"]`);
-    if (!viewport || !card) return;
-    const viewportBox = viewport.getBoundingClientRect();
-    const cardBox = card.getBoundingClientRect();
-    const left = viewport.scrollLeft
-      + cardBox.left
-      - viewportBox.left
-      - ((viewport.clientWidth - cardBox.width) / 2);
+    if (!viewport) return;
+    const selector = requestedCopy === undefined
+      ? `[data-home-card-index="${index}"]`
+      : `[data-home-card-index="${index}"][data-home-card-copy="${requestedCopy}"]`;
+    const candidates = Array.from(viewport.querySelectorAll<HTMLElement>(selector))
+      .map((card) => ({ card, left: getCenteredScrollLeft(viewport, card) }));
+    if (candidates.length === 0) return;
+
+    const currentLeft = viewport.scrollLeft;
+    const directional = direction === 0
+      ? candidates
+      : candidates.filter(({ left }) => direction > 0
+        ? left > currentLeft + 1
+        : left < currentLeft - 1);
+    const pool = directional.length > 0 ? directional : candidates;
+    const target = pool.reduce((nearest, candidate) => {
+      const nearestDistance = Math.abs(nearest.left - currentLeft);
+      const candidateDistance = Math.abs(candidate.left - currentLeft);
+      return candidateDistance < nearestDistance ? candidate : nearest;
+    });
+
     if (typeof viewport.scrollTo === "function") {
-      viewport.scrollTo({ left, behavior });
+      viewport.scrollTo({ left: target.left, behavior });
     } else {
-      viewport.scrollLeft = left;
+      viewport.scrollLeft = target.left;
     }
+    activeCardRef.current = index;
     setActiveCard(index);
   }, []);
 
   useLayoutEffect(() => {
-    centerCard(initialCard, "auto");
+    centerCard(initialCard, "auto", 0, 1);
   }, [centerCard]);
 
   useEffect(() => () => {
     if (scrollFrameRef.current !== null) window.cancelAnimationFrame(scrollFrameRef.current);
+  }, []);
+
+  const normalizeLoopPosition = useCallback((viewport: HTMLDivElement) => {
+    const firstPrevious = viewport.querySelector<HTMLElement>(
+      '[data-home-card-copy="0"][data-home-card-index="0"]',
+    );
+    const firstMiddle = viewport.querySelector<HTMLElement>(
+      '[data-home-card-copy="1"][data-home-card-index="0"]',
+    );
+    const secondMiddle = viewport.querySelector<HTMLElement>(
+      '[data-home-card-copy="1"][data-home-card-index="1"]',
+    );
+    const lastMiddle = viewport.querySelector<HTMLElement>(
+      `[data-home-card-copy="1"][data-home-card-index="${missionCards.length - 1}"]`,
+    );
+    if (!firstPrevious || !firstMiddle || !lastMiddle) return;
+
+    const previousStart = getCenteredScrollLeft(viewport, firstPrevious);
+    const middleStart = getCenteredScrollLeft(viewport, firstMiddle);
+    const middleEnd = getCenteredScrollLeft(viewport, lastMiddle);
+    const cycleWidth = middleStart - previousStart;
+    if (cycleWidth <= 0) return;
+
+    const cardStep = secondMiddle
+      ? Math.abs(getCenteredScrollLeft(viewport, secondMiddle) - middleStart)
+      : cycleWidth / missionCards.length;
+    const lowerBoundary = middleStart - (cardStep * 0.55);
+    const upperBoundary = middleEnd + (cardStep * 0.55);
+    let normalizedLeft = viewport.scrollLeft;
+    while (normalizedLeft < lowerBoundary) normalizedLeft += cycleWidth;
+    while (normalizedLeft > upperBoundary) normalizedLeft -= cycleWidth;
+    if (Math.abs(normalizedLeft - viewport.scrollLeft) > 0.5) {
+      viewport.scrollLeft = normalizedLeft;
+    }
   }, []);
 
   const updateActiveCard = () => {
@@ -85,6 +145,7 @@ export function HomeExperience({ release }: { release: WebsiteRelease }) {
       scrollFrameRef.current = null;
       const viewport = viewportRef.current;
       if (!viewport) return;
+      normalizeLoopPosition(viewport);
       const viewportBox = viewport.getBoundingClientRect();
       const center = viewportBox.left + (viewportBox.width / 2);
       const cards = Array.from(
@@ -101,13 +162,14 @@ export function HomeExperience({ release }: { release: WebsiteRelease }) {
           nearestDistance = distance;
         }
       });
+      activeCardRef.current = nearestIndex;
       setActiveCard(nearestIndex);
     });
   };
 
   const moveCard = (direction: -1 | 1) => {
-    const next = Math.min(missionCards.length - 1, Math.max(0, activeCard + direction));
-    centerCard(next, "smooth");
+    const next = (activeCardRef.current + direction + missionCards.length) % missionCards.length;
+    centerCard(next, "smooth", direction);
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -124,7 +186,24 @@ export function HomeExperience({ release }: { release: WebsiteRelease }) {
       : event.deltaX;
     if (delta === 0) return;
     event.preventDefault();
-    viewport.scrollLeft += delta * 0.72;
+    const modeScale = event.deltaMode === 1
+      ? 33
+      : event.deltaMode === 2
+        ? viewport.clientWidth
+        : 1;
+    wheelAccumulatorRef.current += delta * modeScale;
+    const stepThreshold = 100;
+    const steps = Math.trunc(Math.abs(wheelAccumulatorRef.current) / stepThreshold);
+    if (steps === 0) return;
+    const direction = wheelAccumulatorRef.current > 0 ? 1 : -1;
+    wheelAccumulatorRef.current -= direction * steps * stepThreshold;
+
+    const next = (
+      activeCardRef.current
+      + (direction * steps)
+      + (missionCards.length * steps)
+    ) % missionCards.length;
+    centerCard(next, "auto", direction);
   };
 
   return (
@@ -164,8 +243,9 @@ export function HomeExperience({ release }: { release: WebsiteRelease }) {
           onWheel={handleWheel}
         >
           <div className="site-home-card-track">
-            {missionCards.map((card, index) => {
-              const distance = Math.abs(index - activeCard);
+            {loopCopies.flatMap((copyIndex) => missionCards.map((card, index) => {
+              const directDistance = Math.abs(index - activeCard);
+              const distance = Math.min(directDistance, missionCards.length - directDistance);
               const style = {
                 "--card-scale": 1,
                 "--card-lift": "0px",
@@ -174,20 +254,25 @@ export function HomeExperience({ release }: { release: WebsiteRelease }) {
               } as CSSProperties;
               return (
                 <button
-                  key={card.title}
+                  key={`${copyIndex}-${card.title}`}
                   type="button"
                   className={`site-home-card${index === activeCard ? " is-active" : ""}`}
                   data-home-card-index={index}
-                  aria-label={`${card.title}, card ${index + 1} of ${missionCards.length}`}
-                  aria-current={index === activeCard ? "true" : undefined}
+                  data-home-card-copy={copyIndex}
+                  aria-label={copyIndex === 1
+                    ? `${card.title}, card ${index + 1} of ${missionCards.length}`
+                    : undefined}
+                  aria-current={copyIndex === 1 && index === activeCard ? "true" : undefined}
+                  aria-hidden={copyIndex === 1 ? undefined : "true"}
+                  tabIndex={copyIndex === 1 ? 0 : -1}
                   style={style}
-                  onClick={() => centerCard(index, "smooth")}
+                  onClick={() => centerCard(index, "smooth", 0, copyIndex)}
                 >
                   <img src={card.image} alt="" draggable="false" />
                   <span>{card.title}</span>
                 </button>
               );
-            })}
+            }))}
           </div>
         </div>
       </div>

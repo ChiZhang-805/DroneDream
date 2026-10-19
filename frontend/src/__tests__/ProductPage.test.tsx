@@ -41,7 +41,9 @@ describe("ProductPage", () => {
     expect(screen.getByText("Hardware in the loop")).toBeVisible();
     expect(screen.getByText("Vehicle setup")).toBeVisible();
     expect(screen.getByText("Natural language")).toBeVisible();
-    expect(container.querySelectorAll(".site-products-card li")).toHaveLength(15);
+    expect(container.querySelectorAll(".site-products-card li")).toHaveLength(19);
+    expect(screen.getByText("One installer for the complete suite")).toBeVisible();
+    expect(container.querySelector(".site-products-card.is-universal .site-products-visual")).toBeNull();
     expect(container.querySelector(".site-product-flight-board")).toBeNull();
     expect(container).not.toHaveTextContent(/System requirements|Evidence and history|Who it is for|Validation workflow/i);
     expect(screen.getAllByRole("button", { name: /download unavailable/i })).toHaveLength(4);
