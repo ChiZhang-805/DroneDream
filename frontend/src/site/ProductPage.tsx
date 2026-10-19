@@ -59,6 +59,63 @@ const products: readonly ProductDefinition[] = [
   },
 ] as const;
 
+function ProductFlightline() {
+  return (
+    <div className="site-products-flightline" aria-hidden="true">
+      <svg viewBox="0 0 1920 88" preserveAspectRatio="none" focusable="false">
+        <defs>
+          <linearGradient id="product-flightline-gradient" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#7f70ff" />
+            <stop offset="0.35" stopColor="#55dff7" />
+            <stop offset="0.67" stopColor="#ff9b5b" />
+            <stop offset="1" stopColor="#ff527c" />
+          </linearGradient>
+          <filter id="product-flightline-glow" x="-20%" y="-80%" width="140%" height="260%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        <path className="site-products-flightline-guide" d="M18 65H1898" />
+        <path
+          className="site-products-flightline-route"
+          d="M18 65H112l12-10 11 20 15-43 17 33h96l18-8 12 8h56V51c0-17 14-31 31-31s31 14 31 31v14h111l18-12 16 12h78c18-27 42-39 72-39s54 12 72 39h93l21-9 18 9h78l42-49 43 49h102V44h30v21h31V28h36v37h29V39h33v26h41l22-10 19 10h118l17-16 18 16h81"
+        />
+
+        <g className="site-products-flightline-detail">
+          <path d="M339 51h82M349 51V65M411 51V65M361 37h38M370 28h20" />
+          <path d="M621 65c18-26 42-39 72-39s54 13 72 39M653 65c10-14 23-21 40-21s30 7 40 21" />
+          <path d="M978 65l42-49 43 49M993 49h55M1002 38h36M1010 27h20M1020 16v-7" />
+          <path d="M1165 65V44h30v21M1226 65V28h36v37M1291 65V39h33v26M1174 52h12M1238 40h12M1238 50h12M1302 50h11" />
+          <path d="M1516 65h124M1538 65V45h21v20M1570 65V34h27v31M1608 65V51h20v14" />
+        </g>
+
+        <g className="site-products-flightline-node">
+          <circle cx="263" cy="65" r="3.5" />
+          <circle cx="522" cy="65" r="3.5" />
+          <circle cx="870" cy="65" r="3.5" />
+          <circle cx="1113" cy="65" r="3.5" />
+          <circle cx="1447" cy="65" r="3.5" />
+        </g>
+
+        <g className="site-products-flightline-drone" transform="translate(1743 31)">
+          <path d="M35 18h42l10 11H25z" />
+          <path d="M35 18L21 8M77 18L91 8M31 25L18 35M81 25l13 10" />
+          <path d="M8 8h27M77 8h27M6 35h25M81 35h25" />
+          <circle cx="21" cy="8" r="4" />
+          <circle cx="91" cy="8" r="4" />
+          <circle cx="18" cy="35" r="4" />
+          <circle cx="94" cy="35" r="4" />
+          <path d="M50 29h14l-3 9h-8z" />
+        </g>
+      </svg>
+    </div>
+  );
+}
+
 function ProductAction({
   availability,
   product,
@@ -166,6 +223,8 @@ export function ProductPage({
         <header className="site-products-intro">
           <h1 id="site-products-title">Hey! Get Your Flight Agent.</h1>
         </header>
+
+        <ProductFlightline />
 
         <div className="site-products-layout">
           {renderProduct(universal, 0)}
