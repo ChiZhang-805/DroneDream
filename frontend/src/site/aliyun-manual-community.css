@@ -2351,8 +2351,8 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
 }
 
 .community-page .community-hero {
-  min-height: 118px;
-  padding-block: 1rem;
+  min-height: 92px;
+  padding-block: 0.72rem;
 }
 
 .community-page .community-hero-copy {
@@ -2367,6 +2367,22 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
   line-height: 1.35;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.community-empty-state {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  place-items: center;
+  overflow: hidden;
+  padding: clamp(0.7rem, 1.7vh, 1.25rem);
+}
+
+.community-empty-state img {
+  display: block;
+  width: min(1100px, 74vw, 100%);
+  max-height: min(54vh, 500px);
+  object-fit: contain;
 }
 
 @media (min-width: 901px) {
@@ -2906,4 +2922,8 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) auto;
   }
+}
+
+.community-page .community-empty-state + .community-topic-grid {
+  display: none;
 }

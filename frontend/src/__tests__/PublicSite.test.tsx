@@ -262,7 +262,12 @@ describe("DroneDream public website", () => {
 
     const { container } = renderSite();
 
-    expect(screen.getByRole("heading", { name: "DRONEDREAM COMMUNITY" })).toBeVisible();
+    expect(screen.getByRole("heading", {
+      name: "Hey! Let Your Ideas Take Flight.",
+    })).toBeVisible();
+    expect(screen.queryByText(
+      "Search practical PX4 studies, publish reproducible findings, and improve decisions together.",
+    )).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Recent topics" })).toBeVisible();
     expect(container.querySelector(".community-feed")).not.toBeNull();
     expect(container.querySelector(".community-topic-grid")).not.toBeNull();

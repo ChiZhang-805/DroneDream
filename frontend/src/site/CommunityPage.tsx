@@ -129,11 +129,7 @@ const tagOptions = {
 
 const communityContent = {
   en: {
-    eyebrow: "DRONEDREAM COMMUNITY",
-    title: "Share questions. Compare flight evidence.",
-    mobileTitle: "Share flight evidence.",
-    intro:
-      "Search practical PX4 studies, publish reproducible findings, and improve decisions together.",
+    eyebrow: "Hey! Let Your Ideas Take Flight.",
     newTopic: "Create a topic",
     signIn: "Sign in to publish",
     search: "Search topics, evidence, or tags",
@@ -141,7 +137,8 @@ const communityContent = {
     allTopics: "All topics",
     more: "More topics",
     back: "Back to recent topics",
-    empty: "No topics yet. New English community cards will appear here.",
+    emptyAlt:
+      "No topics yet. A child prepares a quadcopter beside a flight-planning chalkboard.",
     loading: "Loading community topics…",
     unavailable: "The community connection is temporarily unavailable.",
     titleLabel: "Topic title",
@@ -189,10 +186,7 @@ const communityContent = {
     close: "Close",
   },
   "zh-CN": {
-    eyebrow: "DRONEDREAM 社区",
-    title: "分享问题，比较飞行证据。",
-    mobileTitle: "分享飞行证据。",
-    intro: "检索真实的 PX4 研究、发表可复现的发现，并共同改进每一次工程判断。",
+    eyebrow: "Hey! Let Your Ideas Take Flight.",
     newTopic: "创建话题",
     signIn: "登录后发表",
     search: "搜索话题、证据或标签",
@@ -200,7 +194,7 @@ const communityContent = {
     allTopics: "全部话题",
     more: "查看更多",
     back: "返回近期话题",
-    empty: "No topics yet. New English community cards will appear here.",
+    emptyAlt: "暂无话题。一位孩子正在飞行规划黑板旁准备四旋翼无人机。",
     loading: "正在加载社区话题……",
     unavailable: "社区连接暂时不可用。",
     titleLabel: "话题标题",
@@ -907,7 +901,6 @@ export function CommunityPage({
       <header className="community-hero">
         <div className="community-hero-copy">
           <h1 className="site-eyebrow">{copy.eyebrow}</h1>
-          <p>{copy.intro}</p>
         </div>
         <button
           type="button"
@@ -974,7 +967,9 @@ export function CommunityPage({
         ) : null}
 
         {!loading && !feedError && visibleTopics.length === 0 ? (
-          <p className="community-state" role="status">{copy.empty}</p>
+          <div className="community-empty-state" role="status">
+            <img src="/community-empty-topics.webp" alt={copy.emptyAlt} />
+          </div>
         ) : null}
 
         <div className="community-topic-grid">

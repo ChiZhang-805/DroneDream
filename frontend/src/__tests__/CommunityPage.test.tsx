@@ -152,6 +152,25 @@ describe("CommunityPage public data loading", () => {
     expect(screen.getByRole("button", { name: "Page 2" })).toBeVisible();
   });
 
+  it("shows the illustrated empty state while keeping the topic filters", async () => {
+    window.history.replaceState(null, "", "/community/");
+    supabaseMock.rpc.mockImplementation((name: string) => {
+      if (name === "community_count_topics") return rpcResult(0);
+      return rpcResult([]);
+    });
+
+    render(
+      <CommunityPage locale="en" account={null} onRequireAccount={vi.fn()} />,
+    );
+
+    const illustration = await screen.findByRole("img", {
+      name: "No topics yet. A child prepares a quadcopter beside a flight-planning chalkboard.",
+    });
+    expect(illustration).toHaveAttribute("src", "/community-empty-topics.webp");
+    expect(screen.getByRole("button", { name: "# Simulation" })).toBeVisible();
+    expect(screen.queryByText(/New English community cards/i)).not.toBeInTheDocument();
+  });
+
   it("loads only the selected topic's comments when opening a discussion", async () => {
     render(
       <CommunityPage locale="en" account={null} onRequireAccount={vi.fn()} />,
