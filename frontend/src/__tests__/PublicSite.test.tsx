@@ -112,7 +112,7 @@ describe("DroneDream public website", () => {
 
     const { container } = renderSite();
 
-    expect(screen.getByRole("heading", { name: "One platform for every stage of flight." })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Hey! Get Your Flight Agent." })).toBeVisible();
     expect(container.querySelectorAll(".site-products-card")).toHaveLength(5);
     expect(screen.getByAltText("DroneDream Universal")).toBeVisible();
     expect(screen.getByAltText("DroneDream SIM")).toBeVisible();

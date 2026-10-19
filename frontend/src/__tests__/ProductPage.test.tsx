@@ -34,6 +34,8 @@ describe("ProductPage", () => {
     );
 
     expect(container.querySelectorAll(".site-products-card")).toHaveLength(5);
+    expect(container.querySelectorAll(".site-products-card.is-universal")).toHaveLength(1);
+    expect(container.querySelectorAll(".site-products-card.is-focused")).toHaveLength(4);
     expect(screen.getByAltText("DroneDream Universal")).toBeVisible();
     expect(screen.getByText("Scenario replay")).toBeVisible();
     expect(screen.getByText("Hardware in the loop")).toBeVisible();
@@ -123,7 +125,7 @@ describe("ProductPage", () => {
   it("keeps the public product surface in English for every stored interface locale", () => {
     render(<ProductPage availability={fallbackEditionAvailability} locale="zh-CN" />);
 
-    expect(screen.getByRole("heading", { name: "One platform for every stage of flight." })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Hey! Get Your Flight Agent." })).toBeVisible();
     expect(screen.getByText("Scenario replay")).toBeVisible();
     expect(screen.queryByText(/选择你的/)).toBeNull();
   });

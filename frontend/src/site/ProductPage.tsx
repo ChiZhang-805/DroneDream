@@ -111,36 +111,68 @@ export function ProductPage({
   locale: Locale;
   release?: WebsiteRelease;
 }) {
+  const universal = products[0];
+  const focusedProducts = products.slice(1);
+
+  const renderProduct = (product: ProductDefinition, index: number) => {
+    const isUniversal = product.id === "universal";
+    const logo = isUniversal
+      ? universalLockup
+      : editionBrandAssets[product.id as EditionAvailabilityId].lockup;
+
+    return (
+      <article
+        className={`site-products-card ${isUniversal ? "is-universal" : "is-focused"}`}
+        data-product={product.id}
+        style={{ "--product-order": index } as CSSProperties}
+        key={product.id}
+      >
+        <div className="site-products-brand">
+          <img src={logo} alt={`DroneDream ${product.name}`} />
+          <span>{isUniversal ? "Complete suite" : "Focused workspace"}</span>
+        </div>
+
+        <div className="site-products-visual" aria-hidden="true">
+          {isUniversal ? (
+            <div className="site-products-suite-marks">
+              {focusedProducts.map((edition) => (
+                <span key={edition.id}>
+                  <img src={editionBrandAssets[edition.id as EditionAvailabilityId].mark} alt="" />
+                  {edition.name}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <img src={editionBrandAssets[product.id as EditionAvailabilityId].mark} alt="" />
+          )}
+        </div>
+
+        <div className="site-products-copy">
+          <p>{product.summary}</p>
+          <ul>
+            {product.features.map((feature) => (
+              <li key={feature}><Check aria-hidden="true" />{feature}</li>
+            ))}
+          </ul>
+        </div>
+
+        <ProductAction availability={availability} product={product} release={release} />
+      </article>
+    );
+  };
+
   return (
     <section className="site-products-page" aria-labelledby="site-products-title">
       <div className="site-products-shell">
         <header className="site-products-intro">
-          <h1 id="site-products-title">One platform for every stage of flight.</h1>
+          <h1 id="site-products-title">Hey! Get Your Flight Agent.</h1>
         </header>
 
-        <div className="site-products-grid">
-          {products.map((product, index) => {
-            const logo = product.id === "universal"
-              ? universalLockup
-              : editionBrandAssets[product.id].lockup;
-            return (
-              <article
-                className="site-products-card"
-                data-product={product.id}
-                style={{ "--product-order": index } as CSSProperties}
-                key={product.id}
-              >
-                <img src={logo} alt={`DroneDream ${product.name}`} />
-                <p>{product.summary}</p>
-                <ul>
-                  {product.features.map((feature) => (
-                    <li key={feature}><Check aria-hidden="true" />{feature}</li>
-                  ))}
-                </ul>
-                <ProductAction availability={availability} product={product} release={release} />
-              </article>
-            );
-          })}
+        <div className="site-products-layout">
+          {renderProduct(universal, 0)}
+          <div className="site-products-focused-grid">
+            {focusedProducts.map((product, index) => renderProduct(product, index + 1))}
+          </div>
         </div>
       </div>
     </section>
