@@ -100,7 +100,7 @@ describe("DroneDream public website", () => {
     expect(lastCard).toHaveAttribute("aria-current", "true");
   });
 
-  it("renders the production manual reader with its chapter sidebar and offline editions", () => {
+  it("renders the production manual reader with its chapter sidebar and fresh content", async () => {
     window.history.replaceState(null, "", "/manual/");
 
     const { container } = renderSite();
@@ -115,6 +115,12 @@ describe("DroneDream public website", () => {
     expect(container.querySelector(".manual-reader")).not.toBeNull();
     expect(screen.queryByRole("dialog", { name: /manual/i })).toBeNull();
     expect(container.querySelector(".site-footer")).toBeNull();
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/docs\/downloads\/DroneDream-Manual-en\.md\?revision=/u),
+        expect.objectContaining({ cache: "no-store" }),
+      );
+    });
   });
 
   it("routes Products to the five-product family without the retired mission preview", () => {

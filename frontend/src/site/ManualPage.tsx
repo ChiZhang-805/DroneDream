@@ -24,6 +24,13 @@ interface ManualPageProps {
 
 type LoadState = "loading" | "ready" | "error";
 
+declare const __DRONEDREAM_CONTENT_REVISION__: string;
+
+const manualContentRevision =
+  typeof __DRONEDREAM_CONTENT_REVISION__ === "undefined"
+    ? "development"
+    : __DRONEDREAM_CONTENT_REVISION__;
+
 interface ManualNavigationChapter {
   kind: "chapter";
   heading: ManualHeading;
@@ -144,10 +151,13 @@ export function ManualPage({ locale }: ManualPageProps) {
     setActiveId("");
     setExpandedChapterIds(new Set());
 
-    void fetch(`${documentRoot}.md`, {
-      cache: "force-cache",
-      signal: controller.signal,
-    })
+    void fetch(
+      `${documentRoot}.md?revision=${encodeURIComponent(manualContentRevision)}`,
+      {
+        cache: "no-store",
+        signal: controller.signal,
+      },
+    )
       .then((response) => {
         if (!response.ok) throw new Error(`Manual request failed: ${response.status}`);
         return response.text();

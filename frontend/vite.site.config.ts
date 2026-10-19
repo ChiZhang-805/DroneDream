@@ -24,6 +24,9 @@ export default defineConfig(({ mode, isPreview }) => {
       // the edition here keeps shared brand and capability modules safe when
       // they are reached from the browser-only OAuth entry point.
       __DRONEDREAM_BUILD_EDITION__: JSON.stringify("universal"),
+      __DRONEDREAM_CONTENT_REVISION__: JSON.stringify(
+        process.env.GITHUB_SHA?.trim() || "development",
+      ),
       ...(serializedRelease
         ? { __DRONEDREAM_RELEASE__: serializedRelease }
         : {}),
