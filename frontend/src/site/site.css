@@ -4443,90 +4443,14 @@ body:has(.dd-site[data-page="home"]) {
   overflow: hidden;
 }
 
-.site-products-flightline svg {
+.site-products-flightline img {
   display: block;
   width: 100%;
   height: 100%;
-  overflow: visible;
-}
-
-.site-products-flightline-guide,
-.site-products-flightline-route,
-.site-products-flightline-landmark,
-.site-products-flightline-detail,
-.site-products-flightline-drone-arm,
-.site-products-flightline-drone-shell,
-.site-products-flightline-drone-gear,
-.site-products-flightline-camera,
-.site-products-flightline-rotors {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
-}
-
-.site-products-flightline-guide {
-  stroke: rgba(88, 97, 128, 0.18);
-  stroke-width: 1.15;
-  stroke-dasharray: 3 7;
-}
-
-.site-products-flightline-route {
-  stroke: url("#product-flightline-gradient");
-  stroke-width: 1.85;
-  stroke-dasharray: 5 5;
-  filter: url("#product-flightline-glow");
-}
-
-.site-products-flightline-landmark {
-  fill: none;
-  stroke: url("#product-flightline-gradient");
-  stroke-width: 1.45;
-  opacity: 0.82;
-}
-
-.site-products-flightline-detail {
-  fill: rgba(255, 255, 255, 0.24);
-  stroke: url("#product-flightline-gradient");
-  stroke-width: 1.05;
-  opacity: 0.68;
-}
-
-.site-products-flightline-node {
-  fill: #fff;
-  stroke: url("#product-flightline-gradient");
-  stroke-width: 2;
-  vector-effect: non-scaling-stroke;
-}
-
-.site-products-flightline-rotors {
-  stroke: #ef4c94;
-  stroke-width: 1.45;
-}
-
-.site-products-flightline-drone-arm,
-.site-products-flightline-drone-shell,
-.site-products-flightline-drone-gear,
-.site-products-flightline-camera {
-  stroke: #b145af;
-  stroke-width: 1.55;
-}
-
-.site-products-flightline-drone-body {
-  fill: url("#product-flightline-drone-fill");
-  stroke: rgba(87, 49, 139, 0.75);
-  stroke-width: 1.5;
-  stroke-linejoin: round;
-  vector-effect: non-scaling-stroke;
-}
-
-.site-products-flightline-camera circle:last-child {
-  fill: #3f285f;
-  stroke: none;
-}
-
-.site-products-flightline-drone {
-  filter: url("#product-flightline-glow");
+  object-fit: fill;
+  object-position: center;
+  pointer-events: none;
+  user-select: none;
 }
 
 .site-products-layout {

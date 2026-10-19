@@ -36,7 +36,7 @@ describe("ProductPage", () => {
     expect(container.querySelectorAll(".site-products-card")).toHaveLength(5);
     expect(container.querySelectorAll(".site-products-card.is-universal")).toHaveLength(1);
     expect(container.querySelectorAll(".site-products-card.is-focused")).toHaveLength(4);
-    expect(container.querySelector(".site-products-flightline svg")).not.toBeNull();
+    expect(container.querySelector(".site-products-flightline img")).not.toBeNull();
     expect(screen.getByAltText("DroneDream Universal")).toBeVisible();
     expect(screen.getByText("Scenario replay")).toBeVisible();
     expect(screen.getByText("Hardware in the loop")).toBeVisible();
