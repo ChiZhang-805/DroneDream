@@ -2,7 +2,11 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 
-import { AuthProvider, useAuth } from "../features/auth/AuthContext";
+import {
+  AuthProvider,
+  providerRedirectUrl,
+  useAuth,
+} from "../features/auth/AuthContext";
 import {
   activateDesktopAuthSession,
   ADOPT_DESKTOP_AUTH_EVENT,
@@ -242,6 +246,17 @@ function LoadingHistoryProbe({ history }: { history: boolean[] }) {
 }
 
 describe("AuthContext account profile", () => {
+  it("keeps a desktop authorization request through a provider redirect", () => {
+    expect(providerRedirectUrl(
+      "https://getdronedream.com/oauth/consent?authorization_id=desktop-request-1&ignored=value#secret",
+    )).toBe(
+      "https://getdronedream.com/oauth/consent?authorization_id=desktop-request-1",
+    );
+    expect(providerRedirectUrl(
+      "https://getdronedream.com/community/?view=all#topics",
+    )).toBe("https://getdronedream.com/community/");
+  });
+
   it("does not overwrite a newer auth event with a late hydration snapshot", async () => {
     let resolve!: (value: Awaited<ReturnType<typeof authMock.getSession>>) => void;
     const oldUser = { ...authMock.state.user };

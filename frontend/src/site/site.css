@@ -2651,6 +2651,71 @@ html[lang="zh-CN"] .site-hero h1 {
   gap: 0.78rem;
 }
 
+.site-auth-provider {
+  display: grid;
+  min-height: 48px;
+  width: 100%;
+  padding: 0 1rem;
+  border: 1px solid rgba(184, 188, 223, 0.28);
+  border-radius: 12px;
+  color: #17131e;
+  background: #fff;
+  font: inherit;
+  font-weight: 720;
+  cursor: pointer;
+  grid-template-columns: 22px minmax(0, 1fr) 22px;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.site-auth-provider::after {
+  width: 22px;
+  content: "";
+}
+
+.site-auth-provider svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
+.site-auth-provider:hover:not(:disabled),
+.site-auth-provider:focus-visible {
+  border-color: rgba(104, 232, 255, 0.65);
+  box-shadow: 0 0 0 3px rgba(104, 232, 255, 0.1);
+}
+
+.site-auth-provider:disabled {
+  opacity: 0.56;
+  cursor: default;
+}
+
+.site-auth-divider {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  color: rgba(235, 237, 249, 0.58);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.site-auth-divider::before,
+.site-auth-divider::after {
+  height: 1px;
+  background: rgba(184, 188, 223, 0.2);
+  content: "";
+}
+
+.site-auth-dialog.is-oauth-page .site-auth-divider {
+  color: #756b7e;
+}
+
+.site-auth-dialog.is-oauth-page .site-auth-divider::before,
+.site-auth-dialog.is-oauth-page .site-auth-divider::after {
+  background: #e4dfe8;
+}
+
 .site-auth-form label {
   display: grid;
   gap: 0.38rem;

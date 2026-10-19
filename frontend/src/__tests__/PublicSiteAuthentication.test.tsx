@@ -12,6 +12,7 @@ const authMock = vi.hoisted(() => ({
       displayName: string;
       avatarUrl: string | null;
     } | null,
+    googleEnabled: false,
   },
   signInWithPassword: vi.fn(async (): Promise<void> => undefined),
   sendRegistrationCode: vi.fn(async (): Promise<void> => undefined),
@@ -20,6 +21,7 @@ const authMock = vi.hoisted(() => ({
   verifyRecoveryCode: vi.fn(async (): Promise<void> => undefined),
   requestPasswordReset: vi.fn(async (): Promise<void> => undefined),
   updatePassword: vi.fn(async (): Promise<void> => undefined),
+  signInWithProvider: vi.fn(async (): Promise<void> => undefined),
   signOut: vi.fn(async (): Promise<void> => undefined),
 }));
 
@@ -33,7 +35,7 @@ vi.mock("../features/auth/AuthContext", () => ({
     loading: false,
     passwordRecovery: false,
     account: authMock.state.account,
-    googleEnabled: false,
+    googleEnabled: authMock.state.googleEnabled,
     appleEnabled: false,
     signInWithPassword: authMock.signInWithPassword,
     sendRegistrationCode: authMock.sendRegistrationCode,
@@ -42,7 +44,7 @@ vi.mock("../features/auth/AuthContext", () => ({
     verifyRecoveryCode: authMock.verifyRecoveryCode,
     requestPasswordReset: authMock.requestPasswordReset,
     updatePassword: authMock.updatePassword,
-    signInWithProvider: vi.fn(async () => undefined),
+    signInWithProvider: authMock.signInWithProvider,
     updateDisplayName: vi.fn(async () => undefined),
     updateAvatar: vi.fn(async () => undefined),
     signOut: authMock.signOut,
@@ -80,6 +82,7 @@ describe("public website account authentication", () => {
   beforeEach(() => {
     window.localStorage.clear();
     authMock.state.account = null;
+    authMock.state.googleEnabled = false;
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline test")));
     accountApiMock.getManagedModelUsage.mockReset();
     accountApiMock.getManagedModelUsage.mockResolvedValue({
@@ -94,8 +97,22 @@ describe("public website account authentication", () => {
       authMock.verifyRecoveryCode,
       authMock.requestPasswordReset,
       authMock.updatePassword,
+      authMock.signInWithProvider,
       authMock.signOut,
     ].forEach((mock) => mock.mockClear());
+  });
+
+  it("starts Google sign-in from the public account dialog when enabled", async () => {
+    authMock.state.googleEnabled = true;
+    renderHomePage();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    const dialog = await screen.findByRole("dialog", { name: "Sign in" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Continue with Google" }));
+
+    await waitFor(() => {
+      expect(authMock.signInWithProvider).toHaveBeenCalledWith("google");
+    });
   });
 
   afterEach(() => {

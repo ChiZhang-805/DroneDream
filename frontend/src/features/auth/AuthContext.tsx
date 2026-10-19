@@ -248,15 +248,36 @@ function requireClient() {
   return supabaseClient;
 }
 
-function providerRedirectUrl(): string {
-  // Retain origin but remove old query/fragment secrets from the OAuth destination.
-  const redirect = new URL(window.location.href);
-  redirect.pathname = redirect.pathname === "/console"
-    || redirect.pathname.startsWith("/console/")
-    ? "/console/assistant"
-    : "/assistant";
-  redirect.search = "";
-  redirect.hash = "";
+const PUBLIC_AUTH_RETURN_PATHS = new Set([
+  "/",
+  "/product/",
+  "/pricing/",
+  "/manual/",
+  "/community/",
+  "/organization/",
+]);
+
+export function providerRedirectUrl(currentHref = window.location.href): string {
+  // Keep only a known same-origin destination. Desktop authorization must
+  // preserve its one-time request ID so social sign-in can resume consent.
+  const current = new URL(currentHref);
+  const redirect = new URL("/", current.origin);
+  const normalizedPath = current.pathname === "/"
+    ? "/"
+    : `${current.pathname.replace(/\/+$/u, "")}/`;
+
+  if (current.pathname === "/console" || current.pathname.startsWith("/console/")) {
+    redirect.pathname = "/console/assistant";
+  } else if (normalizedPath === "/oauth/consent/") {
+    const authorizationId = current.searchParams.get("authorization_id")?.trim() ?? "";
+    redirect.pathname = "/oauth/consent";
+    if (/^[A-Za-z0-9._~-]{8,512}$/u.test(authorizationId)) {
+      redirect.searchParams.set("authorization_id", authorizationId);
+    }
+  } else if (PUBLIC_AUTH_RETURN_PATHS.has(normalizedPath)) {
+    redirect.pathname = normalizedPath;
+  }
+
   return redirect.toString();
 }
 
