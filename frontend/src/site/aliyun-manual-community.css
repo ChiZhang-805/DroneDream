@@ -2448,7 +2448,7 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
 }
 
 .site-manual-page {
-  grid-template-columns: clamp(260px, 17vw, 310px) minmax(0, 1fr);
+  grid-template-columns: clamp(300px, 18vw, 340px) minmax(0, 1fr);
   transition: grid-template-columns 220ms ease;
 }
 
@@ -2754,7 +2754,7 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
   /* Keep the opening spread inside a desktop viewport. The reader begins on
      the same visual line as the expanded contents panel. */
   .manual-reader-header {
-    padding: 1rem 0 0.8rem;
+    padding: 1rem 0 1.75rem;
   }
 
   .manual-reader-header p {

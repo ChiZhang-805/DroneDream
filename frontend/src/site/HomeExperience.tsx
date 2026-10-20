@@ -220,14 +220,20 @@ export function HomeExperience({ release }: { release: WebsiteRelease }) {
           Turn everyday language into complete drone missions.<br />{" "}
           Plan the route, choose the aircraft, and follow every move.
         </p>
-        <a
-          className="site-home-download"
-          href={release.downloadUrl}
-          download={release.fileName}
-        >
-          <DownloadIcon />
-          <span>Download Universal</span>
-        </a>
+        <div className="site-home-actions">
+          <a
+            className="site-home-download"
+            href={release.downloadUrl}
+            download={release.fileName}
+          >
+            <DownloadIcon />
+            <span>Download Universal</span>
+          </a>
+          <a className="site-home-download is-cli" href="/cli/">
+            <TerminalIcon />
+            <span>Explore the CLI</span>
+          </a>
+        </div>
       </div>
 
       <div className="site-home-card-stage" aria-label="DroneDream mission gallery">
@@ -277,5 +283,14 @@ export function HomeExperience({ release }: { release: WebsiteRelease }) {
         </div>
       </div>
     </section>
+  );
+}
+
+function TerminalIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m5 7 4 4-4 4" />
+      <path d="M11 17h8" />
+    </svg>
   );
 }

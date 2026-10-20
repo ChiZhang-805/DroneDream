@@ -22,6 +22,8 @@ import {
 } from "../features/auth/supabaseClient";
 import { useI18n } from "../i18n/I18nProvider";
 import { CommunityPage } from "./CommunityPage";
+import { ClassicHome } from "./ClassicHome";
+import { CliPage } from "./CliPage";
 import { HomeExperience } from "./HomeExperience";
 import { LegalPage } from "./LegalPage";
 import { ManualPage } from "./ManualPage";
@@ -125,6 +127,7 @@ const content = {
     updatePassword: "Update password",
     passwordUpdated: "Your password has been updated.",
     openConsole: "Open console",
+    classicView: "Classic view",
     signOut: "Sign out",
     closeAuth: "Close account dialog",
     eyebrow: "NATURAL-LANGUAGE UAV ENGINEERING",
@@ -594,6 +597,10 @@ export function SiteApp() {
         ? "organization"
       : path === "/community"
         ? "community"
+        : path === "/cli"
+          ? "cli"
+          : path === "/classic"
+            ? "classic"
         : path === "/privacy"
           ? "privacy"
           : path === "/terms"
@@ -648,6 +655,16 @@ export function SiteApp() {
           title: "DroneDream Terms of Service",
           description: "Terms governing use of the DroneDream website, accounts, cloud features, and official applications.",
         }
+      : sitePage === "cli"
+        ? {
+            title: "DroneDream CLI",
+            description: "Commands for planning, flying, observing, and archiving DroneDream missions from one terminal.",
+          }
+        : sitePage === "classic"
+          ? {
+              title: "DroneDream Classic",
+              description: "The one-screen Three.js DroneDream flight experience.",
+            }
       : { title: copy.metaTitle, description: copy.metaDescription };
 
   useEffect(() => {
@@ -1154,6 +1171,8 @@ export function SiteApp() {
     ["Pricing", "/pricing/"],
     ["Manual", "/manual/"],
     ["Community", "/community/"],
+    ...(sitePage === "cli" ? [["CLI", "/cli/"] as const] : []),
+    ...(sitePage === "classic" ? [["Classic", "/classic/"] as const] : []),
   ] as const;
   const currentNavigationTarget = sitePage === "home"
     ? "/"
@@ -1165,6 +1184,10 @@ export function SiteApp() {
           ? "/manual/"
           : sitePage === "community"
             ? "/community/"
+            : sitePage === "cli"
+              ? "/cli/"
+              : sitePage === "classic"
+                ? "/classic/"
             : null;
   const accountName = auth.account?.displayName.trim() || copy.account;
 
@@ -1244,6 +1267,9 @@ export function SiteApp() {
                 <button type="button" role="menuitem" onClick={openConsole}>
                   {copy.openConsole}
                 </button>
+                <a href="/classic/" role="menuitem" onClick={closeMenu}>
+                  {copy.classicView}
+                </a>
                 {organizationAccess?.authorized ? (
                   <a href="/organization/" role="menuitem" onClick={closeMenu}>
                     {copy.organization}
@@ -1296,6 +1322,10 @@ export function SiteApp() {
       <main id="main-content">
         {sitePage === "manual" ? (
           <ManualPage locale={locale} />
+        ) : sitePage === "cli" ? (
+          <CliPage release={release} />
+        ) : sitePage === "classic" ? (
+          <ClassicHome release={release} />
         ) : sitePage === "product" ? (
           <ProductPage availability={editionAvailability} locale={locale} release={release} />
         ) : sitePage === "pricing" ? (
