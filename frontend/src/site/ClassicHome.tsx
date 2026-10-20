@@ -32,8 +32,8 @@ export function ClassicHome({ release }: ClassicHomeProps) {
         <div className="site-hero-copy">
           <p className="site-eyebrow">NATURAL-LANGUAGE UAV ENGINEERING</p>
           <h1 id="classic-home-title">
-            <span className="site-hero-line">Describe the mission.</span>
-            <span className="site-hero-line site-hero-line-accent">See it take flight.</span>
+            <span className="site-hero-line">Give Every Mission</span>
+            <span className="site-hero-line site-hero-line-accent">Its Own Flight Agent.</span>
           </h1>
           <div className="site-hero-actions">
             <a className="site-button site-button-primary" href={release.downloadUrl} download={release.fileName}>

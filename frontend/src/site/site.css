@@ -4521,13 +4521,20 @@ body:has(.dd-site[data-page="classic"]) {
 .site-home-download:focus-visible::before { opacity: 1; }
 
 .site-home-download.is-cli {
-  color: #f8fbff;
-  background: rgba(8, 17, 30, 0.58);
-  backdrop-filter: blur(14px);
+  border-color: transparent;
+  color: #07111d;
+  background: linear-gradient(105deg, #5edcf5 0%, #9d9cf8 54%, #e75dcc 100%);
+  box-shadow: 0 14px 38px rgba(91, 89, 201, 0.24);
+  backdrop-filter: none;
 }
 
+.site-home-download.is-cli::before { display: none; }
+
 .site-home-download.is-cli:hover,
-.site-home-download.is-cli:focus-visible { background: rgba(8, 17, 30, 0.82); }
+.site-home-download.is-cli:focus-visible {
+  background: linear-gradient(105deg, #5edcf5 0%, #9d9cf8 54%, #e75dcc 100%);
+  box-shadow: 0 18px 46px rgba(137, 82, 221, 0.36);
+}
 
 .site-home-download:hover span,
 .site-home-download:focus-visible span {
