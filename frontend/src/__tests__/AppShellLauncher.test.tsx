@@ -215,11 +215,6 @@ describe("desktop launcher chrome", () => {
       updated_at: "2026-07-29T12:00:00Z",
       deleted_memory_count: 0,
     });
-    const erase = vi.spyOn(apiClient, "deleteUserExperiencePreferences").mockResolvedValue({
-      deleted_preferences: true,
-      deleted_memory_count: 2,
-      memory_enabled: false,
-    });
     const { router } = renderLauncher();
 
     await screen.findByText("Checked");
@@ -245,21 +240,12 @@ describe("desktop launcher chrome", () => {
     });
     expect(update).not.toHaveBeenCalled();
     expect(within(workspace).getByText("Personal defaults saved.")).toBeVisible();
-
-    fireEvent.click(
-      within(workspace).getByRole("button", { name: "Delete defaults & memory" }),
-    );
-    expect(within(workspace).getByRole("group", {
-      name: "Delete all saved defaults and structured memory?",
-    })).toBeVisible();
-    expect(erase).not.toHaveBeenCalled();
-    fireEvent.click(within(workspace).getByRole("button", { name: "Delete permanently" }));
-
-    await waitFor(() => expect(memory).not.toBeChecked());
-    expect(erase).not.toHaveBeenCalled();
-    expect(
-      within(workspace).getByText("Personal defaults deleted; 0 memory rows erased."),
-    ).toBeVisible();
+    expect(within(workspace).getByRole("button", { name: "Save memory settings" }))
+      .toBeVisible();
+    expect(within(workspace).getByRole("button", { name: "Save read and write access" }))
+      .toBeVisible();
+    expect(within(workspace).queryByRole("button", { name: "Delete defaults & memory" }))
+      .not.toBeInTheDocument();
 
     router.dispose();
   });

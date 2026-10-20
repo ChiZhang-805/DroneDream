@@ -422,7 +422,24 @@ async function verifySettings(page, testCase) {
       `${testCase.id}: Quick settings is missing ${label}`,
     );
   }
-  await quickSettings.locator("#quick-settings-appearance").selectOption("dark");
+  const appearanceOptions = quickSettings.locator(".quick-settings-appearance-options button");
+  assert.equal(await appearanceOptions.count(), 2, `${testCase.id}: Appearance must expose exactly Dark and Light`);
+  await quickSettings.getByRole("button", {
+    name: testCase.locale === "zh-CN" ? "浅色" : "Light",
+  }).click();
+  await page.waitForFunction(() => document.documentElement.dataset.ddAppearance === "light");
+  const lightAppearance = await quickSettings.evaluate((element) => ({
+    dialogColor: getComputedStyle(element).color,
+    dialogBackground: getComputedStyle(element).backgroundColor,
+    titleColor: getComputedStyle(element.querySelector("h2")).color,
+  }));
+  assert.notEqual(lightAppearance.dialogColor, "rgb(255, 255, 255)");
+  assert.notEqual(lightAppearance.titleColor, "rgb(255, 255, 255)");
+  assert.notEqual(lightAppearance.dialogBackground, "rgba(0, 0, 0, 0)");
+  await screenshot(page, testCase.id, "settings-quick-light");
+  await quickSettings.getByRole("button", {
+    name: testCase.locale === "zh-CN" ? "深色" : "Dark",
+  }).click();
   await page.waitForFunction(() => document.documentElement.dataset.ddAppearance === "dark");
   const quickImage = await screenshot(page, testCase.id, "settings-quick-dark");
   await quickSettings.getByRole("button", {
@@ -510,7 +527,7 @@ async function verifySettings(page, testCase) {
     assert(measurement.scrollerBottom <= measurement.workspaceBottom + 1);
     assert.equal(measurement.documentScrollWidth, measurement.documentWidth);
     assert.equal(measurement.grantsHardwareAuthority, "false");
-    if (["general", "memory", "model"].includes(measurement.tab)) {
+    if (["general", "model"].includes(measurement.tab)) {
       assert(
         measurement.scrollerScrollHeight <= measurement.scrollerClientHeight + 1,
         `${testCase.id}: ${measurement.tab} settings must fit in one screen `
@@ -602,7 +619,6 @@ async function verifySettings(page, testCase) {
   ]) {
     assert.notEqual(foreground, "rgba(0, 0, 0, 0)");
   }
-  const manage = usage.locator(".settings-model-plan-row .btn");
   const usageRange = usage.locator('.settings-allowance-range [role="tab"][aria-selected="true"]');
   const resetCards = usage.locator(".settings-reset-card-trigger");
   const useResetCard = usage.locator(".settings-model-reset-action");

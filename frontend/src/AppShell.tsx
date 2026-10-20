@@ -49,7 +49,6 @@ import {
   TicketCheck,
   Trophy,
   Sun,
-  Trash2,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -168,7 +167,6 @@ import type {
   UserDefaultTrackType,
 } from "./types/api";
 import {
-  deleteConsolePreferencesAndMemory,
   loadConsoleMemoryConsent,
   loadConsolePreferences,
   MODEL_HARNESS_MEMORY_NAMESPACES,
@@ -470,6 +468,8 @@ interface ExperiencePreferenceDraft {
   default_report_format: string | null;
 }
 
+type MemorySettingsModule = "behavior" | "domains" | "defaults";
+
 const EMPTY_EXPERIENCE_PREFERENCE_DRAFT: ExperiencePreferenceDraft = {
   account_memory_enabled: false,
   memory_enabled: false,
@@ -525,7 +525,7 @@ type SettingsCopy = Readonly<{
   language: string;
   interface: string;
   notifications: string;
-  appearance: readonly [string, string, string, string];
+  appearance: readonly [string, string];
   notificationLabels: readonly [string, string, string, string, string, string, string, string];
   memoryTitle: string;
   memoryEnabled: readonly [string, string];
@@ -554,7 +554,7 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     language: "Language",
     interface: "Interface",
     notifications: "Notifications",
-    appearance: ["Dark", "Light", "System", "Customize"],
+    appearance: ["Dark", "Light"],
     notificationLabels: ["Allow notifications", "Experiment and task completed", "AI response completed", "Product updates", "Approval required", "Allowance or card expiring", "Security and sign-in", "Device or runtime status"],
     memoryTitle: "Memory",
     memoryEnabled: ["Memory off", "Memory on"],
@@ -571,7 +571,7 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     language: "语言",
     interface: "界面",
     notifications: "通知",
-    appearance: ["深色", "浅色", "跟随系统", "自定义"],
+    appearance: ["深色", "浅色"],
     notificationLabels: ["允许通知", "实验与任务完成", "AI 回复完成", "产品更新", "需要审批", "额度或重置卡即将到期", "安全与登录提醒", "设备或运行环境状态"],
     memoryTitle: "记忆",
     memoryEnabled: ["记忆已关闭", "记忆已开启"],
@@ -1041,7 +1041,6 @@ function SettingsDialog({
   const [allowanceResetState, setAllowanceResetState] =
     useState<"idle" | "redeeming" | "success" | "error">("idle");
   const [allowanceResetMessage, setAllowanceResetMessage] = useState<string | null>(null);
-  const customColorInputRef = useRef<HTMLInputElement>(null);
   const [experiencePreferenceDraft, setExperiencePreferenceDraft] =
     useState<ExperiencePreferenceDraft>(
       initialPreferenceDraft ?? EMPTY_EXPERIENCE_PREFERENCE_DRAFT,
@@ -1056,9 +1055,12 @@ function SettingsDialog({
     );
   const [experiencePreferenceMessage, setExperiencePreferenceMessage] =
     useState<string | null>(null);
-  const [confirmExperiencePreferenceDelete, setConfirmExperiencePreferenceDelete] =
-    useState(false);
+  const [memoryModuleSaving, setMemoryModuleSaving] =
+    useState<MemorySettingsModule | null>(null);
   const preferenceHydratedRef = useRef(false);
+  const persistedExperiencePreferenceRef = useRef<ExperiencePreferenceDraft>(
+    initialPreferenceDraft ?? EMPTY_EXPERIENCE_PREFERENCE_DRAFT,
+  );
   const preferenceSaveTimerRef = useRef<number | null>(null);
   const preferenceSaveRequestRef = useRef<(() => Promise<boolean>) | null>(null);
   const preferenceComponentMountedRef = useRef(true);
@@ -1084,22 +1086,24 @@ function SettingsDialog({
       edition,
     };
   }, [auth.account, docsPreview, edition]);
-  const consolePreferenceRecord = useCallback((): ConsolePreferenceRecord => ({
+  const consolePreferenceRecord = useCallback((
+    draft: ExperiencePreferenceDraft = experiencePreferenceDraft,
+  ): ConsolePreferenceRecord => ({
     interface_locale: interfaceLocale,
     appearance_mode: editionTheme.appearancePreference,
     custom_accent: editionTheme.customAccent,
     notifications: notificationPreferences,
-    memory_enabled: experiencePreferenceDraft.memory_enabled,
-    memory_scopes: experiencePreferenceDraft.memory_scopes,
+    memory_enabled: draft.memory_enabled,
+    memory_scopes: draft.memory_scopes,
     defaults: {
-      template: experiencePreferenceDraft.default_template_key,
-      vehicle: experiencePreferenceDraft.default_vehicle,
-      track: experiencePreferenceDraft.default_track_type,
-      altitude_m: experiencePreferenceDraft.default_altitude_m,
-      objective: experiencePreferenceDraft.default_objective,
-      safety_profile: experiencePreferenceDraft.default_safety_profile,
-      units: experiencePreferenceDraft.default_units,
-      report_format: experiencePreferenceDraft.default_report_format,
+      template: draft.default_template_key,
+      vehicle: draft.default_vehicle,
+      track: draft.default_track_type,
+      altitude_m: draft.default_altitude_m,
+      objective: draft.default_objective,
+      safety_profile: draft.default_safety_profile,
+      units: draft.default_units,
+      report_format: draft.default_report_format,
     },
   }), [
     editionTheme.appearancePreference,
@@ -1108,11 +1112,13 @@ function SettingsDialog({
     interfaceLocale,
     notificationPreferences,
   ]);
-  const consoleMemoryConsentRecord = useCallback(() => ({
-    memory_enabled: experiencePreferenceDraft.account_memory_enabled,
-    read_namespaces: experiencePreferenceDraft.read_namespaces,
-    write_namespaces: experiencePreferenceDraft.write_namespaces,
-    memory_scopes: experiencePreferenceDraft.memory_scopes,
+  const consoleMemoryConsentRecord = useCallback((
+    draft: ExperiencePreferenceDraft = experiencePreferenceDraft,
+  ) => ({
+    memory_enabled: draft.account_memory_enabled,
+    read_namespaces: draft.read_namespaces,
+    write_namespaces: draft.write_namespaces,
+    memory_scopes: draft.memory_scopes,
   }), [experiencePreferenceDraft]);
   const updateNotificationPreference = (
     key: NotificationPreferenceKey,
@@ -1204,16 +1210,15 @@ function SettingsDialog({
     preferenceHydratedRef.current = false;
     if (initialPreferenceDraft) {
       setExperiencePreferenceDraft(initialPreferenceDraft);
+      persistedExperiencePreferenceRef.current = initialPreferenceDraft;
       setExperiencePreferenceState("ready");
       setExperiencePreferenceMessage(null);
-      setConfirmExperiencePreferenceDelete(false);
       preferenceHydratedRef.current = true;
       return undefined;
     }
     if (!preferenceBoundary && !docsPreview && !localDesktopPreferences) {
       setExperiencePreferenceState("blocked");
       setExperiencePreferenceMessage(null);
-      setConfirmExperiencePreferenceDelete(false);
       return undefined;
     }
     let active = true;
@@ -1232,7 +1237,7 @@ function SettingsDialog({
         if (!active) return;
         if (preferences || consent) {
           const defaults = preferences?.defaults ?? {};
-          setExperiencePreferenceDraft({
+          const hydratedDraft: ExperiencePreferenceDraft = {
             ...EMPTY_EXPERIENCE_PREFERENCE_DRAFT,
             account_memory_enabled: consent?.memory_enabled ?? false,
             memory_enabled: preferences?.memory_enabled ?? false,
@@ -1254,16 +1259,20 @@ function SettingsDialog({
             default_safety_profile: typeof defaults.safety_profile === "string" ? defaults.safety_profile : null,
             default_units: typeof defaults.units === "string" ? defaults.units : null,
             default_report_format: typeof defaults.report_format === "string" ? defaults.report_format : null,
-          });
+          };
+          setExperiencePreferenceDraft(hydratedDraft);
+          persistedExperiencePreferenceRef.current = hydratedDraft;
           if (preferences) {
             setNotificationPreferences({
               ...DEFAULT_NOTIFICATION_PREFERENCES,
               ...preferences.notifications,
             });
             setLocale(preferences.interface_locale);
-            setAppearancePreference(preferences.appearance_mode);
+            setAppearancePreference(preferences.appearance_mode === "light" ? "light" : "dark");
             setCustomAccentPreference(preferences.custom_accent);
           }
+        } else {
+          persistedExperiencePreferenceRef.current = EMPTY_EXPERIENCE_PREFERENCE_DRAFT;
         }
         preferenceHydratedRef.current = true;
         setExperiencePreferenceState("ready");
@@ -1303,10 +1312,20 @@ function SettingsDialog({
     }
     const saveCurrentPreferences = async () => {
       try {
-        await Promise.all([
-          saveConsolePreferences(preferenceBoundary, consolePreferenceRecord()),
-          saveConsoleMemoryConsent(preferenceBoundary, consoleMemoryConsentRecord()),
-        ]);
+        const memoryDraft = presentation === "quick"
+          ? experiencePreferenceDraft
+          : persistedExperiencePreferenceRef.current;
+        await saveConsolePreferences(
+          preferenceBoundary,
+          consolePreferenceRecord(memoryDraft),
+        );
+        if (presentation === "quick") {
+          await saveConsoleMemoryConsent(
+            preferenceBoundary,
+            consoleMemoryConsentRecord(memoryDraft),
+          );
+          persistedExperiencePreferenceRef.current = memoryDraft;
+        }
         return true;
       } catch {
         if (preferenceComponentMountedRef.current) {
@@ -1332,7 +1351,9 @@ function SettingsDialog({
     consolePreferenceRecord,
     consoleMemoryConsentRecord,
     docsPreview,
+    experiencePreferenceDraft,
     experiencePreferenceState,
+    presentation,
     preferenceBoundary,
     preferenceSaveQueueRef,
     t,
@@ -1371,73 +1392,79 @@ function SettingsDialog({
       }
     };
   }, [preferenceSaveQueueRef]);
-  const saveExperiencePreferences = async () => {
+  const saveMemorySettingsModule = async (module: MemorySettingsModule) => {
     if (
       (!preferenceBoundary && !docsPreview && !localDesktopPreferences) ||
       experiencePreferenceState === "blocked" ||
       experiencePreferenceState === "loading" ||
-      experiencePreferenceState === "saving"
+      memoryModuleSaving !== null
     ) {
       return;
     }
-    setExperiencePreferenceState("saving");
+    setMemoryModuleSaving(module);
     setExperiencePreferenceMessage(null);
+    const saved = persistedExperiencePreferenceRef.current;
+    const nextSaved: ExperiencePreferenceDraft = module === "behavior"
+      ? {
+        ...saved,
+        account_memory_enabled: experiencePreferenceDraft.account_memory_enabled,
+        memory_enabled: experiencePreferenceDraft.memory_enabled,
+        memory_scopes: { ...experiencePreferenceDraft.memory_scopes },
+      }
+      : module === "domains"
+        ? {
+          ...saved,
+          read_namespaces: [...experiencePreferenceDraft.read_namespaces],
+          write_namespaces: [...experiencePreferenceDraft.write_namespaces],
+        }
+        : {
+          ...saved,
+          default_template_key: experiencePreferenceDraft.default_template_key,
+          default_vehicle: experiencePreferenceDraft.default_vehicle,
+          default_track_type: experiencePreferenceDraft.default_track_type,
+          default_altitude_m: experiencePreferenceDraft.default_altitude_m,
+          default_objective: experiencePreferenceDraft.default_objective,
+          default_safety_profile: experiencePreferenceDraft.default_safety_profile,
+          default_units: experiencePreferenceDraft.default_units,
+          default_report_format: experiencePreferenceDraft.default_report_format,
+        };
     try {
       if (preferenceBoundary) {
-        await Promise.all([
-          saveConsolePreferences(preferenceBoundary, consolePreferenceRecord()),
-          saveConsoleMemoryConsent(preferenceBoundary, consoleMemoryConsentRecord()),
-        ]);
+        if (module === "behavior") {
+          await Promise.all([
+            saveConsolePreferences(preferenceBoundary, consolePreferenceRecord(nextSaved)),
+            saveConsoleMemoryConsent(preferenceBoundary, consoleMemoryConsentRecord(nextSaved)),
+          ]);
+        } else if (module === "domains") {
+          await saveConsoleMemoryConsent(
+            preferenceBoundary,
+            consoleMemoryConsentRecord(nextSaved),
+          );
+        } else {
+          await saveConsolePreferences(
+            preferenceBoundary,
+            consolePreferenceRecord(nextSaved),
+          );
+        }
       } else if (localDesktopPreferences) {
         // Pre-login settings remain usable, but account-scoped Memory is never
         // sent to the Runtime without an authenticated account boundary.
       }
+      persistedExperiencePreferenceRef.current = nextSaved;
       preferenceHydratedRef.current = true;
       setExperiencePreferenceState("saved");
       setExperiencePreferenceMessage(t("settings.memory.saved"));
     } catch {
       setExperiencePreferenceState("error");
       setExperiencePreferenceMessage(t("settings.memory.saveFailed"));
-    }
-  };
-  const deleteExperiencePreferences = async () => {
-    if (
-      (!preferenceBoundary && !docsPreview && !localDesktopPreferences) ||
-      experiencePreferenceState === "blocked" ||
-      experiencePreferenceState === "loading" ||
-      experiencePreferenceState === "saving"
-    ) {
-      return;
-    }
-    setExperiencePreferenceState("saving");
-    setExperiencePreferenceMessage(null);
-    try {
-      const deletedCount = preferenceBoundary
-        ? await deleteConsolePreferencesAndMemory(preferenceBoundary)
-        : localDesktopPreferences
-          ? 0
-          : 0;
-      preferenceHydratedRef.current = false;
-      setExperiencePreferenceDraft(EMPTY_EXPERIENCE_PREFERENCE_DRAFT);
-      setConfirmExperiencePreferenceDelete(false);
-      setExperiencePreferenceState("ready");
-      setExperiencePreferenceMessage(
-        preferenceBoundary
-          ? t("settings.memory.deleted", { count: deletedCount })
-          : locale === "zh-CN"
-            ? "已删除本地个人默认值；未删除账户记忆。"
-            : "Personal defaults deleted; 0 memory rows erased.",
-      );
-    } catch {
-      setExperiencePreferenceState("error");
-      setExperiencePreferenceMessage(t("settings.memory.deleteFailed"));
+    } finally {
+      setMemoryModuleSaving(null);
     }
   };
   const numberFormatter = new Intl.NumberFormat(interfaceLocale);
   const experiencePreferenceControlsDisabled =
     experiencePreferenceState === "blocked" ||
-    experiencePreferenceState === "loading" ||
-    experiencePreferenceState === "saving";
+    experiencePreferenceState === "loading";
   const remainingCreditRatio = managedUsage
     ? remainingAllowanceRatio(
         managedUsage.usage.remaining_ai_credits,
@@ -1721,8 +1748,6 @@ function SettingsDialog({
           allSettings: "全部设置",
           dark: "深色",
           light: "浅色",
-          system: "跟随系统",
-          custom: "自定义",
         }
       : {
           title: "Settings",
@@ -1735,8 +1760,6 @@ function SettingsDialog({
           allSettings: "All settings",
           dark: "Dark",
           light: "Light",
-          system: "System",
-          custom: "Custom",
         };
     const availableModels = managedModels.filter(managedModelAvailableForAssistant);
     const selectedModel = `${modelAccess.managedProvider}:${modelAccess.managedModel}`;
@@ -1780,34 +1803,33 @@ function SettingsDialog({
               ))}
             </div>
           </div>
-          <label className="quick-settings-item" htmlFor="quick-settings-appearance">
+          <div className="quick-settings-item quick-settings-appearance">
             <span>{quickCopy.appearance}</span>
-            <select
-              id="quick-settings-appearance"
-              value={editionTheme.appearancePreference}
-              onChange={(event) => {
-                const value = event.target.value as typeof editionTheme.appearancePreference;
-                editionTheme.setAppearance(value);
-                if (value === "custom") {
-                  window.requestAnimationFrame(() => customColorInputRef.current?.click());
-                }
-              }}
+            <div
+              className="quick-settings-appearance-options"
+              role="group"
+              aria-label={quickCopy.appearance}
             >
-              <option value="dark">{quickCopy.dark}</option>
-              <option value="light">{quickCopy.light}</option>
-              <option value="system">{quickCopy.system}</option>
-              <option value="custom">{quickCopy.custom}</option>
-            </select>
-            <input
-              ref={customColorInputRef}
-              className="settings-custom-color-input"
-              type="color"
-              tabIndex={-1}
-              aria-label={interfaceLocale === "zh-CN" ? "选择自定义主题色" : "Choose a custom theme color"}
-              value={editionTheme.customAccent}
-              onChange={(event) => editionTheme.setCustomAccent(event.target.value)}
-            />
-          </label>
+              <button
+                type="button"
+                className={editionTheme.appearancePreference === "dark" ? "selected" : undefined}
+                aria-pressed={editionTheme.appearancePreference === "dark"}
+                onClick={() => editionTheme.setAppearance("dark")}
+              >
+                <Moon aria-hidden="true" />
+                <span>{quickCopy.dark}</span>
+              </button>
+              <button
+                type="button"
+                className={editionTheme.appearancePreference === "light" ? "selected" : undefined}
+                aria-pressed={editionTheme.appearancePreference === "light"}
+                onClick={() => editionTheme.setAppearance("light")}
+              >
+                <Sun aria-hidden="true" />
+                <span>{quickCopy.light}</span>
+              </button>
+            </div>
+          </div>
           {auth.account || docsPreview ? (
             <>
               <div className="quick-settings-item quick-settings-memory">
@@ -1972,40 +1994,7 @@ function SettingsDialog({
                 <strong>{settingsCopy.appearance[1]}</strong>
                 <i aria-hidden="true">✓</i>
               </button>
-              <button
-                type="button"
-                className={editionTheme.appearancePreference === "system" ? "selected" : undefined}
-                aria-pressed={editionTheme.appearancePreference === "system"}
-                onClick={() => editionTheme.setAppearance("system")}
-              >
-                <MonitorCog aria-hidden="true" />
-                <strong>{settingsCopy.appearance[2]}</strong>
-                <i aria-hidden="true">✓</i>
-              </button>
-              <button
-                type="button"
-                className={editionTheme.appearancePreference === "custom" ? "selected" : undefined}
-                aria-pressed={editionTheme.appearancePreference === "custom"}
-                onClick={() => {
-                  editionTheme.setAppearance("custom");
-                  window.requestAnimationFrame(() => customColorInputRef.current?.click());
-                }}
-              >
-                <Sparkles aria-hidden="true" />
-                <strong>{settingsCopy.appearance[3]}</strong>
-                <i aria-hidden="true">✓</i>
-              </button>
             </div>
-            <input
-              ref={customColorInputRef}
-              id="settings_custom_accent"
-              className="settings-custom-color-input"
-              type="color"
-              tabIndex={-1}
-              aria-label={locale === "zh-CN" ? "选择自定义主题色" : "Choose a custom theme color"}
-              value={editionTheme.customAccent}
-              onChange={(event) => editionTheme.setCustomAccent(event.target.value)}
-            />
           </div>
           <div className="settings-general-card settings-notification-card">
             <div className="settings-card-heading">
@@ -2120,7 +2109,23 @@ function SettingsDialog({
           </span>
         </div>
         <div className="settings-memory-body">
-          <div className="settings-memory-switches">
+          <section className="settings-memory-module settings-memory-behavior-module">
+            <header className="settings-memory-module-heading">
+              <h4>{locale === "zh-CN" ? "记忆设置" : "Memory settings"}</h4>
+              <button
+                type="button"
+                className="settings-memory-module-save"
+                disabled={experiencePreferenceControlsDisabled || memoryModuleSaving !== null}
+                aria-label={locale === "zh-CN" ? "保存记忆设置" : "Save memory settings"}
+                title={locale === "zh-CN" ? "保存记忆设置" : "Save memory settings"}
+                onClick={() => void saveMemorySettingsModule("behavior")}
+              >
+                {memoryModuleSaving === "behavior"
+                  ? <LoaderCircle className="is-spinning" aria-hidden="true" />
+                  : <Save aria-hidden="true" />}
+              </button>
+            </header>
+            <div className="settings-memory-switches">
             <SettingsToggle
               checked={experiencePreferenceDraft.account_memory_enabled}
               className="settings-memory-master-toggle"
@@ -2161,6 +2166,24 @@ function SettingsDialog({
                 />
               ))}
             </div>
+            </div>
+          </section>
+          <section className="settings-memory-module settings-memory-domains-module">
+            <header className="settings-memory-module-heading">
+              <h4>{locale === "zh-CN" ? "读写权限" : "Read and write access"}</h4>
+              <button
+                type="button"
+                className="settings-memory-module-save"
+                disabled={experiencePreferenceControlsDisabled || memoryModuleSaving !== null}
+                aria-label={locale === "zh-CN" ? "保存读写权限" : "Save read and write access"}
+                title={locale === "zh-CN" ? "保存读写权限" : "Save read and write access"}
+                onClick={() => void saveMemorySettingsModule("domains")}
+              >
+                {memoryModuleSaving === "domains"
+                  ? <LoaderCircle className="is-spinning" aria-hidden="true" />
+                  : <Save aria-hidden="true" />}
+              </button>
+            </header>
             <div className="settings-memory-scope-grid settings-memory-domain-grid" aria-label={t("settings.memory.domainConsent")}>
               {USER_CONFIGURABLE_MEMORY_NAMESPACES.map((namespace) => {
                 const readable = experiencePreferenceDraft.read_namespaces.includes(namespace);
@@ -2194,8 +2217,24 @@ function SettingsDialog({
                 );
               })}
             </div>
-          </div>
-          <div className="settings-memory-defaults">
+          </section>
+          <section className="settings-memory-module settings-memory-defaults-module">
+            <header className="settings-memory-module-heading">
+              <h4>{locale === "zh-CN" ? "个人默认值" : "Personal defaults"}</h4>
+              <button
+                type="button"
+                className="settings-memory-module-save"
+                disabled={experiencePreferenceControlsDisabled || memoryModuleSaving !== null}
+                aria-label={locale === "zh-CN" ? "保存个人默认值" : "Save personal defaults"}
+                title={locale === "zh-CN" ? "保存个人默认值" : "Save personal defaults"}
+                onClick={() => void saveMemorySettingsModule("defaults")}
+              >
+                {memoryModuleSaving === "defaults"
+                  ? <LoaderCircle className="is-spinning" aria-hidden="true" />
+                  : <Save aria-hidden="true" />}
+              </button>
+            </header>
+            <div className="settings-memory-defaults">
             <div className="settings-memory-grid">
           <label htmlFor="settings_default_template">
             <span>{t("settings.memory.defaultTemplate")}</span>
@@ -2339,52 +2378,8 @@ function SettingsDialog({
             </select>
           </label>
             </div>
-            <div className="settings-memory-actions">
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={experiencePreferenceControlsDisabled}
-            onClick={() => void saveExperiencePreferences()}
-          >
-            <Save aria-hidden="true" />
-            {experiencePreferenceState === "saving"
-              ? t("settings.memory.saving")
-              : t("settings.memory.save")}
-          </button>
-          {!confirmExperiencePreferenceDelete ? (
-            <button
-              type="button"
-              className="btn btn-danger"
-              disabled={experiencePreferenceControlsDisabled}
-              onClick={() => setConfirmExperiencePreferenceDelete(true)}
-            >
-              <Trash2 aria-hidden="true" />{t("settings.memory.delete")}
-            </button>
-          ) : (
-            <div
-              className="settings-memory-delete-confirm"
-              role="group"
-              aria-label={locale === "zh-CN" ? "删除所有已保存的默认值和结构化记忆？" : "Delete all saved defaults and structured memory?"}
-            >
-              <span>{t("settings.memory.confirmDelete")}</span>
-              <button
-                type="button"
-                className="btn btn-danger"
-                onClick={() => void deleteExperiencePreferences()}
-              >
-                {t("settings.memory.confirm")}
-              </button>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => setConfirmExperiencePreferenceDelete(false)}
-              >
-                {t("settings.memory.cancel")}
-              </button>
             </div>
-          )}
-            </div>
-          </div>
+          </section>
         </div>
         {experiencePreferenceState === "blocked" ? (
           <p className="settings-memory-message" role="status">

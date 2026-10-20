@@ -8800,6 +8800,73 @@ a {
   }
 }
 
+/* Appearance is intentionally a two-state product preference. Keep the same
+   segmented control in Quick Settings and the full Settings workspace. */
+.quick-settings-appearance-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.quick-settings-appearance-options button {
+  min-height: 2.45rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text-dim);
+  background: transparent;
+}
+
+.quick-settings-appearance-options button.selected {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 58%, var(--border));
+  background: color-mix(in srgb, var(--dd-brand-start) 15%, var(--bg-elev));
+}
+
+.quick-settings-appearance-options svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* High-contrast appearance tokens are shared by Universal, SIM, LAB, Field,
+   Agent, and every browser-console route that mounts AppShell. */
+:root[data-dd-appearance="dark"] .app-shell .quick-settings-dialog {
+  --text: #ffffff;
+  --text-dim: #f1f5ff;
+  --text-muted: #cbd5ea;
+}
+
+:root[data-dd-appearance="dark"] .app-shell .settings-workspace-host :is(
+  .settings-card-heading,
+  .settings-memory-switches,
+  .settings-memory-domain-consent,
+  .launcher-settings-tabs
+) svg,
+:root[data-dd-appearance="dark"] .app-shell .quick-settings-dialog :is(
+  .quick-settings-memory,
+  .quick-settings-appearance-options,
+  .quick-settings-language
+) svg {
+  color: color-mix(in srgb, #67e8ff 86%, var(--dd-brand-middle));
+}
+
+:root[data-dd-appearance="light"] .app-shell .quick-settings-dialog {
+  --bg: #f7f8fc;
+  --bg-elev: #ffffff;
+  --bg-elev-2: #f1f3f8;
+  --border: #d5d9e4;
+  --text: #191c24;
+  --text-dim: #303541;
+  --text-muted: #5b6270;
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--dd-brand-middle) 28%, var(--border));
+  background: var(--bg-elev);
+}
+
 .wizard-flight-setup .objective-profile-grid {
   margin-bottom: 0;
 }
@@ -22257,7 +22324,7 @@ body {
 }
 
 .settings-workspace-content .settings-interface-card .settings-appearance-options {
-  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
 }
 
 .settings-workspace-content .settings-language-card .launcher-language-options button,
@@ -24340,7 +24407,6 @@ body {
   }
 
   .settings-workspace-content [data-settings-panel="general"]:not([hidden]),
-  .settings-workspace-content [data-settings-panel="memory"]:not([hidden]),
   .settings-workspace-content [data-settings-panel="model"]:not([hidden]) {
     height: 100%;
     min-height: 0;
@@ -24350,15 +24416,20 @@ body {
   .settings-workspace-content .settings-memory-panel {
     height: 100%;
     min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+
+  .settings-workspace-content .settings-memory-panel::-webkit-scrollbar {
+    display: none;
   }
 
   .settings-workspace-content .settings-memory-body {
-    display: grid;
+    display: flex;
     min-height: 0;
-    flex: 1 1 auto;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-items: start;
-    gap: clamp(1.5rem, 2.5vw, 2.75rem);
+    flex: 0 0 auto;
+    flex-direction: column;
+    gap: 1rem;
     padding-top: 0.35rem;
   }
 
@@ -24444,5 +24515,140 @@ body {
   .settings-workspace-content .settings-model-usage {
     min-height: 0;
     overflow: hidden;
+  }
+}
+
+/* Full Memory settings use one vertical flow in every edition and browser
+   console. Each section owns its save action so an edit in one section never
+   commits pending values from another section. */
+.settings-workspace-content .settings-memory-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0.35rem 0 1.5rem;
+}
+
+.settings-workspace-content .settings-memory-module {
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel) 82%, transparent);
+  overflow: hidden;
+}
+
+.settings-workspace-content .settings-memory-module-heading {
+  min-height: 3.15rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+}
+
+.settings-workspace-content .settings-memory-module-heading h4 {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 720;
+}
+
+.settings-workspace-content .settings-memory-module-save {
+  display: inline-grid;
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 2rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--dd-brand-middle);
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.settings-workspace-content .settings-memory-module-save:hover:not(:disabled),
+.settings-workspace-content .settings-memory-module-save:focus-visible {
+  color: var(--dd-brand-end);
+}
+
+.settings-workspace-content .settings-memory-module-save:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--dd-brand-middle) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.settings-workspace-content .settings-memory-module-save:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.settings-workspace-content .settings-memory-module-save svg {
+  width: 1.12rem;
+  height: 1.12rem;
+}
+
+.settings-workspace-content .settings-memory-module .settings-memory-switches,
+.settings-workspace-content .settings-memory-module .settings-memory-defaults,
+.settings-workspace-content .settings-memory-module .settings-memory-scope-grid {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.settings-workspace-content .settings-memory-module .settings-toggle-row,
+.settings-workspace-content .settings-memory-domain-consent,
+.settings-workspace-content .settings-memory-grid label {
+  min-height: 3.15rem;
+  padding: 0.5rem 0.9rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+}
+
+.settings-workspace-content .settings-memory-module :is(.settings-toggle-row, .settings-memory-domain-consent, .settings-memory-grid label):last-child {
+  border-bottom: 0;
+}
+
+.settings-workspace-content .settings-memory-domain-consent {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) auto auto;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.settings-workspace-content .settings-memory-domain-consent > span {
+  width: auto;
+  flex-basis: auto;
+  min-width: 0;
+}
+
+.settings-workspace-content .settings-memory-domain-consent .settings-toggle-row {
+  width: 6.25rem;
+  min-height: 2.15rem;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  padding: 0;
+  border: 0;
+}
+
+.settings-workspace-content .settings-memory-grid label {
+  grid-template-columns: minmax(12rem, 1fr) minmax(18rem, 32rem);
+  gap: 2rem;
+}
+
+@media (max-width: 720px) {
+  .settings-workspace-content .settings-memory-domain-consent {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.65rem;
+  }
+
+  .settings-workspace-content .settings-memory-domain-consent > span {
+    grid-column: 1 / -1;
+  }
+
+  .settings-workspace-content .settings-memory-grid label {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
   }
 }

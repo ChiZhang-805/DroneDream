@@ -223,6 +223,12 @@ describe("sidebar account menu", () => {
     const quickSettings = screen.getByRole("dialog", { name: "Settings" });
     expect(within(quickSettings).getByText("Language")).toBeVisible();
     expect(within(quickSettings).getByText("Appearance")).toBeVisible();
+    const appearance = within(quickSettings).getByRole("group", { name: "Appearance" });
+    expect(within(appearance).getAllByRole("button")).toHaveLength(2);
+    expect(within(appearance).getByRole("button", { name: "Dark" })).toBeVisible();
+    expect(within(appearance).getByRole("button", { name: "Light" })).toBeVisible();
+    expect(within(appearance).queryByRole("button", { name: "System" })).not.toBeInTheDocument();
+    expect(within(appearance).queryByRole("button", { name: "Custom" })).not.toBeInTheDocument();
     expect(within(quickSettings).getByText("Account memory")).toBeVisible();
     expect(within(quickSettings).getByText("This edition's memory")).toBeVisible();
     expect(within(quickSettings).getByRole("combobox", {
@@ -339,7 +345,7 @@ describe("sidebar account menu", () => {
     } as const;
     preferenceMock.preferences = {
       interface_locale: "en",
-      appearance_mode: "system",
+      appearance_mode: "dark",
       custom_accent: "#e52a57",
       notifications: {},
       memory_enabled: true,
@@ -402,7 +408,7 @@ describe("sidebar account menu", () => {
     } as const;
     preferenceMock.preferences = {
       interface_locale: "en",
-      appearance_mode: "system",
+      appearance_mode: "dark",
       custom_accent: "#e52a57",
       notifications: {},
       memory_enabled: true,
@@ -465,14 +471,28 @@ describe("sidebar account menu", () => {
     const simulationRead = within(simulationRow as HTMLElement).getByRole("checkbox", { name: "Read" });
     expect(simulationRead).toBeChecked();
 
+    preferenceMock.savePreferences.mockClear();
+    preferenceMock.saveMemoryConsent.mockClear();
     fireEvent.click(chatPreferences);
     fireEvent.click(simulationRead);
+    fireEvent.click(within(workspace).getByRole("button", { name: "Save memory settings" }));
     await waitFor(() => {
       expect(preferenceMock.preferences?.memory_scopes.chat_preferences).toBe(false);
-      expect(preferenceMock.consent?.read_namespaces).not.toContain("experiment.simulation");
     });
+    expect(preferenceMock.consent?.read_namespaces).toContain("experiment.simulation");
     expect(preferenceMock.preferences?.memory_scopes.metrics_constraints).toBe(true);
     expect(preferenceMock.consent?.write_namespaces).toContain("experiment.simulation");
+    expect(preferenceMock.savePreferences).toHaveBeenCalledTimes(1);
+    expect(preferenceMock.saveMemoryConsent).toHaveBeenCalledTimes(1);
+
+    preferenceMock.savePreferences.mockClear();
+    preferenceMock.saveMemoryConsent.mockClear();
+    fireEvent.click(within(workspace).getByRole("button", { name: "Save read and write access" }));
+    await waitFor(() => {
+      expect(preferenceMock.consent?.read_namespaces).not.toContain("experiment.simulation");
+    });
+    expect(preferenceMock.savePreferences).not.toHaveBeenCalled();
+    expect(preferenceMock.saveMemoryConsent).toHaveBeenCalledTimes(1);
 
     first.unmount();
     first.router.dispose();

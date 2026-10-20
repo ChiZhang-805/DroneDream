@@ -8,6 +8,7 @@ import {
   MonitorCog,
   Moon,
   Plane,
+  Save,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
@@ -16,7 +17,7 @@ import {
   Workflow,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useState, type RefObject } from "react";
 
 import { BrandLockup } from "../components/BrandLockup";
 import { CustomModelSettingsPanel } from "../components/CustomModelSettingsPanel";
@@ -59,6 +60,14 @@ type MemoryScopeKey =
   | "safety"
   | "workflow"
   | "reports";
+type FieldMemoryDomain = "tuning" | "missions" | "simulation" | "crossEdition";
+type FieldMemoryDefaults = Readonly<{
+  vehicle: string;
+  map: string;
+  safety: string;
+  units: string;
+  report: string;
+}>;
 
 const DEFAULT_NOTIFICATIONS: NotificationPreferences = {
   master: true,
@@ -81,6 +90,21 @@ const DEFAULT_MEMORY_SCOPES: Record<MemoryScopeKey, boolean> = {
   reports: true,
 };
 
+const FIELD_MEMORY_DOMAINS: readonly FieldMemoryDomain[] = [
+  "tuning",
+  "missions",
+  "simulation",
+  "crossEdition",
+];
+
+const DEFAULT_FIELD_MEMORY_DEFAULTS: FieldMemoryDefaults = {
+  vehicle: "My Drone",
+  map: "School Map",
+  safety: "strict",
+  units: "metric",
+  report: "evidence",
+};
+
 const COPY = {
   en: {
     title: "Settings",
@@ -92,7 +116,7 @@ const COPY = {
     language: "Language",
     interface: "Interface",
     notifications: "Notifications",
-    appearance: ["Dark", "Light", "System", "Customize"] as const,
+    appearance: ["Dark", "Light"] as const,
     notificationLabels: [
       "Allow notifications",
       "Experiment and task completed",
@@ -128,6 +152,10 @@ const COPY = {
       "Default units",
       "Default report format",
     ] as const,
+    memoryModules: ["Memory settings", "Read and write access", "Personal defaults"] as const,
+    domains: ["Tuning", "Missions", "Simulation", "Cross-edition"] as const,
+    access: ["Read", "Write"] as const,
+    saveMemoryModules: ["Save memory settings", "Save read and write access", "Save personal defaults"] as const,
     courseOverview:
       "The course connects model reasoning, controls, and aerospace engineering tools with reviewable UAV workflows.",
     openCourse: "Open course",
@@ -152,7 +180,7 @@ const COPY = {
     language: "语言",
     interface: "界面",
     notifications: "通知",
-    appearance: ["深色", "浅色", "跟随系统", "自定义"] as const,
+    appearance: ["深色", "浅色"] as const,
     notificationLabels: [
       "允许通知",
       "实验与任务完成",
@@ -182,6 +210,10 @@ const COPY = {
       "报告与交付",
     ] as const,
     defaults: ["默认机型", "默认地图", "默认安全配置", "默认单位制", "默认报告格式"] as const,
+    memoryModules: ["记忆设置", "读写权限", "个人默认值"] as const,
+    domains: ["调优", "任务", "仿真", "跨版本"] as const,
+    access: ["读取", "写入"] as const,
+    saveMemoryModules: ["保存记忆设置", "保存读写权限", "保存个人默认值"] as const,
     courseOverview: "课程把模型推理、控制与航空航天工程工具连接为可复核的无人机工作流。",
     openCourse: "打开课程",
     courseActions: ["阅读说明书", "查看产品"] as const,
@@ -213,6 +245,26 @@ function readJson<T extends Record<string, boolean>>(key: string, fallback: T): 
     return value ? { ...fallback, ...JSON.parse(value) as Partial<T> } : fallback;
   } catch {
     return fallback;
+  }
+}
+
+function readStringArray<T extends string>(key: string, fallback: readonly T[]): T[] {
+  try {
+    const value = JSON.parse(window.localStorage.getItem(key) ?? "null") as unknown;
+    return Array.isArray(value)
+      ? value.filter((entry): entry is T => typeof entry === "string" && fallback.includes(entry as T))
+      : [...fallback];
+  } catch {
+    return [...fallback];
+  }
+}
+
+function readFieldMemoryDefaults(): FieldMemoryDefaults {
+  try {
+    const value = JSON.parse(window.localStorage.getItem("dd.field.memory.defaults") ?? "null") as Partial<FieldMemoryDefaults> | null;
+    return value ? { ...DEFAULT_FIELD_MEMORY_DEFAULTS, ...value } : DEFAULT_FIELD_MEMORY_DEFAULTS;
+  } catch {
+    return DEFAULT_FIELD_MEMORY_DEFAULTS;
   }
 }
 
@@ -281,12 +333,19 @@ export function FieldSettingsDialog({
   const [memoryScopes, setMemoryScopes] = useState(() =>
     readJson("dd.field.memory.scopes", DEFAULT_MEMORY_SCOPES)
   );
+  const [readMemoryDomains, setReadMemoryDomains] = useState<FieldMemoryDomain[]>(() =>
+    readStringArray("dd.field.memory.read-domains", FIELD_MEMORY_DOMAINS)
+  );
+  const [writeMemoryDomains, setWriteMemoryDomains] = useState<FieldMemoryDomain[]>(() =>
+    readStringArray("dd.field.memory.write-domains", FIELD_MEMORY_DOMAINS)
+  );
+  const [memoryDefaults, setMemoryDefaults] = useState<FieldMemoryDefaults>(readFieldMemoryDefaults);
+  const [memorySaveMessage, setMemorySaveMessage] = useState<string | null>(null);
   const [runtimeUpgradeBusy, setRuntimeUpgradeBusy] = useState(false);
   const [runtimeUpgradeNotice, setRuntimeUpgradeNotice] = useState<{
     tone: "success" | "error";
     text: string;
   } | null>(null);
-  const customColorInputRef = useRef<HTMLInputElement>(null);
   const modelAccess = useModelAccess();
   const editionTheme = useEditionTheme();
   const copy = COPY[interfaceLocale === "zh-CN" ? "zh-CN" : "en"];
@@ -333,32 +392,51 @@ export function FieldSettingsDialog({
 
   const updateMemoryEnabled = (enabled: boolean) => {
     setMemoryEnabled(enabled);
-    try {
-      window.localStorage.setItem("dd.field.memory.enabled", String(enabled));
-    } catch {
-      // The current session still reflects the user's selection.
+    if (presentation === "quick") {
+      try { window.localStorage.setItem("dd.field.memory.enabled", String(enabled)); }
+      catch { /* The current quick-settings session still reflects the selection. */ }
     }
   };
 
   const updateAccountMemoryEnabled = (enabled: boolean) => {
     setAccountMemoryEnabled(enabled);
-    try {
-      window.localStorage.setItem("dd.field.account-memory.enabled", String(enabled));
-    } catch {
-      // The current session still reflects the user's selection.
+    if (presentation === "quick") {
+      try { window.localStorage.setItem("dd.field.account-memory.enabled", String(enabled)); }
+      catch { /* The current quick-settings session still reflects the selection. */ }
     }
   };
 
   const updateMemoryScope = (key: MemoryScopeKey, enabled: boolean) => {
-    setMemoryScopes((current) => {
-      const next = { ...current, [key]: enabled };
-      try {
-        window.localStorage.setItem("dd.field.memory.scopes", JSON.stringify(next));
-      } catch {
-        // The current session still reflects the user's selection.
+    setMemoryScopes((current) => ({ ...current, [key]: enabled }));
+  };
+
+  const toggleMemoryDomain = (
+    domain: FieldMemoryDomain,
+    access: "read" | "write",
+    enabled: boolean,
+  ) => {
+    const update = access === "read" ? setReadMemoryDomains : setWriteMemoryDomains;
+    update((current) => enabled
+      ? [...new Set([...current, domain])]
+      : current.filter((entry) => entry !== domain));
+  };
+
+  const saveFieldMemoryModule = (module: "behavior" | "domains" | "defaults") => {
+    try {
+      if (module === "behavior") {
+        window.localStorage.setItem("dd.field.account-memory.enabled", String(accountMemoryEnabled));
+        window.localStorage.setItem("dd.field.memory.enabled", String(memoryEnabled));
+        window.localStorage.setItem("dd.field.memory.scopes", JSON.stringify(memoryScopes));
+      } else if (module === "domains") {
+        window.localStorage.setItem("dd.field.memory.read-domains", JSON.stringify(readMemoryDomains));
+        window.localStorage.setItem("dd.field.memory.write-domains", JSON.stringify(writeMemoryDomains));
+      } else {
+        window.localStorage.setItem("dd.field.memory.defaults", JSON.stringify(memoryDefaults));
       }
-      return next;
-    });
+      setMemorySaveMessage(interfaceLocale === "zh-CN" ? "已保存此模块。" : "This section has been saved.");
+    } catch {
+      setMemorySaveMessage(interfaceLocale === "zh-CN" ? "保存失败，请重试。" : "Save failed. Try again.");
+    }
   };
 
   const beginRuntimeBaseUpgrade = async () => {
@@ -430,34 +508,30 @@ export function FieldSettingsDialog({
               ))}
             </div>
           </div>
-          <label className="quick-settings-item" htmlFor="field-quick-settings-appearance">
+          <div className="quick-settings-item quick-settings-appearance">
             <span>{copy.interface}</span>
-            <select
-              id="field-quick-settings-appearance"
-              value={editionTheme.appearancePreference}
-              onChange={(event) => {
-                const value = event.target.value as typeof editionTheme.appearancePreference;
-                editionTheme.setAppearance(value);
-                if (value === "custom") {
-                  window.requestAnimationFrame(() => customColorInputRef.current?.click());
-                }
-              }}
+            <div
+              className="quick-settings-appearance-options"
+              role="group"
+              aria-label={copy.interface}
             >
-              <option value="dark">{copy.appearance[0]}</option>
-              <option value="light">{copy.appearance[1]}</option>
-              <option value="system">{copy.appearance[2]}</option>
-              <option value="custom">{copy.appearance[3]}</option>
-            </select>
-            <input
-              ref={customColorInputRef}
-              className="settings-custom-color-input"
-              type="color"
-              tabIndex={-1}
-              aria-label={copy.appearance[3]}
-              value={editionTheme.customAccent}
-              onChange={(event) => editionTheme.setCustomAccent(event.target.value)}
-            />
-          </label>
+              {([
+                ["dark", Moon],
+                ["light", Sun],
+              ] as const).map(([appearance, Icon], index) => (
+                <button
+                  key={appearance}
+                  type="button"
+                  className={editionTheme.appearancePreference === appearance ? "selected" : undefined}
+                  aria-pressed={editionTheme.appearancePreference === appearance}
+                  onClick={() => editionTheme.setAppearance(appearance)}
+                >
+                  <Icon aria-hidden="true" />
+                  <span>{copy.appearance[index]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="quick-settings-item quick-settings-memory">
             <SettingsToggle
               checked={accountMemoryEnabled}
@@ -561,20 +635,13 @@ export function FieldSettingsDialog({
               {([
                 ["dark", Moon],
                 ["light", Sun],
-                ["system", MonitorCog],
-                ["custom", Sparkles],
               ] as const).map(([appearance, Icon], index) => (
                 <button
                   key={appearance}
                   type="button"
                   className={editionTheme.appearancePreference === appearance ? "selected" : undefined}
                   aria-pressed={editionTheme.appearancePreference === appearance}
-                  onClick={() => {
-                    editionTheme.setAppearance(appearance);
-                    if (appearance === "custom") {
-                      window.requestAnimationFrame(() => customColorInputRef.current?.click());
-                    }
-                  }}
+                  onClick={() => editionTheme.setAppearance(appearance)}
                 >
                   <Icon aria-hidden="true" />
                   <strong>{copy.appearance[index]}</strong>
@@ -582,15 +649,6 @@ export function FieldSettingsDialog({
                 </button>
               ))}
             </div>
-            <input
-              ref={customColorInputRef}
-              className="settings-custom-color-input"
-              type="color"
-              tabIndex={-1}
-              aria-label={copy.appearance[3]}
-              value={editionTheme.customAccent}
-              onChange={(event) => editionTheme.setCustomAccent(event.target.value)}
-            />
           </div>
           <div className="settings-general-card settings-notification-card">
             <div className="settings-card-heading">
@@ -618,7 +676,18 @@ export function FieldSettingsDialog({
             </span>
           </div>
           <div className="settings-memory-body">
-            <div className="settings-memory-switches">
+            <section className="settings-memory-module settings-memory-behavior-module">
+              <header className="settings-memory-module-heading">
+                <h4>{copy.memoryModules[0]}</h4>
+                <button
+                  type="button"
+                  className="settings-memory-module-save"
+                  aria-label={copy.saveMemoryModules[0]}
+                  title={copy.saveMemoryModules[0]}
+                  onClick={() => saveFieldMemoryModule("behavior")}
+                ><Save aria-hidden="true" /></button>
+              </header>
+              <div className="settings-memory-switches">
               <SettingsToggle
                 checked={accountMemoryEnabled}
                 className="settings-memory-master-toggle"
@@ -646,17 +715,62 @@ export function FieldSettingsDialog({
                   );
                 })}
               </div>
-            </div>
-            <div className="settings-memory-defaults">
-              <div className="settings-memory-grid">
-                <label><span>{copy.defaults[0]}</span><input value="My Drone" readOnly disabled={!accountMemoryEnabled || !memoryEnabled} /></label>
-                <label><span>{copy.defaults[1]}</span><input value="School Map" readOnly disabled={!accountMemoryEnabled || !memoryEnabled} /></label>
-                <label><span>{copy.defaults[2]}</span><select defaultValue="strict" disabled={!accountMemoryEnabled || !memoryEnabled}><option value="strict">{locale === "zh-CN" ? "严格" : "Strict"}</option></select></label>
-                <label><span>{copy.defaults[3]}</span><select defaultValue="metric" disabled={!accountMemoryEnabled || !memoryEnabled}><option value="metric">{locale === "zh-CN" ? "公制" : "Metric"}</option></select></label>
-                <label><span>{copy.defaults[4]}</span><select defaultValue="evidence" disabled={!accountMemoryEnabled || !memoryEnabled}><option value="evidence">{locale === "zh-CN" ? "证据包" : "Evidence"}</option></select></label>
               </div>
-            </div>
+            </section>
+            <section className="settings-memory-module settings-memory-domains-module">
+              <header className="settings-memory-module-heading">
+                <h4>{copy.memoryModules[1]}</h4>
+                <button
+                  type="button"
+                  className="settings-memory-module-save"
+                  aria-label={copy.saveMemoryModules[1]}
+                  title={copy.saveMemoryModules[1]}
+                  onClick={() => saveFieldMemoryModule("domains")}
+                ><Save aria-hidden="true" /></button>
+              </header>
+              <div className="settings-memory-scope-grid settings-memory-domain-grid">
+                {FIELD_MEMORY_DOMAINS.map((domain, index) => (
+                  <div className="settings-memory-domain-consent" key={domain}>
+                    <span>{copy.domains[index]}</span>
+                    <SettingsToggle
+                      checked={readMemoryDomains.includes(domain)}
+                      disabled={!accountMemoryEnabled || !memoryEnabled}
+                      label={copy.access[0]}
+                      onChange={(checked) => toggleMemoryDomain(domain, "read", checked)}
+                    />
+                    <SettingsToggle
+                      checked={writeMemoryDomains.includes(domain)}
+                      disabled={!accountMemoryEnabled || !memoryEnabled}
+                      label={copy.access[1]}
+                      onChange={(checked) => toggleMemoryDomain(domain, "write", checked)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
+            <section className="settings-memory-module settings-memory-defaults-module">
+              <header className="settings-memory-module-heading">
+                <h4>{copy.memoryModules[2]}</h4>
+                <button
+                  type="button"
+                  className="settings-memory-module-save"
+                  aria-label={copy.saveMemoryModules[2]}
+                  title={copy.saveMemoryModules[2]}
+                  onClick={() => saveFieldMemoryModule("defaults")}
+                ><Save aria-hidden="true" /></button>
+              </header>
+              <div className="settings-memory-defaults">
+              <div className="settings-memory-grid">
+                <label><span>{copy.defaults[0]}</span><input value={memoryDefaults.vehicle} disabled={!accountMemoryEnabled || !memoryEnabled} onChange={(event) => setMemoryDefaults((current) => ({ ...current, vehicle: event.target.value }))} /></label>
+                <label><span>{copy.defaults[1]}</span><input value={memoryDefaults.map} disabled={!accountMemoryEnabled || !memoryEnabled} onChange={(event) => setMemoryDefaults((current) => ({ ...current, map: event.target.value }))} /></label>
+                <label><span>{copy.defaults[2]}</span><select value={memoryDefaults.safety} disabled={!accountMemoryEnabled || !memoryEnabled} onChange={(event) => setMemoryDefaults((current) => ({ ...current, safety: event.target.value }))}><option value="strict">{locale === "zh-CN" ? "严格" : "Strict"}</option><option value="standard">{locale === "zh-CN" ? "标准" : "Standard"}</option></select></label>
+                <label><span>{copy.defaults[3]}</span><select value={memoryDefaults.units} disabled={!accountMemoryEnabled || !memoryEnabled} onChange={(event) => setMemoryDefaults((current) => ({ ...current, units: event.target.value }))}><option value="metric">{locale === "zh-CN" ? "公制" : "Metric"}</option><option value="imperial">{locale === "zh-CN" ? "英制" : "Imperial"}</option></select></label>
+                <label><span>{copy.defaults[4]}</span><select value={memoryDefaults.report} disabled={!accountMemoryEnabled || !memoryEnabled} onChange={(event) => setMemoryDefaults((current) => ({ ...current, report: event.target.value }))}><option value="evidence">{locale === "zh-CN" ? "证据包" : "Evidence"}</option><option value="summary">{locale === "zh-CN" ? "摘要" : "Summary"}</option></select></label>
+              </div>
+              </div>
+            </section>
           </div>
+          {memorySaveMessage ? <p className="settings-memory-message" role="status">{memorySaveMessage}</p> : null}
         </section>
       </EditionSettingsPanel>
 

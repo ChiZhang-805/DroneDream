@@ -176,4 +176,53 @@ describe("EditionSettingsSurface", () => {
       "https://binhu7.github.io/courses/ECE498/Spring2025/ECE498home.html",
     );
   });
+
+  it("uses the same three independently saved Memory sections in Field", () => {
+    for (const key of [
+      "dd.field.account-memory.enabled",
+      "dd.field.memory.enabled",
+      "dd.field.memory.scopes",
+      "dd.field.memory.read-domains",
+      "dd.field.memory.write-domains",
+      "dd.field.memory.defaults",
+    ]) window.localStorage.removeItem(key);
+
+    render(
+      <EditionThemeProvider edition="field">
+        <ModelAccessProvider accountScope="field:memory-sections">
+          <FieldSettingsDialog
+            closeRef={createRef<HTMLButtonElement>()}
+            initialTab="memory"
+            locale="en"
+            onClose={() => undefined}
+            onLocaleChange={() => undefined}
+            presentation="workspace"
+          />
+        </ModelAccessProvider>
+      </EditionThemeProvider>,
+    );
+
+    expect(screen.getByRole("heading", { name: "Memory settings" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Read and write access" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Personal defaults" })).toBeVisible();
+    expect(screen.queryByText(/delete/i)).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Default vehicle"), {
+      target: { value: "Survey Drone" },
+    });
+    const simulation = screen.getByText("Simulation").closest(".settings-memory-domain-consent");
+    expect(simulation).not.toBeNull();
+    fireEvent.click(within(simulation as HTMLElement).getByRole("checkbox", { name: "Read" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save personal defaults" }));
+
+    expect(JSON.parse(window.localStorage.getItem("dd.field.memory.defaults") ?? "{}"))
+      .toMatchObject({ vehicle: "Survey Drone" });
+    expect(window.localStorage.getItem("dd.field.memory.read-domains")).toBeNull();
+    expect(window.localStorage.getItem("dd.field.memory.scopes")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save read and write access" }));
+    expect(JSON.parse(window.localStorage.getItem("dd.field.memory.read-domains") ?? "[]"))
+      .not.toContain("simulation");
+    expect(window.localStorage.getItem("dd.field.memory.scopes")).toBeNull();
+  });
 });

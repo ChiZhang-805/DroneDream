@@ -24,7 +24,7 @@ import {
 
 const APPEARANCE_STORAGE_KEY = "dronedream:appearance";
 const CUSTOM_ACCENT_STORAGE_KEY = "dronedream:custom-accent";
-export type AppearancePreference = AppearanceMode | "system" | "custom";
+export type AppearancePreference = AppearanceMode;
 
 export type EditionThemeContextValue = EditionTheme & Readonly<{
   appearancePreference: AppearancePreference;
@@ -50,9 +50,7 @@ function storedAppearance(): AppearancePreference {
   let stored: string | null = null;
   try { stored = window.localStorage.getItem(APPEARANCE_STORAGE_KEY); }
   catch { /* Browser policy can deny persistence while still allowing the app. */ }
-  return stored === "light" || stored === "system" || stored === "custom"
-    ? stored
-    : "dark";
+  return stored === "light" ? "light" : "dark";
 }
 
 /** Permit a hex color token only; arbitrary CSS is never interpolated from persisted text. */
@@ -74,9 +72,6 @@ export function EditionThemeProvider({
   const [appearancePreference, setAppearanceState] =
     useState<AppearancePreference>(storedAppearance);
   const [customAccent, setCustomAccentState] = useState(storedCustomAccent);
-  const [systemAppearance, setSystemAppearance] = useState<AppearanceMode>(() =>
-    window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark"
-  );
   const reducedMotion = useSyncExternalStore(
     subscribeToAppReducedMotion,
     appReducedMotionEnabled,
@@ -95,21 +90,7 @@ export function EditionThemeProvider({
     setCustomAccentState(normalized);
   }, []);
   const resetAppearance = useCallback(() => setAppearance("dark"), [setAppearance]);
-  useLayoutEffect(() => {
-    const query = window.matchMedia?.("(prefers-color-scheme: light)");
-    if (!query) return undefined;
-    const update = () => setSystemAppearance(query.matches ? "light" : "dark");
-    update();
-    if (typeof query.addEventListener === "function") {
-      query.addEventListener("change", update);
-      return () => query.removeEventListener("change", update);
-    }
-    query.addListener?.(update);
-    return () => query.removeListener?.(update);
-  }, []);
-  const appearance: AppearanceMode = appearancePreference === "system"
-    ? systemAppearance
-    : appearancePreference === "light" ? "light" : "dark";
+  const appearance: AppearanceMode = appearancePreference;
   const theme = useMemo<EditionThemeContextValue>(() => ({
     ...editionThemeForAppearance(edition, appearance),
     appearancePreference,
@@ -123,16 +104,10 @@ export function EditionThemeProvider({
     document.documentElement.dataset.ddAppearance = appearance;
     document.documentElement.dataset.ddReducedMotion = String(reducedMotion);
     document.documentElement.style.colorScheme = appearance;
-    if (appearancePreference === "custom") {
-      document.documentElement.style.setProperty("--dd-brand-start", customAccent);
-      document.documentElement.style.setProperty("--dd-brand-middle", customAccent);
-      document.documentElement.style.setProperty("--dd-brand-end", customAccent);
-    } else {
-      document.documentElement.style.removeProperty("--dd-brand-start");
-      document.documentElement.style.removeProperty("--dd-brand-middle");
-      document.documentElement.style.removeProperty("--dd-brand-end");
-    }
-  }, [appearance, appearancePreference, customAccent, edition, reducedMotion]);
+    document.documentElement.style.removeProperty("--dd-brand-start");
+    document.documentElement.style.removeProperty("--dd-brand-middle");
+    document.documentElement.style.removeProperty("--dd-brand-end");
+  }, [appearance, edition, reducedMotion]);
   return (
     <EditionThemeContext.Provider value={theme}>
       {children}
