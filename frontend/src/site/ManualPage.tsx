@@ -173,6 +173,7 @@ export function ManualPage({ locale }: ManualPageProps) {
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const articleRef = useRef<HTMLElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
   const pendingHeadingIdRef = useRef("");
 
   useEffect(() => {
@@ -394,6 +395,29 @@ export function ManualPage({ locale }: ManualPageProps) {
     };
   }, [activeChapterIndex, activeChapterSource, state]);
 
+  useEffect(() => {
+    if (!activeId || !sidebarOpen) return;
+    const sidebar = sidebarRef.current;
+    const activeLink = sidebar?.querySelector<HTMLElement>(
+      'a[aria-current="location"]',
+    );
+    if (!sidebar || !activeLink) return;
+
+    const sidebarBounds = sidebar.getBoundingClientRect();
+    const activeBounds = activeLink.getBoundingClientRect();
+    const topInset = 12;
+    const bottomInset = 16;
+    if (
+      typeof activeLink.scrollIntoView === "function"
+      && (
+        activeBounds.top < sidebarBounds.top + topInset
+        || activeBounds.bottom > sidebarBounds.bottom - bottomInset
+      )
+    ) {
+      activeLink.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  }, [activeId, sidebarOpen]);
+
   const navigateToHeading = (heading: ManualHeading) => {
     pendingHeadingIdRef.current = heading.id;
     setActiveChapterIndex(heading.majorIndex);
@@ -423,7 +447,7 @@ export function ManualPage({ locale }: ManualPageProps) {
 
   return (
     <div className={`site-portal site-manual-page${sidebarOpen ? "" : " is-sidebar-collapsed"}`}>
-      <aside className="manual-sidebar" aria-label={copy.ariaLabel}>
+      <aside ref={sidebarRef} className="manual-sidebar" aria-label={copy.ariaLabel}>
         <header className="manual-sidebar-title">
           <strong>{copy.contents}</strong>
           <button

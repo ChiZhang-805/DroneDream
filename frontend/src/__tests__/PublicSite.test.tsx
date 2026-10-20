@@ -170,6 +170,48 @@ describe("DroneDream public website", () => {
     });
   });
 
+  it("keeps exactly one manual location active while changing chapters and sections", async () => {
+    window.history.replaceState(null, "", "/manual/");
+    Object.defineProperty(window.HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: vi.fn(),
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => [
+        "# 1. The Big Picture",
+        "Opening chapter.",
+        "## 1.1 Why DroneDream",
+        "First section.",
+        "## 1.2 Five Workspaces",
+        "Second section.",
+        "# 2. Flight Agent",
+        "Second chapter.",
+        "## 2.1 Say the Goal",
+        "Third section.",
+      ].join("\n\n"),
+    }));
+
+    const { container } = renderSite();
+    await screen.findByRole("heading", { name: "1. The Big Picture" });
+
+    const expectSingleActiveLocation = (label: string) => {
+      const activeLocations = container.querySelectorAll('[aria-current="location"]');
+      expect(activeLocations).toHaveLength(1);
+      expect(activeLocations[0]).toHaveTextContent(label);
+    };
+
+    expectSingleActiveLocation("The Big Picture");
+    fireEvent.click(screen.getByRole("link", { name: "Five Workspaces" }));
+    await screen.findByRole("heading", { name: "1.2 Five Workspaces" });
+    expectSingleActiveLocation("Five Workspaces");
+
+    fireEvent.click(screen.getByRole("link", { name: "Flight Agent" }));
+    await screen.findByRole("heading", { name: "2. Flight Agent" });
+    expectSingleActiveLocation("Flight Agent");
+    expect(screen.getByRole("navigation", { name: "Chapter navigation" })).toBeVisible();
+  });
+
   it("routes Products to the five-product family without the retired mission preview", () => {
     window.history.replaceState(null, "", "/product/");
 
