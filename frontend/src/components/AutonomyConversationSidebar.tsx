@@ -1,7 +1,8 @@
+import { Pin, PinOff, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import type { BrandEditionId } from "../brand/edition-brand.generated";
-import { AUTONOMY_CONVERSATIONS_CHANGED, autonomyConversationPath, listAutonomyConversations, preserveLegacyAutonomyConversation } from "../features/autonomy/conversationStore";
+import { AUTONOMY_CONVERSATIONS_CHANGED, autonomyConversationPath, deleteAutonomyConversation, listAutonomyConversations, preserveLegacyAutonomyConversation, setAutonomyConversationPinned } from "../features/autonomy/conversationStore";
 
 // 功能：
 //   展示独立自主任务会话入口，首条消息保存后立即更新，切换账户时隔离列表。
@@ -11,6 +12,7 @@ import { AUTONOMY_CONVERSATIONS_CHANGED, autonomyConversationPath, listAutonomyC
 //   sidebar：可重新进入历史会话的侧边栏。
 export function AutonomyConversationSidebar({ ownerId, edition, locale, onNavigate }: { ownerId: string; edition: BrandEditionId; locale: string; onNavigate?: () => void }) {
   const location = useLocation();
+  const navigate = useNavigate();
   const [, setRevision] = useState(0);
   const [error, setError] = useState(false);
   useEffect(() => {
@@ -32,6 +34,9 @@ export function AutonomyConversationSidebar({ ownerId, edition, locale, onNaviga
   let unavailable = error;
   try { conversations = listAutonomyConversations(ownerId, edition); } catch { unavailable = true; }
   const heading = locale === "zh-CN" ? "对话" : "Conversations";
+  const pin = locale === "zh-CN" ? "置顶" : "Pin";
+  const unpin = locale === "zh-CN" ? "取消置顶" : "Unpin";
+  const remove = locale === "zh-CN" ? "删除" : "Delete";
   return (
     <section className="app-workspaces app-conversations" aria-label={heading}>
       <header className="app-workspaces-header"><span>{heading}</span></header>
@@ -42,7 +47,17 @@ export function AutonomyConversationSidebar({ ownerId, edition, locale, onNaviga
             <div key={conversation.id} className={`app-workspace-row${location.pathname === path ? " active" : ""}`}>
               <NavLink to={path} title={conversation.title} onClick={onNavigate}>
                 <span className="app-workspace-label"><strong>{conversation.title}</strong></span>
+                {conversation.pinned ? <span className="app-workspace-pinned-indicator" title={unpin} aria-label={unpin}><Pin aria-hidden="true" /></span> : null}
               </NavLink>
+              <span className="app-workspace-actions">
+                <button type="button" className={conversation.pinned ? "is-active" : undefined} aria-label={`${conversation.pinned ? unpin : pin}: ${conversation.title}`} title={conversation.pinned ? unpin : pin} onClick={() => setAutonomyConversationPinned(ownerId, edition, conversation.id, !conversation.pinned)}>
+                  {conversation.pinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
+                </button>
+                <button type="button" aria-label={`${remove}: ${conversation.title}`} title={remove} onClick={() => {
+                  deleteAutonomyConversation(ownerId, edition, conversation.id);
+                  if (location.pathname === path) void navigate("/autonomy");
+                }}><Trash2 aria-hidden="true" /></button>
+              </span>
             </div>
           );
         })}

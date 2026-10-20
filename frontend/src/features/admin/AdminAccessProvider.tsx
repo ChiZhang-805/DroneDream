@@ -7,7 +7,6 @@ import {
   type ReactNode,
 } from "react";
 
-import { isDesktopRuntime } from "../../desktop/bridge";
 import { useAuth } from "../auth/AuthContext";
 import type { AdminAccessSnapshot } from "./adminConsole";
 import {
@@ -18,7 +17,6 @@ import {
 
 export function AdminAccessProvider({ children }: { children: ReactNode }) {
   const auth = useAuth();
-  const desktopRuntime = isDesktopRuntime();
   const preview = import.meta.env.DEV
     && new URLSearchParams(window.location.search).get("adminPreview") === "1";
   const [status, setStatus] = useState<AdminAccessStatus>("disabled");
@@ -29,7 +27,7 @@ export function AdminAccessProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     const generation = requestGeneration.current + 1;
     requestGeneration.current = generation;
-    if (desktopRuntime || !auth.account || (!auth.configured && !preview)) {
+    if (!auth.account || (!auth.configured && !preview)) {
       setStatus("disabled");
       setAccess(null);
       setError(null);
@@ -58,7 +56,7 @@ export function AdminAccessProvider({ children }: { children: ReactNode }) {
         setError(caught instanceof Error ? caught.message : "Administration access is unavailable.");
       }
     }
-  }, [auth.account, auth.configured, desktopRuntime, preview]);
+  }, [auth.account, auth.configured, preview]);
 
   useEffect(() => {
     void refresh();

@@ -4800,7 +4800,7 @@ function AppShellContent() {
               </Fragment>
             );
           })}
-          {!desktopRuntime && adminAccess.status === "allowed" ? (
+          {activeThemeEdition === "universal" && adminAccess.status === "allowed" ? (
             <NavLink
               to="/admin"
               onClick={() => setMobileMenuOpen(false)}

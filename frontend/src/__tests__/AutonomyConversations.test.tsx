@@ -3,7 +3,7 @@ import { Link, Outlet, RouterProvider, createMemoryRouter } from "react-router-d
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AutonomyConversationSidebar } from "../components/AutonomyConversationSidebar";
 import { acquireAutonomyPlanning } from "../features/autonomy/conversationActivity";
-import { autonomyConversationPath, listAutonomyConversations, loadAutonomyConversation, newAutonomyConversation, preserveLegacyAutonomyConversation, saveAutonomyConversation } from "../features/autonomy/conversationStore";
+import { autonomyConversationPath, deleteAutonomyConversation, listAutonomyConversations, loadAutonomyConversation, newAutonomyConversation, preserveLegacyAutonomyConversation, saveAutonomyConversation, setAutonomyConversationPinned } from "../features/autonomy/conversationStore";
 import { defaultAutonomyWorkspace, saveAutonomyWorkspace } from "../features/autonomy/workspaceStore";
 import { AutonomyOverview, AutonomyPlatform } from "../pages/AutonomyPlatform";
 
@@ -98,6 +98,21 @@ describe("autonomy conversation persistence", () => {
     expect(() => saveAutonomyConversation("local", "autonomy", conversation("one"), storage)).toThrow("quota");
   });
 
+  it("pins conversations ahead of recent items and deletes their saved state", () => {
+    const older = conversation("older", "旧会话");
+    older.mission.updatedAt = "2026-10-19T08:00:00.000Z";
+    const newer = conversation("newer", "新会话");
+    newer.mission.updatedAt = "2026-10-20T08:00:00.000Z";
+    saveAutonomyConversation("local", "autonomy", older);
+    saveAutonomyConversation("local", "autonomy", newer);
+    setAutonomyConversationPinned("local", "autonomy", "older", true);
+    expect(listAutonomyConversations("local", "autonomy").map(({ id, pinned }) => ({ id, pinned })))
+      .toEqual([{ id: "older", pinned: true }, { id: "newer", pinned: false }]);
+    deleteAutonomyConversation("local", "autonomy", "older");
+    expect(loadAutonomyConversation("local", "autonomy", "older")).toBeNull();
+    expect(listAutonomyConversations("local", "autonomy").map(({ id }) => id)).toEqual(["newer"]);
+  });
+
   it("holds one planning request across route changes and releases it idempotently", () => {
     const release = acquireAutonomyPlanning("local", "autonomy", "lease-test");
     expect(acquireAutonomyPlanning("local", "autonomy", "lease-test")).toBeNull();
@@ -110,6 +125,16 @@ describe("autonomy conversation persistence", () => {
 });
 
 describe("Chatbot to independent conversation", () => {
+  it("exposes the desktop pin and delete controls for every conversation", async () => {
+    saveAutonomyConversation("local", "autonomy", conversation("saved", "巡检屋顶"));
+    const router = renderWorkspace(autonomyConversationPath("saved"));
+    fireEvent.click(await screen.findByRole("button", { name: "Pin: 巡检屋顶" }));
+    expect(listAutonomyConversations("local", "autonomy")[0]).toMatchObject({ id: "saved", pinned: true });
+    fireEvent.click(screen.getByRole("button", { name: "Delete: 巡检屋顶" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/autonomy"));
+    await waitFor(() => expect(screen.queryByRole("link", { name: "巡检屋顶" })).not.toBeInTheDocument());
+  });
+
   it("creates and lists the first message before asset checks, even if those checks fail", async () => {
     let rejectAssets: (reason: Error) => void = () => {};
     mocks.reconcile.mockReturnValue(new Promise((_, reject) => { rejectAssets = reject; }));

@@ -19216,10 +19216,6 @@ html[data-dd-reduced-motion="true"] .assistant-voice-button.requesting svg {
   );
 }
 
-.app-conversations .app-workspace-row > a {
-  padding-right: 0.72rem;
-}
-
 .settings-update-error {
   margin: 0.25rem 0 0.75rem;
   color: var(--text-muted);
@@ -19723,6 +19719,63 @@ html[data-dd-reduced-motion="true"] .assistant-voice-button.requesting svg {
   display: flex;
   align-items: center;
   gap: 0.55rem;
+}
+
+.admin-users-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+}
+
+.admin-users-title svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #8a4ee8;
+  stroke-width: 1.9;
+}
+
+.admin-user-search {
+  position: relative;
+  display: flex;
+  height: 40px;
+  flex: 1 1 auto;
+}
+
+.admin-user-search input {
+  height: 40px;
+  padding-right: 2.7rem;
+}
+
+.admin-user-search button {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.admin-user-search button:hover,
+.admin-user-search button:focus-visible {
+  color: var(--primary-strong);
+}
+
+.admin-user-search button:focus-visible {
+  outline: none;
+  box-shadow: inset var(--focus-ring);
+}
+
+.admin-user-search button svg,
+.admin-user-export svg {
+  width: 1.05rem;
+  height: 1.05rem;
 }
 
 .admin-hero-actions > label {
@@ -20479,8 +20532,12 @@ html[data-dd-reduced-motion="true"] .assistant-voice-button.requesting svg {
 }
 
 .admin-user-export {
-  flex: 0 0 auto;
-  white-space: nowrap;
+  display: inline-grid;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  place-items: center;
+  padding: 0;
 }
 
 .admin-user-export-scope,
@@ -20706,6 +20763,180 @@ html[data-dd-reduced-motion="true"] .assistant-voice-button.requesting svg {
 
 .admin-state-card p {
   color: var(--text-muted);
+}
+
+@media (min-width: 1101px) {
+  .admin-page {
+    box-sizing: border-box;
+    height: calc(100dvh - 87px);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    gap: 0.62rem;
+    padding: 0.72rem 1rem 0.85rem;
+    overflow: hidden;
+  }
+
+  .admin-hero h1 {
+    margin-top: 0.1rem;
+    font-size: clamp(1.65rem, 2.4vw, 2.2rem);
+  }
+
+  .admin-tabs {
+    padding: 0.22rem;
+  }
+
+  .admin-tabs button {
+    min-height: 36px;
+  }
+
+  .admin-overview,
+  .admin-model-panel,
+  .admin-users-panel,
+  .admin-page > div:not(.admin-dialog-backdrop) {
+    min-height: 0;
+  }
+
+  .admin-overview {
+    display: grid;
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+  }
+
+  .admin-generated {
+    margin-bottom: 0.35rem;
+  }
+
+  .admin-kpi-grid {
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    gap: 0.42rem;
+  }
+
+  .admin-kpi-grid article {
+    min-height: 60px;
+    padding: 0.52rem 0.58rem;
+    border-radius: 11px;
+  }
+
+  .admin-kpi-grid strong {
+    font-size: 1rem;
+  }
+
+  .admin-overview-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    gap: 0.48rem;
+    min-height: 0;
+    margin-top: 0.48rem;
+  }
+
+  .admin-overview-grid > .admin-panel {
+    min-height: 0;
+    overflow: hidden;
+    padding: 0.58rem;
+  }
+
+  .admin-trend-chart,
+  .admin-throughput {
+    grid-template-rows: minmax(72px, 1fr) auto;
+    min-height: 88px;
+    margin-top: 0.35rem;
+  }
+
+  .admin-throughput-bars {
+    min-height: 72px;
+  }
+
+  .admin-funnel,
+  .admin-acquisition-list,
+  .admin-health-bars {
+    gap: 0.3rem;
+    margin-top: 0.35rem;
+  }
+
+  .admin-engagement {
+    grid-template-columns: minmax(110px, 0.9fr) minmax(120px, 1.1fr);
+    gap: 0.4rem;
+    margin-top: 0.3rem;
+  }
+
+  .admin-engagement-plot {
+    min-height: 90px;
+    margin-bottom: 0.8rem;
+  }
+
+  .admin-engagement-key li,
+  .admin-feature-list > div,
+  .admin-definition-grid > div {
+    padding: 0.3rem 0.4rem;
+  }
+
+  .admin-definition-grid,
+  .admin-health-details,
+  .admin-plan-mix,
+  .admin-token-mix,
+  .admin-time-to-value {
+    margin-top: 0.4rem;
+  }
+
+  .admin-metric-definitions {
+    box-sizing: border-box;
+    height: 74px;
+    margin-top: 0.48rem;
+    padding: 0.5rem 0.58rem;
+    overflow: hidden;
+  }
+
+  .admin-metric-definitions dl {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.3rem 0.65rem;
+    margin-top: 0.35rem;
+  }
+
+  .admin-metric-definitions dd {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    font-size: 0.67rem;
+  }
+
+  .admin-model-panel,
+  .admin-users-panel,
+  .admin-page > div:has(.admin-community-grid) {
+    align-self: stretch;
+    overflow: hidden;
+  }
+
+  .admin-section-summary {
+    margin-top: 0.55rem;
+  }
+
+  .admin-section-summary article {
+    min-height: 58px;
+    padding: 0.48rem 0.58rem;
+  }
+
+  .admin-model-list {
+    margin-top: 0.55rem;
+  }
+
+  .admin-panel th,
+  .admin-panel td {
+    padding: 0.42rem 0.45rem;
+  }
+
+  .admin-pager {
+    margin-top: 0.45rem;
+  }
+
+  .admin-community-grid {
+    height: calc(100% - 72px);
+    gap: 0.55rem;
+    margin-top: 0.55rem;
+  }
+
+  .admin-community-grid > .admin-panel {
+    min-height: 0;
+    overflow: hidden;
+  }
 }
 
 @media (max-width: 1100px) {

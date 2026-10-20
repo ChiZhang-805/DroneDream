@@ -181,11 +181,11 @@ describe("administration console", () => {
     expect(deleteButton).toBeEnabled();
     fireEvent.click(deleteButton);
     await waitFor(() => expect(screen.queryByText("Avery Lin")).not.toBeInTheDocument());
-    expect(screen.getByText(/Passwords and password hashes are never returned/))
-      .toBeVisible();
+    expect(screen.queryByText(/Passwords and password hashes are never returned/))
+      .not.toBeInTheDocument();
     expect(document.querySelector('input[type="password"]')).toBeNull();
-    expect(screen.getByText(/Passwords, API keys, auth tokens, and raw conversations are excluded/))
-      .toBeVisible();
+    expect(screen.queryByText(/Passwords, API keys, auth tokens, and raw conversations are excluded/))
+      .not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Export user data" }));
     await waitFor(() => expect(createObjectUrl).toHaveBeenCalledTimes(1));
     expect(createObjectUrl.mock.calls[0]?.[0]).toBeInstanceOf(Blob);

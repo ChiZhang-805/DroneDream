@@ -4,10 +4,20 @@ import {
   type AdminIdentity,
   buildDashboardSnapshot,
   buildUsersCsv,
+  hasAdminSubscription,
   handleAdminConsoleRequest,
   protectCsvFormula,
   type SafeAdminUser,
 } from "./index.ts";
+
+Deno.test("admin subscription requires active Business Pro and Universal", () => {
+  const eligible = { billing_scope: "business", plan_id: "pro", status: "active" };
+  const universal = { edition: "universal", status: "active" };
+  assert(hasAdminSubscription(eligible, universal), "Business Pro Universal should be eligible");
+  assert(!hasAdminSubscription({ ...eligible, billing_scope: "individual" }, universal), "Individual Pro must be denied");
+  assert(!hasAdminSubscription({ ...eligible, plan_id: "plus" }, universal), "Business Plus must be denied");
+  assert(!hasAdminSubscription(eligible, { ...universal, status: "expired" }), "Inactive Universal must be denied");
+});
 
 function assert(value: unknown, message: string): asserts value {
   if (!value) throw new Error(message);

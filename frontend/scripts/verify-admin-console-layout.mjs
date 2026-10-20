@@ -91,6 +91,8 @@ async function geometry(page) {
       })),
       documentWidth: document.documentElement.clientWidth,
       documentScrollWidth: document.documentElement.scrollWidth,
+      documentHeight: document.documentElement.clientHeight,
+      documentScrollHeight: document.documentElement.scrollHeight,
       passwordInputs: document.querySelectorAll('input[type="password"]').length,
       subtitle: subtitle instanceof HTMLElement ? (() => {
         const computed = window.getComputedStyle(subtitle);
@@ -153,8 +155,11 @@ try {
       assert(overviewGeometry.root.left >= 0);
       assert(overviewGeometry.root.right <= overviewGeometry.documentWidth + 1);
       if (testCase.id === "desktop-zh") {
-        assert(overviewGeometry.subtitle);
-        assert(overviewGeometry.subtitle.lineCount <= 1.15);
+        assert.equal(overviewGeometry.subtitle, null);
+      }
+      if (testCase.id.startsWith("desktop")) {
+        assert(overviewGeometry.root.bottom <= overviewGeometry.documentHeight + 1, JSON.stringify(overviewGeometry));
+        assert(overviewGeometry.panels.every((panel) => panel.bottom <= overviewGeometry.root.bottom + 1), JSON.stringify(overviewGeometry));
       }
       entry.overview = {
         ...overviewGeometry,
@@ -197,6 +202,7 @@ try {
       const userGeometry = await geometry(page);
       assert.equal(userGeometry.passwordInputs, 0);
       assert.equal(userGeometry.documentScrollWidth, userGeometry.documentWidth);
+      if (testCase.id.startsWith("desktop")) assert(userGeometry.root.bottom <= userGeometry.documentHeight + 1);
       const userTable = page.locator(".admin-users-table");
       await userTable.scrollIntoViewIfNeeded();
       entry.users = {

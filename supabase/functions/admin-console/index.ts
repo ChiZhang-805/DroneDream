@@ -113,6 +113,17 @@ export interface ModelPatch {
   version: number;
 }
 
+export function hasAdminSubscription(
+  entitlement: JsonRecord | null,
+  universalLicense: JsonRecord | null,
+): boolean {
+  return entitlement?.billing_scope === "business" &&
+    entitlement?.plan_id === "pro" &&
+    entitlement?.status === "active" &&
+    universalLicense?.edition === "universal" &&
+    universalLicense?.status === "active";
+}
+
 export class AdminConsoleError extends Error {
   readonly code: string;
   readonly status: number;
@@ -1044,6 +1055,27 @@ function actualDependencies(): AdminConsoleDependencies {
         !row || row.active !== true ||
         !["owner", "admin"].includes(String(row.role))
       ) return null;
+      const [entitlementResult, licenseResult] = await Promise.all([
+        client.from("account_entitlements")
+          .select("plan_id,status,billing_scope")
+          .eq("user_id", data.user.id)
+          .maybeSingle(),
+        client.from("user_software_licenses")
+          .select("edition,status")
+          .eq("user_id", data.user.id)
+          .eq("edition", "universal")
+          .eq("status", "active")
+          .maybeSingle(),
+      ]);
+      if (entitlementResult.error || licenseResult.error) {
+        throw new AdminConsoleError(
+          "ADMIN_ENTITLEMENT_FAILED",
+          "Administrator subscription access could not be verified.",
+          503,
+        );
+      }
+      const entitlement = entitlementResult.data;
+      if (!hasAdminSubscription(entitlement, licenseResult.data)) return null;
       const permissions = Array.isArray(row.permissions)
         ? row.permissions.filter((value): value is Permission =>
           ALL_PERMISSIONS.includes(value as Permission)

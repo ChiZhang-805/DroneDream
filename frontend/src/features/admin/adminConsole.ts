@@ -179,6 +179,8 @@ export interface AdminUserExport {
   row_count: number | null;
 }
 
+export const ADMIN_TABLE_PAGE_SIZE = 8;
+
 export class AdminConsoleError extends Error {
   readonly code: string;
   readonly status: number;
@@ -517,9 +519,9 @@ export async function listAdminUsers(
     const items = query
       ? PREVIEW_USERS.filter((user) => user.email.toLowerCase().includes(query))
       : PREVIEW_USERS;
-    return { items, page, page_size: 25, total: items.length };
+    return { items, page, page_size: ADMIN_TABLE_PAGE_SIZE, total: items.length };
   }
-  const params = new URLSearchParams({ page: String(page), page_size: "25" });
+  const params = new URLSearchParams({ page: String(page), page_size: String(ADMIN_TABLE_PAGE_SIZE) });
   if (search.trim()) params.set("search", search.trim());
   return adminRequest<AdminPageResult<AdminUserRow>>(`/users?${params}`);
 }
@@ -620,9 +622,9 @@ export async function exportAdminUsers(search: string): Promise<AdminUserExport>
 
 export async function listAdminTopics(page: number): Promise<AdminPageResult<AdminTopicRow>> {
   if (adminPreviewEnabled()) {
-    return { items: PREVIEW_TOPICS, page, page_size: 25, total: PREVIEW_TOPICS.length };
+    return { items: PREVIEW_TOPICS, page, page_size: ADMIN_TABLE_PAGE_SIZE, total: PREVIEW_TOPICS.length };
   }
-  return adminRequest<AdminPageResult<AdminTopicRow>>(`/community/topics?page=${page}&page_size=25`);
+  return adminRequest<AdminPageResult<AdminTopicRow>>(`/community/topics?page=${page}&page_size=${ADMIN_TABLE_PAGE_SIZE}`);
 }
 
 export async function removeAdminTopic(topicId: string, reason: string): Promise<void> {
@@ -635,7 +637,7 @@ export async function removeAdminTopic(topicId: string, reason: string): Promise
 
 export async function listAdminAudit(page: number): Promise<AdminPageResult<AdminAuditRow>> {
   if (adminPreviewEnabled()) {
-    return { items: PREVIEW_AUDIT, page, page_size: 25, total: PREVIEW_AUDIT.length };
+    return { items: PREVIEW_AUDIT, page, page_size: ADMIN_TABLE_PAGE_SIZE, total: PREVIEW_AUDIT.length };
   }
-  return adminRequest<AdminPageResult<AdminAuditRow>>(`/audit?page=${page}&page_size=25`);
+  return adminRequest<AdminPageResult<AdminAuditRow>>(`/audit?page=${page}&page_size=${ADMIN_TABLE_PAGE_SIZE}`);
 }

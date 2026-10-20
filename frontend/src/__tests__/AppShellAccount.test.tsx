@@ -8,7 +8,9 @@ import { I18nProvider } from "../i18n/I18nProvider";
 vi.mock("../features/auth/supabaseClient", () => ({
   appleAuthEnabled: false,
   cloudAuthConfigured: false,
+  githubAuthEnabled: false,
   googleAuthEnabled: false,
+  slackAuthEnabled: false,
   supabaseClient: null,
 }));
 

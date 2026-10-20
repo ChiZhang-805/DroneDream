@@ -7,9 +7,11 @@ import {
   type CSSProperties,
   type FormEvent,
 } from "react";
+import { Download, Search, UsersRound } from "lucide-react";
 
 import { useAdminAccess } from "../features/admin/AdminAccessContext";
 import {
+  ADMIN_TABLE_PAGE_SIZE,
   AdminConsoleError,
   deleteAdminUser,
   exportAdminUsers,
@@ -30,6 +32,7 @@ import {
 import { EditionLicenseStrip } from "../components/EditionLicenseStrip";
 import { useModalFocus } from "../hooks/useModalFocus";
 import { localeSafeError, useI18n } from "../i18n/I18nProvider";
+import { useEditionTheme } from "../theme/EditionThemeProvider";
 
 type AdminTab = "overview" | "models" | "users" | "community";
 
@@ -512,10 +515,11 @@ function retentionHeat(value: number | null): CSSProperties {
 
 export function AdminPage() {
   const { locale } = useI18n();
+  const edition = useEditionTheme();
   const copy = COPY[locale];
   const access = useAdminAccess();
   const [tab, setTab] = useState<AdminTab>("overview");
-  const [range, setRange] = useState<AdminRange>("30d");
+  const range: AdminRange = "30d";
   const [dashboard, setDashboard] = useState<AdminDashboardSnapshot | null>(null);
   const [models, setModels] = useState<AdminManagedModel[]>([]);
   const [users, setUsers] = useState<AdminUserRow[]>([]);
@@ -726,7 +730,7 @@ export function AdminPage() {
     [locale],
   );
 
-  if (["disabled", "denied"].includes(access.status)) {
+  if (edition.id !== "universal" || ["disabled", "denied"].includes(access.status)) {
     return (
       <main className="admin-state-page">
         <section className="admin-state-card" role="alert">
@@ -874,20 +878,6 @@ export function AdminPage() {
         <div>
           <span>{copy.eyebrow}</span>
           <h1>{copy.title}</h1>
-          <p>{copy.subtitle}</p>
-        </div>
-        <div className="admin-hero-actions">
-          <label>
-            <span className="sr-only">{copy.range}</span>
-            <select value={range} onChange={(event) => setRange(event.target.value as AdminRange)}>
-              <option value="7d">{copy.ranges["7d"]}</option>
-              <option value="30d">{copy.ranges["30d"]}</option>
-              <option value="90d">{copy.ranges["90d"]}</option>
-            </select>
-          </label>
-          <button type="button" className="btn" disabled={loading} onClick={() => void loadAll()}>
-            {copy.refresh}
-          </button>
         </div>
       </header>
       <nav className="admin-tabs" aria-label={copy.title}>
@@ -1002,15 +992,14 @@ export function AdminPage() {
 
       {tab === "users" ? (
         <section className="admin-panel admin-users-panel">
-          <header><div><h2>{copy.users}</h2><p>{copy.userPrivacy}</p></div><div className="admin-users-toolbar"><form onSubmit={submitSearch}><label><span className="sr-only">{copy.searchEmail}</span><input type="search" value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder={copy.searchEmail} /></label><button type="submit" className="btn">{copy.search}</button></form>{canExportUsers ? <button type="button" className="btn admin-user-export" disabled={exportingUsers} onClick={() => void startUserExport()}>{exportingUsers ? copy.exportingUsers : copy.exportUsers}</button> : null}</div></header>
-          {canExportUsers ? <p className="admin-user-export-scope">{copy.exportScope}</p> : null}
+          <header><h2 className="admin-users-title"><UsersRound aria-hidden="true" /><span>{copy.users}</span></h2><div className="admin-users-toolbar"><form onSubmit={submitSearch}><label className="admin-user-search"><span className="sr-only">{copy.searchEmail}</span><input type="search" value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder={copy.searchEmail} /><button type="submit" aria-label={copy.search} title={copy.search}><Search aria-hidden="true" /></button></label></form>{canExportUsers ? <button type="button" className="btn admin-user-export" aria-label={copy.exportUsers} title={copy.exportUsers} disabled={exportingUsers} onClick={() => void startUserExport()}><Download aria-hidden="true" /><span className="sr-only">{exportingUsers ? copy.exportingUsers : copy.exportUsers}</span></button> : null}</div></header>
           {userExportMessage ? <p className="admin-user-export-status" role="status">{userExportMessage}</p> : null}
           {dashboard ? <div className="admin-section-summary admin-user-summary" aria-label={copy.userPortfolio}><article><span>Free</span><strong>{number.format(dashboard.monetization.free_users)}</strong></article><article><span>Plus</span><strong>{number.format(dashboard.monetization.plus_users)}</strong></article><article><span>Pro</span><strong>{number.format(dashboard.monetization.pro_users)}</strong></article><article><span>{copy.credits}</span><strong>{number.format(dashboard.monetization.consumed_ai_credits)}</strong></article></div> : null}
           <div className="admin-users-table"><table aria-label={copy.users}><thead><tr><th>{copy.name}</th><th>{copy.plan}</th><th>{copy.applications}</th><th>{copy.lastSignIn}</th><th /></tr></thead><tbody>
             {users.map((user) => <tr key={user.id}><td><strong>{user.display_name}</strong><small title={user.email}>{user.email}</small></td><td><strong>{user.billing_scope === "business" ? copy.business : copy.individual} {user.plan.toUpperCase()}</strong><small>{user.subscription_status}</small></td><td><EditionLicenseStrip licenses={user.licensed_editions} locale={locale === "zh-CN" ? "zh-CN" : "en"} /></td><td>{user.last_sign_in_at ? date.format(new Date(user.last_sign_in_at)) : "—"}</td><td><button type="button" className="btn admin-user-details-button" onClick={() => { captureUserDetailsTrigger(); setSelectedUser(user); }}>{copy.viewDetails}</button></td></tr>)}
             {users.length === 0 ? <tr><td colSpan={5}>{copy.noUsers}</td></tr> : null}
           </tbody></table></div>
-          <div className="admin-pager"><button type="button" className="btn" disabled={loading || userPage <= 1} onClick={() => setUserPage((current) => Math.max(1, current - 1))}>{copy.previous}</button><span>{copy.page} {userPage} {copy.of} {Math.max(1, Math.ceil(usersTotal / 25))}{locale === "zh-CN" ? " 页" : ""}</span><button type="button" className="btn" disabled={loading || userPage >= Math.max(1, Math.ceil(usersTotal / 25))} onClick={() => setUserPage((current) => current + 1)}>{copy.next}</button></div>
+          <div className="admin-pager"><button type="button" className="btn" disabled={loading || userPage <= 1} onClick={() => setUserPage((current) => Math.max(1, current - 1))}>{copy.previous}</button><span>{copy.page} {userPage} {copy.of} {Math.max(1, Math.ceil(usersTotal / ADMIN_TABLE_PAGE_SIZE))}{locale === "zh-CN" ? " 页" : ""}</span><button type="button" className="btn" disabled={loading || userPage >= Math.max(1, Math.ceil(usersTotal / ADMIN_TABLE_PAGE_SIZE))} onClick={() => setUserPage((current) => current + 1)}>{copy.next}</button></div>
         </section>
       ) : null}
 
@@ -1023,7 +1012,7 @@ export function AdminPage() {
             <div className="admin-table-scroll"><table><thead><tr><th>{copy.topic}</th><th>{copy.author}</th><th>{copy.comments}</th><th>{copy.reports}</th><th>{copy.status}</th><th /></tr></thead><tbody>
               {topics.map((topic) => <tr key={topic.id}><td><strong>{topic.title}</strong><small>{date.format(new Date(topic.created_at))}</small></td><td>{topic.author_email}</td><td>{topic.comment_count}</td><td>{topic.report_count}</td><td>{topic.status === "removed" ? copy.removed : copy.active}</td><td>{canModerateCommunity ? <button type="button" className="btn btn-danger" disabled={topic.status === "removed"} onClick={(event) => { moderationTriggerRef.current = event.currentTarget; setModeratingTopic(topic); }}>{copy.remove}</button> : null}</td></tr>)}
             </tbody></table></div>
-            <div className="admin-pager"><button type="button" className="btn" disabled={loading || topicPage <= 1} onClick={() => setTopicPage((current) => Math.max(1, current - 1))}>{copy.previous}</button><span>{copy.page} {topicPage} {copy.of} {Math.max(1, Math.ceil(topicsTotal / 25))}{locale === "zh-CN" ? " 页" : ""}</span><button type="button" className="btn" disabled={loading || topicPage >= Math.max(1, Math.ceil(topicsTotal / 25))} onClick={() => setTopicPage((current) => current + 1)}>{copy.next}</button></div>
+            <div className="admin-pager"><button type="button" className="btn" disabled={loading || topicPage <= 1} onClick={() => setTopicPage((current) => Math.max(1, current - 1))}>{copy.previous}</button><span>{copy.page} {topicPage} {copy.of} {Math.max(1, Math.ceil(topicsTotal / ADMIN_TABLE_PAGE_SIZE))}{locale === "zh-CN" ? " 页" : ""}</span><button type="button" className="btn" disabled={loading || topicPage >= Math.max(1, Math.ceil(topicsTotal / ADMIN_TABLE_PAGE_SIZE))} onClick={() => setTopicPage((current) => current + 1)}>{copy.next}</button></div>
           </section> : null}
           {canReadAudit ? <section className="admin-panel">
             <h2>{copy.audit}</h2>

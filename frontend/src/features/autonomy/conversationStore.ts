@@ -2,6 +2,7 @@ import type { BrandEditionId } from "../../brand/edition-brand.generated";
 import { defaultAutonomyWorkspace, loadAutonomyWorkspace, normalizeAutonomyWorkspace, type AutonomyWorkspaceState } from "./workspaceStore";
 
 const PREFIX = "dronedream:autonomy-conversation:v1";
+const META_PREFIX = "dronedream:autonomy-conversation-meta:v1";
 export const AUTONOMY_CONVERSATIONS_CHANGED = "dronedream:autonomy-conversations-changed";
 type ConversationStorage = Pick<Storage, "getItem" | "setItem" | "key" | "length">;
 
@@ -13,6 +14,14 @@ type ConversationStorage = Pick<Storage, "getItem" | "setItem" | "key" | "length
 //   storageKey：会话键或该账户的会话键前缀。
 function conversationKey(ownerId: string, edition: BrandEditionId, id = ""): string {
   return `${PREFIX}:${encodeURIComponent(ownerId || "local")}:${edition}:${encodeURIComponent(id)}`;
+}
+
+function conversationMetaKey(ownerId: string, edition: BrandEditionId, id: string): string {
+  return `${META_PREFIX}:${encodeURIComponent(ownerId || "local")}:${edition}:${encodeURIComponent(id)}`;
+}
+
+function notifyConversationChange(ownerId: string, edition: BrandEditionId, id: string): void {
+  window.dispatchEvent(new CustomEvent(AUTONOMY_CONVERSATIONS_CHANGED, { detail: { ownerId, edition, id } }));
 }
 
 // 功能：
@@ -47,7 +56,7 @@ export function saveAutonomyConversation(ownerId: string, edition: BrandEditionI
   if (!id || (!saved.mission.messages.length && !saved.mission.compiledPlan)) throw new Error("AUTONOMY_CONVERSATION_EMPTY");
   // 每份会话单独写入，异步返回只更新其自身，不覆盖另一个会话的记录。
   storage.setItem(conversationKey(ownerId, edition, id), JSON.stringify(saved));
-  window.dispatchEvent(new CustomEvent(AUTONOMY_CONVERSATIONS_CHANGED, { detail: { ownerId, edition, id } }));
+  notifyConversationChange(ownerId, edition, id);
   return saved;
 }
 
@@ -59,6 +68,8 @@ export function saveAutonomyConversation(ownerId: string, edition: BrandEditionI
 //   workspace：会话快照，缺失或无效时为 null。
 export function loadAutonomyConversation(ownerId: string, edition: BrandEditionId, id: string, storage: ConversationStorage = window.localStorage): AutonomyWorkspaceState | null {
   try {
+    const metadata = JSON.parse(storage.getItem(conversationMetaKey(ownerId, edition, id)) ?? "null") as { deleted?: unknown } | null;
+    if (metadata?.deleted === true) return null;
     const raw = storage.getItem(conversationKey(ownerId, edition, id));
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
@@ -92,7 +103,7 @@ export function preserveLegacyAutonomyConversation(ownerId: string, edition: Bra
 // 输出：
 //   conversations：包含标识、标题和更新时间的会话摘要列表。
 export function listAutonomyConversations(ownerId: string, edition: BrandEditionId, storage: ConversationStorage = window.localStorage) {
-  const conversations: Array<{ id: string; title: string; updatedAt: string }> = [];
+  const conversations: Array<{ id: string; title: string; updatedAt: string; pinned: boolean }> = [];
   const prefix = conversationKey(ownerId, edition);
   for (let index = 0; index < storage.length; index += 1) {
     const key = storage.key(index);
@@ -102,9 +113,26 @@ export function listAutonomyConversations(ownerId: string, edition: BrandEdition
     const workspace = loadAutonomyConversation(ownerId, edition, id, storage);
     if (!workspace) continue;
     const firstMessage = workspace.mission.messages.find((message) => message.role === "user");
-    conversations.push({ id, title: (firstMessage?.content || workspace.mission.intent).replace(/\s+/gu, " ").trim().slice(0, 80), updatedAt: workspace.mission.updatedAt });
+    const pinned = (() => {
+      try {
+        const metadata = JSON.parse(storage.getItem(conversationMetaKey(ownerId, edition, id)) ?? "null") as { pinned?: unknown } | null;
+        return metadata?.pinned === true;
+      } catch { return false; }
+    })();
+    conversations.push({ id, title: (firstMessage?.content || workspace.mission.intent).replace(/\s+/gu, " ").trim().slice(0, 80), updatedAt: workspace.mission.updatedAt, pinned });
   }
-  return conversations.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id));
+  return conversations.sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id));
+}
+
+export function setAutonomyConversationPinned(ownerId: string, edition: BrandEditionId, id: string, pinned: boolean, storage: Pick<Storage, "setItem"> = window.localStorage): void {
+  storage.setItem(conversationMetaKey(ownerId, edition, id), JSON.stringify({ pinned }));
+  notifyConversationChange(ownerId, edition, id);
+}
+
+export function deleteAutonomyConversation(ownerId: string, edition: BrandEditionId, id: string, storage: Pick<Storage, "removeItem" | "setItem"> = window.localStorage): void {
+  storage.removeItem(conversationKey(ownerId, edition, id));
+  storage.setItem(conversationMetaKey(ownerId, edition, id), JSON.stringify({ deleted: true, pinned: false }));
+  notifyConversationChange(ownerId, edition, id);
 }
 
 // 功能：
