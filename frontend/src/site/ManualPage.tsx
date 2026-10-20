@@ -377,14 +377,18 @@ export function ManualPage({ locale }: ManualPageProps) {
     let frame = 0;
     let releaseTimer = 0;
     let contentObserver: MutationObserver | null = null;
+    let resizeObserver: ResizeObserver | null = null;
+    const finishPendingScroll = () => {
+      pendingHeadingIdRef.current = "";
+      contentObserver?.disconnect();
+      resizeObserver?.disconnect();
+    };
     const scrollToPendingHeading = () => {
       const target = document.getElementById(pendingHeadingIdRef.current);
       if (!target) return;
-      contentObserver?.disconnect();
       target.scrollIntoView({ behavior: "auto", block: "start" });
-      releaseTimer = window.setTimeout(() => {
-        pendingHeadingIdRef.current = "";
-      }, 650);
+      window.clearTimeout(releaseTimer);
+      releaseTimer = window.setTimeout(finishPendingScroll, 700);
     };
     const scheduleScroll = () => {
       window.cancelAnimationFrame(frame);
@@ -392,9 +396,14 @@ export function ManualPage({ locale }: ManualPageProps) {
     };
     contentObserver = new MutationObserver(scheduleScroll);
     contentObserver.observe(root, { childList: true, subtree: true });
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(scheduleScroll);
+      resizeObserver.observe(root);
+    }
     scheduleScroll();
     return () => {
       contentObserver?.disconnect();
+      resizeObserver?.disconnect();
       window.cancelAnimationFrame(frame);
       window.clearTimeout(releaseTimer);
     };
