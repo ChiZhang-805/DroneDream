@@ -26,7 +26,8 @@
     "longDescription": "DroneDream · SIM provides simulation-only autonomous tuning across PX4 SITL and Gazebo. Hardware, HITL and physical-aircraft authority are not included.",
     "externalBin": [
       "binaries/dronedream-autonomy-core",
-      "binaries/dronedream-plugin-isolator"
+      "binaries/dronedream-plugin-isolator",
+      "binaries/dronedream-live"
     ],
     "icon": [
       "gen/brand/sim/windows/32x32.png",

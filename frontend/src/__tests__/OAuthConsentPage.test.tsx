@@ -86,7 +86,7 @@ describe("desktop OAuth consent page", () => {
       error: null,
     });
 
-    render(
+    const page = render(
       <StrictMode>
         <OAuthConsentPage
           locale="en"
@@ -101,9 +101,9 @@ describe("desktop OAuth consent page", () => {
       </StrictMode>,
     );
 
-    expect(await screen.findByText("AGENT")).toBeVisible();
-    expect(screen.getByText("DroneDream AGENT")).toBeVisible();
-    expect(screen.getByText(account.email)).toBeVisible();
+    expect(page.container.querySelector(".site-oauth-auth-stage")).toBeInTheDocument();
+    expect(screen.queryByText("Continue to DroneDream")).not.toBeInTheDocument();
+    expect(screen.queryByText("SECURE DESKTOP SIGN-IN")).not.toBeInTheDocument();
     expect(oauthMock.getAuthorizationDetails).toHaveBeenCalledWith("authorization-1");
     await waitFor(() => {
       expect(oauthMock.approveAuthorization).toHaveBeenCalledTimes(1);
@@ -386,10 +386,10 @@ describe("desktop OAuth consent page", () => {
     expect(oauthMock.approveAuthorization).not.toHaveBeenCalled();
   });
 
-  it("keeps distinct sign-in and account registration actions on the browser page", async () => {
+  it("does not render a second consent page while the account dialog owns sign-in", () => {
     const onRequireSignIn = vi.fn();
     const onRequireRegistration = vi.fn();
-    render(
+    const page = render(
       <OAuthConsentPage
         locale="en"
         account={null}
@@ -401,7 +401,8 @@ describe("desktop OAuth consent page", () => {
       />,
     );
 
-    expect(screen.getByText(/verify your email and password/i)).toBeVisible();
+    expect(page.container.querySelector(".site-oauth-auth-stage")).toBeInTheDocument();
+    expect(screen.queryByText("Continue to DroneDream")).not.toBeInTheDocument();
     expect(onRequireSignIn).not.toHaveBeenCalled();
     expect(onRequireRegistration).not.toHaveBeenCalled();
     expect(oauthMock.getAuthorizationDetails).not.toHaveBeenCalled();

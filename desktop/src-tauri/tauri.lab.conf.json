@@ -26,7 +26,8 @@
     "longDescription": "DroneDream · LAB joins simulation and recorded real-device evidence for bounded calibration and qualification. Hardware actions remain denied until every native, backend, Runtime and Vehicle Pack gate authorizes them.",
     "externalBin": [
       "binaries/dronedream-autonomy-core",
-      "binaries/dronedream-plugin-isolator"
+      "binaries/dronedream-plugin-isolator",
+      "binaries/dronedream-live"
     ],
     "icon": [
       "gen/brand/lab/windows/32x32.png",
