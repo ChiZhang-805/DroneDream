@@ -1,5 +1,4 @@
-import { Download, Sparkles } from "lucide-react";
-import { useRef } from "react";
+import { Download, TerminalSquare } from "lucide-react";
 
 import { DroneLaunchScene } from "../components/DroneLaunchScene";
 import type { WebsiteRelease } from "./release";
@@ -18,14 +17,12 @@ interface ClassicHomeProps {
 }
 
 export function ClassicHome({ release }: ClassicHomeProps) {
-  const droneFlightRef = useRef<(() => void) | null>(null);
-
   return (
     <section className="site-hero site-classic-home" aria-labelledby="classic-home-title">
       <div className="site-hero-scene" aria-hidden="true">
         <DroneLaunchScene
           active
-          starflightControllerRef={droneFlightRef}
+          starflightEnabled={false}
           themeOverride={WEBSITE_DRONE_THEME}
           visualOffsetX={1.58}
         />
@@ -43,10 +40,10 @@ export function ClassicHome({ release }: ClassicHomeProps) {
               <Download aria-hidden="true" />
               Download Universal
             </a>
-            <button className="site-button site-button-ghost" type="button" onClick={() => droneFlightRef.current?.()}>
-              <Sparkles aria-hidden="true" />
-              Launch starflight
-            </button>
+            <a className="site-button site-button-ghost" href="/cli/">
+              <TerminalSquare aria-hidden="true" />
+              CLI Manual
+            </a>
           </div>
         </div>
       </div>

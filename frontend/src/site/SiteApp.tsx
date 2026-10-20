@@ -490,14 +490,6 @@ const content = {
   },
 } as const;
 
-function DownloadChevronIcon() {
-  return (
-    <svg className="site-header-download-chevron" viewBox="0 0 16 16" aria-hidden="true">
-      <path d="m3.5 6 4.5 4 4.5-4" />
-    </svg>
-  );
-}
-
 function ArrowRightIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1172,7 +1164,6 @@ export function SiteApp() {
     ["Manual", "/manual/"],
     ["Community", "/community/"],
     ...(sitePage === "cli" ? [["CLI", "/cli/"] as const] : []),
-    ...(sitePage === "classic" ? [["Classic", "/classic/"] as const] : []),
   ] as const;
   const currentNavigationTarget = sitePage === "home"
     ? "/"
@@ -1187,7 +1178,7 @@ export function SiteApp() {
             : sitePage === "cli"
               ? "/cli/"
               : sitePage === "classic"
-                ? "/classic/"
+                ? "/"
             : null;
   const accountName = auth.account?.displayName.trim() || copy.account;
 
@@ -1240,7 +1231,6 @@ export function SiteApp() {
                 avatarUrl={auth.account?.avatarUrl ?? null}
               />
               <span>{auth.account ? accountName : copy.signIn}</span>
-              {auth.account ? <DownloadChevronIcon /> : null}
             </button>
             {auth.account && accountMenuOpen ? (
               <div

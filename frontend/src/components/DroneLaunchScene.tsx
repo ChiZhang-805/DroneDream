@@ -28,6 +28,7 @@ import {
 type DroneLaunchSceneProps = {
   active?: boolean;
   progress?: number | null;
+  starflightEnabled?: boolean;
   starflightControllerRef?: MutableRefObject<(() => void) | null>;
   telemetryActiveLabel?: string;
   telemetryStandbyLabel?: string;
@@ -1088,6 +1089,7 @@ function buildNightCity(
 export function DroneLaunchSceneCore({
   active = false,
   progress = null,
+  starflightEnabled = true,
   starflightControllerRef,
   labels,
   themeOverride,
@@ -1140,7 +1142,7 @@ export function DroneLaunchSceneCore({
     renderer.toneMappingExposure = 1.22;
     renderer.domElement.className = "drone-launch-canvas";
     renderer.domElement.setAttribute("aria-hidden", "true");
-    renderer.domElement.style.cursor = reducedMotion ? "default" : "crosshair";
+    renderer.domElement.style.cursor = reducedMotion || !starflightEnabled ? "default" : "crosshair";
     host.appendChild(renderer.domElement);
     host.dataset.renderDpr = qualityController.currentDpr.toFixed(2);
     host.dataset.renderFps = reducedMotion ? "0" : String(DRONE_IDLE_FPS);
@@ -1351,13 +1353,13 @@ export function DroneLaunchSceneCore({
     };
 
     const setDroneCursorHit = (hit: boolean) => {
-      if (cursorHitsDrone === hit || starflightStartedAt !== null) return;
+      if (!starflightEnabled || cursorHitsDrone === hit || starflightStartedAt !== null) return;
       cursorHitsDrone = hit;
       renderer.domElement.style.cursor = hit ? "pointer" : "crosshair";
     };
 
     const beginStarflight = () => {
-      if (starflightStartedAt !== null || reducedMotion) return;
+      if (!starflightEnabled || starflightStartedAt !== null || reducedMotion) return;
       starflightStartedAt = sceneElapsedSeconds;
       interactionUntil = Number.POSITIVE_INFINITY;
       renderer.domElement.style.cursor = "progress";
@@ -1372,7 +1374,7 @@ export function DroneLaunchSceneCore({
       interactionUntil = performance.now() + DRONE_INTERACTION_TAIL_MS;
     };
     const onPointerUp = (event: PointerEvent) => {
-      if (event.button !== 0 || starflightStartedAt !== null) return;
+      if (!starflightEnabled || event.button !== 0 || starflightStartedAt !== null) return;
       interactionUntil = performance.now() + DRONE_INTERACTION_TAIL_MS;
       const rect = host.getBoundingClientRect();
       if (!isDroneHit(event.clientX, event.clientY, rect)) return;
@@ -1680,7 +1682,7 @@ export function DroneLaunchSceneCore({
       renderer.forceContextLoss();
       renderer.domElement.remove();
     };
-  }, [editionTheme.id, lightAppearance, reducedMotion, sceneTheme, starflightControllerRef, visualOffsetX]);
+  }, [editionTheme.id, lightAppearance, reducedMotion, sceneTheme, starflightControllerRef, starflightEnabled, visualOffsetX]);
 
   const taglineLines = launchTaglineLines(labels);
 

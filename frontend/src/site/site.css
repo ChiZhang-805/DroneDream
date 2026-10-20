@@ -5457,3 +5457,49 @@ body:has(.dd-site[data-page="classic"]) {
   .dd-site[data-page="cli"] .site-cli-command { grid-template-columns: 1fr; gap: 0.3rem; }
   .dd-site[data-page="cli"] .site-cli-command > span { white-space: normal; }
 }
+
+/* Classic keeps the original Three.js scene with the current site chrome. */
+.dd-site[data-page="classic"] .site-classic-home .site-hero-layout {
+  width: auto;
+  max-width: none;
+  margin: 0;
+  padding-inline: clamp(14px, 1.6vw, 30px);
+}
+
+.dd-site[data-page="classic"] .site-classic-home .site-hero-copy {
+  width: min(1080px, 62vw);
+  margin-top: clamp(2.8rem, 8vh, 6.2rem);
+}
+
+.dd-site[data-page="classic"] .site-classic-home .site-eyebrow {
+  margin-bottom: 1.55rem;
+  font-size: clamp(0.98rem, 1.08vw, 1.18rem);
+}
+
+.dd-site[data-page="classic"] .site-classic-home h1 {
+  max-width: 1080px;
+  font-size: clamp(4.25rem, 5.9vw, 7.35rem);
+  line-height: 1.015;
+}
+
+.dd-site[data-page="classic"] .site-classic-home .site-hero-actions {
+  gap: 1rem;
+  margin-top: 2.4rem;
+}
+
+.dd-site[data-page="classic"] .site-classic-home .site-button {
+  min-height: 68px;
+  padding: 1.08rem 2rem;
+  font-size: 1.18rem;
+  text-decoration: none;
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1), border-color 220ms ease, box-shadow 220ms ease, background 220ms ease;
+}
+
+.dd-site[data-page="classic"] .site-classic-home .site-button:hover {
+  text-decoration: none;
+  transform: translateY(-3px);
+}
+
+.dd-site[data-page="classic"] .site-classic-home .site-button:not(:hover) {
+  transform: translateY(0);
+}
