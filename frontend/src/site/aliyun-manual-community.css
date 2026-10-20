@@ -2748,7 +2748,12 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
   .site-manual-page.is-sidebar-collapsed .manual-sidebar-toggle { margin: 0; }
   .site-manual-page.is-sidebar-collapsed .manual-reader-header,
   .site-manual-page.is-sidebar-collapsed .manual-reader-document {
+    width: min(calc(100% - clamp(48px, 7vw, 112px)), 76ch);
     transform: translateX(-29px);
+  }
+
+  .site-manual-page.is-sidebar-collapsed .manual-chapter-view {
+    width: 100%;
   }
 
   /* Keep the opening spread inside a desktop viewport. The reader begins on
