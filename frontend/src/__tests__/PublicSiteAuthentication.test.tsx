@@ -161,7 +161,7 @@ describe("public website account authentication", () => {
     expect(await within(menu).findByText("Plan: Pro")).toBeVisible();
     expect(within(menu).queryByText("pilot@example.com")).not.toBeInTheDocument();
     expect(within(menu).getByRole("menuitem", { name: "Account" })).toBeVisible();
-    expect(within(menu).getByRole("menuitem", { name: "Open console" })).toBeVisible();
+    expect(within(menu).getByRole("menuitem", { name: "Console" })).toBeVisible();
 
     fireEvent.click(within(menu).getByRole("menuitem", { name: "Account" }));
     const dialog = screen.getByRole("dialog", { name: "Account" });
@@ -175,7 +175,7 @@ describe("public website account authentication", () => {
       authMock.state.account.avatarUrl,
     );
 
-    fireEvent.click(within(dialog).getByRole("button", { name: "Sign out" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Sign Out" }));
     expect(authMock.signOut).toHaveBeenCalledOnce();
   });
 
@@ -202,7 +202,7 @@ describe("public website account authentication", () => {
 
     const modern = renderHomePage();
     fireEvent.click(screen.getByRole("button", { name: "Pilot Rivera" }));
-    expect(screen.getByRole("menuitem", { name: "Classic view" }))
+    expect(screen.getByRole("menuitem", { name: "Classic" }))
       .toHaveAttribute("href", "/classic/");
     modern.unmount();
 
@@ -213,7 +213,7 @@ describe("public website account authentication", () => {
       </I18nProvider>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Pilot Rivera" }));
-    expect(screen.getByRole("menuitem", { name: "Modern view" }))
+    expect(screen.getByRole("menuitem", { name: "Modern" }))
       .toHaveAttribute("href", "/");
   });
 
@@ -230,10 +230,10 @@ describe("public website account authentication", () => {
     fireEvent.click(accountButton);
 
     const menu = screen.getByRole("menu", { name: "Account" });
-    expect(within(menu).getAllByRole("menuitem", { name: "Policies" })).toHaveLength(1);
+    expect(within(menu).getAllByRole("menuitem", { name: "Policy" })).toHaveLength(1);
     expect(within(menu).queryByText("Privacy policy")).not.toBeInTheDocument();
     expect(within(menu).queryByText("Code signing policy")).not.toBeInTheDocument();
-    fireEvent.click(within(menu).getByRole("menuitem", { name: "Policies" }));
+    fireEvent.click(within(menu).getByRole("menuitem", { name: "Policy" }));
 
     const dialog = await screen.findByRole(
       "dialog",

@@ -9,7 +9,7 @@ const organizationMock = vi.hoisted(() => ({
   removeOrganizationMember: vi.fn(),
   setOrganizationMemberPlan: vi.fn(),
   setOrganizationPlan: vi.fn(),
-  updateOrganizationProfile: vi.fn(),
+  updateOrganizationName: vi.fn(),
   setOrganizationJoinPassword: vi.fn(),
   transferOrganizationFounder: vi.fn(),
   createOrganization: vi.fn(),
@@ -102,7 +102,7 @@ describe("OrganizationPage", () => {
     organizationMock.removeOrganizationMember.mockResolvedValue(snapshot());
     organizationMock.setOrganizationMemberPlan.mockResolvedValue(snapshot());
     organizationMock.setOrganizationPlan.mockResolvedValue(snapshot());
-    organizationMock.updateOrganizationProfile.mockResolvedValue(snapshot());
+    organizationMock.updateOrganizationName.mockResolvedValue(snapshot());
     organizationMock.setOrganizationJoinPassword.mockResolvedValue(snapshot());
     organizationMock.transferOrganizationFounder.mockResolvedValue(snapshot());
     organizationMock.createOrganization.mockResolvedValue(snapshot());
@@ -224,6 +224,51 @@ describe("OrganizationPage", () => {
     const memberRow = screen.getByText("pilot@example.test").closest("tr")!;
     expect(within(ownerRow).getByRole("button", { name: "Delete member: Organization Owner" })).toBeDisabled();
     expect(within(memberRow).getByRole("button", { name: "Delete member: Pilot Member" })).toBeEnabled();
+  });
+
+  it("saves organization fields independently", async () => {
+    const renamed = snapshot();
+    renamed.organization.name = "Renamed Flight Lab";
+    let resolveName!: (value: ReturnType<typeof snapshot>) => void;
+    organizationMock.updateOrganizationName.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveName = resolve;
+    }));
+
+    render(<OrganizationPage locale="en" accountId="user-owner" />);
+    await screen.findByRole("heading", { name: "Aerial Systems Lab" });
+    fireEvent.click(screen.getByRole("button", { name: "Organization" }));
+    const dialog = screen.getByRole("dialog", { name: "Organization details" });
+
+    fireEvent.change(within(dialog).getByLabelText("Organization name"), {
+      target: { value: "Renamed Flight Lab" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Plan"), { target: { value: "plus" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save organization name" }));
+    await waitFor(() => expect(organizationMock.updateOrganizationName).toHaveBeenCalledWith("Renamed Flight Lab"));
+    expect(within(dialog).getByRole("button", { name: "Save plan" })).toBeEnabled();
+    expect(organizationMock.setOrganizationPlan).not.toHaveBeenCalled();
+    expect(organizationMock.setOrganizationJoinPassword).not.toHaveBeenCalled();
+
+    resolveName(renamed);
+    await waitFor(() => expect(within(dialog).getByRole("button", { name: "Save organization name" })).toBeDisabled());
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save plan" }));
+    await waitFor(() => expect(organizationMock.setOrganizationPlan).toHaveBeenCalledWith("plus"));
+    expect(organizationMock.updateOrganizationName).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves member role without submitting the member plan", async () => {
+    render(<OrganizationPage locale="en" accountId="user-owner" />);
+    await screen.findByRole("heading", { name: "Aerial Systems Lab" });
+    const memberRow = screen.getByText("pilot@example.test").closest("tr")!;
+    fireEvent.click(within(memberRow).getByRole("button", { name: "View details" }));
+    const dialog = screen.getByRole("dialog", { name: "Pilot Member" });
+    fireEvent.change(within(dialog).getByLabelText("Role"), { target: { value: "admin" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save role" }));
+    await waitFor(() => expect(organizationMock.setOrganizationMemberRole).toHaveBeenCalledWith(
+      "44444444-4444-4444-8444-444444444444",
+      "admin",
+    ));
+    expect(organizationMock.setOrganizationMemberPlan).not.toHaveBeenCalled();
   });
 
   it("lets administrators view organization details without edit controls", async () => {

@@ -100,7 +100,7 @@ export interface OrganizationConsoleDependencies {
   setMemberPlan(actorUserId: string, targetUserId: string, plan: OrganizationPlan): Promise<void>;
   transferFounder(actorUserId: string, targetUserId: string): Promise<void>;
   setFounderPlan(actorUserId: string, plan: OrganizationPlan): Promise<void>;
-  updateOrganization(actorUserId: string, name: string, plan: OrganizationPlan): Promise<void>;
+  updateOrganizationName(actorUserId: string, name: string): Promise<void>;
   setJoinPassword(actorUserId: string, password: string): Promise<void>;
   createOrganization(
     founderUserId: string,
@@ -689,11 +689,10 @@ function actualDependencies(): OrganizationConsoleDependencies {
       });
       if (error) mapRpcError(error);
     },
-    async updateOrganization(actorUserId, name, plan) {
-      const { error } = await client.rpc("organization_update_profile", {
+    async updateOrganizationName(actorUserId, name) {
+      const { error } = await client.rpc("organization_update_name", {
         p_actor_user_id: actorUserId,
         p_name: name,
-        p_plan_id: plan,
       });
       if (error) mapRpcError(error);
     },
@@ -811,12 +810,12 @@ export async function handleOrganizationConsoleRequest(
       await deps.createOrganization(actor.id, body.name.trim(), body.description.trim(), body.structure, body.plan, body.password);
       return jsonResponse(request, 201, { data: await deps.snapshot(actor.id) });
     }
-    if (request.method === "PATCH" && route === "/organization") {
+    if (request.method === "PATCH" && route === "/organization/name") {
       const body = await readBoundedJsonObject(request, MAX_BODY_BYTES);
-      if (!exactKeys(body, ["name", "plan"]) || typeof body.name !== "string" || body.name.trim().length < 1 || body.name.trim().length > 120 || !validPlan(body.plan)) {
-        throw new OrganizationConsoleError("INVALID_REQUEST", "A valid organization name and Business plan are required.", 400);
+      if (!exactKeys(body, ["name"]) || typeof body.name !== "string" || body.name.trim().length < 1 || body.name.trim().length > 120) {
+        throw new OrganizationConsoleError("INVALID_REQUEST", "A valid organization name is required.", 400);
       }
-      await deps.updateOrganization(actor.id, body.name.trim(), body.plan);
+      await deps.updateOrganizationName(actor.id, body.name.trim());
       return jsonResponse(request, 200, { data: await deps.snapshot(actor.id) });
     }
     if (request.method === "PUT" && route === "/join-password") {

@@ -4323,10 +4323,18 @@ body:has(.dd-site[data-page="classic"]) {
 
 .site-account-menu-profile {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   min-width: 0;
-  gap: 0.18rem;
+  gap: 0.65rem;
+  align-items: center;
   padding: 0.55rem 0.62rem 0.68rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.site-account-menu-profile > div {
+  display: grid;
+  min-width: 0;
+  gap: 0.18rem;
 }
 
 .site-account-menu-profile strong,
@@ -4339,10 +4347,28 @@ body:has(.dd-site[data-page="classic"]) {
 .site-account-menu-profile strong { font-size: 0.9rem; }
 .site-account-menu-profile span { color: rgba(224, 233, 246, 0.58); font-size: 0.7rem; }
 
+.site-account-menu-admin {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  color: rgba(238, 245, 255, 0.78);
+  background: transparent;
+  cursor: pointer;
+  place-items: center;
+}
+
+.site-account-menu-admin svg { width: 18px; height: 18px; }
+.site-account-menu-admin:hover,
+.site-account-menu-admin:focus-visible { color: #fff; background: rgba(255, 255, 255, 0.075); }
+
 .site-account-menu > button,
 .site-account-menu > a {
   display: flex;
   min-height: 38px;
+  gap: 0.65rem;
   align-items: center;
   padding: 0 0.62rem;
   border: 0;
@@ -4355,6 +4381,13 @@ body:has(.dd-site[data-page="classic"]) {
   text-align: left;
   text-decoration: none;
   cursor: pointer;
+}
+
+.site-account-menu > button > svg,
+.site-account-menu > a > svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
 }
 
 .site-account-menu > button:hover,
@@ -5370,6 +5403,12 @@ body:has(.dd-site[data-page="classic"]) {
 
 .dd-site .site-account-menu-profile { border-bottom-color: var(--site-menu-divider); }
 .dd-site .site-account-menu-profile span { color: var(--site-menu-muted); }
+.dd-site .site-account-menu-admin { color: var(--site-nav-foreground); }
+.dd-site .site-account-menu-admin:hover,
+.dd-site .site-account-menu-admin:focus-visible {
+  color: var(--site-nav-foreground-strong);
+  background: var(--site-nav-hover);
+}
 .dd-site .site-account-menu > button,
 .dd-site .site-account-menu > a { color: var(--site-nav-foreground); }
 .dd-site .site-account-menu > button:hover,

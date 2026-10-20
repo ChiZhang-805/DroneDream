@@ -30,7 +30,7 @@ import {
   setOrganizationJoinPassword,
   setOrganizationPlan,
   transferOrganizationFounder,
-  updateOrganizationProfile,
+  updateOrganizationName,
   type OrganizationMember,
   type OrganizationPlan,
   type OrganizationRole,
@@ -111,7 +111,7 @@ const content = {
     passwordConfigured: "Configured",
     passwordMissing: "Not configured",
     savePassword: "Save password",
-    saveOrganization: "Save organization",
+    saveName: "Save organization name",
     organizationDetails: "Organization details",
     deleteMember: "Delete member",
   },
@@ -183,7 +183,7 @@ const content = {
     passwordConfigured: "已设置",
     passwordMissing: "未设置",
     savePassword: "保存密码",
-    saveOrganization: "保存组织信息",
+    saveName: "保存组织名称",
     organizationDetails: "组织信息",
     deleteMember: "删除成员",
   },
@@ -227,6 +227,14 @@ export function OrganizationPage({
   const [canCreate, setCanCreate] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  type SaveAction = "organization-name" | "organization-plan" | "organization-password" | "member-role" | "member-plan";
+  const [savingActions, setSavingActions] = useState<ReadonlySet<SaveAction>>(() => new Set());
+  const markSaving = (action: SaveAction, saving: boolean) => setSavingActions((current) => {
+    const next = new Set(current);
+    if (saving) next.add(action);
+    else next.delete(action);
+    return next;
+  });
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [newRole, setNewRole] = useState<"admin" | "member">("member");
@@ -341,11 +349,11 @@ export function OrganizationPage({
   };
 
   const savePlan = async () => {
-    if (!selected || busy || selected.role === "owner") return;
-    setBusy(true);
+    if (!selected || savingActions.has("member-plan") || selected.role === "owner") return;
+    markSaving("member-plan", true);
     try { updateSnapshot(await setOrganizationMemberPlan(selected.id, selectedPlan)); }
     catch (reason) { setError(reason instanceof OrganizationConsoleError ? reason.message : copy.unavailable); }
-    finally { setBusy(false); }
+    finally { markSaving("member-plan", false); }
   };
 
   const transferFounder = async () => {
@@ -419,15 +427,15 @@ export function OrganizationPage({
   };
 
   const saveRole = async () => {
-    if (!selected || busy || selected.role === "owner") return;
-    setBusy(true);
+    if (!selected || savingActions.has("member-role") || selected.role === "owner") return;
+    markSaving("member-role", true);
     setError(null);
     try {
       updateSnapshot(await setOrganizationMemberRole(selected.id, selectedRole));
     } catch (reason) {
       setError(reason instanceof OrganizationConsoleError ? reason.message : copy.unavailable);
     } finally {
-      setBusy(false);
+      markSaving("member-role", false);
     }
   };
 
@@ -472,20 +480,28 @@ export function OrganizationPage({
     setOrganizationDialogOpen(true);
   };
 
-  const saveOrganization = async () => {
-    if (!snapshot || snapshot.actor.role !== "owner" || !organizationDraftName.trim() || busy) return;
-    setBusy(true);
-    try { updateSnapshot(await updateOrganizationProfile(organizationDraftName.trim(), organizationDraftPlan)); }
+  const saveOrganizationName = async () => {
+    if (!snapshot || snapshot.actor.role !== "owner" || !organizationDraftName.trim() || savingActions.has("organization-name")) return;
+    markSaving("organization-name", true);
+    try { updateSnapshot(await updateOrganizationName(organizationDraftName.trim())); }
     catch (reason) { setError(reason instanceof OrganizationConsoleError ? reason.message : copy.unavailable); }
-    finally { setBusy(false); }
+    finally { markSaving("organization-name", false); }
+  };
+
+  const saveOrganizationPlan = async () => {
+    if (!snapshot || snapshot.actor.role !== "owner" || savingActions.has("organization-plan")) return;
+    markSaving("organization-plan", true);
+    try { updateSnapshot(await setOrganizationPlan(organizationDraftPlan)); }
+    catch (reason) { setError(reason instanceof OrganizationConsoleError ? reason.message : copy.unavailable); }
+    finally { markSaving("organization-plan", false); }
   };
 
   const saveOrganizationPassword = async () => {
-    if (!snapshot || snapshot.actor.role !== "owner" || organizationDraftPassword.length < 8 || busy) return;
-    setBusy(true);
-    try { updateSnapshot(await setOrganizationJoinPassword(organizationDraftPassword)); setOrganizationDraftPassword(""); }
+    if (!snapshot || snapshot.actor.role !== "owner" || organizationDraftPassword.length < 8 || savingActions.has("organization-password")) return;
+    markSaving("organization-password", true);
+    try { updateSnapshot(await setOrganizationJoinPassword(organizationDraftPassword)); }
     catch (reason) { setError(reason instanceof OrganizationConsoleError ? reason.message : copy.unavailable); }
-    finally { setBusy(false); }
+    finally { markSaving("organization-password", false); }
   };
 
   if (loading) {
@@ -579,9 +595,9 @@ export function OrganizationPage({
             <div><dt>{copy.password}</dt><dd>{snapshot.organization.join_password ?? copy.passwordMissing}</dd></div>
           </dl></div>
           {snapshot.actor.role === "owner" ? <div className="organization-member-actions">
-            <div className="organization-profile-field is-inline"><label htmlFor="organization-profile-name">{copy.name}</label><input id="organization-profile-name" maxLength={120} value={organizationDraftName} onChange={(event) => setOrganizationDraftName(event.target.value)} /><button type="button" aria-label={copy.saveOrganization} title={copy.saveOrganization} disabled={busy || !organizationDraftName.trim()} onClick={() => void saveOrganization()}><Save aria-hidden="true" /></button></div>
-            <div className="organization-profile-field is-inline"><label htmlFor="organization-profile-plan">{copy.plan}</label><select id="organization-profile-plan" value={organizationDraftPlan} onChange={(event) => setOrganizationDraftPlan(event.target.value as OrganizationPlan)}><option value="free">Business Free</option><option value="plus">Business Plus</option><option value="pro">Business Pro</option></select><button type="button" aria-label={copy.saveOrganization} title={copy.saveOrganization} disabled={busy} onClick={() => void saveOrganization()}><Save aria-hidden="true" /></button></div>
-            <div className="organization-profile-field is-inline"><label htmlFor="organization-profile-password">{copy.password}</label><input id="organization-profile-password" type="text" minLength={8} maxLength={72} value={organizationDraftPassword} onChange={(event) => setOrganizationDraftPassword(event.target.value)} /><button type="button" aria-label={copy.savePassword} title={copy.savePassword} disabled={busy || organizationDraftPassword.length < 8} onClick={() => void saveOrganizationPassword()}><Save aria-hidden="true" /></button></div>
+            <div className="organization-profile-field is-inline"><label htmlFor="organization-profile-name">{copy.name}</label><input id="organization-profile-name" maxLength={120} value={organizationDraftName} onChange={(event) => setOrganizationDraftName(event.target.value)} /><button type="button" aria-label={savingActions.has("organization-name") ? copy.saving : copy.saveName} title={copy.saveName} disabled={savingActions.has("organization-name") || !organizationDraftName.trim() || organizationDraftName.trim() === snapshot.organization.name} onClick={() => void saveOrganizationName()}><Save aria-hidden="true" /></button></div>
+            <div className="organization-profile-field is-inline"><label htmlFor="organization-profile-plan">{copy.plan}</label><select id="organization-profile-plan" value={organizationDraftPlan} onChange={(event) => setOrganizationDraftPlan(event.target.value as OrganizationPlan)}><option value="free">Business Free</option><option value="plus">Business Plus</option><option value="pro">Business Pro</option></select><button type="button" aria-label={savingActions.has("organization-plan") ? copy.saving : copy.savePlan} title={copy.savePlan} disabled={savingActions.has("organization-plan") || organizationDraftPlan === snapshot.organization.plan} onClick={() => void saveOrganizationPlan()}><Save aria-hidden="true" /></button></div>
+            <div className="organization-profile-field is-inline"><label htmlFor="organization-profile-password">{copy.password}</label><input id="organization-profile-password" type="text" minLength={8} maxLength={72} value={organizationDraftPassword} onChange={(event) => setOrganizationDraftPassword(event.target.value)} /><button type="button" aria-label={savingActions.has("organization-password") ? copy.saving : copy.savePassword} title={copy.savePassword} disabled={savingActions.has("organization-password") || organizationDraftPassword.length < 8 || organizationDraftPassword === snapshot.organization.join_password} onClick={() => void saveOrganizationPassword()}><Save aria-hidden="true" /></button></div>
           </div> : null}
           {error ? <p className="organization-error" role="alert">{error}</p> : null}
         </section>
@@ -604,8 +620,8 @@ export function OrganizationPage({
             </div>
             {canManageSelected ? (
               <div className="organization-member-actions">
-                {canManageAdmins ? <div className="organization-member-edit-row"><label htmlFor="organization-member-role">{copy.role}</label><select id="organization-member-role" value={selectedRole} onChange={(event) => setSelectedRole(event.target.value as "admin" | "member")}><option value="member">{copy.member}</option><option value="admin">{copy.admin}</option></select><button type="button" className="organization-save-button" aria-label={busy ? copy.saving : copy.saveRole} title={copy.saveRole} onClick={() => void saveRole()} disabled={busy || selectedRole === selected.role}><Save aria-hidden="true" /></button></div> : null}
-                <div className="organization-member-edit-row"><label htmlFor="organization-member-plan">{copy.memberPlan}</label><select id="organization-member-plan" value={selectedPlan} onChange={(event) => setSelectedPlan(event.target.value as OrganizationPlan)}><option value="free">Business Free</option>{snapshot.organization.plan !== "free" ? <option value="plus">Business Plus</option> : null}{snapshot.organization.plan === "pro" ? <option value="pro">Business Pro</option> : null}</select><button type="button" className="organization-save-button" aria-label={copy.savePlan} title={copy.savePlan} onClick={() => void savePlan()} disabled={busy || selectedPlan === selected.plan}><Save aria-hidden="true" /></button></div>
+                {canManageAdmins ? <div className="organization-member-edit-row"><label htmlFor="organization-member-role">{copy.role}</label><select id="organization-member-role" value={selectedRole} onChange={(event) => setSelectedRole(event.target.value as "admin" | "member")}><option value="member">{copy.member}</option><option value="admin">{copy.admin}</option></select><button type="button" className="organization-save-button" aria-label={savingActions.has("member-role") ? copy.saving : copy.saveRole} title={copy.saveRole} onClick={() => void saveRole()} disabled={savingActions.has("member-role") || selectedRole === selected.role}><Save aria-hidden="true" /></button></div> : null}
+                <div className="organization-member-edit-row"><label htmlFor="organization-member-plan">{copy.memberPlan}</label><select id="organization-member-plan" value={selectedPlan} onChange={(event) => setSelectedPlan(event.target.value as OrganizationPlan)}><option value="free">Business Free</option>{snapshot.organization.plan !== "free" ? <option value="plus">Business Plus</option> : null}{snapshot.organization.plan === "pro" ? <option value="pro">Business Pro</option> : null}</select><button type="button" className="organization-save-button" aria-label={savingActions.has("member-plan") ? copy.saving : copy.savePlan} title={copy.savePlan} onClick={() => void savePlan()} disabled={savingActions.has("member-plan") || selectedPlan === selected.plan}><Save aria-hidden="true" /></button></div>
                 {canManageAdmins && snapshot.organization.structure_model !== "flat" && selected.role !== "owner" ? <div className="organization-member-edit-row is-department"><label htmlFor="organization-member-department">{copy.assignDepartment}</label><select id="organization-member-department" value={snapshot.departments.find((department) => [...department.manager_user_ids, ...department.member_user_ids].includes(selected.id))?.id ?? ""} onChange={(event) => void assignDepartment(event.target.value)}><option value="" disabled>{copy.unassigned}</option>{snapshot.departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select></div> : null}
                 {snapshot.actor.can_transfer_founder && selected.role === "admin" ? <><button type="button" onClick={() => void transferFounder()} disabled={busy}>{transferArmed ? copy.confirmTransfer : copy.transfer}</button><small>{copy.transferHelp}</small></> : null}
                 <div className="organization-member-danger-row"><button type="button" className="is-danger" onClick={() => void removeMember()} disabled={busy}><Trash2 aria-hidden="true" />{busy ? copy.removing : removalArmed ? copy.confirmRemove : copy.remove}</button>{removalArmed ? <small>{copy.downgrade}</small> : null}</div>

@@ -235,10 +235,10 @@ export function requestOrganizationJoin(publicCode: string, plan: OrganizationPl
   });
 }
 
-export function updateOrganizationProfile(name: string, plan: OrganizationPlan): Promise<OrganizationSnapshot> {
-  return request<OrganizationSnapshot>("/organization", {
+export function updateOrganizationName(name: string): Promise<OrganizationSnapshot> {
+  return request<OrganizationSnapshot>("/organization/name", {
     method: "PATCH",
-    body: JSON.stringify({ name, plan }),
+    body: JSON.stringify({ name }),
   });
 }
 

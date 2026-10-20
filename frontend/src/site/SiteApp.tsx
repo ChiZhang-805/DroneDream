@@ -7,6 +7,14 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  CircleUserRound,
+  FileText,
+  LayoutTemplate,
+  LogOut,
+  Monitor,
+  ShieldCheck,
+} from "lucide-react";
 
 import { BrandLockup } from "../components/BrandLockup";
 import { AuthCaptcha } from "../features/auth/AuthCaptcha";
@@ -126,10 +134,10 @@ const content = {
     resetUpdateBody: "This email link verified the reset request. Choose a new password to finish.",
     updatePassword: "Update password",
     passwordUpdated: "Your password has been updated.",
-    openConsole: "Open console",
-    classicView: "Classic view",
-    modernView: "Modern view",
-    signOut: "Sign out",
+    openConsole: "Console",
+    classicView: "Classic",
+    modernView: "Modern",
+    signOut: "Sign Out",
     closeAuth: "Close account dialog",
     eyebrow: "NATURAL-LANGUAGE UAV ENGINEERING",
     heroLead: "Describe the mission.",
@@ -268,7 +276,7 @@ const content = {
     platformValue: "Windows x64",
     released: "Released",
     footerLine: "Local-first UAV planning, simulation, and mission control. Version 1.0.0 is available now.",
-    policies: "Policies",
+    policies: "Policy",
     communityGuidelines: "Community guidelines",
   },
   "zh-CN": {
@@ -342,7 +350,9 @@ const content = {
     resetUpdateBody: "邮件链接已确认本次重置请求，请设置新密码以完成操作。",
     updatePassword: "更新密码",
     passwordUpdated: "密码已更新。",
-    openConsole: "进入控制台",
+    openConsole: "控制台",
+    classicView: "经典版",
+    modernView: "现代版",
     signOut: "退出登录",
     closeAuth: "关闭账号窗口",
     eyebrow: "本地优先的 PX4 / GAZEBO 调优平台",
@@ -1252,31 +1262,36 @@ export function SiteApp() {
                 aria-label={copy.account}
               >
                 <div className="site-account-menu-profile">
-                  <strong>{accountName}</strong>
-                  <span>
-                    {copy.accountPlan}: {accountPlan
-                      ? `${accountPlan.billingScope === "business" ? `${copy.businessPlan} ` : ""}${accountPlan.name}`
-                      : "—"}
-                  </span>
+                  <div>
+                    <strong>{accountName}</strong>
+                    <span>
+                      {copy.accountPlan}: {accountPlan
+                        ? `${accountPlan.billingScope === "business" ? `${copy.businessPlan} ` : ""}${accountPlan.name}`
+                        : "—"}
+                    </span>
+                  </div>
+                  {organizationAccess?.authorized ? (
+                    <a className="site-account-menu-admin" href="/organization/" role="menuitem" aria-label={copy.organization} title={copy.organization} onClick={closeMenu}>
+                      <ShieldCheck aria-hidden="true" />
+                    </a>
+                  ) : null}
                 </div>
                 <button
                   type="button"
                   role="menuitem"
                   onClick={() => openAccount("sign-in")}
                 >
+                  <CircleUserRound aria-hidden="true" />
                   {copy.account}
                 </button>
                 <button type="button" role="menuitem" onClick={openConsole}>
+                  <Monitor aria-hidden="true" />
                   {copy.openConsole}
                 </button>
                 <a href={classicMode ? "/" : "/classic/"} role="menuitem" onClick={closeMenu}>
+                  <LayoutTemplate aria-hidden="true" />
                   {classicMode ? copy.modernView : copy.classicView}
                 </a>
-                {organizationAccess?.authorized ? (
-                  <a href="/organization/" role="menuitem" onClick={closeMenu}>
-                    {copy.organization}
-                  </a>
-                ) : null}
                 <button
                   type="button"
                   role="menuitem"
@@ -1285,6 +1300,7 @@ export function SiteApp() {
                     setPolicyOpen(true);
                   }}
                 >
+                  <FileText aria-hidden="true" />
                   {copy.policies}
                 </button>
                 <button
@@ -1299,6 +1315,7 @@ export function SiteApp() {
                       .finally(() => setAuthPending(false));
                   }}
                 >
+                  <LogOut aria-hidden="true" />
                   {copy.signOut}
                 </button>
               </div>

@@ -70,7 +70,7 @@ function dependencies(
     setMemberPlan: () => Promise.resolve(),
     transferFounder: () => Promise.resolve(),
     setFounderPlan: () => Promise.resolve(),
-    updateOrganization: () => Promise.resolve(),
+    updateOrganizationName: () => Promise.resolve(),
     setJoinPassword: () => Promise.resolve(),
     createOrganization: () => Promise.resolve(),
     createDepartment: () => Promise.resolve(),
@@ -253,6 +253,21 @@ Deno.test("organization join requires and forwards a password", async () => {
   );
   assert(response.status === 201, "password-protected join should be accepted");
   assert(action === `${ACTOR_ID}:DD00001:plus:secure-flight-2026`, "join password was not forwarded");
+});
+
+Deno.test("organization name updates do not submit or change the plan", async () => {
+  let action = "";
+  const response = await handleOrganizationConsoleRequest(
+    request("/organization/name", "PATCH", { name: "Renamed Flight Lab" }),
+    dependencies({
+      updateOrganizationName: (actor, name) => {
+        action = `${actor}:${name}`;
+        return Promise.resolve();
+      },
+    }),
+  );
+  assert(response.status === 200, "organization name update should pass");
+  assert(action === `${ACTOR_ID}:Renamed Flight Lab`, "name-only update payload mismatch");
 });
 
 Deno.test("organization mutations reject unknown fields, owner role, and invalid ids", async () => {
