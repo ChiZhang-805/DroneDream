@@ -48,6 +48,7 @@ interface CommunityPageProps {
   account: DroneDreamAccount | null;
   onRequireAccount: () => void;
   sensitiveCloudActionsEnabled?: boolean;
+  routePrefix?: "" | "/classic";
 }
 
 export interface CommunityTopic {
@@ -368,6 +369,7 @@ export function CommunityPage({
   account,
   onRequireAccount,
   sensitiveCloudActionsEnabled = true,
+  routePrefix = "",
 }: CommunityPageProps) {
   const copy = communityContent[locale];
   const presets = tagOptions[locale];
@@ -953,7 +955,7 @@ export function CommunityPage({
             ))}
           </div>
           {!loading && !feedError && !allTopicsView && visibleTopics.length > 0 ? (
-            <a className="community-more is-filter-action" href="/community/?view=all">
+            <a className="community-more is-filter-action" href={`${routePrefix}/community/?view=all`}>
               {copy.more}
               <ChevronRight aria-hidden="true" />
             </a>
@@ -1071,7 +1073,7 @@ export function CommunityPage({
         {!loading && !feedError && visibleTopics.length > 0 ? (
           <nav className="community-pagination" aria-label={copy.allTopics}>
             {allTopicsView ? (
-              <a className="community-pagination-back" href="/community/">
+              <a className="community-pagination-back" href={`${routePrefix}/community/`}>
                 <ArrowLeft aria-hidden="true" />
                 {copy.back}
               </a>

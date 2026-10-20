@@ -192,6 +192,31 @@ describe("public website account authentication", () => {
     expect(container.querySelector(".site-account-avatar svg")).toBeVisible();
   });
 
+  it("switches between modern and classic experiences from the account menu", () => {
+    authMock.state.account = {
+      id: "account-1",
+      email: "pilot@example.com",
+      displayName: "Pilot Rivera",
+      avatarUrl: null,
+    };
+
+    const modern = renderHomePage();
+    fireEvent.click(screen.getByRole("button", { name: "Pilot Rivera" }));
+    expect(screen.getByRole("menuitem", { name: "Classic view" }))
+      .toHaveAttribute("href", "/classic/");
+    modern.unmount();
+
+    window.history.replaceState(null, "", "/classic/product/");
+    render(
+      <I18nProvider>
+        <SiteApp />
+      </I18nProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Pilot Rivera" }));
+    expect(screen.getByRole("menuitem", { name: "Modern view" }))
+      .toHaveAttribute("href", "/");
+  });
+
   it("combines privacy and code-signing content in one Policies dialog", async () => {
     authMock.state.account = {
       id: "account-1",

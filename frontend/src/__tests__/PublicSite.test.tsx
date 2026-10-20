@@ -112,6 +112,27 @@ describe("DroneDream public website", () => {
     expect(card).toHaveAttribute("aria-current", "true");
   });
 
+  it("keeps navigation inside the classic experience", () => {
+    window.history.replaceState(null, "", "/classic/");
+    const classicHome = renderSite();
+
+    expect(screen.getByRole("heading", { name: /Give Every Mission.*Its Own Flight Agent\./u })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/classic/");
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Products" })).toHaveAttribute("href", "/classic/product/");
+    expect(screen.getByRole("link", { name: "Pricing" })).toHaveAttribute("href", "/classic/pricing/");
+    expect(screen.getByRole("link", { name: "Manual" })).toHaveAttribute("href", "/classic/manual/");
+    expect(screen.getByRole("link", { name: "Community" })).toHaveAttribute("href", "/classic/community/");
+    expect(screen.getByRole("link", { name: "CLI Manual" })).toHaveAttribute("href", "/classic/cli/");
+    classicHome.unmount();
+
+    window.history.replaceState(null, "", "/classic/product/");
+    renderSite();
+    expect(screen.getByRole("heading", { name: "Hey! Get Your Flight Agent." })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute("href", "/classic/");
+    expect(screen.getByRole("link", { name: "Products" })).toHaveAttribute("aria-current", "page");
+  });
+
   it("loops mission cards in both directions from the mouse wheel", () => {
     renderSite();
 

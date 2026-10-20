@@ -14,9 +14,10 @@ const WEBSITE_DRONE_THEME = Object.freeze({
 
 interface ClassicHomeProps {
   release: WebsiteRelease;
+  cliHref?: string;
 }
 
-export function ClassicHome({ release }: ClassicHomeProps) {
+export function ClassicHome({ release, cliHref = "/cli/" }: ClassicHomeProps) {
   return (
     <section className="site-hero site-classic-home" aria-labelledby="classic-home-title">
       <div className="site-hero-scene" aria-hidden="true">
@@ -40,7 +41,7 @@ export function ClassicHome({ release }: ClassicHomeProps) {
               <Download aria-hidden="true" />
               Download Universal
             </a>
-            <a className="site-button site-button-ghost" href="/cli/">
+            <a className="site-button site-button-ghost" href={cliHref}>
               <TerminalSquare aria-hidden="true" />
               CLI Manual
             </a>

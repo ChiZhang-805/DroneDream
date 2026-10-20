@@ -128,6 +128,7 @@ const content = {
     passwordUpdated: "Your password has been updated.",
     openConsole: "Open console",
     classicView: "Classic view",
+    modernView: "Modern view",
     signOut: "Sign out",
     closeAuth: "Close account dialog",
     eyebrow: "NATURAL-LANGUAGE UAV ENGINEERING",
@@ -579,25 +580,27 @@ export function SiteApp() {
     requestAnimationFrame(() => accountButtonRef.current?.focus());
   }, []);
   const path = window.location.pathname.replace(/\/+$/u, "") || "/";
-  const sitePage = path === "/manual"
+  const classicMode = path === "/classic" || path.startsWith("/classic/");
+  const routePath = classicMode ? path.slice("/classic".length) || "/" : path;
+  const sitePage = routePath === "/manual"
     ? "manual"
-    : path === "/product"
+    : routePath === "/product"
       ? "product"
-      : path === "/pricing"
+      : routePath === "/pricing"
         ? "pricing"
-      : path === "/organization"
+      : routePath === "/organization"
         ? "organization"
-      : path === "/community"
+      : routePath === "/community"
         ? "community"
-        : path === "/cli"
+        : routePath === "/cli"
           ? "cli"
-          : path === "/classic"
+          : classicMode && routePath === "/"
             ? "classic"
-        : path === "/privacy"
+        : routePath === "/privacy"
           ? "privacy"
-          : path === "/terms"
+          : routePath === "/terms"
             ? "terms"
-         : path === "/oauth/consent"
+         : routePath === "/oauth/consent"
            ? "oauth-consent"
          : "home";
   const oauthAuthorizationId = sitePage === "oauth-consent"
@@ -1157,36 +1160,45 @@ export function SiteApp() {
     || authMode === "register"
     || recoveryCodeMode
   );
+  const routePrefix = classicMode ? "/classic" : "";
+  const experienceHref = (target: string) => routePrefix
+    ? target === "/" ? `${routePrefix}/` : `${routePrefix}${target}`
+    : target;
   const headerNavigation = [
-    ["Home", "/"],
-    ["Products", "/product/"],
-    ["Pricing", "/pricing/"],
-    ["Manual", "/manual/"],
-    ["Community", "/community/"],
-    ...(sitePage === "cli" ? [["CLI", "/cli/"] as const] : []),
+    ["Home", experienceHref("/")],
+    ["Products", experienceHref("/product/")],
+    ["Pricing", experienceHref("/pricing/")],
+    ["Manual", experienceHref("/manual/")],
+    ["Community", experienceHref("/community/")],
+    ...(sitePage === "cli" ? [["CLI", experienceHref("/cli/")] as const] : []),
   ] as const;
   const currentNavigationTarget = sitePage === "home"
-    ? "/"
+    ? experienceHref("/")
     : sitePage === "product"
-      ? "/product/"
+      ? experienceHref("/product/")
       : sitePage === "pricing"
-        ? "/pricing/"
+        ? experienceHref("/pricing/")
         : sitePage === "manual"
-          ? "/manual/"
+          ? experienceHref("/manual/")
           : sitePage === "community"
-            ? "/community/"
+            ? experienceHref("/community/")
             : sitePage === "cli"
-              ? "/cli/"
+              ? experienceHref("/cli/")
               : sitePage === "classic"
-                ? "/"
+                ? experienceHref("/")
             : null;
   const accountName = auth.account?.displayName.trim() || copy.account;
 
   return (
-    <div className="dd-site" data-locale={locale} data-page={sitePage}>
+    <div
+      className="dd-site"
+      data-locale={locale}
+      data-page={sitePage}
+      data-experience={classicMode ? "classic" : "modern"}
+    >
       <a className="site-skip-link" href="#main-content">{copy.skip}</a>
       <header className={`site-header${scrolled ? " is-scrolled" : ""}`}>
-        <a className="site-brand" href="/" onClick={closeMenu} aria-label="DroneDream">
+        <a className="site-brand" href={experienceHref("/")} onClick={closeMenu} aria-label="DroneDream">
           <BrandLockup />
         </a>
         <nav
@@ -1257,8 +1269,8 @@ export function SiteApp() {
                 <button type="button" role="menuitem" onClick={openConsole}>
                   {copy.openConsole}
                 </button>
-                <a href="/classic/" role="menuitem" onClick={closeMenu}>
-                  {copy.classicView}
+                <a href={classicMode ? "/" : "/classic/"} role="menuitem" onClick={closeMenu}>
+                  {classicMode ? copy.modernView : copy.classicView}
                 </a>
                 {organizationAccess?.authorized ? (
                   <a href="/organization/" role="menuitem" onClick={closeMenu}>
@@ -1315,7 +1327,7 @@ export function SiteApp() {
         ) : sitePage === "cli" ? (
           <CliPage release={release} />
         ) : sitePage === "classic" ? (
-          <ClassicHome release={release} />
+          <ClassicHome release={release} cliHref={experienceHref("/cli/")} />
         ) : sitePage === "product" ? (
           <ProductPage availability={editionAvailability} locale={locale} release={release} />
         ) : sitePage === "pricing" ? (
@@ -1331,6 +1343,7 @@ export function SiteApp() {
             locale={locale}
             account={auth.account}
             onRequireAccount={() => openAccount("sign-in")}
+            routePrefix={routePrefix}
           />
         ) : sitePage === "privacy" ? (
           <LegalPage document="privacy" />

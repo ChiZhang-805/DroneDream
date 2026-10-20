@@ -172,6 +172,23 @@ if (-not (Test-Path -LiteralPath $termsHtml -PathType Leaf)) {
     throw "The site build completed without producing the public terms route."
 }
 
+# Publish parallel entry points for the classic browsing experience. The React
+# application reuses the same page components while the /classic prefix keeps
+# every navigation action inside the experience selected by the visitor.
+foreach ($classicRoute in @("product", "pricing", "manual", "community", "cli")) {
+    $sourceRouteHtml = Join-Path $outputDirectory "$classicRoute\index.html"
+    if (-not (Test-Path -LiteralPath $sourceRouteHtml -PathType Leaf)) {
+        throw "The site build completed without producing the source route: $classicRoute"
+    }
+    $classicRouteDirectory = Join-Path $outputDirectory "classic\$classicRoute"
+    New-Item -ItemType Directory -Force -Path $classicRouteDirectory | Out-Null
+    $classicRouteHtml = Join-Path $classicRouteDirectory "index.html"
+    Copy-Item -LiteralPath $sourceRouteHtml -Destination $classicRouteHtml -Force
+    if (-not (Test-Path -LiteralPath $classicRouteHtml -PathType Leaf)) {
+        throw "The Pages build failed to produce the classic route entry: $classicRoute"
+    }
+}
+
 $builtJavaScript = @(
     Get-ChildItem -LiteralPath $assetDirectory -Filter "*.js" -File |
         ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw }
