@@ -212,6 +212,35 @@ describe("DroneDream public website", () => {
     expect(screen.getByRole("navigation", { name: "Chapter navigation" })).toBeVisible();
   });
 
+  it("restores a linked manual section after the chapter content mounts", async () => {
+    window.history.replaceState(null, "", "/manual/#manual-heading-3");
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(window.HTMLElement.prototype, "scrollIntoView", {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => [
+        "# 1. First Chapter",
+        "Opening chapter.",
+        "## 1.1 First Section",
+        "Opening section.",
+        "# 2. Second Chapter",
+        "Second chapter.",
+        "## 2.1 Linked Section",
+        "Linked section.",
+      ].join("\n\n"),
+    }));
+
+    const { container } = renderSite();
+    await screen.findByRole("heading", { name: "2.1 Linked Section" });
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalled());
+    const activeLocations = container.querySelectorAll('[aria-current="location"]');
+    expect(activeLocations).toHaveLength(1);
+    expect(activeLocations[0]).toHaveTextContent("Linked Section");
+  });
+
   it("routes Products to the five-product family without the retired mission preview", () => {
     window.history.replaceState(null, "", "/product/");
 

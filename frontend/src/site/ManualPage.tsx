@@ -372,24 +372,29 @@ export function ManualPage({ locale }: ManualPageProps) {
 
   useEffect(() => {
     if (state !== "ready" || !pendingHeadingIdRef.current) return;
+    const root = articleRef.current;
+    if (!root) return;
     let frame = 0;
     let releaseTimer = 0;
-    let attempts = 0;
+    let contentObserver: MutationObserver | null = null;
     const scrollToPendingHeading = () => {
       const target = document.getElementById(pendingHeadingIdRef.current);
-      if (!target && attempts < 12) {
-        attempts += 1;
-        frame = window.requestAnimationFrame(scrollToPendingHeading);
-        return;
-      }
       if (!target) return;
+      contentObserver?.disconnect();
       target.scrollIntoView({ behavior: "auto", block: "start" });
       releaseTimer = window.setTimeout(() => {
         pendingHeadingIdRef.current = "";
       }, 650);
     };
-    frame = window.requestAnimationFrame(scrollToPendingHeading);
+    const scheduleScroll = () => {
+      window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(scrollToPendingHeading);
+    };
+    contentObserver = new MutationObserver(scheduleScroll);
+    contentObserver.observe(root, { childList: true, subtree: true });
+    scheduleScroll();
     return () => {
+      contentObserver?.disconnect();
       window.cancelAnimationFrame(frame);
       window.clearTimeout(releaseTimer);
     };
