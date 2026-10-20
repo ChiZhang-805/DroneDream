@@ -61,6 +61,7 @@ export interface OrganizationSnapshot {
     description: string;
     structure_model: OrganizationStructure;
     join_password_configured: boolean;
+    join_password: string | null;
   };
   actor: {
     user_id: string;
@@ -275,6 +276,47 @@ function avatarUrl(user: User): string | null {
     : null;
 }
 
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function base64ToBytes(value: string): Uint8Array {
+  const binary = atob(value);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
+}
+
+async function organizationPasswordKey(): Promise<CryptoKey> {
+  const raw = base64ToBytes(requiredEnv("ORGANIZATION_PASSWORD_KEY"));
+  if (raw.byteLength !== 32) throw new Error("ORGANIZATION_PASSWORD_KEY must decode to 32 bytes");
+  return await crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
+}
+
+async function encryptOrganizationPassword(password: string): Promise<string> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv }, await organizationPasswordKey(), new TextEncoder().encode(password),
+  ));
+  return `v1.${bytesToBase64(iv)}.${bytesToBase64(ciphertext)}`;
+}
+
+async function decryptOrganizationPassword(value: unknown): Promise<string | null> {
+  if (typeof value !== "string") return null;
+  const [version, iv, ciphertext] = value.split(".");
+  if (version !== "v1" || !iv || !ciphertext) return null;
+  try {
+    const plaintext = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: base64ToBytes(iv) },
+      await organizationPasswordKey(),
+      base64ToBytes(ciphertext),
+    );
+    return new TextDecoder().decode(plaintext);
+  } catch {
+    return null;
+  }
+}
+
 let cachedClient: SupabaseClient | null = null;
 
 function adminClient(): SupabaseClient {
@@ -429,7 +471,7 @@ function actualDependencies(): OrganizationConsoleDependencies {
       }
       const [organizationResult, memberResult, departmentResult, assignmentResult, joinRequestResult] = await Promise.all([
         client.from("organizations")
-          .select("organization_id,name,plan,status,owner_user_id,public_code,description,structure_model,join_password_hash")
+          .select("organization_id,name,plan,status,owner_user_id,public_code,description,structure_model,join_password_hash,join_password_ciphertext")
           .eq("organization_id", actorAccess.organization_id)
           .single(),
         client.from("organization_members")
@@ -561,6 +603,7 @@ function actualDependencies(): OrganizationConsoleDependencies {
           description: String(organization.description ?? ""),
           structure_model: organization.structure_model as OrganizationStructure,
           join_password_configured: typeof organization.join_password_hash === "string" && organization.join_password_hash.length > 0,
+          join_password: await decryptOrganizationPassword(organization.join_password_ciphertext),
         },
         actor: {
           user_id: userId,
@@ -655,20 +698,24 @@ function actualDependencies(): OrganizationConsoleDependencies {
       if (error) mapRpcError(error);
     },
     async setJoinPassword(actorUserId, password) {
+      const ciphertext = await encryptOrganizationPassword(password);
       const { error } = await client.rpc("organization_set_join_password", {
         p_actor_user_id: actorUserId,
         p_password: password,
+        p_password_ciphertext: ciphertext,
       });
       if (error) mapRpcError(error);
     },
     async createOrganization(founderUserId, name, description, structure, plan, password) {
-      const { error } = await client.rpc("organization_create_v3", {
+      const ciphertext = await encryptOrganizationPassword(password);
+      const { error } = await client.rpc("organization_create_v4", {
         p_founder_user_id: founderUserId,
         p_name: name,
         p_description: description,
         p_structure_model: structure,
         p_founder_plan: plan,
         p_password: password,
+        p_password_ciphertext: ciphertext,
       });
       if (error) mapRpcError(error);
     },

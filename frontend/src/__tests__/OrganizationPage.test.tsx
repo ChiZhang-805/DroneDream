@@ -36,6 +36,7 @@ function snapshot(role: "owner" | "admin" = "owner") {
       description: "Flight research",
       structure_model: "flat" as const,
       join_password_configured: true,
+      join_password: "shared-flight-secret",
     },
     actor: {
       user_id: role === "owner"
@@ -215,7 +216,7 @@ describe("OrganizationPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Organization" }));
     const dialog = screen.getByRole("dialog", { name: "Organization details" });
     expect(within(dialog).getAllByText("DD00001")).toHaveLength(2);
-    expect(within(dialog).getByText("Configured")).toBeVisible();
+    expect(within(dialog).getByText("shared-flight-secret")).toBeVisible();
     expect(within(dialog).getByLabelText("Organization name")).toHaveValue("Aerial Systems Lab");
     fireEvent.click(within(dialog).getByRole("button", { name: "Close member details" }));
 
@@ -223,5 +224,16 @@ describe("OrganizationPage", () => {
     const memberRow = screen.getByText("pilot@example.test").closest("tr")!;
     expect(within(ownerRow).getByRole("button", { name: "Delete member: Organization Owner" })).toBeDisabled();
     expect(within(memberRow).getByRole("button", { name: "Delete member: Pilot Member" })).toBeEnabled();
+  });
+
+  it("lets administrators view organization details without edit controls", async () => {
+    organizationMock.getOrganizationSnapshot.mockResolvedValueOnce(snapshot("admin"));
+    render(<OrganizationPage locale="en" accountId="user-admin" />);
+    await screen.findByRole("heading", { name: "Aerial Systems Lab" });
+    fireEvent.click(screen.getByRole("button", { name: "Organization" }));
+    const dialog = screen.getByRole("dialog", { name: "Organization details" });
+    expect(within(dialog).getByText("shared-flight-secret")).toBeVisible();
+    expect(within(dialog).queryByLabelText("Organization name")).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Save password" })).not.toBeInTheDocument();
   });
 });

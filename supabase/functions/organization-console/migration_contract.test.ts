@@ -18,6 +18,10 @@ const passwordMigrationUrl = new URL(
   "../../migrations/20261020030000_secure_organization_join_password.sql",
   import.meta.url,
 );
+const recoverablePasswordMigrationUrl = new URL(
+  "../../migrations/20261020031000_encrypt_recoverable_organization_join_secret.sql",
+  import.meta.url,
+);
 
 const migration = (
   await Promise.all([
@@ -25,6 +29,7 @@ const migration = (
     Deno.readTextFile(extensionMigrationUrl),
     Deno.readTextFile(hierarchyMigrationUrl),
     Deno.readTextFile(passwordMigrationUrl),
+    Deno.readTextFile(recoverablePasswordMigrationUrl),
   ])
 ).join("\n");
 
@@ -153,4 +158,5 @@ Deno.test("organization passwords are one-way hashed and required for joins", ()
   assert(migration.includes("extensions.crypt(p_password, organization.join_password_hash)"), "join password verification missing");
   assert(migration.includes("drop function if exists public.organization_request_join(uuid, text, text)"), "passwordless join entry point must be removed");
   assert(!migration.includes("join_password text"), "plaintext organization passwords must never be stored");
+  assert(migration.includes("join_password_ciphertext text"), "recoverable password must be encrypted at rest");
 });

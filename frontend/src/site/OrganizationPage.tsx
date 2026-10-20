@@ -468,7 +468,7 @@ export function OrganizationPage({
     captureOrganizationTrigger();
     setOrganizationDraftName(snapshot.organization.name);
     setOrganizationDraftPlan(snapshot.organization.plan);
-    setOrganizationDraftPassword("");
+    setOrganizationDraftPassword(snapshot.organization.join_password ?? "");
     setOrganizationDialogOpen(true);
   };
 
@@ -576,14 +576,12 @@ export function OrganizationPage({
             <div><dt>{copy.members}</dt><dd>{snapshot.members.length}</dd></div>
             <div><dt>{copy.delegated}</dt><dd>{adminCount} / {snapshot.admin_limit}</dd></div>
             <div><dt>{copy.code}</dt><dd>{snapshot.organization.public_code}</dd></div>
-            <div><dt>{copy.password}</dt><dd>{snapshot.organization.join_password_configured ? copy.passwordConfigured : copy.passwordMissing}</dd></div>
+            <div><dt>{copy.password}</dt><dd>{snapshot.organization.join_password ?? copy.passwordMissing}</dd></div>
           </dl></div>
           {snapshot.actor.role === "owner" ? <div className="organization-member-actions">
-            <div className="organization-profile-field"><label htmlFor="organization-profile-name">{copy.name}</label><input id="organization-profile-name" maxLength={120} value={organizationDraftName} onChange={(event) => setOrganizationDraftName(event.target.value)} /></div>
-            <div className="organization-profile-field"><label htmlFor="organization-profile-plan">{copy.plan}</label><select id="organization-profile-plan" value={organizationDraftPlan} onChange={(event) => setOrganizationDraftPlan(event.target.value as OrganizationPlan)}><option value="free">Business Free</option><option value="plus">Business Plus</option><option value="pro">Business Pro</option></select></div>
-            <button type="button" disabled={busy || !organizationDraftName.trim()} onClick={() => void saveOrganization()}><Save aria-hidden="true" />{copy.saveOrganization}</button>
-            <div className="organization-profile-field"><label htmlFor="organization-profile-password">{copy.password}</label><input id="organization-profile-password" type="password" minLength={8} maxLength={72} value={organizationDraftPassword} placeholder={copy.passwordHelp} onChange={(event) => setOrganizationDraftPassword(event.target.value)} /></div>
-            <button type="button" disabled={busy || organizationDraftPassword.length < 8} onClick={() => void saveOrganizationPassword()}><Save aria-hidden="true" />{copy.savePassword}</button>
+            <div className="organization-profile-field is-inline"><label htmlFor="organization-profile-name">{copy.name}</label><input id="organization-profile-name" maxLength={120} value={organizationDraftName} onChange={(event) => setOrganizationDraftName(event.target.value)} /><button type="button" aria-label={copy.saveOrganization} title={copy.saveOrganization} disabled={busy || !organizationDraftName.trim()} onClick={() => void saveOrganization()}><Save aria-hidden="true" /></button></div>
+            <div className="organization-profile-field is-inline"><label htmlFor="organization-profile-plan">{copy.plan}</label><select id="organization-profile-plan" value={organizationDraftPlan} onChange={(event) => setOrganizationDraftPlan(event.target.value as OrganizationPlan)}><option value="free">Business Free</option><option value="plus">Business Plus</option><option value="pro">Business Pro</option></select><button type="button" aria-label={copy.saveOrganization} title={copy.saveOrganization} disabled={busy} onClick={() => void saveOrganization()}><Save aria-hidden="true" /></button></div>
+            <div className="organization-profile-field is-inline"><label htmlFor="organization-profile-password">{copy.password}</label><input id="organization-profile-password" type="text" minLength={8} maxLength={72} value={organizationDraftPassword} onChange={(event) => setOrganizationDraftPassword(event.target.value)} /><button type="button" aria-label={copy.savePassword} title={copy.savePassword} disabled={busy || organizationDraftPassword.length < 8} onClick={() => void saveOrganizationPassword()}><Save aria-hidden="true" /></button></div>
           </div> : null}
           {error ? <p className="organization-error" role="alert">{error}</p> : null}
         </section>

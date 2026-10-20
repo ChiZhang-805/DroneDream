@@ -24,6 +24,7 @@ function snapshot(): OrganizationSnapshot {
       description: "Flight research",
       structure_model: "flat",
       join_password_configured: true,
+      join_password: "shared-flight-secret",
     },
     actor: {
       user_id: ACTOR_ID,

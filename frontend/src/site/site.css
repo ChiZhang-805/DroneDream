@@ -1575,8 +1575,12 @@ html[lang="zh-CN"] .site-hero h1 {
 .organization-profile-field label { color: #6d6777; font-size: 12px; font-weight: 800; }
 .organization-profile-field input,
 .organization-profile-field select { width: 100%; height: 44px; border: 1px solid rgba(91,73,144,.2); border-radius: 11px; background: #fff; padding: 0 13px; color: #171322; -webkit-text-fill-color: #171322; font: inherit; }
-.organization-information-dialog .organization-member-actions > button { display: inline-flex; align-items: center; justify-content: center; justify-self: end; gap: 8px; min-width: 190px; }
-.organization-information-dialog .organization-member-actions > button svg { width: 17px; height: 17px; }
+.organization-profile-field.is-inline { grid-template-columns: 150px minmax(0, 1fr) 44px; align-items: center; gap: 12px; }
+.organization-profile-field.is-inline label { font-size: 13px; }
+.organization-profile-field.is-inline input,
+.organization-profile-field.is-inline select { min-width: 0; }
+.organization-profile-field.is-inline button { display: grid; width: 44px; height: 44px; min-height: 44px; padding: 0; place-items: center; }
+.organization-profile-field.is-inline button svg { width: 18px; height: 18px; }
 .organization-member-edit-row { display: grid; grid-template-columns: minmax(145px, .42fr) minmax(0, 1fr) 42px; align-items: center; gap: 12px; }
 .organization-member-edit-row.is-department { grid-template-columns: minmax(145px, .42fr) minmax(0, 1fr); padding-right: 54px; }
 .organization-member-edit-row > label { color: #6d6777; font-size: 13px; font-weight: 800; }

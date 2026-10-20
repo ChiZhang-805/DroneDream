@@ -37,6 +37,7 @@ export interface OrganizationSnapshot {
     description: string;
     structure_model: OrganizationStructure;
     join_password_configured: boolean;
+    join_password: string | null;
   };
   actor: {
     user_id: string;
