@@ -20,14 +20,20 @@ function snapshot(): OrganizationSnapshot {
       plan: "pro",
       status: "active",
       owner_user_id: ACTOR_ID,
+      public_code: "DD00001",
+      description: "Flight research",
+      structure_model: "flat",
     },
     actor: {
       user_id: ACTOR_ID,
       role: "owner",
       can_manage_members: true,
       can_manage_admins: true,
+      can_transfer_founder: true,
     },
     admin_limit: 3,
+    departments: [],
+    join_requests: [],
     members: [{
       id: ACTOR_ID,
       display_name: "Owner",
@@ -58,6 +64,15 @@ function dependencies(
     addMember: () => Promise.resolve(),
     setMemberRole: () => Promise.resolve(),
     removeMember: () => Promise.resolve(),
+    setMemberPlan: () => Promise.resolve(),
+    transferFounder: () => Promise.resolve(),
+    setFounderPlan: () => Promise.resolve(),
+    createOrganization: () => Promise.resolve(),
+    createDepartment: () => Promise.resolve(),
+    assignDepartment: () => Promise.resolve(),
+    searchOrganizations: () => Promise.resolve([]),
+    requestJoin: () => Promise.resolve(),
+    reviewJoin: () => Promise.resolve(),
     ...overrides,
   };
 }
@@ -181,6 +196,43 @@ Deno.test("member role changes and removals pass only the server-derived actor",
     actions[1] === `remove:${ACTOR_ID}:${TARGET_ID}`,
     "remove actor mismatch",
   );
+});
+
+Deno.test("Founder transfer and member plan changes use server-derived authority", async () => {
+  const actions: string[] = [];
+  const deps = dependencies({
+    transferFounder: (actor, target) => { actions.push(`transfer:${actor}:${target}`); return Promise.resolve(); },
+    setMemberPlan: (actor, target, plan) => { actions.push(`plan:${actor}:${target}:${plan}`); return Promise.resolve(); },
+  });
+  const transfer = await handleOrganizationConsoleRequest(
+    request(`/founder/transfer/${TARGET_ID}`, "POST"), deps,
+  );
+  const plan = await handleOrganizationConsoleRequest(
+    request(`/members/${TARGET_ID}`, "PATCH", { plan: "plus" }), deps,
+  );
+  assert(transfer.status === 200 && plan.status === 200, "hierarchy mutations should pass");
+  assert(actions[0] === `transfer:${ACTOR_ID}:${TARGET_ID}`, "transfer actor mismatch");
+  assert(actions[1] === `plan:${ACTOR_ID}:${TARGET_ID}:plus`, "plan actor mismatch");
+});
+
+Deno.test("organization creation accepts only a bounded Business wizard payload", async () => {
+  let action = "";
+  const response = await handleOrganizationConsoleRequest(
+    request("/organizations", "POST", {
+      name: "Aerial Systems Lab",
+      description: "Autonomous flight research",
+      structure: "department_dual",
+      plan: "pro",
+    }),
+    dependencies({
+      createOrganization: (actor, name, description, structure, plan) => {
+        action = `${actor}:${name}:${description}:${structure}:${plan}`;
+        return Promise.resolve();
+      },
+    }),
+  );
+  assert(response.status === 201, "organization creation should return created");
+  assert(action === `${ACTOR_ID}:Aerial Systems Lab:Autonomous flight research:department_dual:pro`, "wizard payload mismatch");
 });
 
 Deno.test("organization mutations reject unknown fields, owner role, and invalid ids", async () => {

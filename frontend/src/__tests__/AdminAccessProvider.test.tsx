@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
     } | null,
     configured: true,
   },
-  getAdminAccess: vi.fn(),
+  getOrganizationAccess: vi.fn(),
 }));
 
 vi.mock("../desktop/bridge", () => ({
@@ -30,8 +30,8 @@ vi.mock("../features/auth/AuthContext", () => ({
   useAuth: () => mocks.auth,
 }));
 
-vi.mock("../features/admin/adminConsole", () => ({
-  getAdminAccess: mocks.getAdminAccess,
+vi.mock("../features/organization/organizationConsole", () => ({
+  getOrganizationAccess: mocks.getOrganizationAccess,
 }));
 
 function Probe() {
@@ -48,16 +48,16 @@ describe("AdminAccessProvider request isolation", () => {
       avatarUrl: null,
     };
     mocks.auth.configured = true;
-    mocks.getAdminAccess.mockReset();
+    mocks.getOrganizationAccess.mockReset();
   });
 
   it("ignores an allowed response that arrives after the account signs out", async () => {
     let resolveAccess: ((value: {
       authorized: boolean;
       role: "owner";
-      permissions: string[];
+      organization_id: string;
     }) => void) | undefined;
-    mocks.getAdminAccess.mockReturnValueOnce(new Promise((resolve) => {
+    mocks.getOrganizationAccess.mockReturnValueOnce(new Promise((resolve) => {
       resolveAccess = resolve;
     }));
 
@@ -81,7 +81,7 @@ describe("AdminAccessProvider request isolation", () => {
     resolveAccess?.({
       authorized: true,
       role: "owner",
-      permissions: ["metrics.read"],
+      organization_id: "organization-1",
     });
     await Promise.resolve();
     await Promise.resolve();

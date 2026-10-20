@@ -40,4 +40,33 @@ describe("console stylesheet contract", () => {
       [...referenced].filter((name) => !defined.has(name)).sort(),
     ).toEqual([]);
   });
+
+  it("keeps native scrollbar rails hidden across the shared desktop and console surface", () => {
+    const stylesheet = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
+    const root = postcss.parse(stylesheet);
+    const universalRule = root.nodes.find((node) => (
+      node.type === "rule"
+      && node.selector?.includes("*::before")
+      && node.selector?.includes("*::after")
+      && node.nodes.some((child) => (
+        child.type === "decl"
+        && child.prop === "scrollbar-width"
+        && child.value === "none"
+        && child.important
+      ))
+    ));
+    const webkitRule = root.nodes.find((node) => (
+      node.type === "rule"
+      && node.selector === "*::-webkit-scrollbar"
+      && node.nodes.some((child) => (
+        child.type === "decl"
+        && child.prop === "display"
+        && child.value === "none"
+        && child.important
+      ))
+    ));
+
+    expect(universalRule).toBeDefined();
+    expect(webkitRule).toBeDefined();
+  });
 });

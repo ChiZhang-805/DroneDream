@@ -16,7 +16,8 @@ import {
 
 type JsonRecord = Record<string, unknown>;
 export type OrganizationRole = "owner" | "admin" | "member";
-export type OrganizationPlan = "plus" | "pro";
+export type OrganizationPlan = "free" | "plus" | "pro";
+export type OrganizationStructure = "flat" | "department_single" | "department_dual";
 export type EditionId = "universal" | "sim" | "lab" | "field" | "autonomy";
 
 const DEFAULT_ALLOWED_ORIGINS = [
@@ -55,15 +56,26 @@ export interface OrganizationSnapshot {
     plan: OrganizationPlan;
     status: "active" | "suspended";
     owner_user_id: string;
+    public_code: string;
+    description: string;
+    structure_model: OrganizationStructure;
   };
   actor: {
     user_id: string;
     role: OrganizationRole;
     can_manage_members: boolean;
     can_manage_admins: boolean;
+    can_transfer_founder: boolean;
   };
   admin_limit: 3;
   members: OrganizationMember[];
+  departments: Array<{
+    id: string;
+    name: string;
+    manager_user_ids: string[];
+    member_user_ids: string[];
+  }>;
+  join_requests: Array<{ id: string; user_id: string; email: string; display_name: string; requested_plan: OrganizationPlan }>;
 }
 
 export interface OrganizationConsoleDependencies {
@@ -82,6 +94,21 @@ export interface OrganizationConsoleDependencies {
     role: Exclude<OrganizationRole, "owner">,
   ): Promise<void>;
   removeMember(actorUserId: string, targetUserId: string): Promise<void>;
+  setMemberPlan(actorUserId: string, targetUserId: string, plan: OrganizationPlan): Promise<void>;
+  transferFounder(actorUserId: string, targetUserId: string): Promise<void>;
+  setFounderPlan(actorUserId: string, plan: OrganizationPlan): Promise<void>;
+  createOrganization(
+    founderUserId: string,
+    name: string,
+    description: string,
+    structure: OrganizationStructure,
+    plan: OrganizationPlan,
+  ): Promise<void>;
+  createDepartment(actorUserId: string, name: string): Promise<void>;
+  assignDepartment(actorUserId: string, targetUserId: string, departmentId: string): Promise<void>;
+  searchOrganizations(query: string): Promise<Array<{ public_code: string; name: string; description: string; plan: OrganizationPlan; structure_model: OrganizationStructure }>>;
+  requestJoin(userId: string, publicCode: string, plan: OrganizationPlan): Promise<void>;
+  reviewJoin(actorUserId: string, requestId: string, approved: boolean): Promise<void>;
 }
 
 export class OrganizationConsoleError extends Error {
@@ -122,7 +149,7 @@ function corsHeaders(request: Request): HeadersInit {
       ...sensitiveCorsHeaders(request, allowedOrigins()),
       "Access-Control-Allow-Headers":
         "authorization, apikey, content-type, x-client-info",
-      "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
     };
   } catch (error) {
     if (error instanceof SensitiveCorsError) {
@@ -219,6 +246,14 @@ function validRole(value: unknown): value is "admin" | "member" {
   return value === "admin" || value === "member";
 }
 
+function validPlan(value: unknown): value is OrganizationPlan {
+  return value === "free" || value === "plus" || value === "pro";
+}
+
+function validStructure(value: unknown): value is OrganizationStructure {
+  return value === "flat" || value === "department_single" || value === "department_dual";
+}
+
 function displayName(user: User): string {
   const candidate = user.user_metadata.display_name ??
     user.user_metadata.full_name ?? user.user_metadata.name;
@@ -255,6 +290,30 @@ function mapRpcError(error: { message?: string } | null): never {
       "This organization member is protected.",
     ],
     [
+      "ORGANIZATION_FOUNDER_REQUIRES_ADMIN",
+      "ORGANIZATION_FOUNDER_REQUIRES_ADMIN",
+      409,
+      "Founder can only be transferred to an existing administrator.",
+    ],
+    [
+      "ORGANIZATION_MEMBER_PLAN_EXCEEDS_FOUNDER",
+      "ORGANIZATION_MEMBER_PLAN_EXCEEDS_FOUNDER",
+      409,
+      "The selected plan exceeds the organization plan.",
+    ],
+    [
+      "ORGANIZATION_DEPARTMENT_PERMISSION_REQUIRED",
+      "ORGANIZATION_DEPARTMENT_PERMISSION_REQUIRED",
+      403,
+      "This member is outside the administrator's department.",
+    ],
+    [
+      "ORGANIZATION_DEPARTMENT_MANAGER_LIMIT",
+      "ORGANIZATION_DEPARTMENT_MANAGER_LIMIT",
+      409,
+      "This department already has the maximum number of administrators.",
+    ],
+    [
       "ORGANIZATION_ADMIN_LIMIT",
       "ORGANIZATION_ADMIN_LIMIT",
       409,
@@ -271,6 +330,18 @@ function mapRpcError(error: { message?: string } | null): never {
       "ORGANIZATION_USER_NOT_FOUND",
       404,
       "No account matches that email address.",
+    ],
+    [
+      "ORGANIZATION_NOT_FOUND",
+      "ORGANIZATION_NOT_FOUND",
+      404,
+      "No organization matches that code.",
+    ],
+    [
+      "ORGANIZATION_JOIN_REQUEST_NOT_FOUND",
+      "ORGANIZATION_JOIN_REQUEST_NOT_FOUND",
+      404,
+      "This join request is no longer pending.",
     ],
   ];
   for (const [needle, code, status, safeMessage] of mappings) {
@@ -337,9 +408,9 @@ function actualDependencies(): OrganizationConsoleDependencies {
           403,
         );
       }
-      const [organizationResult, memberResult] = await Promise.all([
+      const [organizationResult, memberResult, departmentResult, assignmentResult, joinRequestResult] = await Promise.all([
         client.from("organizations")
-          .select("organization_id,name,plan,status,owner_user_id")
+          .select("organization_id,name,plan,status,owner_user_id,public_code,description,structure_model")
           .eq("organization_id", actorAccess.organization_id)
           .single(),
         client.from("organization_members")
@@ -348,9 +419,21 @@ function actualDependencies(): OrganizationConsoleDependencies {
           .eq("status", "active")
           .order("role")
           .limit(MAX_MEMBERS + 1),
+        client.from("organization_departments")
+          .select("department_id,name")
+          .eq("organization_id", actorAccess.organization_id)
+          .order("created_at"),
+        client.from("organization_department_assignments")
+          .select("department_id,user_id,assignment_role")
+          .eq("organization_id", actorAccess.organization_id),
+        client.from("organization_join_requests")
+          .select("request_id,user_id,requested_plan")
+          .eq("organization_id", actorAccess.organization_id)
+          .eq("status", "pending")
+          .order("created_at"),
       ]);
       if (
-        organizationResult.error || memberResult.error ||
+        organizationResult.error || memberResult.error || departmentResult.error || assignmentResult.error || joinRequestResult.error ||
         !organizationResult.data
       ) {
         throw new OrganizationConsoleError(
@@ -368,6 +451,7 @@ function actualDependencies(): OrganizationConsoleDependencies {
         );
       }
       const userIds = rawMembers.map((row) => String(row.user_id));
+      const joinUserIds = (joinRequestResult.data ?? []).map((row) => String(row.user_id));
       const [entitlements, licenses, users] = await Promise.all([
         userIds.length
           ? client.from("account_entitlements")
@@ -415,6 +499,12 @@ function actualDependencies(): OrganizationConsoleDependencies {
         ]);
       }
       const userById = new Map(users.map((user) => [user.id, user]));
+      const joinUsers = await Promise.all(joinUserIds.map(async (joinUserId) => {
+        const result = await client.auth.admin.getUserById(joinUserId);
+        if (result.error || !result.data.user) throw new OrganizationConsoleError("ORGANIZATION_USER_LOOKUP_FAILED", "An organization join request is unavailable.", 503);
+        return result.data.user;
+      }));
+      const joinUserById = new Map(joinUsers.map((user) => [user.id, user]));
       const members: OrganizationMember[] = rawMembers.map((row) => {
         const id = String(row.user_id);
         const user = userById.get(id);
@@ -447,15 +537,36 @@ function actualDependencies(): OrganizationConsoleDependencies {
           plan: organization.plan as OrganizationPlan,
           status: organization.status as "active" | "suspended",
           owner_user_id: String(organization.owner_user_id),
+          public_code: String(organization.public_code),
+          description: String(organization.description ?? ""),
+          structure_model: organization.structure_model as OrganizationStructure,
         },
         actor: {
           user_id: userId,
           role: actorAccess.role,
           can_manage_members: true,
           can_manage_admins: actorAccess.role === "owner",
+          can_transfer_founder: actorAccess.role === "owner",
         },
         admin_limit: 3,
         members,
+        departments: (departmentResult.data ?? []).map((department) => {
+          const assignments = (assignmentResult.data ?? []).filter((row) => String(row.department_id) === String(department.department_id));
+          return {
+            id: String(department.department_id),
+            name: String(department.name),
+            manager_user_ids: assignments.filter((row) => row.assignment_role === "manager").map((row) => String(row.user_id)),
+            member_user_ids: assignments.filter((row) => row.assignment_role === "member").map((row) => String(row.user_id)),
+          };
+        }),
+        join_requests: (joinRequestResult.data ?? []).map((row) => {
+          const joinUser = joinUserById.get(String(row.user_id));
+          return {
+            id: String(row.request_id), user_id: String(row.user_id),
+            email: joinUser?.email ?? "", display_name: joinUser ? displayName(joinUser) : "DroneDream user",
+            requested_plan: row.requested_plan as OrganizationPlan,
+          };
+        }),
       };
     },
     async findUserIdByEmail(email) {
@@ -491,6 +602,74 @@ function actualDependencies(): OrganizationConsoleDependencies {
       });
       if (error) mapRpcError(error);
     },
+    async setMemberPlan(actorUserId, targetUserId, plan) {
+      const { error } = await client.rpc("organization_set_member_plan", {
+        p_actor_user_id: actorUserId,
+        p_target_user_id: targetUserId,
+        p_plan_id: plan,
+      });
+      if (error) mapRpcError(error);
+    },
+    async transferFounder(actorUserId, targetUserId) {
+      const { error } = await client.rpc("organization_transfer_founder", {
+        p_actor_user_id: actorUserId,
+        p_target_user_id: targetUserId,
+      });
+      if (error) mapRpcError(error);
+    },
+    async setFounderPlan(actorUserId, plan) {
+      const { error } = await client.rpc("organization_set_founder_plan", {
+        p_actor_user_id: actorUserId,
+        p_plan_id: plan,
+      });
+      if (error) mapRpcError(error);
+    },
+    async createOrganization(founderUserId, name, description, structure, plan) {
+      const { error } = await client.rpc("organization_create_v2", {
+        p_founder_user_id: founderUserId,
+        p_name: name,
+        p_description: description,
+        p_structure_model: structure,
+        p_founder_plan: plan,
+      });
+      if (error) mapRpcError(error);
+    },
+    async createDepartment(actorUserId, name) {
+      const { error } = await client.rpc("organization_create_department", {
+        p_actor_user_id: actorUserId,
+        p_name: name,
+      });
+      if (error) mapRpcError(error);
+    },
+    async assignDepartment(actorUserId, targetUserId, departmentId) {
+      const { error } = await client.rpc("organization_assign_department", {
+        p_actor_user_id: actorUserId,
+        p_target_user_id: targetUserId,
+        p_department_id: departmentId,
+      });
+      if (error) mapRpcError(error);
+    },
+    async searchOrganizations(query) {
+      const normalized = query.trim();
+      let builder = client.from("organizations")
+        .select("public_code,name,description,plan,structure_model")
+        .eq("status", "active")
+        .limit(12);
+      builder = /^DD[0-9]{1,5}$/iu.test(normalized)
+        ? builder.ilike("public_code", `${normalized}%`)
+        : builder.ilike("name", `%${normalized.replace(/[%_]/gu, "")}%`);
+      const { data, error } = await builder;
+      if (error) throw new OrganizationConsoleError("ORGANIZATION_SEARCH_FAILED", "Organizations could not be searched.", 503);
+      return (data ?? []) as Array<{ public_code: string; name: string; description: string; plan: OrganizationPlan; structure_model: OrganizationStructure }>;
+    },
+    async requestJoin(userId, publicCode, plan) {
+      const { error } = await client.rpc("organization_request_join", { p_user_id: userId, p_public_code: publicCode, p_plan_id: plan });
+      if (error) mapRpcError(error);
+    },
+    async reviewJoin(actorUserId, requestId, approved) {
+      const { error } = await client.rpc("organization_review_join_request", { p_actor_user_id: actorUserId, p_request_id: requestId, p_approved: approved });
+      if (error) mapRpcError(error);
+    },
   };
 }
 
@@ -515,10 +694,68 @@ export async function handleOrganizationConsoleRequest(
     if (request.method === "GET" && route === "/access") {
       return jsonResponse(request, 200, { data: await deps.access(actor.id) });
     }
+    if (request.method === "GET" && route === "/organizations/search") {
+      const query = new URL(request.url).searchParams.get("q")?.trim() ?? "";
+      if (query.length < 2 || query.length > 80) throw new OrganizationConsoleError("INVALID_REQUEST", "Enter an organization name or code.", 400);
+      return jsonResponse(request, 200, { data: await deps.searchOrganizations(query) });
+    }
+    if (request.method === "POST" && route === "/join-requests") {
+      const body = await readBoundedJsonObject(request, MAX_BODY_BYTES);
+      if (!exactKeys(body, ["public_code", "plan"]) || typeof body.public_code !== "string" || !/^DD[0-9]{5}$/u.test(body.public_code.toUpperCase()) || !validPlan(body.plan)) {
+        throw new OrganizationConsoleError("INVALID_REQUEST", "A valid organization code and Business plan are required.", 400);
+      }
+      await deps.requestJoin(actor.id, body.public_code.toUpperCase(), body.plan);
+      return jsonResponse(request, 201, { data: { requested: true } });
+    }
     if (request.method === "GET" && route === "/") {
       return jsonResponse(request, 200, {
         data: await deps.snapshot(actor.id),
       });
+    }
+    if (request.method === "POST" && route === "/organizations") {
+      const body = await readBoundedJsonObject(request, MAX_BODY_BYTES);
+      if (
+        !exactKeys(body, ["name", "description", "structure", "plan"]) ||
+        typeof body.name !== "string" || typeof body.description !== "string" ||
+        body.name.trim().length < 1 || body.name.trim().length > 120 ||
+        body.description.trim().length > 500 || !validStructure(body.structure) ||
+        !validPlan(body.plan)
+      ) {
+        throw new OrganizationConsoleError("INVALID_REQUEST", "Valid organization details are required.", 400);
+      }
+      await deps.createOrganization(actor.id, body.name.trim(), body.description.trim(), body.structure, body.plan);
+      return jsonResponse(request, 201, { data: await deps.snapshot(actor.id) });
+    }
+    if (request.method === "PATCH" && route === "/plan") {
+      const body = await readBoundedJsonObject(request, MAX_BODY_BYTES);
+      if (!exactKeys(body, ["plan"]) || !validPlan(body.plan)) {
+        throw new OrganizationConsoleError("INVALID_REQUEST", "A valid Business plan is required.", 400);
+      }
+      await deps.setFounderPlan(actor.id, body.plan);
+      return jsonResponse(request, 200, { data: await deps.snapshot(actor.id) });
+    }
+    if (request.method === "POST" && route === "/departments") {
+      const body = await readBoundedJsonObject(request, MAX_BODY_BYTES);
+      if (!exactKeys(body, ["name"]) || typeof body.name !== "string" || body.name.trim().length < 1 || body.name.trim().length > 80) {
+        throw new OrganizationConsoleError("INVALID_REQUEST", "A valid department name is required.", 400);
+      }
+      await deps.createDepartment(actor.id, body.name.trim());
+      return jsonResponse(request, 201, { data: await deps.snapshot(actor.id) });
+    }
+    const joinReviewMatch = /^\/join-requests\/([0-9a-f-]{36})$/iu.exec(route);
+    if (joinReviewMatch?.[1] && request.method === "PATCH") {
+      const body = await readBoundedJsonObject(request, MAX_BODY_BYTES);
+      if (!validUuid(joinReviewMatch[1]) || !exactKeys(body, ["approved"]) || typeof body.approved !== "boolean") throw new OrganizationConsoleError("INVALID_REQUEST", "A valid join decision is required.", 400);
+      await deps.reviewJoin(actor.id, joinReviewMatch[1], body.approved);
+      return jsonResponse(request, 200, { data: await deps.snapshot(actor.id) });
+    }
+    const departmentAssignmentMatch = /^\/departments\/([0-9a-f-]{36})\/members\/([0-9a-f-]{36})$/iu.exec(route);
+    if (departmentAssignmentMatch?.[1] && departmentAssignmentMatch?.[2] && request.method === "PUT") {
+      if (!validUuid(departmentAssignmentMatch[1]) || !validUuid(departmentAssignmentMatch[2])) {
+        throw new OrganizationConsoleError("INVALID_REQUEST", "The department assignment is invalid.", 400);
+      }
+      await deps.assignDepartment(actor.id, departmentAssignmentMatch[2], departmentAssignmentMatch[1]);
+      return jsonResponse(request, 200, { data: await deps.snapshot(actor.id) });
     }
     if (request.method === "POST" && route === "/members") {
       const body = await readBoundedJsonObject(request, MAX_BODY_BYTES);
@@ -549,6 +786,10 @@ export async function handleOrganizationConsoleRequest(
     }
     if (memberMatch?.[1] && request.method === "PATCH") {
       const body = await readBoundedJsonObject(request, MAX_BODY_BYTES);
+      if (exactKeys(body, ["plan"]) && validPlan(body.plan)) {
+        await deps.setMemberPlan(actor.id, memberMatch[1], body.plan);
+        return jsonResponse(request, 200, { data: await deps.snapshot(actor.id) });
+      }
       if (!exactKeys(body, ["role"]) || !validRole(body.role)) {
         throw new OrganizationConsoleError(
           "INVALID_REQUEST",
@@ -560,6 +801,14 @@ export async function handleOrganizationConsoleRequest(
       return jsonResponse(request, 200, {
         data: await deps.snapshot(actor.id),
       });
+    }
+    const transferMatch = /^\/founder\/transfer\/([0-9a-f-]{36})$/iu.exec(route);
+    if (transferMatch?.[1] && request.method === "POST") {
+      if (!validUuid(transferMatch[1])) {
+        throw new OrganizationConsoleError("INVALID_MEMBER_ID", "The member id is invalid.", 400);
+      }
+      await deps.transferFounder(actor.id, transferMatch[1]);
+      return jsonResponse(request, 200, { data: await deps.snapshot(actor.id) });
     }
     if (memberMatch?.[1] && request.method === "DELETE") {
       await deps.removeMember(actor.id, memberMatch[1]);

@@ -2,10 +2,15 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const organizationMock = vi.hoisted(() => ({
+  getOrganizationAccess: vi.fn(),
   getOrganizationSnapshot: vi.fn(),
   addOrganizationMember: vi.fn(),
   setOrganizationMemberRole: vi.fn(),
   removeOrganizationMember: vi.fn(),
+  setOrganizationMemberPlan: vi.fn(),
+  setOrganizationPlan: vi.fn(),
+  transferOrganizationFounder: vi.fn(),
+  createOrganization: vi.fn(),
 }));
 
 vi.mock("../features/organization/organizationConsole", async () => {
@@ -25,6 +30,9 @@ function snapshot(role: "owner" | "admin" = "owner") {
       plan: "pro" as const,
       status: "active" as const,
       owner_user_id: "11111111-1111-4111-8111-111111111111",
+      public_code: "DD00001",
+      description: "Flight research",
+      structure_model: "flat" as const,
     },
     actor: {
       user_id: role === "owner"
@@ -33,8 +41,11 @@ function snapshot(role: "owner" | "admin" = "owner") {
       role,
       can_manage_members: true,
       can_manage_admins: role === "owner",
+      can_transfer_founder: role === "owner",
     },
     admin_limit: 3 as const,
+    departments: [],
+    join_requests: [],
     members: [
       {
         id: "11111111-1111-4111-8111-111111111111",
@@ -75,11 +86,17 @@ function snapshot(role: "owner" | "admin" = "owner") {
 
 describe("OrganizationPage", () => {
   beforeEach(() => {
+    window.history.replaceState({}, "", "/organization/");
     Object.values(organizationMock).forEach((mock) => mock.mockReset());
+    organizationMock.getOrganizationAccess.mockResolvedValue({ authorized: true, organization_id: "33333333-3333-4333-8333-333333333333", role: "owner" });
     organizationMock.getOrganizationSnapshot.mockResolvedValue(snapshot());
     organizationMock.addOrganizationMember.mockResolvedValue(snapshot());
     organizationMock.setOrganizationMemberRole.mockResolvedValue(snapshot());
     organizationMock.removeOrganizationMember.mockResolvedValue(snapshot());
+    organizationMock.setOrganizationMemberPlan.mockResolvedValue(snapshot());
+    organizationMock.setOrganizationPlan.mockResolvedValue(snapshot());
+    organizationMock.transferOrganizationFounder.mockResolvedValue(snapshot());
+    organizationMock.createOrganization.mockResolvedValue(snapshot());
   });
 
   it("renders a compact member directory and five explicit application marks", async () => {
@@ -147,5 +164,33 @@ describe("OrganizationPage", () => {
       .not.toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Save role" }))
       .not.toBeInTheDocument();
+  });
+
+  it("creates a Business organization through the two-step architecture wizard", async () => {
+    organizationMock.getOrganizationAccess.mockResolvedValueOnce({ authorized: false, organization_id: null, role: null });
+    render(<OrganizationPage locale="en" accountId="new-founder" />);
+    expect(await screen.findByRole("heading", { name: "How would you like to use Business?" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Create a new organization" }));
+    fireEvent.change(screen.getByLabelText("Organization name"), { target: { value: "Flight Lab" } });
+    fireEvent.change(screen.getByLabelText("Organization description"), { target: { value: "Research team" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    fireEvent.click(screen.getByText("Departments · two managers"));
+    fireEvent.change(screen.getByLabelText("Founder Business plan"), { target: { value: "plus" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create organization" }));
+    await waitFor(() => expect(organizationMock.createOrganization).toHaveBeenCalledWith({
+      name: "Flight Lab", description: "Research team", structure: "department_dual", plan: "plus",
+    }));
+  });
+
+  it("carries the selected Business tier into both onboarding paths", async () => {
+    window.history.replaceState({}, "", "/organization/?plan=plus");
+    organizationMock.getOrganizationAccess.mockResolvedValueOnce({ authorized: false, organization_id: null, role: null });
+    render(<OrganizationPage locale="en" accountId="new-founder" />);
+    await screen.findByRole("heading", { name: "How would you like to use Business?" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Create a new organization" }));
+    fireEvent.change(screen.getByLabelText("Organization name"), { target: { value: "Flight Lab" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(screen.getByLabelText("Founder Business plan")).toHaveValue("plus");
   });
 });

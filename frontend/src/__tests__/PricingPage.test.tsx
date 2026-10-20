@@ -164,6 +164,25 @@ describe("PricingPage payment channels", () => {
       .toBeVisible();
   });
 
+  it("starts the organization wizard for every Business tier, including Free", async () => {
+    const onStartBusinessOrganization = vi.fn();
+    render(
+      <PricingPage
+        locale="en"
+        authenticated
+        onRequireAccount={vi.fn()}
+        onStartBusinessOrganization={onStartBusinessOrganization}
+      />,
+    );
+
+    await screen.findByText(/3,000,000 managed AI credits/i);
+    fireEvent.click(screen.getByRole("tab", { name: "Business" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start free" }));
+
+    expect(onStartBusinessOrganization).toHaveBeenCalledWith("free");
+    expect(billingMock.createBillingCheckout).not.toHaveBeenCalled();
+  });
+
   it("quietly keeps the HTTP mirror read-only without probing or creating billing", () => {
     render(
       <PricingPage

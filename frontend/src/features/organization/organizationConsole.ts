@@ -3,7 +3,8 @@ import { getAuthAccessToken } from "../auth/authTokenStore";
 import type { SoftwareEditionId } from "../licensing/softwareLicense";
 
 export type OrganizationRole = "owner" | "admin" | "member";
-export type OrganizationPlan = "plus" | "pro";
+export type OrganizationPlan = "free" | "plus" | "pro";
+export type OrganizationStructure = "flat" | "department_single" | "department_dual";
 export type EditionLicenseId = SoftwareEditionId;
 
 export interface OrganizationAccess {
@@ -31,15 +32,26 @@ export interface OrganizationSnapshot {
     plan: OrganizationPlan;
     status: "active" | "suspended";
     owner_user_id: string;
+    public_code: string;
+    description: string;
+    structure_model: OrganizationStructure;
   };
   actor: {
     user_id: string;
     role: OrganizationRole;
     can_manage_members: boolean;
     can_manage_admins: boolean;
+    can_transfer_founder: boolean;
   };
   admin_limit: 3;
   members: OrganizationMember[];
+  departments: Array<{
+    id: string;
+    name: string;
+    manager_user_ids: string[];
+    member_user_ids: string[];
+  }>;
+  join_requests: Array<{ id: string; user_id: string; email: string; display_name: string; requested_plan: OrganizationPlan }>;
 }
 
 export class OrganizationConsoleError extends Error {
@@ -146,5 +158,82 @@ export function removeOrganizationMember(
 ): Promise<OrganizationSnapshot> {
   return request<OrganizationSnapshot>(`/members/${encodeURIComponent(userId)}`, {
     method: "DELETE",
+  });
+}
+
+export function setOrganizationMemberPlan(
+  userId: string,
+  plan: OrganizationPlan,
+): Promise<OrganizationSnapshot> {
+  return request<OrganizationSnapshot>(`/members/${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ plan }),
+  });
+}
+
+export function transferOrganizationFounder(userId: string): Promise<OrganizationSnapshot> {
+  return request<OrganizationSnapshot>(`/founder/transfer/${encodeURIComponent(userId)}`, {
+    method: "POST",
+  });
+}
+
+export function setOrganizationPlan(plan: OrganizationPlan): Promise<OrganizationSnapshot> {
+  return request<OrganizationSnapshot>("/plan", {
+    method: "PATCH",
+    body: JSON.stringify({ plan }),
+  });
+}
+
+export function createOrganization(input: {
+  name: string;
+  description: string;
+  structure: OrganizationStructure;
+  plan: OrganizationPlan;
+}): Promise<OrganizationSnapshot> {
+  return request<OrganizationSnapshot>("/organizations", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function createOrganizationDepartment(name: string): Promise<OrganizationSnapshot> {
+  return request<OrganizationSnapshot>("/departments", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export function assignOrganizationDepartment(
+  departmentId: string,
+  userId: string,
+): Promise<OrganizationSnapshot> {
+  return request<OrganizationSnapshot>(`/departments/${encodeURIComponent(departmentId)}/members/${encodeURIComponent(userId)}`, {
+    method: "PUT",
+  });
+}
+
+export interface OrganizationSearchResult {
+  public_code: string;
+  name: string;
+  description: string;
+  plan: OrganizationPlan;
+  structure_model: OrganizationStructure;
+}
+
+export function searchOrganizations(query: string): Promise<OrganizationSearchResult[]> {
+  return request<OrganizationSearchResult[]>(`/organizations/search?q=${encodeURIComponent(query)}`);
+}
+
+export function requestOrganizationJoin(publicCode: string, plan: OrganizationPlan): Promise<{ requested: true }> {
+  return request<{ requested: true }>("/join-requests", {
+    method: "POST",
+    body: JSON.stringify({ public_code: publicCode, plan }),
+  });
+}
+
+export function reviewOrganizationJoin(requestId: string, approved: boolean): Promise<OrganizationSnapshot> {
+  return request<OrganizationSnapshot>(`/join-requests/${encodeURIComponent(requestId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ approved }),
   });
 }

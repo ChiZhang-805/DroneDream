@@ -12051,6 +12051,27 @@ a {
   box-shadow: none;
 }
 
+.settings-workspace-admin {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.7rem;
+  padding: 0.65rem 0.8rem;
+  color: var(--text);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  font-weight: 650;
+  text-align: left;
+}
+.settings-workspace-admin:hover,
+.settings-workspace-admin:focus-visible {
+  background: color-mix(in srgb, var(--dd-brand-start) 12%, var(--bg-elev-2));
+}
+.settings-workspace-admin svg { width: 18px; height: 18px; color: var(--dd-brand-start); }
+
 .settings-workspace-back {
   width: 100%;
   min-height: 42px;
@@ -23305,6 +23326,23 @@ body {
 .app-shell .settings-workspace-content .settings-model-reset-row,
 .app-shell .settings-workspace-content .settings-model-usage-footer {
   padding-inline: 0;
+}
+
+/* Desktop and browser console are one visual product surface. Native scrollbar
+   rails must never consume canvas space or appear over the shared application
+   layout; wheel, touch and keyboard scrolling remain fully available. */
+*,
+*::before,
+*::after {
+  scrollbar-width: none !important;
+  scrollbar-gutter: auto !important;
+  -ms-overflow-style: none !important;
+}
+
+*::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 /* Settings detail polish: preserve the single-screen composition while giving

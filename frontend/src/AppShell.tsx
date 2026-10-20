@@ -1005,6 +1005,7 @@ function SettingsDialog({
   const setAppearancePreference = editionTheme.setAppearance;
   const setCustomAccentPreference = editionTheme.setCustomAccent;
   const auth = useAuth();
+  const adminAccess = useAdminAccess();
   const {
     settings: modelAccess,
     selectAccessMode,
@@ -1904,6 +1905,16 @@ function SettingsDialog({
           {settingsCopy.courseOpen}
           <ArrowRight aria-hidden="true" />
         </a>
+      ) : null}
+      sidebarAction={edition === "universal" && adminAccess.status === "allowed" ? (
+        <button
+          type="button"
+          className="settings-workspace-admin"
+          onClick={() => { onClose(); navigate("/admin"); }}
+        >
+          <ShieldCheck aria-hidden="true" />
+          <span>{interfaceLocale === "zh-CN" ? "管理端" : "Administration"}</span>
+        </button>
       ) : null}
     >
       <EditionSettingsPanel active={activeSettingsTab === "general"} id="general">
@@ -3916,7 +3927,6 @@ function AppShellContent() {
   const desktopRuntime = isDesktopRuntime();
   const runtimeAccess = useDesktopRuntimeAccess();
   const auth = useAuth();
-  const adminAccess = useAdminAccess();
   const updater = useAppUpdaterState();
 
   useEffect(() => {
@@ -4800,18 +4810,6 @@ function AppShellContent() {
               </Fragment>
             );
           })}
-          {activeThemeEdition === "universal" && adminAccess.status === "allowed" ? (
-            <NavLink
-              to="/admin"
-              onClick={() => setMobileMenuOpen(false)}
-              className={({ isActive }) => isActive ? "active" : undefined}
-            >
-              <span className="app-nav-entry">
-                <ShieldCheck aria-hidden="true" strokeWidth={1.75} />
-                <span>{locale === "zh-CN" ? "管理端" : "Admin"}</span>
-              </span>
-            </NavLink>
-          ) : null}
           </nav>
           {activeThemeEdition === "autonomy" || activeThemeEdition === "universal" ? <AutonomyConversationSidebar
             ownerId={auth.account?.id ?? "local"}

@@ -48,6 +48,7 @@ export function EditionSettingsSurface({
   presentation = "dialog",
   backLabel,
   headerAction,
+  sidebarAction,
 }: {
   activeTab: SettingsSurfaceTabId;
   closeLabel: string;
@@ -62,6 +63,7 @@ export function EditionSettingsSurface({
   presentation?: "dialog" | "workspace";
   backLabel?: string;
   headerAction?: ReactNode;
+  sidebarAction?: ReactNode;
 }) {
   const tabRefs = useRef(new Map<SettingsSurfaceTabId, HTMLButtonElement>());
   useEffect(() => {
@@ -167,6 +169,7 @@ export function EditionSettingsSurface({
         <aside className="settings-workspace-sidebar">
           <h2 id="launcher-settings-title">{title}</h2>
           {navigation}
+          {sidebarAction ?? null}
           <button
             type="button"
             className="settings-workspace-back"

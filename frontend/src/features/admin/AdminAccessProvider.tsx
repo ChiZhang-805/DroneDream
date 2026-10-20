@@ -36,8 +36,27 @@ export function AdminAccessProvider({ children }: { children: ReactNode }) {
     setStatus("loading");
     setError(null);
     try {
-      const { getAdminAccess } = await import("./adminConsole");
-      const snapshot = await getAdminAccess();
+      if (preview) {
+        const { getAdminAccess } = await import("./adminConsole");
+        const snapshot = await getAdminAccess();
+        if (generation !== requestGeneration.current) return;
+        setAccess(snapshot);
+        setStatus(snapshot.authorized ? "allowed" : "denied");
+        return;
+      }
+      const { getOrganizationAccess } = await import("../organization/organizationConsole");
+      const organization = await getOrganizationAccess();
+      const snapshot: AdminAccessSnapshot = {
+        authorized: organization.authorized,
+        role: organization.role === "owner" || organization.role === "admin"
+          ? organization.role
+          : null,
+        permissions: organization.role === "owner"
+          ? ["organization.members", "organization.admins", "organization.founder"]
+          : organization.role === "admin"
+            ? ["organization.members"]
+            : [],
+      };
       if (generation !== requestGeneration.current) return;
       setAccess(snapshot);
       setStatus(snapshot.authorized ? "allowed" : "denied");

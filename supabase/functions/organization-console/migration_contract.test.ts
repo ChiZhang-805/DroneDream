@@ -10,11 +10,16 @@ const extensionMigrationUrl = new URL(
   "../../migrations/20260830010000_complete_account_cloud_contracts.sql",
   import.meta.url,
 );
+const hierarchyMigrationUrl = new URL(
+  "../../migrations/20261020020000_complete_organization_role_hierarchy.sql",
+  import.meta.url,
+);
 
 const migration = (
   await Promise.all([
     Deno.readTextFile(baseMigrationUrl),
     Deno.readTextFile(extensionMigrationUrl),
+    Deno.readTextFile(hierarchyMigrationUrl),
   ])
 ).join("\n");
 
@@ -110,4 +115,29 @@ Deno.test("edition licenses stay explicit and compact for all five applications"
     migration.includes("primary key (user_id, edition)"),
     "a user must have one authoritative state per edition",
   );
+});
+
+Deno.test("Founder transfer is restricted to administrators and is atomic", () => {
+  const transfer = migration.slice(
+    migration.indexOf("create or replace function public.organization_transfer_founder"),
+    migration.indexOf("revoke all on function public.organization_transfer_founder"),
+  );
+  assert(transfer.includes("target.role <> 'admin'"), "Founder must transfer only to an admin");
+  assert(transfer.includes("set role = 'owner'"), "target must become Founder");
+  assert(transfer.includes("set role = 'admin'"), "previous Founder must become admin");
+  assert(transfer.includes("set owner_user_id = target.user_id"), "organization owner must move atomically");
+});
+
+Deno.test("Business plan ceilings and downgrade clamping are database enforced", () => {
+  assert(migration.includes("ORGANIZATION_MEMBER_PLAN_EXCEEDS_FOUNDER"), "member plan ceiling missing");
+  assert(migration.includes("when 'pro' then p_plan_id in ('free', 'plus', 'pro')"), "Pro matrix missing");
+  assert(migration.includes("when 'plus' then p_plan_id in ('free', 'plus')"), "Plus matrix missing");
+  assert(migration.includes("else p_plan_id = 'free'"), "Free matrix missing");
+  assert(migration.includes("A Founder upgrade never changes members"), "upgrade preservation missing");
+});
+
+Deno.test("department structures enforce one or two scoped managers", () => {
+  assert(migration.includes("structure_model in ('flat', 'department_single', 'department_dual')"), "structure models missing");
+  assert(migration.includes("structure = 'department_single' then 1 else 2"), "department manager limits missing");
+  assert(migration.includes("ORGANIZATION_DEPARTMENT_PERMISSION_REQUIRED"), "department-scoped plan management missing");
 });

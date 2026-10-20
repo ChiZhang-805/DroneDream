@@ -161,10 +161,9 @@ function appRoutes(desktopRuntime: boolean): RouteObject[] {
         {
           path: "admin",
           lazy: async () => {
-            const { AdminPage } = await import("./pages/AdminPage");
-            return { Component: AdminPage };
+            const { OrganizationAdminPage } = await import("./pages/OrganizationAdminPage");
+            return { Component: OrganizationAdminPage };
           },
-          loader: desktopRuntime ? () => redirect("/assistant") : undefined,
         },
         { path: "batches/*", loader: () => redirect("/dashboard") },
         {

@@ -52,6 +52,8 @@ interface PricingPageProps {
   locale: SiteLocale;
   authenticated: boolean;
   onRequireAccount: () => void;
+  organizationHref?: string;
+  onStartBusinessOrganization?: (plan: Plan["id"]) => void;
   sensitiveCloudActionsEnabled?: boolean;
 }
 
@@ -224,6 +226,8 @@ export function PricingPage({
   locale,
   authenticated,
   onRequireAccount,
+  organizationHref = "/organization/",
+  onStartBusinessOrganization,
   sensitiveCloudActionsEnabled = true,
 }: PricingPageProps) {
   const copy = pricingContent[locale];
@@ -348,6 +352,16 @@ export function PricingPage({
     if (!sensitiveCloudActionsEnabled) return;
     if (!authenticated) {
       onRequireAccount();
+      return;
+    }
+    if (plan.billingScope === "business") {
+      if (onStartBusinessOrganization) {
+        onStartBusinessOrganization(plan.id);
+      } else {
+        const target = new URL(organizationHref, window.location.origin);
+        target.searchParams.set("plan", plan.id);
+        window.location.assign(target.toString());
+      }
       return;
     }
     if (plan.id === "free") return;

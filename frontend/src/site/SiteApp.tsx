@@ -81,7 +81,7 @@ const content = {
       autonomy: "Natural-language autonomous mission workflows",
     },
     console: "Console",
-    organization: "Manage organization",
+    organization: "Administration",
     accountPlan: "Plan",
     businessPlan: "Business",
     signIn: "Sign in",
@@ -297,7 +297,7 @@ const content = {
       autonomy: "通过自然语言完成自主任务工作流",
     },
     console: "控制台",
-    organization: "企业管理",
+    organization: "管理端",
     accountPlan: "套餐",
     businessPlan: "企业",
     signIn: "登录",
@@ -1335,6 +1335,7 @@ export function SiteApp() {
             locale={locale}
             authenticated={Boolean(auth.account)}
             onRequireAccount={() => openAccount("register")}
+            organizationHref={experienceHref("/organization/")}
           />
         ) : sitePage === "organization" ? (
           <OrganizationPage locale={locale} accountId={auth.account?.id ?? null} />
