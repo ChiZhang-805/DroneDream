@@ -38,6 +38,7 @@ function snapshot(): OrganizationSnapshot {
       id: ACTOR_ID,
       display_name: "Owner",
       email: "owner@example.test",
+      avatar_url: "https://example.test/avatar.png",
       role: "owner",
       plan: "pro",
       subscription_status: "active",
@@ -131,6 +132,10 @@ Deno.test("organization snapshot is compact and includes the four-edition portfo
   const body = await response.json();
   assert(response.status === 200, "owner should read the organization");
   assert(body.data.admin_limit === 3, "delegated admin limit must be explicit");
+  assert(
+    body.data.members[0].avatar_url === "https://example.test/avatar.png",
+    "member avatars must be included in the compact snapshot",
+  );
   assert(
     body.data.members[0].licenses.join(",") === "universal,lab",
     "edition licenses must remain compact",

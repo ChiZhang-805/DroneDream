@@ -17,6 +17,7 @@ export interface OrganizationMember {
   id: string;
   display_name: string;
   email: string;
+  avatar_url: string | null;
   role: OrganizationRole;
   plan: "free" | OrganizationPlan;
   subscription_status: string;
@@ -51,7 +52,7 @@ export interface OrganizationSnapshot {
     manager_user_ids: string[];
     member_user_ids: string[];
   }>;
-  join_requests: Array<{ id: string; user_id: string; email: string; display_name: string; requested_plan: OrganizationPlan }>;
+  join_requests: Array<{ id: string; user_id: string; email: string; display_name: string; avatar_url: string | null; requested_plan: OrganizationPlan }>;
 }
 
 export class OrganizationConsoleError extends Error {

@@ -41,6 +41,7 @@ export interface OrganizationMember {
   id: string;
   display_name: string;
   email: string;
+  avatar_url: string | null;
   role: OrganizationRole;
   plan: "free" | OrganizationPlan;
   subscription_status: string;
@@ -75,7 +76,7 @@ export interface OrganizationSnapshot {
     manager_user_ids: string[];
     member_user_ids: string[];
   }>;
-  join_requests: Array<{ id: string; user_id: string; email: string; display_name: string; requested_plan: OrganizationPlan }>;
+  join_requests: Array<{ id: string; user_id: string; email: string; display_name: string; avatar_url: string | null; requested_plan: OrganizationPlan }>;
 }
 
 export interface OrganizationConsoleDependencies {
@@ -260,6 +261,14 @@ function displayName(user: User): string {
   return typeof candidate === "string" && candidate.trim()
     ? candidate.trim().slice(0, 96)
     : user.email?.split("@")[0] || "DroneDream user";
+}
+
+function avatarUrl(user: User): string | null {
+  const candidate = user.user_metadata.avatar_url ?? user.user_metadata.picture;
+  return typeof candidate === "string" &&
+    (candidate.startsWith("https://") || candidate.startsWith("data:image/"))
+    ? candidate
+    : null;
 }
 
 let cachedClient: SupabaseClient | null = null;
@@ -521,6 +530,7 @@ function actualDependencies(): OrganizationConsoleDependencies {
           id,
           display_name: displayName(user),
           email: user.email,
+          avatar_url: avatarUrl(user),
           role: row.role as OrganizationRole,
           plan: plan === "plus" || plan === "pro" ? plan : "free",
           subscription_status: String(entitlement?.status ?? "active"),
@@ -564,6 +574,7 @@ function actualDependencies(): OrganizationConsoleDependencies {
           return {
             id: String(row.request_id), user_id: String(row.user_id),
             email: joinUser?.email ?? "", display_name: joinUser ? displayName(joinUser) : "DroneDream user",
+            avatar_url: joinUser ? avatarUrl(joinUser) : null,
             requested_plan: row.requested_plan as OrganizationPlan,
           };
         }),

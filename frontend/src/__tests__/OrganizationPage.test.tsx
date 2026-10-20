@@ -51,6 +51,7 @@ function snapshot(role: "owner" | "admin" = "owner") {
         id: "11111111-1111-4111-8111-111111111111",
         display_name: "Organization Owner",
         email: "owner@example.test",
+        avatar_url: "/owner-avatar.png",
         role: "owner" as const,
         plan: "pro" as const,
         subscription_status: "active",
@@ -62,6 +63,7 @@ function snapshot(role: "owner" | "admin" = "owner") {
         id: "22222222-2222-4222-8222-222222222222",
         display_name: "Flight Admin",
         email: "admin@example.test",
+        avatar_url: null,
         role: "admin" as const,
         plan: "pro" as const,
         subscription_status: "active",
@@ -73,6 +75,7 @@ function snapshot(role: "owner" | "admin" = "owner") {
         id: "44444444-4444-4444-8444-444444444444",
         display_name: "Pilot Member",
         email: "pilot@example.test",
+        avatar_url: null,
         role: "member" as const,
         plan: "pro" as const,
         subscription_status: "active",
@@ -111,6 +114,7 @@ describe("OrganizationPage", () => {
       /^(Universal|SIM|LAB|FIELD|AGENT) (not )?licensed$/i,
     )).toHaveLength(5);
     expect(ownerRow?.querySelectorAll(".edition-license-strip .is-active")).toHaveLength(2);
+    expect(within(ownerRow!).getByRole("img")).toHaveAttribute("src", "/owner-avatar.png");
     expect(container.querySelector(".organization-member-table")).toBeVisible();
   });
 
@@ -139,6 +143,9 @@ describe("OrganizationPage", () => {
     const pilotRow = screen.getByText("pilot@example.test").closest("tr");
     fireEvent.click(within(pilotRow!).getByRole("button", { name: "View details" }));
     const dialog = screen.getByRole("dialog", { name: "Pilot Member" });
+    expect(within(dialog).getByRole("button", { name: "Close member details" })).toBeVisible();
+    expect(within(dialog).getByText("Applications").closest("div"))
+      .toHaveClass("organization-member-applications");
     expect(within(dialog).queryByText("Individual · Free")).not.toBeInTheDocument();
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Remove from organization" }));
@@ -171,6 +178,7 @@ describe("OrganizationPage", () => {
     render(<OrganizationPage locale="en" accountId="new-founder" />);
     expect(await screen.findByRole("heading", { name: "How would you like to use Business?" })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Create a new organization" }));
+    expect(screen.getByRole("button", { name: "Back" })).toBeVisible();
     fireEvent.change(screen.getByLabelText("Organization name"), { target: { value: "Flight Lab" } });
     fireEvent.change(screen.getByLabelText("Organization description"), { target: { value: "Research team" } });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));

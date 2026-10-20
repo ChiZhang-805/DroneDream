@@ -12051,27 +12051,6 @@ a {
   box-shadow: none;
 }
 
-.settings-workspace-admin {
-  width: 100%;
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 0.7rem;
-  padding: 0.65rem 0.8rem;
-  color: var(--text);
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background: transparent;
-  font-weight: 650;
-  text-align: left;
-}
-.settings-workspace-admin:hover,
-.settings-workspace-admin:focus-visible {
-  background: color-mix(in srgb, var(--dd-brand-start) 12%, var(--bg-elev-2));
-}
-.settings-workspace-admin svg { width: 18px; height: 18px; color: var(--dd-brand-start); }
-
 .settings-workspace-back {
   width: 100%;
   min-height: 42px;
@@ -12129,6 +12108,20 @@ a {
   width: min(1120px, 100%);
   margin: 0 auto;
   overflow: visible;
+}
+
+.settings-workspace-content .launcher-settings-panel[data-settings-panel="administration"] {
+  width: 100%;
+}
+
+.settings-organization-panel .organization-page {
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+}
+
+.settings-organization-panel .organization-heading h1 {
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
 }
 
 .settings-workspace-content .settings-general-panel {

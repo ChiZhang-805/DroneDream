@@ -2,9 +2,11 @@ import {
   Fragment,
   useCallback,
   useEffect,
+  lazy,
   useMemo,
   useRef,
   useState,
+  Suspense,
   useSyncExternalStore,
 } from "react";
 import type { ChangeEvent, MouseEvent, MutableRefObject, RefObject } from "react";
@@ -951,6 +953,11 @@ function AccountScopedModelAccessProvider() {
 type RuntimeHealthLevel = "unknown" | "healthy" | "warning" | "error";
 type RuntimeCheckVisualState = "pending" | "checking" | "success" | "error";
 
+const OrganizationAdminSettings = lazy(async () => {
+  const module = await import("./pages/OrganizationAdminPage");
+  return { default: module.OrganizationAdminPage };
+});
+
 const COMPONENT_STATE_KEY: Record<RuntimeComponentState, TranslationKey> = {
   ready: "desktop.component.ready",
   missing: "desktop.component.missing",
@@ -1534,6 +1541,12 @@ function SettingsDialog({
       disabled: !auth.account,
     },
     { id: "course", label: "ECE498BH" },
+    ...(edition === "universal" && adminAccess.status === "allowed"
+      ? [{
+          id: "administration",
+          label: interfaceLocale === "zh-CN" ? "管理端" : "Administration",
+        } as const]
+      : []),
     ...(access.desktopRuntime
       ? [{
           id: "runtime",
@@ -1906,16 +1919,6 @@ function SettingsDialog({
           <ArrowRight aria-hidden="true" />
         </a>
       ) : null}
-      sidebarAction={edition === "universal" && adminAccess.status === "allowed" ? (
-        <button
-          type="button"
-          className="settings-workspace-admin"
-          onClick={() => { onClose(); navigate("/admin"); }}
-        >
-          <ShieldCheck aria-hidden="true" />
-          <span>{interfaceLocale === "zh-CN" ? "管理端" : "Administration"}</span>
-        </button>
-      ) : null}
     >
       <EditionSettingsPanel active={activeSettingsTab === "general"} id="general">
         <section className="settings-general-panel">
@@ -2057,6 +2060,15 @@ function SettingsDialog({
             />
           </div>
         </section>
+      </EditionSettingsPanel>
+      <EditionSettingsPanel active={activeSettingsTab === "administration"} id="administration">
+        {activeSettingsTab === "administration" ? (
+          <div className="settings-organization-panel">
+            <Suspense fallback={<p>{interfaceLocale === "zh-CN" ? "正在加载管理端…" : "Loading administration…"}</p>}>
+              <OrganizationAdminSettings />
+            </Suspense>
+          </div>
+        ) : null}
       </EditionSettingsPanel>
       <EditionSettingsPanel active={activeSettingsTab === "course"} id="course">
         <section className="settings-course-panel" aria-labelledby="settings-workspace-active-title">

@@ -4,6 +4,7 @@ import {
   Bot,
   Database,
   GraduationCap,
+  ShieldCheck,
   SlidersHorizontal,
   X,
   type LucideIcon,
@@ -18,7 +19,7 @@ import {
 
 import type { BrandEditionId } from "../brand/edition-brand.generated";
 
-export type SettingsSurfaceTabId = "general" | "memory" | "model" | "course" | "runtime";
+export type SettingsSurfaceTabId = "general" | "memory" | "model" | "course" | "runtime" | "administration";
 
 export type SettingsSurfaceTab = Readonly<{
   id: SettingsSurfaceTabId;
@@ -32,6 +33,7 @@ const TAB_ICONS: Readonly<Record<SettingsSurfaceTabId, LucideIcon>> = {
   model: Bot,
   course: GraduationCap,
   runtime: Activity,
+  administration: ShieldCheck,
 };
 
 export function EditionSettingsSurface({
@@ -48,7 +50,6 @@ export function EditionSettingsSurface({
   presentation = "dialog",
   backLabel,
   headerAction,
-  sidebarAction,
 }: {
   activeTab: SettingsSurfaceTabId;
   closeLabel: string;
@@ -63,7 +64,6 @@ export function EditionSettingsSurface({
   presentation?: "dialog" | "workspace";
   backLabel?: string;
   headerAction?: ReactNode;
-  sidebarAction?: ReactNode;
 }) {
   const tabRefs = useRef(new Map<SettingsSurfaceTabId, HTMLButtonElement>());
   useEffect(() => {
@@ -169,7 +169,6 @@ export function EditionSettingsSurface({
         <aside className="settings-workspace-sidebar">
           <h2 id="launcher-settings-title">{title}</h2>
           {navigation}
-          {sidebarAction ?? null}
           <button
             type="button"
             className="settings-workspace-back"

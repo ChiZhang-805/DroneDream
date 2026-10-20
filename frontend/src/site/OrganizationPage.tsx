@@ -1,5 +1,6 @@
 import {
   Building2,
+  CircleUserRound,
   Crown,
   Eye,
   ShieldCheck,
@@ -174,6 +175,21 @@ function roleLabel(
   copy: typeof content.en | typeof content["zh-CN"],
 ): string {
   return role === "owner" ? copy.owner : role === "admin" ? copy.admin : copy.member;
+}
+
+function OrganizationAvatar({ member, large = false }: {
+  member: Pick<OrganizationMember, "avatar_url" | "display_name">;
+  large?: boolean;
+}) {
+  return (
+    <span className={`organization-avatar${large ? " is-large" : ""}`}>
+      {member.avatar_url ? (
+        <img src={member.avatar_url} alt={`${member.display_name} avatar`} loading="lazy" referrerPolicy="no-referrer" />
+      ) : (
+        <CircleUserRound aria-hidden="true" />
+      )}
+    </span>
+  );
 }
 
 export function OrganizationPage({
@@ -405,12 +421,12 @@ export function OrganizationPage({
     return <main className="organization-page site-shell" aria-busy="true">{copy.loading}</main>;
   }
   if (!snapshot && canCreate) {
-    return <main className="organization-page site-shell"><section className="organization-onboarding" aria-labelledby="organization-create-title">
+    return <main className="organization-page site-shell"><section className={`organization-onboarding is-${onboardingMode}`} aria-labelledby="organization-create-title">
       <header><Building2 aria-hidden="true" /><div><h1 id="organization-create-title">{onboardingMode === "choose" ? copy.choosePath : onboardingMode === "join" ? copy.joinExisting : copy.createTitle}</h1><p>{copy.createIntro}</p></div>{onboardingMode === "create" ? <span>{wizardStep} / 2</span> : null}</header>
       {onboardingMode === "choose" ? <div className="organization-path-options"><button type="button" onClick={() => setOnboardingMode("create")}><Crown aria-hidden="true" /><strong>{copy.createNew}</strong></button><button type="button" onClick={() => setOnboardingMode("join")}><Users aria-hidden="true" /><strong>{copy.joinExisting}</strong></button></div> : onboardingMode === "join" ? <div className="organization-wizard-fields"><label><span>{copy.searchOrganization}</span><input autoFocus value={organizationQuery} onChange={(event) => setOrganizationQuery(event.target.value)} /></label><label><span>{copy.memberPlan}</span><select value={joinPlan} onChange={(event) => setJoinPlan(event.target.value as OrganizationPlan)}><option value="free">Business Free</option><option value="plus">Business Plus</option><option value="pro">Business Pro</option></select></label><div className="organization-wizard-actions"><button type="button" className="is-secondary" onClick={() => setOnboardingMode("choose")}>{copy.back}</button><button type="button" onClick={() => void searchForOrganizations()}>{copy.search}</button></div>{joinRequested ? <p>{copy.requestSent}</p> : organizationResults.map((organization) => <article className="organization-search-result" key={organization.public_code}><div><strong>{organization.name}</strong><span>{organization.public_code} · Business {organization.plan.toUpperCase()}</span><small>{organization.description}</small></div><button type="button" disabled={(organization.plan === "free" && joinPlan !== "free") || (organization.plan === "plus" && joinPlan === "pro")} onClick={() => void requestJoin(organization)}>{copy.requestJoin}</button></article>)}</div> : wizardStep === 1 ? <div className="organization-wizard-fields">
         <label><span>{copy.name}</span><input autoFocus maxLength={120} value={organizationName} onChange={(event) => setOrganizationName(event.target.value)} /></label>
         <label><span>{copy.description}</span><textarea maxLength={500} rows={4} value={organizationDescription} onChange={(event) => setOrganizationDescription(event.target.value)} /></label>
-        <button type="button" disabled={!organizationName.trim()} onClick={() => setWizardStep(2)}>{copy.next}</button>
+        <div className="organization-wizard-actions"><button type="button" className="is-secondary" onClick={() => setOnboardingMode("choose")}>{copy.back}</button><button type="button" disabled={!organizationName.trim()} onClick={() => setWizardStep(2)}>{copy.next}</button></div>
       </div> : <div className="organization-wizard-fields">
         <fieldset><legend>{copy.architecture}</legend>{([
           ["flat", copy.flat, copy.flatHelp], ["department_single", copy.single, copy.singleHelp], ["department_dual", copy.dual, copy.dualHelp],
@@ -467,7 +483,7 @@ export function OrganizationPage({
             <tbody>
               {snapshot.members.map((member) => (
                 <tr key={member.id}>
-                  <td><span className="organization-avatar">{member.display_name.slice(0, 1).toUpperCase()}</span><span><strong>{member.display_name}</strong><small>{member.email}</small></span></td>
+                  <td><OrganizationAvatar member={member} /><span><strong>{member.display_name}</strong><small>{member.email}</small></span></td>
                   <td><span className={`organization-role is-${member.role}`}>{roleLabel(member.role, copy)}</span></td>
                   <td><strong>{member.plan.toUpperCase()}</strong></td>
                   <td><EditionLicenseStrip licenses={member.licenses} locale={locale} /></td>
@@ -486,10 +502,15 @@ export function OrganizationPage({
           if (event.target === event.currentTarget) setSelected(null);
         }}>
           <section ref={dialogRef} className="organization-member-dialog" role="dialog" aria-modal="true" aria-labelledby="organization-member-title" tabIndex={-1}>
-            <header><div><span className="organization-avatar is-large">{selected.display_name.slice(0, 1).toUpperCase()}</span><div><h2 id="organization-member-title">{selected.display_name}</h2><span>{selected.email}</span></div></div><button ref={closeRef} type="button" aria-label={copy.close} onClick={() => setSelected(null)}><X aria-hidden="true" /></button></header>
+            <header><div><OrganizationAvatar member={selected} large /><div><h2 id="organization-member-title">{selected.display_name}</h2><span>{selected.email}</span></div></div><button ref={closeRef} type="button" aria-label={copy.close} onClick={() => setSelected(null)}><X aria-hidden="true" /></button></header>
             <div className="organization-member-profile">
-              <dl><div><dt>{copy.role}</dt><dd>{roleLabel(selected.role, copy)}</dd></div><div><dt>{copy.plan}</dt><dd>{selected.plan.toUpperCase()}</dd></div><div><dt>{copy.created}</dt><dd>{date.format(new Date(selected.created_at))}</dd></div><div><dt>{copy.lastSignIn}</dt><dd>{selected.last_sign_in_at ? date.format(new Date(selected.last_sign_in_at)) : copy.noSignIn}</dd></div></dl>
-              <EditionLicenseStrip licenses={selected.licenses} locale={locale} />
+              <dl>
+                <div><dt>{copy.role}</dt><dd>{roleLabel(selected.role, copy)}</dd></div>
+                <div><dt>{copy.plan}</dt><dd>{selected.plan.toUpperCase()}</dd></div>
+                <div><dt>{copy.created}</dt><dd>{date.format(new Date(selected.created_at))}</dd></div>
+                <div><dt>{copy.lastSignIn}</dt><dd>{selected.last_sign_in_at ? date.format(new Date(selected.last_sign_in_at)) : copy.noSignIn}</dd></div>
+                <div className="organization-member-applications"><dt>{copy.apps}</dt><dd><EditionLicenseStrip licenses={selected.licenses} locale={locale} /></dd></div>
+              </dl>
             </div>
             {canManageSelected ? (
               <div className="organization-member-actions">
