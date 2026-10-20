@@ -3,6 +3,7 @@ import {
   CircleUserRound,
   Crown,
   Eye,
+  Save,
   ShieldCheck,
   Trash2,
   UserPlus,
@@ -514,14 +515,11 @@ export function OrganizationPage({
             </div>
             {canManageSelected ? (
               <div className="organization-member-actions">
-                {canManageAdmins ? <label><span>{copy.role}</span><select value={selectedRole} onChange={(event) => setSelectedRole(event.target.value as "admin" | "member")}><option value="member">{copy.member}</option><option value="admin">{copy.admin}</option></select></label> : null}
-                {canManageAdmins ? <button type="button" onClick={() => void saveRole()} disabled={busy || selectedRole === selected.role}>{busy ? copy.saving : copy.saveRole}</button> : null}
-                <label><span>{copy.memberPlan}</span><select value={selectedPlan} onChange={(event) => setSelectedPlan(event.target.value as OrganizationPlan)}><option value="free">Business Free</option>{snapshot.organization.plan !== "free" ? <option value="plus">Business Plus</option> : null}{snapshot.organization.plan === "pro" ? <option value="pro">Business Pro</option> : null}</select></label>
-                <button type="button" onClick={() => void savePlan()} disabled={busy || selectedPlan === selected.plan}>{copy.savePlan}</button>
-                {canManageAdmins && snapshot.organization.structure_model !== "flat" && selected.role !== "owner" ? <label><span>{copy.assignDepartment}</span><select value={snapshot.departments.find((department) => [...department.manager_user_ids, ...department.member_user_ids].includes(selected.id))?.id ?? ""} onChange={(event) => void assignDepartment(event.target.value)}><option value="" disabled>{copy.unassigned}</option>{snapshot.departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select></label> : null}
+                {canManageAdmins ? <div className="organization-member-edit-row"><label htmlFor="organization-member-role">{copy.role}</label><select id="organization-member-role" value={selectedRole} onChange={(event) => setSelectedRole(event.target.value as "admin" | "member")}><option value="member">{copy.member}</option><option value="admin">{copy.admin}</option></select><button type="button" className="organization-save-button" aria-label={busy ? copy.saving : copy.saveRole} title={copy.saveRole} onClick={() => void saveRole()} disabled={busy || selectedRole === selected.role}><Save aria-hidden="true" /></button></div> : null}
+                <div className="organization-member-edit-row"><label htmlFor="organization-member-plan">{copy.memberPlan}</label><select id="organization-member-plan" value={selectedPlan} onChange={(event) => setSelectedPlan(event.target.value as OrganizationPlan)}><option value="free">Business Free</option>{snapshot.organization.plan !== "free" ? <option value="plus">Business Plus</option> : null}{snapshot.organization.plan === "pro" ? <option value="pro">Business Pro</option> : null}</select><button type="button" className="organization-save-button" aria-label={copy.savePlan} title={copy.savePlan} onClick={() => void savePlan()} disabled={busy || selectedPlan === selected.plan}><Save aria-hidden="true" /></button></div>
+                {canManageAdmins && snapshot.organization.structure_model !== "flat" && selected.role !== "owner" ? <div className="organization-member-edit-row is-department"><label htmlFor="organization-member-department">{copy.assignDepartment}</label><select id="organization-member-department" value={snapshot.departments.find((department) => [...department.manager_user_ids, ...department.member_user_ids].includes(selected.id))?.id ?? ""} onChange={(event) => void assignDepartment(event.target.value)}><option value="" disabled>{copy.unassigned}</option>{snapshot.departments.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}</select></div> : null}
                 {snapshot.actor.can_transfer_founder && selected.role === "admin" ? <><button type="button" onClick={() => void transferFounder()} disabled={busy}>{transferArmed ? copy.confirmTransfer : copy.transfer}</button><small>{copy.transferHelp}</small></> : null}
-                <button type="button" className="is-danger" onClick={() => void removeMember()} disabled={busy}><Trash2 aria-hidden="true" />{busy ? copy.removing : removalArmed ? copy.confirmRemove : copy.remove}</button>
-                {removalArmed ? <small>{copy.downgrade}</small> : null}
+                <div className="organization-member-danger-row"><button type="button" className="is-danger" onClick={() => void removeMember()} disabled={busy}><Trash2 aria-hidden="true" />{busy ? copy.removing : removalArmed ? copy.confirmRemove : copy.remove}</button>{removalArmed ? <small>{copy.downgrade}</small> : null}</div>
               </div>
             ) : null}
           </section>

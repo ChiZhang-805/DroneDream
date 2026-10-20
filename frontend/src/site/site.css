@@ -1485,7 +1485,7 @@ html[lang="zh-CN"] .site-hero h1 {
   color: #7957e8;
   overflow: hidden;
 }
-.organization-avatar.is-large { width: 48px; height: 48px; border-radius: 15px; font-size: 20px; }
+.organization-avatar.is-large { width: 52px; height: 52px; flex: 0 0 52px; border-radius: 15px; font-size: 20px; }
 .organization-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .organization-avatar svg { width: 68%; height: 68%; stroke-width: 1.7; }
 .organization-role {
@@ -1521,10 +1521,11 @@ html[lang="zh-CN"] .site-hero h1 {
   display: grid;
   place-items: center;
   padding: 24px;
-  background: #f2f3f8;
+  background: rgba(12, 10, 22, 0.58);
+  backdrop-filter: blur(14px);
 }
 .organization-member-dialog {
-  width: min(100%, 520px);
+  width: min(100%, 660px);
   padding: 22px;
   border-radius: 24px;
   background: #fff;
@@ -1556,10 +1557,17 @@ html[lang="zh-CN"] .site-hero h1 {
 .organization-member-profile dd { margin: 0; color: #211b2d; font-weight: 800; text-align: right; }
 .organization-member-applications dd { min-width: 170px; }
 .organization-member-applications .edition-license-strip { justify-content: flex-end; }
-.organization-member-actions { display: flex; align-items: end; gap: 10px; flex-wrap: wrap; }
-.organization-member-actions .is-danger { display: inline-flex; align-items: center; gap: 7px; background: #bb3157; }
+.organization-member-actions { display: grid; gap: 12px; }
+.organization-member-edit-row { display: grid; grid-template-columns: minmax(145px, .42fr) minmax(0, 1fr) 42px; align-items: center; gap: 12px; }
+.organization-member-edit-row.is-department { grid-template-columns: minmax(145px, .42fr) minmax(0, 1fr); padding-right: 54px; }
+.organization-member-edit-row > label { color: #6d6777; font-size: 13px; font-weight: 800; }
+.organization-member-edit-row > select { width: 100%; height: 44px; }
+.organization-member-actions .organization-save-button { display: grid; width: 42px; min-height: 42px; padding: 0; place-items: center; }
+.organization-save-button svg { width: 19px; height: 19px; }
+.organization-member-danger-row { display: flex; align-items: flex-end; justify-content: flex-end; gap: 12px; margin-top: 4px; }
+.organization-member-actions .is-danger { display: inline-flex; width: min(230px, 38%); min-width: 215px; align-items: center; justify-content: center; gap: 7px; background: #bb3157; }
 .organization-member-actions .is-danger svg { width: 16px; }
-.organization-member-actions small { flex-basis: 100%; color: #a5224d; }
+.organization-member-actions small { color: #a5224d; }
 
 @media (max-width: 1100px) {
   .organization-member-table th:nth-child(5),
