@@ -669,12 +669,7 @@ export function FieldSettingsDialog({
 
       <EditionSettingsPanel active={activeTab === "memory"} id="memory">
         <section className="settings-memory-panel" aria-labelledby="field-settings-memory-title">
-          <div className="settings-memory-heading">
-            <h3 id="field-settings-memory-title">{copy.memory}</h3>
-            <span className={accountMemoryEnabled && memoryEnabled ? "configured" : undefined}>
-              {copy.memoryState[accountMemoryEnabled && memoryEnabled ? 1 : 0]}
-            </span>
-          </div>
+          <h3 id="field-settings-memory-title" className="sr-only">{copy.memory}</h3>
           <div className="settings-memory-body">
             <section className="settings-memory-module settings-memory-behavior-module">
               <header className="settings-memory-module-heading">

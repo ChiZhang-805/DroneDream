@@ -1293,8 +1293,8 @@ html[lang="zh-CN"] .site-hero h1 {
 }
 
 .organization-heading > div { gap: 12px; }
-.organization-heading svg { width: 30px; height: 30px; color: #7957e8; }
-.organization-heading h1 { margin: 0; font-size: clamp(30px, 3vw, 46px); line-height: 1; }
+.organization-heading svg { width: 28px; height: 28px; color: #7957e8; }
+.organization-heading h1 { margin: 0; font-size: clamp(24px, 2vw, 30px); line-height: 1.12; }
 .organization-settings-trigger {
   min-height: 36px;
   padding: 0 16px;
@@ -1331,7 +1331,7 @@ html[lang="zh-CN"] .site-hero h1 {
 }
 
 .organization-summary svg { width: 22px; height: 22px; color: #8b5be8; }
-.organization-summary span { color: #6d6777; font-weight: 700; }
+.organization-summary span { min-width: 0; color: #6d6777; font-weight: 700; white-space: nowrap; }
 .organization-summary strong { font-size: 20px; white-space: nowrap; }
 .organization-summary select { min-width: 132px; border: 1px solid #d9d0eb; border-radius: 10px; background: #fff; padding: 8px 10px; color: #171322; color-scheme: light; font: inherit; font-weight: 800; }
 .organization-summary select option { color: #171322; background: #fff; }

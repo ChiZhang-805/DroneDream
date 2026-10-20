@@ -2093,21 +2093,7 @@ function SettingsDialog({
       </EditionSettingsPanel>
       <EditionSettingsPanel active={activeSettingsTab === "memory"} id="memory">
         <section className="settings-memory-panel" aria-labelledby="settings-memory-title">
-        <div className="settings-memory-heading">
-          <div>
-            <h3
-              id="settings-memory-title"
-              className={presentation === "workspace" ? "sr-only" : undefined}
-            >
-              {settingsCopy.memoryTitle}
-            </h3>
-          </div>
-          <span className={experiencePreferenceDraft.account_memory_enabled && experiencePreferenceDraft.memory_enabled ? "configured" : undefined}>
-            {settingsCopy.memoryEnabled[
-              experiencePreferenceDraft.account_memory_enabled && experiencePreferenceDraft.memory_enabled ? 1 : 0
-            ]}
-          </span>
-        </div>
+        <h3 id="settings-memory-title" className="sr-only">{settingsCopy.memoryTitle}</h3>
         <div className="settings-memory-body">
           <section className="settings-memory-module settings-memory-behavior-module">
             <header className="settings-memory-module-heading">

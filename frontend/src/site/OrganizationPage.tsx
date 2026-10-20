@@ -47,7 +47,8 @@ const content = {
     title: "Organization",
     members: "Members",
     delegated: "Delegated admins",
-    plan: "Plan",
+    plan: "Business plan",
+    planControl: "Plan",
     addMember: "Add member",
     email: "Account email",
     role: "Role",
@@ -72,7 +73,8 @@ const content = {
     downgrade: "Individual · Free",
     createTitle: "Create your Business organization",
     createIntro: "Business starts with a shared identity and a clear management structure.",
-    name: "Organization name",
+    name: "Name",
+    nameControl: "Organization name",
     description: "Organization description",
     next: "Continue",
     back: "Back",
@@ -85,7 +87,7 @@ const content = {
     dual: "Departments · two managers",
     dualHelp: "Each department can have two administrators who manage only that department.",
     founderPlan: "Founder Business plan",
-    code: "Organization code",
+    code: "Code",
     transfer: "Transfer Founder role",
     confirmTransfer: "Confirm transfer",
     transferHelp: "The selected administrator becomes Founder. You become an administrator.",
@@ -106,7 +108,8 @@ const content = {
     addDepartment: "Add department",
     assignDepartment: "Assign department",
     unassigned: "Not assigned",
-    password: "Organization password",
+    password: "Password",
+    passwordControl: "Organization password",
     passwordHelp: "Use this password when joining the organization.",
     passwordConfigured: "Configured",
     passwordMissing: "Not configured",
@@ -119,7 +122,8 @@ const content = {
     title: "企业管理",
     members: "成员",
     delegated: "委托管理员",
-    plan: "套餐",
+    plan: "企业套餐",
+    planControl: "套餐",
     addMember: "添加成员",
     email: "账户邮箱",
     role: "权限",
@@ -144,7 +148,8 @@ const content = {
     downgrade: "个人版 · Free",
     createTitle: "创建 Business 组织",
     createIntro: "先建立共享身份，再选择清晰的组织管理架构。",
-    name: "组织名称",
+    name: "名称",
+    nameControl: "组织名称",
     description: "组织简介",
     next: "继续",
     back: "返回",
@@ -157,7 +162,7 @@ const content = {
     dual: "部门制 · 双负责人",
     dualHelp: "每个部门可由两名管理员负责，且只能管理本部门成员。",
     founderPlan: "创始人 Business 套餐",
-    code: "组织代号",
+    code: "代号",
     transfer: "转交创始人权限",
     confirmTransfer: "确认转交",
     transferHelp: "所选管理员将成为创始人，你会自动降级为管理员。",
@@ -178,7 +183,8 @@ const content = {
     addDepartment: "添加部门",
     assignDepartment: "分配部门",
     unassigned: "尚未分配",
-    password: "组织密码",
+    password: "密码",
+    passwordControl: "组织密码",
     passwordHelp: "加入组织时需要输入此密码。",
     passwordConfigured: "已设置",
     passwordMissing: "未设置",
@@ -510,10 +516,10 @@ export function OrganizationPage({
   if (!snapshot && canCreate) {
     return <main className="organization-page site-shell"><section className={`organization-onboarding is-${onboardingMode}`} aria-labelledby="organization-create-title">
       <header><Building2 aria-hidden="true" /><div><h1 id="organization-create-title">{onboardingMode === "choose" ? copy.choosePath : onboardingMode === "join" ? copy.joinExisting : copy.createTitle}</h1><p>{copy.createIntro}</p></div>{onboardingMode === "create" ? <span>{wizardStep} / 2</span> : null}</header>
-      {onboardingMode === "choose" ? <div className="organization-path-options"><button type="button" onClick={() => setOnboardingMode("create")}><Crown aria-hidden="true" /><strong>{copy.createNew}</strong></button><button type="button" onClick={() => setOnboardingMode("join")}><Users aria-hidden="true" /><strong>{copy.joinExisting}</strong></button></div> : onboardingMode === "join" ? <div className="organization-wizard-fields"><label><span>{copy.searchOrganization}</span><input autoFocus value={organizationQuery} onChange={(event) => setOrganizationQuery(event.target.value)} /></label><label><span>{copy.password}</span><input aria-label={copy.password} type="password" maxLength={72} value={joinPassword} onChange={(event) => setJoinPassword(event.target.value)} /></label><label><span>{copy.memberPlan}</span><select value={joinPlan} onChange={(event) => setJoinPlan(event.target.value as OrganizationPlan)}><option value="free">Business Free</option><option value="plus">Business Plus</option><option value="pro">Business Pro</option></select></label><div className="organization-wizard-actions"><button type="button" className="is-secondary" onClick={() => setOnboardingMode("choose")}>{copy.back}</button><button type="button" onClick={() => void searchForOrganizations()}>{copy.search}</button></div>{joinRequested ? <p>{copy.requestSent}</p> : organizationResults.map((organization) => <article className="organization-search-result" key={organization.public_code}><div><strong>{organization.name}</strong><span>{organization.public_code} · Business {organization.plan.toUpperCase()}</span><small>{organization.description}</small></div><button type="button" disabled={!joinPassword || (organization.plan === "free" && joinPlan !== "free") || (organization.plan === "plus" && joinPlan === "pro")} onClick={() => void requestJoin(organization)}>{copy.requestJoin}</button></article>)}</div> : wizardStep === 1 ? <div className="organization-wizard-fields">
-        <label><span>{copy.name}</span><input autoFocus maxLength={120} value={organizationName} onChange={(event) => setOrganizationName(event.target.value)} /></label>
+      {onboardingMode === "choose" ? <div className="organization-path-options"><button type="button" onClick={() => setOnboardingMode("create")}><Crown aria-hidden="true" /><strong>{copy.createNew}</strong></button><button type="button" onClick={() => setOnboardingMode("join")}><Users aria-hidden="true" /><strong>{copy.joinExisting}</strong></button></div> : onboardingMode === "join" ? <div className="organization-wizard-fields"><label><span>{copy.searchOrganization}</span><input autoFocus value={organizationQuery} onChange={(event) => setOrganizationQuery(event.target.value)} /></label><label><span>{copy.password}</span><input aria-label={copy.passwordControl} type="password" maxLength={72} value={joinPassword} onChange={(event) => setJoinPassword(event.target.value)} /></label><label><span>{copy.memberPlan}</span><select value={joinPlan} onChange={(event) => setJoinPlan(event.target.value as OrganizationPlan)}><option value="free">Business Free</option><option value="plus">Business Plus</option><option value="pro">Business Pro</option></select></label><div className="organization-wizard-actions"><button type="button" className="is-secondary" onClick={() => setOnboardingMode("choose")}>{copy.back}</button><button type="button" onClick={() => void searchForOrganizations()}>{copy.search}</button></div>{joinRequested ? <p>{copy.requestSent}</p> : organizationResults.map((organization) => <article className="organization-search-result" key={organization.public_code}><div><strong>{organization.name}</strong><span>{organization.public_code} · Business {organization.plan.toUpperCase()}</span><small>{organization.description}</small></div><button type="button" disabled={!joinPassword || (organization.plan === "free" && joinPlan !== "free") || (organization.plan === "plus" && joinPlan === "pro")} onClick={() => void requestJoin(organization)}>{copy.requestJoin}</button></article>)}</div> : wizardStep === 1 ? <div className="organization-wizard-fields">
+        <label><span>{copy.name}</span><input aria-label={copy.nameControl} autoFocus maxLength={120} value={organizationName} onChange={(event) => setOrganizationName(event.target.value)} /></label>
         <label><span>{copy.description}</span><textarea maxLength={500} rows={4} value={organizationDescription} onChange={(event) => setOrganizationDescription(event.target.value)} /></label>
-        <label><span>{copy.password}</span><input aria-label={copy.password} type="password" minLength={8} maxLength={72} value={organizationPassword} onChange={(event) => setOrganizationPassword(event.target.value)} /><small>{copy.passwordHelp}</small></label>
+        <label><span>{copy.password}</span><input aria-label={copy.passwordControl} type="password" minLength={8} maxLength={72} value={organizationPassword} onChange={(event) => setOrganizationPassword(event.target.value)} /><small>{copy.passwordHelp}</small></label>
         <div className="organization-wizard-actions"><button type="button" className="is-secondary" onClick={() => setOnboardingMode("choose")}>{copy.back}</button><button type="button" disabled={!organizationName.trim() || organizationPassword.length < 8} onClick={() => setWizardStep(2)}>{copy.next}</button></div>
       </div> : <div className="organization-wizard-fields">
         <fieldset><legend>{copy.architecture}</legend>{([
@@ -595,9 +601,9 @@ export function OrganizationPage({
             <div><dt>{copy.password}</dt><dd>{snapshot.organization.join_password ?? copy.passwordMissing}</dd></div>
           </dl></div>
           {snapshot.actor.role === "owner" ? <div className="organization-member-actions">
-            <div className="organization-profile-field is-inline"><label htmlFor="organization-profile-name">{copy.name}</label><input id="organization-profile-name" maxLength={120} value={organizationDraftName} onChange={(event) => setOrganizationDraftName(event.target.value)} /><button type="button" aria-label={savingActions.has("organization-name") ? copy.saving : copy.saveName} title={copy.saveName} disabled={savingActions.has("organization-name") || !organizationDraftName.trim() || organizationDraftName.trim() === snapshot.organization.name} onClick={() => void saveOrganizationName()}><Save aria-hidden="true" /></button></div>
-            <div className="organization-profile-field is-inline"><label htmlFor="organization-profile-plan">{copy.plan}</label><select id="organization-profile-plan" value={organizationDraftPlan} onChange={(event) => setOrganizationDraftPlan(event.target.value as OrganizationPlan)}><option value="free">Business Free</option><option value="plus">Business Plus</option><option value="pro">Business Pro</option></select><button type="button" aria-label={savingActions.has("organization-plan") ? copy.saving : copy.savePlan} title={copy.savePlan} disabled={savingActions.has("organization-plan") || organizationDraftPlan === snapshot.organization.plan} onClick={() => void saveOrganizationPlan()}><Save aria-hidden="true" /></button></div>
-            <div className="organization-profile-field is-inline"><label htmlFor="organization-profile-password">{copy.password}</label><input id="organization-profile-password" type="text" minLength={8} maxLength={72} value={organizationDraftPassword} onChange={(event) => setOrganizationDraftPassword(event.target.value)} /><button type="button" aria-label={savingActions.has("organization-password") ? copy.saving : copy.savePassword} title={copy.savePassword} disabled={savingActions.has("organization-password") || organizationDraftPassword.length < 8 || organizationDraftPassword === snapshot.organization.join_password} onClick={() => void saveOrganizationPassword()}><Save aria-hidden="true" /></button></div>
+            <div className="organization-profile-field is-inline"><label htmlFor="organization-profile-name">{copy.name}</label><input id="organization-profile-name" aria-label={copy.nameControl} maxLength={120} value={organizationDraftName} onChange={(event) => setOrganizationDraftName(event.target.value)} /><button type="button" aria-label={savingActions.has("organization-name") ? copy.saving : copy.saveName} title={copy.saveName} disabled={savingActions.has("organization-name") || !organizationDraftName.trim() || organizationDraftName.trim() === snapshot.organization.name} onClick={() => void saveOrganizationName()}><Save aria-hidden="true" /></button></div>
+            <div className="organization-profile-field is-inline"><label htmlFor="organization-profile-plan">{copy.plan}</label><select id="organization-profile-plan" aria-label={copy.planControl} value={organizationDraftPlan} onChange={(event) => setOrganizationDraftPlan(event.target.value as OrganizationPlan)}><option value="free">Business Free</option><option value="plus">Business Plus</option><option value="pro">Business Pro</option></select><button type="button" aria-label={savingActions.has("organization-plan") ? copy.saving : copy.savePlan} title={copy.savePlan} disabled={savingActions.has("organization-plan") || organizationDraftPlan === snapshot.organization.plan} onClick={() => void saveOrganizationPlan()}><Save aria-hidden="true" /></button></div>
+            <div className="organization-profile-field is-inline"><label htmlFor="organization-profile-password">{copy.password}</label><input id="organization-profile-password" aria-label={copy.passwordControl} type="text" minLength={8} maxLength={72} value={organizationDraftPassword} onChange={(event) => setOrganizationDraftPassword(event.target.value)} /><button type="button" aria-label={savingActions.has("organization-password") ? copy.saving : copy.savePassword} title={copy.savePassword} disabled={savingActions.has("organization-password") || organizationDraftPassword.length < 8 || organizationDraftPassword === snapshot.organization.join_password} onClick={() => void saveOrganizationPassword()}><Save aria-hidden="true" /></button></div>
           </div> : null}
           {error ? <p className="organization-error" role="alert">{error}</p> : null}
         </section>
