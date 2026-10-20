@@ -18,6 +18,7 @@ import {
 
 import { BrandLockup } from "../components/BrandLockup";
 import { AuthCaptcha } from "../features/auth/AuthCaptcha";
+import { deleteCurrentAccount } from "../features/auth/accountSelfService";
 import { useAuthOrLocal } from "../features/auth/AuthContext";
 import { getManagedModelUsage } from "../features/settings/cloudModelAccess";
 import {
@@ -138,6 +139,11 @@ const content = {
     classicView: "Classic",
     modernView: "Modern",
     signOut: "Sign Out",
+    deleteAccount: "Delete Account",
+    deleteAccountTitle: "Permanently delete this account?",
+    deleteAccountWarning: "This removes your sign-in account and eligible account data. This action cannot be undone.",
+    cancel: "Cancel",
+    confirmDeleteAccount: "Permanently Delete",
     closeAuth: "Close account dialog",
     eyebrow: "NATURAL-LANGUAGE UAV ENGINEERING",
     heroLead: "Describe the mission.",
@@ -354,6 +360,11 @@ const content = {
     classicView: "经典版",
     modernView: "现代版",
     signOut: "退出登录",
+    deleteAccount: "注销账号",
+    deleteAccountTitle: "永久注销此账号？",
+    deleteAccountWarning: "这会删除登录账号及允许删除的账号数据，且无法撤销。",
+    cancel: "取消",
+    confirmDeleteAccount: "永久注销",
     closeAuth: "关闭账号窗口",
     eyebrow: "本地优先的 PX4 / GAZEBO 调优平台",
     heroLead: "让调优有章法",
@@ -501,14 +512,6 @@ const content = {
   },
 } as const;
 
-function ArrowRightIcon() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M5 12h14m-5-5 5 5-5 5" />
-    </svg>
-  );
-}
-
 function AccountIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -570,6 +573,7 @@ export function SiteApp() {
   const [authPending, setAuthPending] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authNotice, setAuthNotice] = useState<string | null>(null);
+  const [accountDeleteConfirming, setAccountDeleteConfirming] = useState(false);
   const [organizationAccess, setOrganizationAccess] =
     useState<OrganizationAccess | null>(null);
   const [accountPlan, setAccountPlan] = useState<{
@@ -913,6 +917,10 @@ export function SiteApp() {
     copy.passwordTooShort,
     copy.recoveryCodeRequired,
   ]);
+
+  useEffect(() => {
+    if (!authOpen) setAccountDeleteConfirming(false);
+  }, [authOpen]);
 
   useEffect(() => {
     if (!auth.passwordRecovery) return;
@@ -1497,32 +1505,41 @@ export function SiteApp() {
                     ? `${accountPlan.billingScope === "business" ? `${copy.businessPlan} ` : ""}${accountPlan.name}`
                     : "—"}
                 </span>
-                <a className="site-button site-button-primary" href="/console/">
-                  {copy.openConsole}
-                  <ArrowRightIcon />
-                </a>
-                {organizationAccess?.authorized ? (
-                  <a className="site-button site-button-secondary" href="/organization/">
-                    {copy.organization}
-                    <ArrowRightIcon />
-                  </a>
-                ) : null}
-                <button
-                  type="button"
-                  className="site-auth-text-button"
-                  disabled={authPending}
-                  onClick={() => {
-                    setAuthPending(true);
-                    setAuthError(null);
-                    void auth.signOut()
-                      .catch((reason: unknown) => {
-                        setAuthError(localizedAuthError(reason));
-                      })
-                      .finally(() => setAuthPending(false));
-                  }}
-                >
-                  {copy.signOut}
-                </button>
+                {!accountDeleteConfirming ? <>
+                  <button
+                    type="button"
+                    className="site-button site-button-primary"
+                    disabled={authPending}
+                    onClick={() => {
+                      setAuthPending(true);
+                      setAuthError(null);
+                      void auth.signOut()
+                        .catch((reason: unknown) => setAuthError(localizedAuthError(reason)))
+                        .finally(() => setAuthPending(false));
+                    }}
+                  >
+                    {copy.signOut}
+                    <LogOut aria-hidden="true" />
+                  </button>
+                  <button type="button" className="site-auth-text-button is-danger" disabled={authPending} onClick={() => setAccountDeleteConfirming(true)}>
+                    {copy.deleteAccount}
+                  </button>
+                </> : <div className="site-auth-delete-confirmation">
+                  <strong>{copy.deleteAccountTitle}</strong>
+                  <p>{copy.deleteAccountWarning}</p>
+                  <div>
+                    <button type="button" disabled={authPending} onClick={() => setAccountDeleteConfirming(false)}>{copy.cancel}</button>
+                    <button type="button" className="is-danger" disabled={authPending} onClick={() => {
+                      setAuthPending(true);
+                      setAuthError(null);
+                      void deleteCurrentAccount()
+                        .then(() => auth.signOut())
+                        .then(() => setAuthOpen(false))
+                        .catch((reason: unknown) => setAuthError(localizedAuthError(reason)))
+                        .finally(() => setAuthPending(false));
+                    }}>{copy.confirmDeleteAccount}</button>
+                  </div>
+                </div>}
               </div>
             ) : authMode === "recovery-choice" ? (
               <div className="site-auth-recovery-options">

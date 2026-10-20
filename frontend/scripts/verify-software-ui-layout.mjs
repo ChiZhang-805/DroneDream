@@ -510,6 +510,13 @@ async function verifySettings(page, testCase) {
     assert(measurement.scrollerBottom <= measurement.workspaceBottom + 1);
     assert.equal(measurement.documentScrollWidth, measurement.documentWidth);
     assert.equal(measurement.grantsHardwareAuthority, "false");
+    if (["general", "memory", "model"].includes(measurement.tab)) {
+      assert(
+        measurement.scrollerScrollHeight <= measurement.scrollerClientHeight + 1,
+        `${testCase.id}: ${measurement.tab} settings must fit in one screen `
+          + `(scroll ${measurement.scrollerScrollHeight}, client ${measurement.scrollerClientHeight})`,
+      );
+    }
     panelMeasurements.push(measurement);
     panelImages.push(await screenshot(
       page,
@@ -600,15 +607,26 @@ async function verifySettings(page, testCase) {
   const resetCards = usage.locator(".settings-reset-card-trigger");
   const useResetCard = usage.locator(".settings-model-reset-action");
   const refresh = usage.locator(".settings-model-refresh");
-  await manage.focus();
-  await page.keyboard.press("Tab");
-  assert(await resetCards.evaluate((element) => element === document.activeElement));
-  await page.keyboard.press("Tab");
-  assert(await useResetCard.evaluate((element) => element === document.activeElement));
-  await page.keyboard.press("Tab");
-  assert(await refresh.evaluate((element) => element === document.activeElement));
+  const keyboardOrder = await usage.evaluate((element) =>
+    Array.from(element.querySelectorAll('a[href],button:not([disabled]),[tabindex]:not([tabindex="-1"])'))
+      .map((candidate) => candidate instanceof HTMLElement
+        ? candidate.className || candidate.getAttribute("role") || candidate.tagName
+        : ""),
+  );
+  const expectedOrder = ["btn"];
+  if (!await resetCards.isDisabled()) expectedOrder.push("settings-reset-card-trigger");
+  if (!await useResetCard.isDisabled()) expectedOrder.push("settings-model-reset-action");
+  if (!await refresh.isDisabled()) expectedOrder.push("settings-model-refresh");
+  expectedOrder.push("tab");
+  let lastIndex = -1;
+  for (const expectedClass of expectedOrder) {
+    const index = keyboardOrder.findIndex((entry, candidateIndex) =>
+      candidateIndex > lastIndex && String(entry).includes(expectedClass));
+    assert(index > lastIndex, `${testCase.id}: ${expectedClass} is missing from keyboard order`);
+    lastIndex = index;
+  }
   assert.equal((await refresh.textContent())?.trim(), "");
-  await page.keyboard.press("Tab");
+  await usageRange.focus();
   assert(await usageRange.evaluate((element) => element === document.activeElement));
   await page.keyboard.press("ArrowRight");
   const nextUsageRange = usage.locator('.settings-allowance-range [role="tab"][aria-selected="true"]');

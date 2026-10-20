@@ -23321,6 +23321,7 @@ body {
   padding-inline: 0;
 }
 
+
 /* Desktop and browser console are one visual product surface. Native scrollbar
    rails must never consume canvas space or appear over the shared application
    layout; wheel, touch and keyboard scrolling remain fully available. */
@@ -24327,4 +24328,121 @@ body {
 .app-shell .settings-workspace-content .settings-model-reset-row,
 .app-shell .settings-workspace-content .settings-model-usage-footer {
   padding-inline: 0;
+}
+
+/* The complete Settings workspace remains distinct from Quick Settings, but
+   its everyday General, Memory and Models pages must still read as one-screen
+   desktop surfaces. Memory is the densest page, so split policy/consent from
+   personal defaults instead of stacking both long groups vertically. */
+@media (min-width: 1180px) and (min-height: 760px) {
+  .settings-workspace-content > .launcher-settings-panels {
+    overflow: hidden;
+  }
+
+  .settings-workspace-content [data-settings-panel="general"]:not([hidden]),
+  .settings-workspace-content [data-settings-panel="memory"]:not([hidden]),
+  .settings-workspace-content [data-settings-panel="model"]:not([hidden]) {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .settings-workspace-content .settings-memory-panel {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .settings-workspace-content .settings-memory-body {
+    display: grid;
+    min-height: 0;
+    flex: 1 1 auto;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+    gap: clamp(1.5rem, 2.5vw, 2.75rem);
+    padding-top: 0.35rem;
+  }
+
+  .settings-workspace-content .settings-memory-switches,
+  .settings-workspace-content .settings-memory-defaults {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .settings-workspace-content .settings-memory-switches > .settings-toggle-row,
+  .settings-workspace-content .settings-memory-scope-grid .settings-toggle-row,
+  .settings-workspace-content .settings-memory-domain-consent {
+    min-height: 2.35rem;
+    padding-block: 0.28rem;
+    font-size: 0.82rem;
+  }
+
+  .settings-workspace-content .settings-memory-domain-consent {
+    gap: 0.45rem;
+  }
+
+  .settings-workspace-content .settings-memory-domain-consent > span {
+    width: 7.4rem;
+    flex-basis: 7.4rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .settings-workspace-content .settings-memory-domain-consent .settings-toggle-row {
+    min-height: 2.2rem;
+    gap: 0.24rem;
+  }
+
+  .settings-workspace-content .settings-memory-grid label {
+    min-height: 2.75rem;
+    grid-template-columns: minmax(9rem, 0.8fr) minmax(12rem, 1.2fr);
+    gap: 0.75rem;
+    padding-block: 0.32rem;
+  }
+
+  .settings-workspace-content .settings-memory-grid label > span,
+  .settings-workspace-content .settings-memory-grid input,
+  .settings-workspace-content .settings-memory-grid select {
+    font-size: 0.82rem;
+  }
+
+  .settings-workspace-content .settings-memory-grid input,
+  .settings-workspace-content .settings-memory-grid select {
+    min-height: 2.15rem;
+  }
+
+  .settings-workspace-content .settings-memory-actions {
+    min-height: 2.8rem;
+    padding-top: 0.45rem;
+  }
+
+  .settings-workspace-content .settings-memory-message {
+    margin: 0.25rem 0 0;
+    font-size: 0.76rem;
+  }
+
+  .settings-workspace-content .settings-general-panel {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .settings-workspace-content .settings-general-card {
+    min-height: 3.6rem;
+    padding-block: 0.55rem;
+  }
+
+  .settings-workspace-content .settings-notification-card {
+    grid-template-rows: repeat(8, minmax(2.55rem, 1fr));
+  }
+
+  .settings-workspace-content .settings-notification-card .settings-toggle-row {
+    min-height: 2.55rem;
+    padding-block: 0.35rem;
+  }
+
+  .settings-workspace-content .settings-model-panel,
+  .settings-workspace-content .settings-model-usage {
+    min-height: 0;
+    overflow: hidden;
+  }
 }

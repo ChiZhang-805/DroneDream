@@ -31,6 +31,10 @@ const accountApiMock = vi.hoisted(() => ({
   getManagedModelUsage: vi.fn(),
 }));
 
+const accountSelfServiceMock = vi.hoisted(() => ({
+  deleteCurrentAccount: vi.fn(async (): Promise<void> => undefined),
+}));
+
 vi.mock("../features/auth/AuthContext", () => ({
   useAuthOrLocal: () => ({
     configured: true,
@@ -57,6 +61,10 @@ vi.mock("../features/auth/AuthContext", () => ({
 
 vi.mock("../features/settings/cloudModelAccess", () => ({
   getManagedModelUsage: accountApiMock.getManagedModelUsage,
+}));
+
+vi.mock("../features/auth/accountSelfService", () => ({
+  deleteCurrentAccount: accountSelfServiceMock.deleteCurrentAccount,
 }));
 
 function renderOAuthPage(locale: "en" | "zh-CN" = "en") {
@@ -91,6 +99,7 @@ describe("public website account authentication", () => {
     authMock.state.slackEnabled = false;
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline test")));
     accountApiMock.getManagedModelUsage.mockReset();
+    accountSelfServiceMock.deleteCurrentAccount.mockClear();
     accountApiMock.getManagedModelUsage.mockResolvedValue({
       plan: { name: "Pro" },
       account: { billing_scope: "individual" },
@@ -177,6 +186,32 @@ describe("public website account authentication", () => {
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Sign Out" }));
     expect(authMock.signOut).toHaveBeenCalledOnce();
+  });
+
+  it("requires a separate confirmation before permanently deleting the account", async () => {
+    authMock.state.account = {
+      id: "account-1",
+      email: "pilot@example.com",
+      displayName: "Pilot Rivera",
+      avatarUrl: null,
+    };
+
+    renderHomePage();
+    fireEvent.click(screen.getByRole("button", { name: "Pilot Rivera" }));
+    fireEvent.click(within(screen.getByRole("menu", { name: "Account" }))
+      .getByRole("menuitem", { name: "Account" }));
+
+    const dialog = screen.getByRole("dialog", { name: "Account" });
+    expect(within(dialog).queryByText("Console")).not.toBeInTheDocument();
+    expect(within(dialog).queryByText("Administration")).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Delete Account" }));
+    expect(accountSelfServiceMock.deleteCurrentAccount).not.toHaveBeenCalled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Permanently Delete" }));
+    await waitFor(() => {
+      expect(accountSelfServiceMock.deleteCurrentAccount).toHaveBeenCalledOnce();
+      expect(authMock.signOut).toHaveBeenCalledOnce();
+    });
   });
 
   it("shows the neutral person fallback only when no uploaded avatar exists", () => {

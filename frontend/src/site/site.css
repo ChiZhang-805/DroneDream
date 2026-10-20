@@ -3181,6 +3181,43 @@ html[lang="zh-CN"] .site-hero h1 {
   margin-top: 0.7rem;
 }
 
+.site-auth-account button.site-button {
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.site-auth-text-button.is-danger { color: #ff9fbd; }
+.site-auth-text-button.is-danger:hover:not(:disabled),
+.site-auth-text-button.is-danger:focus-visible { color: #ffd4e1; }
+
+.site-auth-delete-confirmation {
+  display: grid;
+  width: 100%;
+  gap: 0.75rem;
+  margin-top: 0.7rem;
+  padding: 1rem;
+  border: 1px solid rgba(255, 113, 156, 0.26);
+  border-radius: 14px;
+  background: rgba(255, 72, 127, 0.07);
+  text-align: left;
+}
+
+.site-auth-delete-confirmation > strong { font-size: 1rem; }
+.site-auth-delete-confirmation > p { margin: 0; color: rgba(238, 225, 232, 0.76); line-height: 1.5; }
+.site-auth-delete-confirmation > div { display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; }
+.site-auth-delete-confirmation button {
+  min-height: 42px;
+  border: 1px solid rgba(184, 188, 223, 0.22);
+  border-radius: 11px;
+  color: #eef0ff;
+  background: rgba(255, 255, 255, 0.045);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.site-auth-delete-confirmation button.is-danger { border-color: rgba(255, 113, 156, 0.35); color: #fff; background: rgba(207, 47, 93, 0.72); }
+
 @media (max-height: 720px) {
   .site-auth-dialog {
     gap: 0.7rem;
