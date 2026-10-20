@@ -248,7 +248,7 @@
     IfErrors 0 dronedream_cli_alias_ready
       Abort "DroneDream could not publish the dronedream-live command. Close open DroneDream terminals and run setup again."
     dronedream_cli_alias_ready:
-    ${If} $NoShortcutMode == 0
+    ${If} $NoShortcutMode != 1
       CreateShortcut "$SMPROGRAMS\${DRONEDREAM_SHORTCUTNAME} CLI.lnk" "$INSTDIR\dronedream-live.exe" "" "$INSTDIR\${MAINBINARYNAME}.exe" 0
     ${EndIf}
   dronedream_cli_publish_done:
