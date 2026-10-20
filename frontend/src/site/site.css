@@ -1330,7 +1330,7 @@ html[lang="zh-CN"] .site-hero h1 {
 .organization-summary select { min-width: 132px; border: 1px solid #d9d0eb; border-radius: 10px; background: #fff; padding: 8px 10px; color: #171322; color-scheme: light; font: inherit; font-weight: 800; }
 .organization-summary select option { color: #171322; background: #fff; }
 
-.organization-onboarding { display: flex; width: min(860px, 100%); min-height: 620px; margin: 28px auto; padding: 38px; flex-direction: column; border: 1px solid rgba(105, 82, 173, 0.18); border-radius: 28px; background: rgba(255, 255, 255, 0.94); box-shadow: 0 22px 60px rgba(62, 43, 99, 0.12); }
+.organization-onboarding { display: flex; width: min(860px, 100%); min-height: 700px; margin: 28px auto; padding: 38px; flex-direction: column; border: 1px solid rgba(105, 82, 173, 0.18); border-radius: 28px; background: rgba(255, 255, 255, 0.94); box-shadow: 0 22px 60px rgba(62, 43, 99, 0.12); }
 .organization-onboarding > header { display: flex; align-items: flex-start; gap: 20px; }
 .organization-onboarding > header > svg { width: 72px; height: 72px; flex: 0 0 72px; color: #7957e8; }
 .organization-onboarding > header > div { flex: 1; }
