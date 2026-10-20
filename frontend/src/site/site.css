@@ -5466,6 +5466,17 @@ body:has(.dd-site[data-page="classic"]) {
 }
 
 /* Classic keeps the original Three.js scene with the current site chrome. */
+@media (min-width: 901px) {
+  .dd-site[data-page="classic"] .site-header,
+  .dd-site[data-page="classic"] .site-header.is-scrolled {
+    padding-inline: clamp(42px, 3.2vw, 68px);
+  }
+
+  .dd-site[data-page="classic"] .site-classic-home .site-hero-layout {
+    padding-inline: clamp(42px, 3.2vw, 68px);
+  }
+}
+
 .dd-site[data-page="classic"] .site-classic-home .site-hero-layout {
   width: auto;
   max-width: none;
@@ -5475,7 +5486,7 @@ body:has(.dd-site[data-page="classic"]) {
 
 .dd-site[data-page="classic"] .site-classic-home .site-hero-copy {
   width: min(1080px, 62vw);
-  margin-top: clamp(2.8rem, 8vh, 6.2rem);
+  margin-top: clamp(1rem, 3vh, 2.4rem);
 }
 
 .dd-site[data-page="classic"] .site-classic-home .site-eyebrow {
@@ -5487,6 +5498,10 @@ body:has(.dd-site[data-page="classic"]) {
   max-width: 1080px;
   font-size: clamp(4.25rem, 5.9vw, 7.35rem);
   line-height: 1.015;
+}
+
+.dd-site[data-page="classic"] .site-classic-home .site-hero-line + .site-hero-line {
+  margin-top: 0.1em;
 }
 
 .dd-site[data-page="classic"] .site-classic-home .site-hero-actions {
