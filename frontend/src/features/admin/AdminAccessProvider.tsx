@@ -17,29 +17,40 @@ import {
 
 export function AdminAccessProvider({ children }: { children: ReactNode }) {
   const auth = useAuth();
+  const accountId = auth.account?.id ?? null;
   const preview = import.meta.env.DEV
     && new URLSearchParams(window.location.search).get("adminPreview") === "1";
   const [status, setStatus] = useState<AdminAccessStatus>("disabled");
   const [access, setAccess] = useState<AdminAccessSnapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
   const requestGeneration = useRef(0);
+  const resolvedAccountId = useRef<string | null>(null);
 
   const refresh = useCallback(async () => {
     const generation = requestGeneration.current + 1;
     requestGeneration.current = generation;
-    if (!auth.account || (!auth.configured && !preview)) {
+    if (!accountId || (!auth.configured && !preview)) {
+      resolvedAccountId.current = null;
       setStatus("disabled");
       setAccess(null);
       setError(null);
       return;
     }
-    setStatus("loading");
+    // A token refresh replaces the auth account object even though the signed-in
+    // identity has not changed. Keep the confirmed permission visible while the
+    // same account is checked again so restoring a window cannot make the
+    // Administration entry disappear and then flash back into place.
+    if (resolvedAccountId.current !== accountId) {
+      setStatus("loading");
+      setAccess(null);
+    }
     setError(null);
     try {
       if (preview) {
         const { getAdminAccess } = await import("./adminConsole");
         const snapshot = await getAdminAccess();
         if (generation !== requestGeneration.current) return;
+        resolvedAccountId.current = accountId;
         setAccess(snapshot);
         setStatus(snapshot.authorized ? "allowed" : "denied");
         return;
@@ -58,10 +69,12 @@ export function AdminAccessProvider({ children }: { children: ReactNode }) {
             : [],
       };
       if (generation !== requestGeneration.current) return;
+      resolvedAccountId.current = accountId;
       setAccess(snapshot);
       setStatus(snapshot.authorized ? "allowed" : "denied");
     } catch (caught) {
       if (generation !== requestGeneration.current) return;
+      resolvedAccountId.current = accountId;
       setAccess(null);
       const statusCode = caught instanceof Error
         && "status" in caught
@@ -75,7 +88,7 @@ export function AdminAccessProvider({ children }: { children: ReactNode }) {
         setError(caught instanceof Error ? caught.message : "Administration access is unavailable.");
       }
     }
-  }, [auth.account, auth.configured, preview]);
+  }, [accountId, auth.configured, preview]);
 
   useEffect(() => {
     void refresh();

@@ -553,6 +553,7 @@ export function SiteApp() {
   const { setLocale } = useI18n();
   const locale = "en" as const;
   const auth = useAuthOrLocal();
+  const accountId = auth.account?.id ?? null;
   const copy = content.en;
   const [release, setRelease] = useState<WebsiteRelease>(fallbackRelease);
   const [editionAvailability, setEditionAvailability] =
@@ -629,7 +630,7 @@ export function SiteApp() {
 
   useEffect(() => {
     let active = true;
-    if (!auth.account) {
+    if (!accountId) {
       setOrganizationAccess(null);
       setAccountPlan(null);
       return () => { active = false; };
@@ -652,7 +653,7 @@ export function SiteApp() {
       );
     });
     return () => { active = false; };
-  }, [auth.account]);
+  }, [accountId]);
 
   const pageMetadata = sitePage === "privacy"
     ? {

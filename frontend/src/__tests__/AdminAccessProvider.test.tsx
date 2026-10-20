@@ -36,7 +36,11 @@ vi.mock("../features/organization/organizationConsole", () => ({
 
 function Probe() {
   const admin = useAdminAccess();
-  return <output aria-label="admin-status">{admin.status}</output>;
+  return (
+    <output aria-label="admin-status">
+      {admin.status}:{admin.access?.role ?? "none"}
+    </output>
+  );
 }
 
 describe("AdminAccessProvider request isolation", () => {
@@ -87,5 +91,38 @@ describe("AdminAccessProvider request isolation", () => {
     await Promise.resolve();
 
     expect(screen.getByLabelText("admin-status")).toHaveTextContent("disabled");
+  });
+
+  it("keeps confirmed access stable when auth refreshes the same account object", async () => {
+    mocks.getOrganizationAccess.mockResolvedValue({
+      authorized: true,
+      role: "owner",
+      organization_id: "organization-1",
+    });
+
+    const view = render(
+      <AdminAccessProvider>
+        <Probe />
+      </AdminAccessProvider>,
+    );
+    await waitFor(() => {
+      expect(screen.getByLabelText("admin-status")).toHaveTextContent("allowed:owner");
+    });
+    expect(mocks.getOrganizationAccess).toHaveBeenCalledTimes(1);
+
+    mocks.auth.account = {
+      id: "owner-1",
+      email: "owner@example.test",
+      displayName: "Owner after token refresh",
+      avatarUrl: null,
+    };
+    view.rerender(
+      <AdminAccessProvider>
+        <Probe />
+      </AdminAccessProvider>,
+    );
+
+    expect(screen.getByLabelText("admin-status")).toHaveTextContent("allowed:owner");
+    expect(mocks.getOrganizationAccess).toHaveBeenCalledTimes(1);
   });
 });
