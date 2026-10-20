@@ -2460,6 +2460,14 @@ html[lang="zh-CN"] .community-cover-title-group > strong {
     linear-gradient(90deg, rgba(235, 245, 255, 0.84), rgba(248, 246, 255, 0.54));
   box-shadow: none;
   backdrop-filter: blur(18px);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.manual-sidebar::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .manual-sidebar::before {
