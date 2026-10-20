@@ -5272,3 +5272,188 @@ body:has(.dd-site[data-page="classic"]) {
     box-shadow: 0 20px 50px rgba(24, 29, 51, 0.12);
   }
 }
+
+/* CLI reference: full-width modules aligned with the global header. */
+.dd-site[data-page="cli"] .site-cli-page {
+  width: auto;
+  max-width: none;
+  margin-inline: clamp(14px, 1.6vw, 30px);
+  padding-top: calc(clamp(68px, 8.5vh, 88px) + clamp(2.6rem, 6vh, 5rem));
+}
+
+.dd-site[data-page="cli"] .site-cli-hero {
+  max-width: none;
+}
+
+.dd-site[data-page="cli"] .site-cli-hero h1 {
+  max-width: 100%;
+  font-size: clamp(3.25rem, 5.9vw, 7rem);
+  line-height: 0.96;
+  white-space: nowrap;
+}
+
+.dd-site[data-page="cli"] .site-cli-groups {
+  gap: 1rem;
+  margin-top: clamp(2rem, 4.5vh, 3.4rem);
+}
+
+.dd-site[data-page="cli"] .site-cli-group {
+  display: block;
+  padding: clamp(1.25rem, 1.8vw, 1.8rem);
+  border-radius: 24px;
+}
+
+.dd-site[data-page="cli"] .site-cli-group h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.72rem;
+  margin: 0;
+  color: #7750da;
+  font-size: clamp(1.2rem, 1.65vw, 1.75rem);
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+
+.dd-site[data-page="cli"] .site-cli-group h2 svg {
+  width: 1.3em;
+  height: 1.3em;
+  flex: 0 0 auto;
+  stroke-width: 2;
+}
+
+.dd-site[data-page="cli"] .site-cli-command-list {
+  gap: 0.64rem;
+  margin-top: 1rem;
+}
+
+.dd-site[data-page="cli"] .site-cli-command {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(270px, 0.34fr);
+  align-items: center;
+  gap: clamp(0.85rem, 1.6vw, 1.5rem);
+}
+
+.dd-site[data-page="cli"] .site-cli-command-box {
+  position: relative;
+  min-width: 0;
+}
+
+.dd-site[data-page="cli"] .site-cli-command-box code {
+  display: block;
+  width: 100%;
+  padding: 0.78rem 3.25rem 0.78rem 1rem;
+  overflow-x: auto;
+  border-radius: 13px;
+  color: #f7f4ff;
+  background: #111522;
+  font: 600 0.82rem/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+
+.dd-site[data-page="cli"] .site-cli-command-box code::-webkit-scrollbar {
+  display: none;
+}
+
+.dd-site[data-page="cli"] .site-cli-command-box code b {
+  color: #ed6fcf;
+}
+
+.dd-site[data-page="cli"] .site-cli-command-box button {
+  position: absolute;
+  top: 50%;
+  right: 0.58rem;
+  display: grid;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 8px;
+  opacity: 0;
+  color: #fff;
+  background: #252b3a;
+  transform: translateY(-50%) scale(0.92);
+  transition: opacity 160ms ease, transform 160ms ease, color 160ms ease, background 160ms ease;
+  cursor: pointer;
+  place-items: center;
+}
+
+.dd-site[data-page="cli"] .site-cli-command-box:hover button,
+.dd-site[data-page="cli"] .site-cli-command-box:focus-within button {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+}
+
+.dd-site[data-page="cli"] .site-cli-command-box button:hover,
+.dd-site[data-page="cli"] .site-cli-command-box button:focus-visible {
+  background: #343c50;
+}
+
+.dd-site[data-page="cli"] .site-cli-command-box button.is-copied {
+  opacity: 1;
+  color: #7ef0ad;
+}
+
+.dd-site[data-page="cli"] .site-cli-command-box button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.dd-site[data-page="cli"] .site-cli-command > span {
+  overflow: hidden;
+  color: #6f7789;
+  font-size: clamp(0.8rem, 0.86vw, 0.92rem);
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dd-site[data-page="cli"] .site-cli-footer-note {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.64rem;
+  margin-top: 1rem;
+  padding: clamp(1.25rem, 1.8vw, 1.8rem);
+  border: 1px solid rgba(71, 79, 112, 0.14);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow: 0 22px 70px rgba(62, 68, 102, 0.08);
+}
+
+.dd-site[data-page="cli"] .site-cli-footer-note > strong {
+  margin: 0 0 0.25rem;
+  color: #7750da;
+  font-size: clamp(1.2rem, 1.65vw, 1.75rem);
+}
+
+.dd-site[data-page="cli"] .site-header,
+.dd-site[data-page="cli"] .site-header .site-nav,
+.dd-site[data-page="cli"] .site-header .site-account-button {
+  transition: height 240ms ease, background 240ms ease, border-color 240ms ease, box-shadow 240ms ease;
+}
+
+.dd-site[data-page="cli"] .site-header.is-scrolled {
+  border-bottom: 1px solid rgba(64, 69, 94, 0.08);
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 10px 34px rgba(43, 47, 76, 0.08);
+  backdrop-filter: blur(18px) saturate(135%);
+}
+
+.dd-site[data-page="cli"] .site-header.is-scrolled .site-nav,
+.dd-site[data-page="cli"] .site-header.is-scrolled .site-account-button {
+  border-color: rgba(66, 72, 99, 0.12);
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(47, 51, 80, 0.09);
+}
+
+.dd-site[data-page="cli"] .site-header.is-scrolled .site-nav a[aria-current="page"] {
+  color: #fff;
+  background: linear-gradient(115deg, #37cbed 0%, #8355e8 48%, #ef5fbd 100%);
+  box-shadow: 0 6px 18px rgba(128, 77, 219, 0.24);
+}
+
+@media (max-width: 900px) {
+  .dd-site[data-page="cli"] .site-cli-hero h1 { white-space: normal; }
+  .dd-site[data-page="cli"] .site-cli-command { grid-template-columns: 1fr; gap: 0.3rem; }
+  .dd-site[data-page="cli"] .site-cli-command > span { white-space: normal; }
+}
