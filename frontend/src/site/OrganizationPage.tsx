@@ -27,8 +27,10 @@ import {
   searchOrganizations,
   setOrganizationMemberPlan,
   setOrganizationMemberRole,
+  setOrganizationJoinPassword,
   setOrganizationPlan,
   transferOrganizationFounder,
+  updateOrganizationProfile,
   type OrganizationMember,
   type OrganizationPlan,
   type OrganizationRole,
@@ -104,6 +106,14 @@ const content = {
     addDepartment: "Add department",
     assignDepartment: "Assign department",
     unassigned: "Not assigned",
+    password: "Organization password",
+    passwordHelp: "Use this password when joining the organization.",
+    passwordConfigured: "Configured",
+    passwordMissing: "Not configured",
+    savePassword: "Save password",
+    saveOrganization: "Save organization",
+    organizationDetails: "Organization details",
+    deleteMember: "Delete member",
   },
   "zh-CN": {
     title: "企业管理",
@@ -168,6 +178,14 @@ const content = {
     addDepartment: "添加部门",
     assignDepartment: "分配部门",
     unassigned: "尚未分配",
+    password: "组织密码",
+    passwordHelp: "加入组织时需要输入此密码。",
+    passwordConfigured: "已设置",
+    passwordMissing: "未设置",
+    savePassword: "保存密码",
+    saveOrganization: "保存组织信息",
+    organizationDetails: "组织信息",
+    deleteMember: "删除成员",
   },
 } as const;
 
@@ -220,6 +238,7 @@ export function OrganizationPage({
   const [wizardStep, setWizardStep] = useState<1 | 2>(1);
   const [organizationName, setOrganizationName] = useState("");
   const [organizationDescription, setOrganizationDescription] = useState("");
+  const [organizationPassword, setOrganizationPassword] = useState("");
   const [organizationStructure, setOrganizationStructure] = useState<OrganizationStructure>("flat");
   const [founderPlan, setFounderPlan] = useState<OrganizationPlan>(requestedPlan);
   const [departmentName, setDepartmentName] = useState("");
@@ -227,14 +246,27 @@ export function OrganizationPage({
   const [organizationQuery, setOrganizationQuery] = useState("");
   const [organizationResults, setOrganizationResults] = useState<OrganizationSearchResult[]>([]);
   const [joinPlan, setJoinPlan] = useState<OrganizationPlan>(requestedPlan);
+  const [joinPassword, setJoinPassword] = useState("");
   const [joinRequested, setJoinRequested] = useState(false);
+  const [organizationDialogOpen, setOrganizationDialogOpen] = useState(false);
+  const [organizationDraftName, setOrganizationDraftName] = useState("");
+  const [organizationDraftPlan, setOrganizationDraftPlan] = useState<OrganizationPlan>("free");
+  const [organizationDraftPassword, setOrganizationDraftPassword] = useState("");
   const dialogRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const organizationDialogRef = useRef<HTMLElement>(null);
+  const organizationCloseRef = useRef<HTMLButtonElement>(null);
   const captureDetailsTrigger = useModalFocus({
     open: Boolean(selected),
     dialogRef,
     initialFocusRef: closeRef,
     onClose: () => setSelected(null),
+  });
+  const captureOrganizationTrigger = useModalFocus({
+    open: organizationDialogOpen,
+    dialogRef: organizationDialogRef,
+    initialFocusRef: organizationCloseRef,
+    onClose: () => setOrganizationDialogOpen(false),
   });
   const date = useMemo(() => new Intl.DateTimeFormat(
     locale === "zh-CN" ? "zh-CN" : "en",
@@ -326,12 +358,12 @@ export function OrganizationPage({
   };
 
   const submitOrganization = async () => {
-    if (!organizationName.trim() || busy) return;
+    if (!organizationName.trim() || organizationPassword.length < 8 || busy) return;
     setBusy(true);
     try {
       updateSnapshot(await createOrganization({
         name: organizationName.trim(), description: organizationDescription.trim(),
-        structure: organizationStructure, plan: founderPlan,
+        structure: organizationStructure, plan: founderPlan, password: organizationPassword,
       }));
       setCanCreate(false);
     } catch (reason) { setError(reason instanceof OrganizationConsoleError ? reason.message : copy.unavailable); }
@@ -373,7 +405,7 @@ export function OrganizationPage({
   const requestJoin = async (organization: OrganizationSearchResult) => {
     if (busy) return;
     setBusy(true);
-    try { await requestOrganizationJoin(organization.public_code, joinPlan); setJoinRequested(true); setError(null); }
+    try { await requestOrganizationJoin(organization.public_code, joinPlan, joinPassword); setJoinRequested(true); setError(null); }
     catch (reason) { setError(reason instanceof OrganizationConsoleError ? reason.message : copy.unavailable); }
     finally { setBusy(false); }
   };
@@ -418,16 +450,55 @@ export function OrganizationPage({
     }
   };
 
+  const canRemove = (member: OrganizationMember) => member.role !== "owner" && (
+    snapshot?.actor.role === "owner" || member.role === "member"
+  );
+
+  const removeMemberFromRow = async (member: OrganizationMember) => {
+    if (!canRemove(member) || busy) return;
+    setBusy(true);
+    setError(null);
+    try { updateSnapshot(await removeOrganizationMember(member.id)); }
+    catch (reason) { setError(reason instanceof OrganizationConsoleError ? reason.message : copy.unavailable); }
+    finally { setBusy(false); }
+  };
+
+  const openOrganizationDialog = () => {
+    if (!snapshot) return;
+    captureOrganizationTrigger();
+    setOrganizationDraftName(snapshot.organization.name);
+    setOrganizationDraftPlan(snapshot.organization.plan);
+    setOrganizationDraftPassword("");
+    setOrganizationDialogOpen(true);
+  };
+
+  const saveOrganization = async () => {
+    if (!snapshot || snapshot.actor.role !== "owner" || !organizationDraftName.trim() || busy) return;
+    setBusy(true);
+    try { updateSnapshot(await updateOrganizationProfile(organizationDraftName.trim(), organizationDraftPlan)); }
+    catch (reason) { setError(reason instanceof OrganizationConsoleError ? reason.message : copy.unavailable); }
+    finally { setBusy(false); }
+  };
+
+  const saveOrganizationPassword = async () => {
+    if (!snapshot || snapshot.actor.role !== "owner" || organizationDraftPassword.length < 8 || busy) return;
+    setBusy(true);
+    try { updateSnapshot(await setOrganizationJoinPassword(organizationDraftPassword)); setOrganizationDraftPassword(""); }
+    catch (reason) { setError(reason instanceof OrganizationConsoleError ? reason.message : copy.unavailable); }
+    finally { setBusy(false); }
+  };
+
   if (loading) {
     return <main className="organization-page site-shell" aria-busy="true">{copy.loading}</main>;
   }
   if (!snapshot && canCreate) {
     return <main className="organization-page site-shell"><section className={`organization-onboarding is-${onboardingMode}`} aria-labelledby="organization-create-title">
       <header><Building2 aria-hidden="true" /><div><h1 id="organization-create-title">{onboardingMode === "choose" ? copy.choosePath : onboardingMode === "join" ? copy.joinExisting : copy.createTitle}</h1><p>{copy.createIntro}</p></div>{onboardingMode === "create" ? <span>{wizardStep} / 2</span> : null}</header>
-      {onboardingMode === "choose" ? <div className="organization-path-options"><button type="button" onClick={() => setOnboardingMode("create")}><Crown aria-hidden="true" /><strong>{copy.createNew}</strong></button><button type="button" onClick={() => setOnboardingMode("join")}><Users aria-hidden="true" /><strong>{copy.joinExisting}</strong></button></div> : onboardingMode === "join" ? <div className="organization-wizard-fields"><label><span>{copy.searchOrganization}</span><input autoFocus value={organizationQuery} onChange={(event) => setOrganizationQuery(event.target.value)} /></label><label><span>{copy.memberPlan}</span><select value={joinPlan} onChange={(event) => setJoinPlan(event.target.value as OrganizationPlan)}><option value="free">Business Free</option><option value="plus">Business Plus</option><option value="pro">Business Pro</option></select></label><div className="organization-wizard-actions"><button type="button" className="is-secondary" onClick={() => setOnboardingMode("choose")}>{copy.back}</button><button type="button" onClick={() => void searchForOrganizations()}>{copy.search}</button></div>{joinRequested ? <p>{copy.requestSent}</p> : organizationResults.map((organization) => <article className="organization-search-result" key={organization.public_code}><div><strong>{organization.name}</strong><span>{organization.public_code} · Business {organization.plan.toUpperCase()}</span><small>{organization.description}</small></div><button type="button" disabled={(organization.plan === "free" && joinPlan !== "free") || (organization.plan === "plus" && joinPlan === "pro")} onClick={() => void requestJoin(organization)}>{copy.requestJoin}</button></article>)}</div> : wizardStep === 1 ? <div className="organization-wizard-fields">
+      {onboardingMode === "choose" ? <div className="organization-path-options"><button type="button" onClick={() => setOnboardingMode("create")}><Crown aria-hidden="true" /><strong>{copy.createNew}</strong></button><button type="button" onClick={() => setOnboardingMode("join")}><Users aria-hidden="true" /><strong>{copy.joinExisting}</strong></button></div> : onboardingMode === "join" ? <div className="organization-wizard-fields"><label><span>{copy.searchOrganization}</span><input autoFocus value={organizationQuery} onChange={(event) => setOrganizationQuery(event.target.value)} /></label><label><span>{copy.password}</span><input aria-label={copy.password} type="password" maxLength={72} value={joinPassword} onChange={(event) => setJoinPassword(event.target.value)} /></label><label><span>{copy.memberPlan}</span><select value={joinPlan} onChange={(event) => setJoinPlan(event.target.value as OrganizationPlan)}><option value="free">Business Free</option><option value="plus">Business Plus</option><option value="pro">Business Pro</option></select></label><div className="organization-wizard-actions"><button type="button" className="is-secondary" onClick={() => setOnboardingMode("choose")}>{copy.back}</button><button type="button" onClick={() => void searchForOrganizations()}>{copy.search}</button></div>{joinRequested ? <p>{copy.requestSent}</p> : organizationResults.map((organization) => <article className="organization-search-result" key={organization.public_code}><div><strong>{organization.name}</strong><span>{organization.public_code} · Business {organization.plan.toUpperCase()}</span><small>{organization.description}</small></div><button type="button" disabled={!joinPassword || (organization.plan === "free" && joinPlan !== "free") || (organization.plan === "plus" && joinPlan === "pro")} onClick={() => void requestJoin(organization)}>{copy.requestJoin}</button></article>)}</div> : wizardStep === 1 ? <div className="organization-wizard-fields">
         <label><span>{copy.name}</span><input autoFocus maxLength={120} value={organizationName} onChange={(event) => setOrganizationName(event.target.value)} /></label>
         <label><span>{copy.description}</span><textarea maxLength={500} rows={4} value={organizationDescription} onChange={(event) => setOrganizationDescription(event.target.value)} /></label>
-        <div className="organization-wizard-actions"><button type="button" className="is-secondary" onClick={() => setOnboardingMode("choose")}>{copy.back}</button><button type="button" disabled={!organizationName.trim()} onClick={() => setWizardStep(2)}>{copy.next}</button></div>
+        <label><span>{copy.password}</span><input aria-label={copy.password} type="password" minLength={8} maxLength={72} value={organizationPassword} onChange={(event) => setOrganizationPassword(event.target.value)} /><small>{copy.passwordHelp}</small></label>
+        <div className="organization-wizard-actions"><button type="button" className="is-secondary" onClick={() => setOnboardingMode("choose")}>{copy.back}</button><button type="button" disabled={!organizationName.trim() || organizationPassword.length < 8} onClick={() => setWizardStep(2)}>{copy.next}</button></div>
       </div> : <div className="organization-wizard-fields">
         <fieldset><legend>{copy.architecture}</legend>{([
           ["flat", copy.flat, copy.flatHelp], ["department_single", copy.single, copy.singleHelp], ["department_dual", copy.dual, copy.dualHelp],
@@ -452,7 +523,7 @@ export function OrganizationPage({
     <main className="organization-page site-shell">
       <header className="organization-heading">
         <div><Building2 aria-hidden="true" /><h1>{snapshot.organization.name}</h1></div>
-        <span>{copy.title}</span>
+        <button type="button" className="organization-settings-trigger" onClick={openOrganizationDialog}><Building2 aria-hidden="true" />{copy.title}</button>
       </header>
 
       <section className="organization-summary" aria-label={copy.title}>
@@ -490,13 +561,33 @@ export function OrganizationPage({
                   <td><EditionLicenseStrip licenses={member.licenses} locale={locale} /></td>
                   <td>{date.format(new Date(member.created_at))}</td>
                   <td>{member.last_sign_in_at ? date.format(new Date(member.last_sign_in_at)) : copy.noSignIn}</td>
-                  <td><button type="button" className="organization-details-button" onClick={() => openDetails(member)}><Eye aria-hidden="true" /><span>{copy.details}</span></button></td>
+                  <td><div className="organization-row-actions"><button type="button" className="organization-details-button" onClick={() => openDetails(member)}><Eye aria-hidden="true" /><span>{copy.details}</span></button><button type="button" className="organization-row-delete" aria-label={`${copy.deleteMember}: ${member.display_name}`} title={copy.deleteMember} disabled={busy || !canRemove(member)} onClick={() => void removeMemberFromRow(member)}><Trash2 aria-hidden="true" /></button></div></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </section>
+
+      {organizationDialogOpen ? <div className="organization-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setOrganizationDialogOpen(false); }}>
+        <section ref={organizationDialogRef} className="organization-member-dialog organization-information-dialog" role="dialog" aria-modal="true" aria-labelledby="organization-information-title" tabIndex={-1}>
+          <header><div><span className="organization-avatar is-large"><Building2 aria-hidden="true" /></span><div><h2 id="organization-information-title">{copy.organizationDetails}</h2><span>{snapshot.organization.public_code}</span></div></div><button ref={organizationCloseRef} type="button" aria-label={copy.close} onClick={() => setOrganizationDialogOpen(false)}><X aria-hidden="true" /></button></header>
+          <div className="organization-member-profile"><dl>
+            <div><dt>{copy.members}</dt><dd>{snapshot.members.length}</dd></div>
+            <div><dt>{copy.delegated}</dt><dd>{adminCount} / {snapshot.admin_limit}</dd></div>
+            <div><dt>{copy.code}</dt><dd>{snapshot.organization.public_code}</dd></div>
+            <div><dt>{copy.password}</dt><dd>{snapshot.organization.join_password_configured ? copy.passwordConfigured : copy.passwordMissing}</dd></div>
+          </dl></div>
+          {snapshot.actor.role === "owner" ? <div className="organization-member-actions">
+            <div className="organization-profile-field"><label htmlFor="organization-profile-name">{copy.name}</label><input id="organization-profile-name" maxLength={120} value={organizationDraftName} onChange={(event) => setOrganizationDraftName(event.target.value)} /></div>
+            <div className="organization-profile-field"><label htmlFor="organization-profile-plan">{copy.plan}</label><select id="organization-profile-plan" value={organizationDraftPlan} onChange={(event) => setOrganizationDraftPlan(event.target.value as OrganizationPlan)}><option value="free">Business Free</option><option value="plus">Business Plus</option><option value="pro">Business Pro</option></select></div>
+            <button type="button" disabled={busy || !organizationDraftName.trim()} onClick={() => void saveOrganization()}><Save aria-hidden="true" />{copy.saveOrganization}</button>
+            <div className="organization-profile-field"><label htmlFor="organization-profile-password">{copy.password}</label><input id="organization-profile-password" type="password" minLength={8} maxLength={72} value={organizationDraftPassword} placeholder={copy.passwordHelp} onChange={(event) => setOrganizationDraftPassword(event.target.value)} /></div>
+            <button type="button" disabled={busy || organizationDraftPassword.length < 8} onClick={() => void saveOrganizationPassword()}><Save aria-hidden="true" />{copy.savePassword}</button>
+          </div> : null}
+          {error ? <p className="organization-error" role="alert">{error}</p> : null}
+        </section>
+      </div> : null}
 
       {selected ? (
         <div className="organization-dialog-backdrop" onMouseDown={(event) => {

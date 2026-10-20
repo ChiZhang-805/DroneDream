@@ -14,12 +14,17 @@ const hierarchyMigrationUrl = new URL(
   "../../migrations/20261020020000_complete_organization_role_hierarchy.sql",
   import.meta.url,
 );
+const passwordMigrationUrl = new URL(
+  "../../migrations/20261020030000_secure_organization_join_password.sql",
+  import.meta.url,
+);
 
 const migration = (
   await Promise.all([
     Deno.readTextFile(baseMigrationUrl),
     Deno.readTextFile(extensionMigrationUrl),
     Deno.readTextFile(hierarchyMigrationUrl),
+    Deno.readTextFile(passwordMigrationUrl),
   ])
 ).join("\n");
 
@@ -140,4 +145,12 @@ Deno.test("department structures enforce one or two scoped managers", () => {
   assert(migration.includes("structure_model in ('flat', 'department_single', 'department_dual')"), "structure models missing");
   assert(migration.includes("structure = 'department_single' then 1 else 2"), "department manager limits missing");
   assert(migration.includes("ORGANIZATION_DEPARTMENT_PERMISSION_REQUIRED"), "department-scoped plan management missing");
+});
+
+Deno.test("organization passwords are one-way hashed and required for joins", () => {
+  assert(migration.includes("join_password_hash text"), "password hash column missing");
+  assert(migration.includes("extensions.gen_salt('bf', 12)"), "password must use a slow salted hash");
+  assert(migration.includes("extensions.crypt(p_password, organization.join_password_hash)"), "join password verification missing");
+  assert(migration.includes("drop function if exists public.organization_request_join(uuid, text, text)"), "passwordless join entry point must be removed");
+  assert(!migration.includes("join_password text"), "plaintext organization passwords must never be stored");
 });

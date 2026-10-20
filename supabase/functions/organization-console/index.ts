@@ -60,6 +60,7 @@ export interface OrganizationSnapshot {
     public_code: string;
     description: string;
     structure_model: OrganizationStructure;
+    join_password_configured: boolean;
   };
   actor: {
     user_id: string;
@@ -98,17 +99,20 @@ export interface OrganizationConsoleDependencies {
   setMemberPlan(actorUserId: string, targetUserId: string, plan: OrganizationPlan): Promise<void>;
   transferFounder(actorUserId: string, targetUserId: string): Promise<void>;
   setFounderPlan(actorUserId: string, plan: OrganizationPlan): Promise<void>;
+  updateOrganization(actorUserId: string, name: string, plan: OrganizationPlan): Promise<void>;
+  setJoinPassword(actorUserId: string, password: string): Promise<void>;
   createOrganization(
     founderUserId: string,
     name: string,
     description: string,
     structure: OrganizationStructure,
     plan: OrganizationPlan,
+    password: string,
   ): Promise<void>;
   createDepartment(actorUserId: string, name: string): Promise<void>;
   assignDepartment(actorUserId: string, targetUserId: string, departmentId: string): Promise<void>;
   searchOrganizations(query: string): Promise<Array<{ public_code: string; name: string; description: string; plan: OrganizationPlan; structure_model: OrganizationStructure }>>;
-  requestJoin(userId: string, publicCode: string, plan: OrganizationPlan): Promise<void>;
+  requestJoin(userId: string, publicCode: string, plan: OrganizationPlan, password: string): Promise<void>;
   reviewJoin(actorUserId: string, requestId: string, approved: boolean): Promise<void>;
 }
 
@@ -347,6 +351,12 @@ function mapRpcError(error: { message?: string } | null): never {
       "No organization matches that code.",
     ],
     [
+      "ORGANIZATION_PASSWORD_INCORRECT",
+      "ORGANIZATION_PASSWORD_INCORRECT",
+      403,
+      "The organization password is incorrect.",
+    ],
+    [
       "ORGANIZATION_JOIN_REQUEST_NOT_FOUND",
       "ORGANIZATION_JOIN_REQUEST_NOT_FOUND",
       404,
@@ -419,7 +429,7 @@ function actualDependencies(): OrganizationConsoleDependencies {
       }
       const [organizationResult, memberResult, departmentResult, assignmentResult, joinRequestResult] = await Promise.all([
         client.from("organizations")
-          .select("organization_id,name,plan,status,owner_user_id,public_code,description,structure_model")
+          .select("organization_id,name,plan,status,owner_user_id,public_code,description,structure_model,join_password_hash")
           .eq("organization_id", actorAccess.organization_id)
           .single(),
         client.from("organization_members")
@@ -550,6 +560,7 @@ function actualDependencies(): OrganizationConsoleDependencies {
           public_code: String(organization.public_code),
           description: String(organization.description ?? ""),
           structure_model: organization.structure_model as OrganizationStructure,
+          join_password_configured: typeof organization.join_password_hash === "string" && organization.join_password_hash.length > 0,
         },
         actor: {
           user_id: userId,
@@ -635,13 +646,29 @@ function actualDependencies(): OrganizationConsoleDependencies {
       });
       if (error) mapRpcError(error);
     },
-    async createOrganization(founderUserId, name, description, structure, plan) {
-      const { error } = await client.rpc("organization_create_v2", {
+    async updateOrganization(actorUserId, name, plan) {
+      const { error } = await client.rpc("organization_update_profile", {
+        p_actor_user_id: actorUserId,
+        p_name: name,
+        p_plan_id: plan,
+      });
+      if (error) mapRpcError(error);
+    },
+    async setJoinPassword(actorUserId, password) {
+      const { error } = await client.rpc("organization_set_join_password", {
+        p_actor_user_id: actorUserId,
+        p_password: password,
+      });
+      if (error) mapRpcError(error);
+    },
+    async createOrganization(founderUserId, name, description, structure, plan, password) {
+      const { error } = await client.rpc("organization_create_v3", {
         p_founder_user_id: founderUserId,
         p_name: name,
         p_description: description,
         p_structure_model: structure,
         p_founder_plan: plan,
+        p_password: password,
       });
       if (error) mapRpcError(error);
     },
@@ -673,8 +700,8 @@ function actualDependencies(): OrganizationConsoleDependencies {
       if (error) throw new OrganizationConsoleError("ORGANIZATION_SEARCH_FAILED", "Organizations could not be searched.", 503);
       return (data ?? []) as Array<{ public_code: string; name: string; description: string; plan: OrganizationPlan; structure_model: OrganizationStructure }>;
     },
-    async requestJoin(userId, publicCode, plan) {
-      const { error } = await client.rpc("organization_request_join", { p_user_id: userId, p_public_code: publicCode, p_plan_id: plan });
+    async requestJoin(userId, publicCode, plan, password) {
+      const { error } = await client.rpc("organization_request_join", { p_user_id: userId, p_public_code: publicCode, p_plan_id: plan, p_password: password });
       if (error) mapRpcError(error);
     },
     async reviewJoin(actorUserId, requestId, approved) {
@@ -712,10 +739,10 @@ export async function handleOrganizationConsoleRequest(
     }
     if (request.method === "POST" && route === "/join-requests") {
       const body = await readBoundedJsonObject(request, MAX_BODY_BYTES);
-      if (!exactKeys(body, ["public_code", "plan"]) || typeof body.public_code !== "string" || !/^DD[0-9]{5}$/u.test(body.public_code.toUpperCase()) || !validPlan(body.plan)) {
-        throw new OrganizationConsoleError("INVALID_REQUEST", "A valid organization code and Business plan are required.", 400);
+      if (!exactKeys(body, ["public_code", "plan", "password"]) || typeof body.public_code !== "string" || !/^DD[0-9]{5}$/u.test(body.public_code.toUpperCase()) || !validPlan(body.plan) || typeof body.password !== "string" || body.password.length < 1 || body.password.length > 72) {
+        throw new OrganizationConsoleError("INVALID_REQUEST", "A valid organization code, password, and Business plan are required.", 400);
       }
-      await deps.requestJoin(actor.id, body.public_code.toUpperCase(), body.plan);
+      await deps.requestJoin(actor.id, body.public_code.toUpperCase(), body.plan, body.password);
       return jsonResponse(request, 201, { data: { requested: true } });
     }
     if (request.method === "GET" && route === "/") {
@@ -726,16 +753,32 @@ export async function handleOrganizationConsoleRequest(
     if (request.method === "POST" && route === "/organizations") {
       const body = await readBoundedJsonObject(request, MAX_BODY_BYTES);
       if (
-        !exactKeys(body, ["name", "description", "structure", "plan"]) ||
+        !exactKeys(body, ["name", "description", "structure", "plan", "password"]) ||
         typeof body.name !== "string" || typeof body.description !== "string" ||
         body.name.trim().length < 1 || body.name.trim().length > 120 ||
         body.description.trim().length > 500 || !validStructure(body.structure) ||
-        !validPlan(body.plan)
+        !validPlan(body.plan) || typeof body.password !== "string" || body.password.length < 8 || body.password.length > 72
       ) {
         throw new OrganizationConsoleError("INVALID_REQUEST", "Valid organization details are required.", 400);
       }
-      await deps.createOrganization(actor.id, body.name.trim(), body.description.trim(), body.structure, body.plan);
+      await deps.createOrganization(actor.id, body.name.trim(), body.description.trim(), body.structure, body.plan, body.password);
       return jsonResponse(request, 201, { data: await deps.snapshot(actor.id) });
+    }
+    if (request.method === "PATCH" && route === "/organization") {
+      const body = await readBoundedJsonObject(request, MAX_BODY_BYTES);
+      if (!exactKeys(body, ["name", "plan"]) || typeof body.name !== "string" || body.name.trim().length < 1 || body.name.trim().length > 120 || !validPlan(body.plan)) {
+        throw new OrganizationConsoleError("INVALID_REQUEST", "A valid organization name and Business plan are required.", 400);
+      }
+      await deps.updateOrganization(actor.id, body.name.trim(), body.plan);
+      return jsonResponse(request, 200, { data: await deps.snapshot(actor.id) });
+    }
+    if (request.method === "PUT" && route === "/join-password") {
+      const body = await readBoundedJsonObject(request, MAX_BODY_BYTES);
+      if (!exactKeys(body, ["password"]) || typeof body.password !== "string" || body.password.length < 8 || body.password.length > 72) {
+        throw new OrganizationConsoleError("INVALID_REQUEST", "The organization password must contain 8 to 72 characters.", 400);
+      }
+      await deps.setJoinPassword(actor.id, body.password);
+      return jsonResponse(request, 200, { data: await deps.snapshot(actor.id) });
     }
     if (request.method === "PATCH" && route === "/plan") {
       const body = await readBoundedJsonObject(request, MAX_BODY_BYTES);

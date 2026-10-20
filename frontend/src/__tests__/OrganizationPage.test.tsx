@@ -9,6 +9,8 @@ const organizationMock = vi.hoisted(() => ({
   removeOrganizationMember: vi.fn(),
   setOrganizationMemberPlan: vi.fn(),
   setOrganizationPlan: vi.fn(),
+  updateOrganizationProfile: vi.fn(),
+  setOrganizationJoinPassword: vi.fn(),
   transferOrganizationFounder: vi.fn(),
   createOrganization: vi.fn(),
 }));
@@ -33,6 +35,7 @@ function snapshot(role: "owner" | "admin" = "owner") {
       public_code: "DD00001",
       description: "Flight research",
       structure_model: "flat" as const,
+      join_password_configured: true,
     },
     actor: {
       user_id: role === "owner"
@@ -98,6 +101,8 @@ describe("OrganizationPage", () => {
     organizationMock.removeOrganizationMember.mockResolvedValue(snapshot());
     organizationMock.setOrganizationMemberPlan.mockResolvedValue(snapshot());
     organizationMock.setOrganizationPlan.mockResolvedValue(snapshot());
+    organizationMock.updateOrganizationProfile.mockResolvedValue(snapshot());
+    organizationMock.setOrganizationJoinPassword.mockResolvedValue(snapshot());
     organizationMock.transferOrganizationFounder.mockResolvedValue(snapshot());
     organizationMock.createOrganization.mockResolvedValue(snapshot());
   });
@@ -181,12 +186,13 @@ describe("OrganizationPage", () => {
     expect(screen.getByRole("button", { name: "Back" })).toBeVisible();
     fireEvent.change(screen.getByLabelText("Organization name"), { target: { value: "Flight Lab" } });
     fireEvent.change(screen.getByLabelText("Organization description"), { target: { value: "Research team" } });
+    fireEvent.change(screen.getByLabelText("Organization password"), { target: { value: "secure-flight-2026" } });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     fireEvent.click(screen.getByText("Departments · two managers"));
     fireEvent.change(screen.getByLabelText("Founder Business plan"), { target: { value: "plus" } });
     fireEvent.click(screen.getByRole("button", { name: "Create organization" }));
     await waitFor(() => expect(organizationMock.createOrganization).toHaveBeenCalledWith({
-      name: "Flight Lab", description: "Research team", structure: "department_dual", plan: "plus",
+      name: "Flight Lab", description: "Research team", structure: "department_dual", plan: "plus", password: "secure-flight-2026",
     }));
   });
 
@@ -198,7 +204,24 @@ describe("OrganizationPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Create a new organization" }));
     fireEvent.change(screen.getByLabelText("Organization name"), { target: { value: "Flight Lab" } });
+    fireEvent.change(screen.getByLabelText("Organization password"), { target: { value: "secure-flight-2026" } });
     fireEvent.click(screen.getByRole("button", { name: "Continue" }));
     expect(screen.getByLabelText("Founder Business plan")).toHaveValue("plus");
+  });
+
+  it("opens organization details and applies member delete permissions", async () => {
+    render(<OrganizationPage locale="en" accountId="user-owner" />);
+    await screen.findByRole("heading", { name: "Aerial Systems Lab" });
+    fireEvent.click(screen.getByRole("button", { name: "Organization" }));
+    const dialog = screen.getByRole("dialog", { name: "Organization details" });
+    expect(within(dialog).getAllByText("DD00001")).toHaveLength(2);
+    expect(within(dialog).getByText("Configured")).toBeVisible();
+    expect(within(dialog).getByLabelText("Organization name")).toHaveValue("Aerial Systems Lab");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close member details" }));
+
+    const ownerRow = screen.getByText("owner@example.test").closest("tr")!;
+    const memberRow = screen.getByText("pilot@example.test").closest("tr")!;
+    expect(within(ownerRow).getByRole("button", { name: "Delete member: Organization Owner" })).toBeDisabled();
+    expect(within(memberRow).getByRole("button", { name: "Delete member: Pilot Member" })).toBeEnabled();
   });
 });

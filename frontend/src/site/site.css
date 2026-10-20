@@ -1287,7 +1287,7 @@ html[lang="zh-CN"] .site-hero h1 {
 }
 
 .organization-heading > div,
-.organization-heading > span {
+.organization-settings-trigger {
   display: flex;
   align-items: center;
 }
@@ -1295,14 +1295,20 @@ html[lang="zh-CN"] .site-hero h1 {
 .organization-heading > div { gap: 12px; }
 .organization-heading svg { width: 30px; height: 30px; color: #7957e8; }
 .organization-heading h1 { margin: 0; font-size: clamp(30px, 3vw, 46px); line-height: 1; }
-.organization-heading > span {
+.organization-settings-trigger {
   min-height: 36px;
   padding: 0 16px;
   border: 1px solid rgba(91, 73, 144, 0.18);
   border-radius: 999px;
   color: #625a75;
   font-weight: 700;
+  background: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  gap: 7px;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 }
+.organization-settings-trigger:hover { transform: translateY(-2px); border-color: rgba(121, 87, 232, .44); box-shadow: 0 9px 24px rgba(86, 57, 155, .12); }
+.organization-settings-trigger svg { width: 17px; height: 17px; }
 
 .organization-summary {
   display: grid;
@@ -1468,6 +1474,8 @@ html[lang="zh-CN"] .site-hero h1 {
 .organization-member-table th:nth-child(5),
 .organization-member-table th:nth-child(6) { width: 13%; }
 .organization-member-table th:nth-child(7) { width: 14%; }
+.organization-member-table th:nth-child(2),
+.organization-member-table td:nth-child(2) { text-align: center; }
 .organization-member-table td:first-child { display: flex; align-items: center; gap: 9px; }
 .organization-member-table td:first-child > span:last-child { min-width: 0; display: grid; }
 .organization-member-table td strong,
@@ -1513,6 +1521,10 @@ html[lang="zh-CN"] .site-hero h1 {
   font-weight: 800;
 }
 .organization-details-button svg { width: 15px; }
+.organization-row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
+.organization-row-delete { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border: 1px solid rgba(197, 40, 83, .24); border-radius: 9px; background: #fff1f4; color: #c52853; cursor: pointer; }
+.organization-row-delete svg { width: 15px; height: 15px; }
+.organization-row-delete:disabled { border-color: rgba(125, 116, 137, .12); background: #f6f4f8; color: #c9c3ce; cursor: not-allowed; opacity: 1; }
 
 .organization-dialog-backdrop {
   position: fixed;
@@ -1558,6 +1570,13 @@ html[lang="zh-CN"] .site-hero h1 {
 .organization-member-applications dd { min-width: 170px; }
 .organization-member-applications .edition-license-strip { justify-content: flex-end; }
 .organization-member-actions { display: grid; gap: 12px; }
+.organization-information-dialog { width: min(100%, 620px); }
+.organization-profile-field { display: grid; gap: 6px; }
+.organization-profile-field label { color: #6d6777; font-size: 12px; font-weight: 800; }
+.organization-profile-field input,
+.organization-profile-field select { width: 100%; height: 44px; border: 1px solid rgba(91,73,144,.2); border-radius: 11px; background: #fff; padding: 0 13px; color: #171322; -webkit-text-fill-color: #171322; font: inherit; }
+.organization-information-dialog .organization-member-actions > button { display: inline-flex; align-items: center; justify-content: center; justify-self: end; gap: 8px; min-width: 190px; }
+.organization-information-dialog .organization-member-actions > button svg { width: 17px; height: 17px; }
 .organization-member-edit-row { display: grid; grid-template-columns: minmax(145px, .42fr) minmax(0, 1fr) 42px; align-items: center; gap: 12px; }
 .organization-member-edit-row.is-department { grid-template-columns: minmax(145px, .42fr) minmax(0, 1fr); padding-right: 54px; }
 .organization-member-edit-row > label { color: #6d6777; font-size: 13px; font-weight: 800; }

@@ -36,6 +36,7 @@ export interface OrganizationSnapshot {
     public_code: string;
     description: string;
     structure_model: OrganizationStructure;
+    join_password_configured: boolean;
   };
   actor: {
     user_id: string;
@@ -190,6 +191,7 @@ export function createOrganization(input: {
   description: string;
   structure: OrganizationStructure;
   plan: OrganizationPlan;
+  password: string;
 }): Promise<OrganizationSnapshot> {
   return request<OrganizationSnapshot>("/organizations", {
     method: "POST",
@@ -225,10 +227,24 @@ export function searchOrganizations(query: string): Promise<OrganizationSearchRe
   return request<OrganizationSearchResult[]>(`/organizations/search?q=${encodeURIComponent(query)}`);
 }
 
-export function requestOrganizationJoin(publicCode: string, plan: OrganizationPlan): Promise<{ requested: true }> {
+export function requestOrganizationJoin(publicCode: string, plan: OrganizationPlan, password: string): Promise<{ requested: true }> {
   return request<{ requested: true }>("/join-requests", {
     method: "POST",
-    body: JSON.stringify({ public_code: publicCode, plan }),
+    body: JSON.stringify({ public_code: publicCode, plan, password }),
+  });
+}
+
+export function updateOrganizationProfile(name: string, plan: OrganizationPlan): Promise<OrganizationSnapshot> {
+  return request<OrganizationSnapshot>("/organization", {
+    method: "PATCH",
+    body: JSON.stringify({ name, plan }),
+  });
+}
+
+export function setOrganizationJoinPassword(password: string): Promise<OrganizationSnapshot> {
+  return request<OrganizationSnapshot>("/join-password", {
+    method: "PUT",
+    body: JSON.stringify({ password }),
   });
 }
 

@@ -23,6 +23,7 @@ function snapshot(): OrganizationSnapshot {
       public_code: "DD00001",
       description: "Flight research",
       structure_model: "flat",
+      join_password_configured: true,
     },
     actor: {
       user_id: ACTOR_ID,
@@ -68,6 +69,8 @@ function dependencies(
     setMemberPlan: () => Promise.resolve(),
     transferFounder: () => Promise.resolve(),
     setFounderPlan: () => Promise.resolve(),
+    updateOrganization: () => Promise.resolve(),
+    setJoinPassword: () => Promise.resolve(),
     createOrganization: () => Promise.resolve(),
     createDepartment: () => Promise.resolve(),
     assignDepartment: () => Promise.resolve(),
@@ -228,16 +231,27 @@ Deno.test("organization creation accepts only a bounded Business wizard payload"
       description: "Autonomous flight research",
       structure: "department_dual",
       plan: "pro",
+      password: "secure-flight-2026",
     }),
     dependencies({
-      createOrganization: (actor, name, description, structure, plan) => {
-        action = `${actor}:${name}:${description}:${structure}:${plan}`;
+      createOrganization: (actor, name, description, structure, plan, password) => {
+        action = `${actor}:${name}:${description}:${structure}:${plan}:${password}`;
         return Promise.resolve();
       },
     }),
   );
   assert(response.status === 201, "organization creation should return created");
-  assert(action === `${ACTOR_ID}:Aerial Systems Lab:Autonomous flight research:department_dual:pro`, "wizard payload mismatch");
+  assert(action === `${ACTOR_ID}:Aerial Systems Lab:Autonomous flight research:department_dual:pro:secure-flight-2026`, "wizard payload mismatch");
+});
+
+Deno.test("organization join requires and forwards a password", async () => {
+  let action = "";
+  const response = await handleOrganizationConsoleRequest(
+    request("/join-requests", "POST", { public_code: "DD00001", plan: "plus", password: "secure-flight-2026" }),
+    dependencies({ requestJoin: (actor, code, plan, password) => { action = `${actor}:${code}:${plan}:${password}`; return Promise.resolve(); } }),
+  );
+  assert(response.status === 201, "password-protected join should be accepted");
+  assert(action === `${ACTOR_ID}:DD00001:plus:secure-flight-2026`, "join password was not forwarded");
 });
 
 Deno.test("organization mutations reject unknown fields, owner role, and invalid ids", async () => {
