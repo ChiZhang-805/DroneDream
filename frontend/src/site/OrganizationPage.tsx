@@ -511,7 +511,7 @@ export function OrganizationPage({
   };
 
   if (loading) {
-    return <main className="organization-page site-shell" aria-busy="true">{copy.loading}</main>;
+    return <main className="organization-page organization-loading site-shell" aria-busy="true"><span>{copy.loading}</span></main>;
   }
   if (!snapshot && canCreate) {
     return <main className="organization-page site-shell"><section className={`organization-onboarding is-${onboardingMode}`} aria-labelledby="organization-create-title">
