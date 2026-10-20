@@ -5471,10 +5471,6 @@ body:has(.dd-site[data-page="classic"]) {
   .dd-site[data-page="classic"] .site-header.is-scrolled {
     padding-inline: clamp(42px, 3.2vw, 68px);
   }
-
-  .dd-site[data-page="classic"] .site-classic-home .site-hero-layout {
-    padding-inline: clamp(42px, 3.2vw, 68px);
-  }
 }
 
 .dd-site[data-page="classic"] .site-classic-home .site-hero-layout {
@@ -5482,6 +5478,12 @@ body:has(.dd-site[data-page="classic"]) {
   max-width: none;
   margin: 0;
   padding-inline: clamp(14px, 1.6vw, 30px);
+}
+
+@media (min-width: 901px) {
+  .dd-site[data-page="classic"] .site-classic-home .site-hero-layout {
+    padding-inline: clamp(42px, 3.2vw, 68px);
+  }
 }
 
 .dd-site[data-page="classic"] .site-classic-home .site-hero-copy {
