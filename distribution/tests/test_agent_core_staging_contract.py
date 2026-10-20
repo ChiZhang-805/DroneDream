@@ -22,6 +22,8 @@ def test_agent_core_stage_carries_qualified_default_assets_into_the_installer() 
         "local expert catalog is not the current single-package contract",
         "local expert catalog scope and receipt kind disagree",
         "localPolicyCatalogSha256",
+        '"dronedream-live-$sourceTriple.exe"',
+        '"dronedream-live-$TargetTriple.exe"',
     ):
         assert fragment in script
 
@@ -39,6 +41,26 @@ def test_agent_core_stage_carries_qualified_default_assets_into_the_installer() 
         )
         resources = config["bundle"]["resources"]
         assert resources["agent-core-resources/default-assets"] == ("agent-core/default-assets")
+        assert "binaries/dronedream-live" in config["bundle"]["externalBin"]
+
+
+def test_every_installer_publishes_one_shared_native_cli_command() -> None:
+    hook = (ROOT / "desktop" / "src-tauri" / "nsis" / "webview2-health.nsh").read_text(
+        encoding="utf-8-sig"
+    )
+
+    assert '$INSTDIR\\dronedream-live.exe' in hook
+    assert '$LOCALAPPDATA\\Microsoft\\WindowsApps\\dronedream-live.exe' in hook
+    assert 'Python311\\Scripts' not in hook
+    assert '${DRONEDREAM_SHORTCUTNAME} CLI.lnk' in hook
+    for product in (
+        "DroneDream-Universal",
+        "DroneDream-Sim",
+        "DroneDream-Lab",
+        "DroneDream-Field",
+        "DroneDream-Agent",
+    ):
+        assert f'$LOCALAPPDATA\\{product}\\dronedream-live.exe' in hook
 
 
 def test_five_edition_build_forwards_one_explicit_agent_core_repository() -> None:

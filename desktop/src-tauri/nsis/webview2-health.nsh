@@ -236,6 +236,22 @@
   !insertmacro DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$SMPROGRAMS\$AppStartMenuFolder\${DRONEDREAM_SHORTCUTNAME}.lnk"
   !insertmacro DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$SMPROGRAMS\${DRONEDREAM_SHORTCUTNAME}.lnk"
   !insertmacro DRONEDREAM_REFRESH_BRANDED_SHORTCUT "$DESKTOP\${DRONEDREAM_SHORTCUTNAME}.lnk"
+
+  ; Every Edition ships the same self-contained console launcher. Publish one
+  ; native command through Windows' existing per-user command directory so a
+  ; clean machine can run `dronedream-live` without Python or a PATH rewrite.
+  IfFileExists "$INSTDIR\dronedream-live.exe" 0 dronedream_cli_publish_done
+    CreateDirectory "$LOCALAPPDATA\Microsoft\WindowsApps"
+    Delete "$LOCALAPPDATA\Microsoft\WindowsApps\dronedream-live.cmd"
+    ClearErrors
+    CopyFiles /SILENT "$INSTDIR\dronedream-live.exe" "$LOCALAPPDATA\Microsoft\WindowsApps\dronedream-live.exe"
+    IfErrors 0 dronedream_cli_alias_ready
+      Abort "DroneDream could not publish the dronedream-live command. Close open DroneDream terminals and run setup again."
+    dronedream_cli_alias_ready:
+    ${If} $NoShortcutMode != 1
+      CreateShortcut "$SMPROGRAMS\${DRONEDREAM_SHORTCUTNAME} CLI.lnk" "$INSTDIR\dronedream-live.exe" "" "$INSTDIR\${MAINBINARYNAME}.exe" 0
+    ${EndIf}
+  dronedream_cli_publish_done:
   System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'
 
   Pop $0
@@ -288,6 +304,22 @@
   ; Runtime/cache/other WSL distributions are intentionally untouched.
   Pop $1
   Pop $0
+!macroend
+
+!macro NSIS_HOOK_POSTUNINSTALL
+  Delete "$SMPROGRAMS\${DRONEDREAM_SHORTCUTNAME} CLI.lnk"
+
+  ; The command alias is shared by all five side-by-side Editions. Remove it
+  ; only after the final Edition has gone; otherwise the remaining install can
+  ; still resolve itself through the launcher's complete-install discovery.
+  IfFileExists "$LOCALAPPDATA\DroneDream-Universal\dronedream-live.exe" dronedream_cli_uninstall_done 0
+  IfFileExists "$LOCALAPPDATA\DroneDream-Sim\dronedream-live.exe" dronedream_cli_uninstall_done 0
+  IfFileExists "$LOCALAPPDATA\DroneDream-Lab\dronedream-live.exe" dronedream_cli_uninstall_done 0
+  IfFileExists "$LOCALAPPDATA\DroneDream-Field\dronedream-live.exe" dronedream_cli_uninstall_done 0
+  IfFileExists "$LOCALAPPDATA\DroneDream-Agent\dronedream-live.exe" dronedream_cli_uninstall_done 0
+    Delete "$LOCALAPPDATA\Microsoft\WindowsApps\dronedream-live.exe"
+    Delete "$LOCALAPPDATA\Microsoft\WindowsApps\dronedream-live.cmd"
+  dronedream_cli_uninstall_done:
 !macroend
 
 Function DroneDreamWebView2IsUsable

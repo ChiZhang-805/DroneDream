@@ -170,10 +170,12 @@ $sourceBinaryRoot = Join-Path $sourceRoot "binaries"
 $sourceTriple = "x86_64-pc-windows-msvc"
 $coreBinary = Join-Path $sourceBinaryRoot "dronedream-autonomy-core-$sourceTriple.exe"
 $isolatorBinary = Join-Path $sourceBinaryRoot "dronedream-plugin-isolator-$sourceTriple.exe"
+$consoleBinary = Join-Path $sourceBinaryRoot "dronedream-live-$sourceTriple.exe"
 $sourceResources = Join-Path $sourceRoot "resources"
 $required = @(
     $coreBinary,
     $isolatorBinary,
+    $consoleBinary,
     (Join-Path $sourceResources "runtime\runtime-manifest.json"),
     (Join-Path $sourceResources "runtime\local-policy\catalog.json"),
     (Join-Path $sourceResources "official-plugins\index.json"),
@@ -213,8 +215,10 @@ foreach ($target in @($targetBinaryRoot, $targetResourceRoot)) {
 
 $stagedCoreName = "dronedream-autonomy-core-$TargetTriple.exe"
 $stagedIsolatorName = "dronedream-plugin-isolator-$TargetTriple.exe"
+$stagedConsoleName = "dronedream-live-$TargetTriple.exe"
 Copy-Item -LiteralPath $coreBinary -Destination (Join-Path $targetBinaryRoot $stagedCoreName)
 Copy-Item -LiteralPath $isolatorBinary -Destination (Join-Path $targetBinaryRoot $stagedIsolatorName)
+Copy-Item -LiteralPath $consoleBinary -Destination (Join-Path $targetBinaryRoot $stagedConsoleName)
 Copy-Item -LiteralPath $isolatorBinary -Destination (Join-Path $targetResourceRoot "dronedream-plugin-isolator.exe")
 
 $runtimeSource = Join-Path $sourceResources "runtime"
@@ -310,6 +314,8 @@ foreach ($entry in $boundReceipt.files.PSObject.Properties) {
         $target = Join-Path $targetBinaryRoot $stagedCoreName
     } elseif ($name -ceq "app/desktop/src-tauri/binaries/dronedream-plugin-isolator-$sourceTriple.exe") {
         $target = Join-Path $targetBinaryRoot $stagedIsolatorName
+    } elseif ($name -ceq "app/desktop/src-tauri/binaries/dronedream-live-$sourceTriple.exe") {
+        $target = Join-Path $targetBinaryRoot $stagedConsoleName
     } else {
         throw "Unknown Core build receipt member: $name"
     }
@@ -341,6 +347,11 @@ $receipt = [ordered]@{
             name = $stagedIsolatorName
             bytes = (Get-Item -LiteralPath (Join-Path $targetBinaryRoot $stagedIsolatorName)).Length
             sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $targetBinaryRoot $stagedIsolatorName)).Hash.ToLowerInvariant()
+        },
+        [ordered]@{
+            name = $stagedConsoleName
+            bytes = (Get-Item -LiteralPath (Join-Path $targetBinaryRoot $stagedConsoleName)).Length
+            sha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $targetBinaryRoot $stagedConsoleName)).Hash.ToLowerInvariant()
         }
     )
     resourceIndexSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath (
