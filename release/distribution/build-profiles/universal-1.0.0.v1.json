@@ -68,9 +68,8 @@
       }
     ],
     "visualEvidence": {
-      "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/software-ui-layout-receipt.json",
-      "sha256": "f5bce9cc9a166be53c790cbd22e2b6e5f2f5a91ea3c81f7600a9be53b2d73700",
-      "subjectCommit": "7cf37d728211a92bbcbb411c3ce8cca904d4c38a",
+      "storage": "external-release-validation",
+      "trackedInRepository": false,
       "caseCount": 7,
       "locales": ["en", "zh-CN"],
       "viewportWidths": [390, 760, 1440],

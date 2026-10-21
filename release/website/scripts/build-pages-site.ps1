@@ -5,9 +5,9 @@ $repositoryRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
 $frontendRoot = Join-Path $repositoryRoot "apps\frontend"
 $releaseConfigPath = Join-Path $repositoryRoot "release\website\pages-release.json"
 $tauriConfigPath = Join-Path $repositoryRoot "apps\desktop\src-tauri\tauri.conf.json"
-$codeSigningPolicyPath = Join-Path $repositoryRoot "CODE_SIGNING_POLICY.md"
-$privacyPolicyPath = Join-Path $repositoryRoot "PRIVACY.md"
-$termsOfServicePath = Join-Path $repositoryRoot "TERMS.md"
+$codeSigningPolicyPath = Join-Path $repositoryRoot "docs/release/code-signing.md"
+$privacyPolicyPath = Join-Path $repositoryRoot "docs/legal/privacy.md"
+$termsOfServicePath = Join-Path $repositoryRoot "docs/legal/terms.md"
 $release = Get-Content -LiteralPath $releaseConfigPath -Raw | ConvertFrom-Json
 $tauriConfig = Get-Content -LiteralPath $tauriConfigPath -Raw | ConvertFrom-Json
 $codeSigningPolicy = Get-Content -LiteralPath $codeSigningPolicyPath -Raw
@@ -197,9 +197,9 @@ foreach ($marker in @(
     $fileName,
     $sha256,
     $publishedAt,
-    "CODE_SIGNING_POLICY.md",
-    "PRIVACY.md",
-    "TERMS.md",
+    "docs/release/code-signing.md",
+    "docs/legal/privacy.md",
+    "docs/legal/terms.md",
     "Google user data",
     "DroneDream Terms of Service"
 )) {
