@@ -13,7 +13,9 @@ import pytest
 ROOT = Path(__file__).resolve().parents[3]
 PROFILE = ROOT / "release/distribution/build-profiles/universal-1.0.0.v1.json"
 INTEGRATED_WORKSPACES = ROOT / "release/distribution/universal/integrated-workspaces.v2.json"
-EXTERNAL_ASSET_QUALIFICATION = ROOT / "release/distribution/shared/external-asset-qualification.v1.json"
+EXTERNAL_ASSET_QUALIFICATION = (
+    ROOT / "release/distribution/shared/external-asset-qualification.v1.json"
+)
 OVERLAY = ROOT / "apps/desktop/src-tauri/tauri.universal.conf.json"
 SCRIPT = ROOT / "apps/desktop/scripts/build-universal-installer.ps1"
 FINALIZER = ROOT / "apps/desktop/scripts/finalize-existing-universal-candidate.ps1"
@@ -195,8 +197,8 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
         "integrated-in-universal"
     )
     visual = shared_ui["visualEvidence"]  # type: ignore[index]
-    assert visual["subjectCommit"] == "7cf37d728211a92bbcbb411c3ce8cca904d4c38a"
-    assert visual["subjectCommit"] != shared_ui["donorCommit"]
+    assert visual["storage"] == "external-release-validation"
+    assert visual["trackedInRepository"] is False
     assert visual["caseCount"] == 7
     assert visual["locales"] == ["en", "zh-CN"]
     assert visual["viewportWidths"] == [390, 760, 1440]
@@ -211,10 +213,10 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
         assert path.is_file()
         assert hashlib.sha256(path.read_bytes()).hexdigest() == source_file["sha256"]
     builder = SCRIPT.read_text(encoding="utf-8-sig")
-    assert "$Build -and (-not $CurrentUiEvidencePath" in builder
+    assert "if (-not $CurrentUiEvidencePath" in builder
     assert "$expectedUiEvidenceCommit = $sourceCommit" in builder
     assert "$sharedUiEvidence.subject_commit -cne $expectedUiEvidenceCommit" in builder
-    assert "historical donor evidence cannot authorize this build" in builder
+    assert "must be supplied from external release staging" in builder
     integrated_ui = profile["integratedWorkspaceUiContract"]
     assert integrated_ui == {  # type: ignore[comparison-overlap]
         "contractId": "dronedream-universal-integrated-workspaces/v2",

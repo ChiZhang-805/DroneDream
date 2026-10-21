@@ -17,9 +17,9 @@ is not a claim that the complete product already meets every condition.
 | First-party license | MIT; modification, redistribution and commercial use permitted |
 | Products | Universal, SIM, LAB, FIELD, AGENT (five editions) |
 | Installer form | Windows x64 NSIS executable |
-| Signing policy | https://github.com/ChiZhang-805/DroneDream/blob/main/CODE_SIGNING_POLICY.md |
-| Privacy policy | https://github.com/ChiZhang-805/DroneDream/blob/main/PRIVACY.md |
-| Security policy | https://github.com/ChiZhang-805/DroneDream/blob/main/SECURITY.md |
+| Signing policy | https://github.com/ChiZhang-805/DroneDream/blob/main/docs/release/code-signing.md |
+| Privacy policy | https://github.com/ChiZhang-805/DroneDream/blob/main/docs/legal/privacy.md |
+| Security policy | https://github.com/ChiZhang-805/DroneDream/blob/main/.github/SECURITY.md |
 
 Commercial use permitted by MIT is not commercial dual-licensing. Do not invent
 user numbers, student eligibility, reputation, or a guaranteed acceptance decision.

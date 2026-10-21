@@ -2,8 +2,8 @@ import type { AnchorHTMLAttributes } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import privacyPolicy from "../../../../PRIVACY.md?raw";
-import termsOfService from "../../../../TERMS.md?raw";
+import privacyPolicy from "../../../../docs/legal/privacy.md?raw";
+import termsOfService from "../../../../docs/legal/terms.md?raw";
 
 export type LegalDocument = "privacy" | "terms";
 

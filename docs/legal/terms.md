@@ -118,4 +118,4 @@ application, email, or another appropriate channel.
 ## 12. Contact
 
 Questions about these terms may be sent to **cz005623@gmail.com**. Privacy and
-deletion requests are handled under the [Privacy Policy](PRIVACY.md).
+deletion requests are handled under the [Privacy Policy](privacy.md).

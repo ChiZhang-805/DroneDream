@@ -6,9 +6,9 @@ on:
       - main
     paths:
       - ".github/workflows/pages.yml"
-      - "CODE_SIGNING_POLICY.md"
-      - "PRIVACY.md"
-      - "TERMS.md"
+      - "docs/release/code-signing.md"
+      - "docs/legal/privacy.md"
+      - "docs/legal/terms.md"
       - "apps/desktop/src-tauri/tauri.conf.json"
       - "apps/frontend/**"
       - "release/website/pages-release.json"

@@ -139,7 +139,7 @@ dedicated `DroneDreamRuntime` WSL distribution.
 We use access controls, encrypted network connections, scoped credentials, and
 other safeguards appropriate to the service. No method of transmission or
 storage is completely secure. Security issues should be reported according to
-the [Security Policy](SECURITY.md).
+the [Security Policy](../../.github/SECURITY.md).
 
 ## Children's privacy
 

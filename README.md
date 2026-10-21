@@ -44,15 +44,17 @@ shared/
   contracts/      Interfaces shared across applications and services
 docs/
   guides/         Product and engineering guides
+  legal/          Privacy policy and terms of service
+  release/        Signing and versioning policies
   report/         Technical report source and generated publication
-artifacts/         Retained repository-specific acceptance receipts
 tools/            Repository checks, development helpers, and simulators
 ```
 
 Every top-level directory has one purpose. Generated builds, release staging,
-and cross-worktree test results live outside the checkout under
+and test results live outside the checkout under
 `Q:\DroneDream-Workspace\Build` and `Q:\DroneDream-Workspace\TestRuns` on the
-managed Windows workspace.
+managed Windows workspace. Repository-local `artifacts/` output is ignored and
+must not be committed.
 
 ## Start locally
 
@@ -120,5 +122,6 @@ credentials, user projects, generated installers, Runtime images, or local
 experiment data in the repository.
 
 Release and user-data requirements are documented in the
-[Code signing policy](CODE_SIGNING_POLICY.md) and
-[Privacy policy](PRIVACY.md).
+[Code signing policy](docs/release/code-signing.md) and
+[Privacy policy](docs/legal/privacy.md). Contribution and vulnerability
+reporting guidance lives in GitHub's standard `.github` directory.
