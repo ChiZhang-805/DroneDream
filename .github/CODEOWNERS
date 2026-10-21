@@ -2,10 +2,10 @@
 /.github/CODEOWNERS @ChiZhang-805
 /.github/workflows/desktop-installer.yml @ChiZhang-805
 /.signpath/ @ChiZhang-805
-/CODE_SIGNING_POLICY.md @ChiZhang-805
-/PRIVACY.md @ChiZhang-805
-/SECURITY.md @ChiZhang-805
-/VERSIONING.md @ChiZhang-805
+/docs/release/code-signing.md @ChiZhang-805
+/docs/legal/privacy.md @ChiZhang-805
+/.github/SECURITY.md @ChiZhang-805
+/docs/release/versioning.md @ChiZhang-805
 /apps/desktop/scripts/ @ChiZhang-805
 /apps/desktop/src-tauri/ @ChiZhang-805
 /release/website/scripts/ @ChiZhang-805

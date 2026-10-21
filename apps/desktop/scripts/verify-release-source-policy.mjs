@@ -34,8 +34,8 @@ if (!licenseText.startsWith("MIT License\n") && !licenseText.startsWith("MIT Lic
   fail("the repository LICENSE is not the expected MIT License");
 }
 
-const codeSigningPolicy = readText("CODE_SIGNING_POLICY.md");
-const privacyPolicy = readText("PRIVACY.md");
+const codeSigningPolicy = readText("docs/release/code-signing.md");
+const privacyPolicy = readText("docs/legal/privacy.md");
 const readme = readText("README.md");
 const llvmBuildScript = readText("apps/desktop/scripts/build-windows-llvm.ps1");
 const msvcBuildScript = readText("apps/desktop/scripts/build-windows-msvc.ps1");
@@ -47,10 +47,10 @@ for (const requiredText of [
   "certificate by [SignPath Foundation]",
   "Authors and committers",
   "Approver",
-  "[Privacy policy](PRIVACY.md)",
+  "[Privacy policy](../legal/privacy.md)",
 ]) {
   if (!codeSigningPolicy.includes(requiredText)) {
-    fail(`CODE_SIGNING_POLICY.md is missing: ${requiredText}`);
+    fail(`docs/release/code-signing.md is missing: ${requiredText}`);
   }
 }
 if ([llvmBuildScript, msvcBuildScript, updaterSignerScript, desktopReleaseWorkflow].some((script) =>
@@ -99,12 +99,12 @@ for (const requiredText of [
   "User control and deletion",
 ]) {
   if (!privacyPolicy.includes(requiredText)) {
-    fail(`PRIVACY.md is missing: ${requiredText}`);
+    fail(`docs/legal/privacy.md is missing: ${requiredText}`);
   }
 }
 for (const requiredText of [
-  "[Code signing policy](CODE_SIGNING_POLICY.md)",
-  "[Privacy policy](PRIVACY.md)",
+  "[Code signing policy](docs/release/code-signing.md)",
+  "[Privacy policy](docs/legal/privacy.md)",
 ]) {
   if (!readme.includes(requiredText)) {
     fail(`README.md is missing: ${requiredText}`);

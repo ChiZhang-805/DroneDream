@@ -29,7 +29,14 @@ EDITION_LABELS = {
     "lab": "Lab",
     "sim": "Sim",
 }
-CORE_PATHS = ("backend", "desktop", "engine-pack", "frontend", "runtime", "worker")
+CORE_PATHS = (
+    "services/backend",
+    "apps/desktop",
+    "platform/engine-pack",
+    "apps/frontend",
+    "platform/runtime",
+    "services/worker",
+)
 COMPONENT_IDS = {
     "desktop-core",
     "engine-pack",

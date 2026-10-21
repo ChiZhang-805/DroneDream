@@ -87,7 +87,7 @@ release scripts require code-owner review.
 ## Privacy and security
 
 DroneDream's data handling and network behavior are documented in the
-[Privacy policy](PRIVACY.md). Vulnerability reporting and the simulation-safety
-boundary are documented in the [Security policy](SECURITY.md).
+[Privacy policy](../legal/privacy.md). Vulnerability reporting and the simulation-safety
+boundary are documented in the [Security policy](../../.github/SECURITY.md).
 
 Questions about this policy may be sent to **cz005623@gmail.com**.

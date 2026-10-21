@@ -275,7 +275,7 @@ metadata channel (`desktop-<edition>-channel`) and replaces only its
 installer asset, so the application can update without mixing products or
 rewriting historical binaries. Public installer names are
 `DroneDream-<Edition>-<version>.exe`; raw Tauri bundle names remain internal to
-the build. See `../../CODE_SIGNING_POLICY.md`,
+the build. See `../../docs/release/code-signing.md`,
 `../../release/distribution/desktop/edition-runtime-update-families.v1.json`, and
 `../../docs/guides/signpath-foundation-application.md` for the contracts.
 
