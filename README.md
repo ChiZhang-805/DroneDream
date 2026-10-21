@@ -16,7 +16,7 @@
 <p align="center">
   <a href="technical-report/output/DroneDream_AURORA_Technical_Report.pdf">Read the PDF</a> ·
   <a href="technical-report/README.md">Report provenance</a> ·
-  <a href="https://github.com/ChiZhang-805/DroneDream/tree/codex/software">Software evidence source</a>
+  <a href="https://github.com/ChiZhang-805/DroneDream/tree/software">Software evidence source</a>
 </p>
 
 ## 📄 The report track
@@ -91,7 +91,7 @@ campaigns remain future experimental gates.
   [claim-evidence ledger](technical-report/claim-evidence-ledger.json) and
   [evidence-reference manifest](technical-report/evidence-reference-manifest.json).
 - Visit the
-  [software branch](https://github.com/ChiZhang-805/DroneDream/tree/codex/software)
+  [software branch](https://github.com/ChiZhang-805/DroneDream/tree/software)
   for the implementation that produces the frozen evidence.
 
 Build and audit commands remain in the report-owned documentation so this page

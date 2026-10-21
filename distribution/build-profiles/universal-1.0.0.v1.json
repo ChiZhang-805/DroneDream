@@ -36,11 +36,11 @@
     "sourceFiles": [
       {
         "path": "frontend/src/AppShell.tsx",
-        "sha256": "1042c57055025b671cf3b0cfe9e8fffb35681211e210ed8613d561e2413d2f92"
+        "sha256": "02bedcbbb5a8c238801e7f1cb413635a03df17b7d1cb40d073814599e196b563"
       },
       {
         "path": "frontend/src/components/EditionSettingsSurface.tsx",
-        "sha256": "ee75ed50ffedcb164a2a766473b060ee80b88431190c3ecc7342bf363913c165"
+        "sha256": "691d89a78f561a3a188c22d480dfcac84cfe9e53c82efe90fe1a2cc3d0e080ef"
       },
       {
         "path": "frontend/src/components/SettingsUpdateCenter.tsx",
@@ -48,7 +48,7 @@
       },
       {
         "path": "frontend/src/components/DroneLaunchScene.tsx",
-        "sha256": "882ee9c984e647ef5b30891b8aa80795027d5d1d98ad4d95fe4e0ab35307ab0a"
+        "sha256": "488458516876384ec00d562227fbc5783583a243a559f02e0aba7374b9e1a210"
       },
       {
         "path": "frontend/src/features/distribution/universalMode.ts",
@@ -56,11 +56,11 @@
       },
       {
         "path": "frontend/src/styles.css",
-        "sha256": "c8c8d669cd16b28ec1666474bf6f2d04279030ad507f7e0bf3e8ce4b81f6765e"
+        "sha256": "4b89030be59d365e6551824eb9230536175e610847fb39592b58a35518a6c85a"
       },
       {
         "path": "frontend/src/theme/EditionThemeProvider.tsx",
-        "sha256": "c0cdb878931dffd39f27f461c2b37b7ae2f1b3b6b2b1d076d1b6f2f3af36c659"
+        "sha256": "005f21c91389c0507ff3539d5e3322f12681d7130674d32781930f0e8cf84da5"
       },
       {
         "path": "frontend/src/theme/editionTheme.ts",
@@ -91,7 +91,7 @@
   "integratedWorkspaceUiContract": {
     "contractId": "dronedream-universal-integrated-workspaces/v2",
     "manifest": "distribution/universal/integrated-workspaces.v2.json",
-    "sha256": "a71f84155e4209271bbc5349b55e99b4a26e8e69652beb6be4120691561d5ab8",
+    "sha256": "20e41eebf9e528ab35e988951385b53861214452d2355d47a0c8b7c2da485718",
     "sourceFileCount": 12,
     "workspaceModes": ["sim", "lab", "field", "autonomy"],
     "createsCrossEditionHarnessOrchestrator": false,
@@ -117,7 +117,7 @@
       "grantsHardwareAuthority": false,
       "sourceFilesPurpose": "current-build-inputs-not-visual-qualification",
       "sourceFiles": [
-        {"path": "frontend/src/pages/AutonomyPlatform.tsx", "sha256": "0ef96913a03bd0ff4024b23701b9bbbea86e03e28f37a91de1755ae974e56f86"},
+        {"path": "frontend/src/pages/AutonomyPlatform.tsx", "sha256": "3d6e68813ef8401c02a5202f69c86558a2db56cd2e3ee9ae7b26f6acba16e1f8"},
         {"path": "frontend/src/features/autonomy/agentCore.ts", "sha256": "a0d477cd912213fc06e7adca1934de24e5e109777fa71fb812940b513383499b"},
         {"path": "frontend/src/features/autonomy/agentCorePlanning.ts", "sha256": "9fdd6bed6950b98dcaa79242e790d989c0194352a0118a004d6cb6461cda41cd"},
         {"path": "frontend/src/features/autonomy/assetLibraryStore.ts", "sha256": "845bcda6344ac22153f1ef948ff8170c32d3b36398fadc1f5a03285f35c645f7"},
@@ -160,7 +160,7 @@
   },
   "websiteHandoff": {
     "contract": "distribution/universal/release/website-exact-exe-handoff.v1.json",
-    "recipientBranch": "codex/website",
+    "recipientBranch": "website",
     "receiverMayRebuild": false,
     "receiverMayRename": false,
     "publishedFiles": [

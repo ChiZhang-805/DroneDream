@@ -115,10 +115,10 @@
       "properties": {
         "developmentBranch": {
           "enum": [
-            "codex/software-sim",
-            "codex/software-lab",
-            "codex/software-field",
-            "codex/software-agent"
+            "software-sim",
+            "software-lab",
+            "software-field",
+            "software-agent"
           ]
         },
         "integrationBranch": {"const": "main"},
@@ -134,10 +134,10 @@
       "properties": {
         "branch": {
           "enum": [
-            "codex/software-sim",
-            "codex/software-lab",
-            "codex/software-field",
-            "codex/software-agent"
+            "software-sim",
+            "software-lab",
+            "software-field",
+            "software-agent"
           ]
         },
         "creationState": {"const": "long-lived-product-branch"},

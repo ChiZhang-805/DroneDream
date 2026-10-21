@@ -696,7 +696,7 @@ def build_harness_handoff_closure(
         "schema_version": SCHEMA_VERSION,
         "generated_at": generated_at,
         "subject_commit": subject_commit,
-        "branch": "codex/software",
+        "branch": "software",
         "handoff_document": {
             "name": HANDOFF_DOCUMENT_NAME,
             "sha256": HANDOFF_DOCUMENT_SHA256,

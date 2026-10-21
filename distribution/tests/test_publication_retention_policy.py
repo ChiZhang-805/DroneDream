@@ -38,7 +38,7 @@ def test_release_publisher_requires_release_and_tag_set_equality() -> None:
         "$channelTags + $keepCombined + $keepRuntime",
         "GitHub long-lived branch inventory",
         "repos/$Repository/branches?per_page=100",
-        '"codex/technical-report"',
+        '"technical-report"',
     ):
         assert fragment in publisher
     assert publisher.index('"release", "delete"') < publisher.index(

@@ -59,7 +59,7 @@
         "forcePushAllowed"
       ],
       "properties": {
-        "targetBranch": {"pattern": "^codex/software-(sim|lab|field|autonomy)$"},
+        "targetBranch": {"pattern": "^software-(sim|lab|field|agent)$"},
         "creationState": {
           "enum": ["long-lived-product-branch", "existing-protected"]
         },

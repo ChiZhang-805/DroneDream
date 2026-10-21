@@ -104,11 +104,11 @@ EDITION_KEYS = {
 }
 EDITION_IDS = {"sim", "lab", "field", "autonomy"}
 EDITION_BRANCHES = {
-    "sim": "codex/software-sim",
-    "lab": "codex/software-lab",
-    "field": "codex/software-field",
+    "sim": "software-sim",
+    "lab": "software-lab",
+    "field": "software-field",
     # Protocol and storage retain `autonomy`; the visible product channel is AGENT.
-    "autonomy": "codex/software-agent",
+    "autonomy": "software-agent",
 }
 ENFORCEMENT_LAYERS = {"backend", "runtime", "native"}
 CONDITION_LAYERS = ENFORCEMENT_LAYERS | {"operator"}

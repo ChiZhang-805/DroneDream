@@ -71,14 +71,14 @@
     "receiptCompatibilityFailClosed": true
   },
   "sourcePolicy": {
-    "developmentBranch": "codex/software-field",
+    "developmentBranch": "software-field",
     "integrationBranch": "main",
     "editionSourceDivergenceAllowed": false,
     "hotfixMustReturnToCore": true,
     "commonCoreHashRequired": true
   },
   "releaseChannel": {
-    "branch": "codex/software-field",
+    "branch": "software-field",
     "creationState": "long-lived-product-branch",
     "promotionManifestRequired": true,
     "forcePushAllowed": false

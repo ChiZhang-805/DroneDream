@@ -44,11 +44,11 @@ if ($isRelease) {
     } else {
         $editionByBranch = @{
             "main" = "universal"
-            "codex/software" = "universal"
-            "codex/software-sim" = "sim"
-            "codex/software-lab" = "lab"
-            "codex/software-field" = "field"
-            "codex/software-agent" = "autonomy"
+            "software" = "universal"
+            "software-sim" = "sim"
+            "software-lab" = "lab"
+            "software-field" = "field"
+            "software-agent" = "autonomy"
         }
         if (-not $editionByBranch.ContainsKey($PullRequestBaseBranch)) {
             throw "Desktop pull request target branch does not own a product edition: $PullRequestBaseBranch"

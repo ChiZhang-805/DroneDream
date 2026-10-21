@@ -13,11 +13,11 @@
   "productDisplayVersion": "1.0.0",
   "edition": {
     "editionId": "sim",
-    "editionManifestSha256": "74bf27e5e607c180cc939d0e38b65149ba8c4d6bb455fb4ca78d00a04c53c95b",
-    "compositeManifestSha256": "3a95397cb3c9cd897bbc2986061e5b8fad249446096285fea217e1f4dae57dff"
+    "editionManifestSha256": "5d87fe593d456df7c67ddd26da0fa95620742c377fcb5f8caf5d3d299ca20f07",
+    "compositeManifestSha256": "7fd8937ff6f5ed1c6d7a22fddabb0c8b60214f2ec5832c331bd0b9bcd3812271"
   },
   "branchPolicy": {
-    "targetBranch": "codex/software-sim",
+    "targetBranch": "software-sim",
     "creationState": "long-lived-product-branch",
     "proposedHeadCommit": "6b50f86ed80c190b816f19d06de143a328bda7e2",
     "headClassification": "exact-source",

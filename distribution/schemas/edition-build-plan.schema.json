@@ -262,7 +262,7 @@
         "rollback"
       ],
       "properties": {
-        "targetBranch": {"pattern": "^codex/software-(sim|lab|field|autonomy)$"},
+        "targetBranch": {"pattern": "^software-(sim|lab|field|agent)$"},
         "creationState": {"const": "long-lived-product-branch"},
         "observedBranchHead": {"$ref": "#/$defs/commit"},
         "sourceCommit": {"$ref": "#/$defs/commit"},
