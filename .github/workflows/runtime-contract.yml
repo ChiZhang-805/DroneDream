@@ -20,20 +20,20 @@ jobs:
       - name: Validate pinned inputs and Python code
         run: |
           python -m pip install --disable-pip-version-check \
-            --requirement runtime/locks/release-tools-requirements.lock \
+            --requirement platform/runtime/locks/release-tools-requirements.lock \
             "ruff==0.15.21" "pytest==9.1.1"
-          python -m ruff check runtime/tools runtime/tests runtime/scripts scripts/simulators
-          python -m ruff check runtime/tools runtime/scripts scripts/simulators --select S
-          python -m ruff format --check runtime/tools runtime/tests runtime/scripts \
-            scripts/simulators
-          python runtime/tools/runtime_manifest.py validate-config \
-            --pins runtime/pins.env \
-            --python-lock runtime/locks/python-requirements.lock
-          python -m compileall -q runtime/tools runtime/tests runtime/scripts scripts/simulators
-          python -m pytest runtime/tests -q
+          python -m ruff check platform/runtime/tools platform/runtime/tests platform/runtime/scripts tools/simulators
+          python -m ruff check platform/runtime/tools platform/runtime/scripts tools/simulators --select S
+          python -m ruff format --check platform/runtime/tools platform/runtime/tests platform/runtime/scripts \
+            tools/simulators
+          python platform/runtime/tools/runtime_manifest.py validate-config \
+            --pins platform/runtime/pins.env \
+            --python-lock platform/runtime/locks/python-requirements.lock
+          python -m compileall -q platform/runtime/tools platform/runtime/tests platform/runtime/scripts tools/simulators
+          python -m pytest platform/runtime/tests -q
       - name: Validate shell syntax
         run: |
-          mapfile -d '' scripts < <(find runtime scripts/simulators -type f -name '*.sh' -print0)
+          mapfile -d '' scripts < <(find runtime tools/simulators -type f -name '*.sh' -print0)
           if (( ${#scripts[@]} == 0 )); then
             echo "No Runtime or simulator shell scripts were found" >&2
             exit 1
@@ -44,12 +44,12 @@ jobs:
           done
       - name: Prove untested manifests cannot be released
         run: |
-          python runtime/tools/runtime_manifest.py generate \
-            --pins runtime/pins.env \
-            --python-lock runtime/locks/python-requirements.lock \
+          python platform/runtime/tools/runtime_manifest.py generate \
+            --pins platform/runtime/pins.env \
+            --python-lock platform/runtime/locks/python-requirements.lock \
             --source-commit "$(git rev-parse HEAD)" \
             --output /tmp/runtime-manifest.json
-          if python runtime/tools/runtime_manifest.py validate \
+          if python platform/runtime/tools/runtime_manifest.py validate \
             --manifest /tmp/runtime-manifest.json --require-smoke-passed; then
             echo "un-smoked manifest was incorrectly accepted" >&2
             exit 1

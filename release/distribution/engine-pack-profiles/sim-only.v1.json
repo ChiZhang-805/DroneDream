@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-engine-pack-profile",
+  "profileId": "sim-only",
+  "profileVersion": "1.0.0",
+  "includesLargeSimulator": true,
+  "hardwarePayloadAllowed": false,
+  "allowedEditionIds": ["sim"],
+  "allowedVehiclePackIds": ["px4-gazebo-x500-reference"],
+  "sourceRoots": [
+    "services/backend/alembic",
+    "services/backend/alembic.ini",
+    "services/backend/app",
+    "services/backend/pyproject.toml",
+    "services/worker/drone_dream_worker",
+    "services/worker/pyproject.toml",
+    "tools/simulators"
+  ],
+  "excludedSourcePaths": ["services/backend/app/distribution_safety.py"],
+  "directPayloadPaths": [
+    "LICENSE",
+    "platform/runtime/THIRD_PARTY_NOTICES.md",
+    "release/distribution/capabilities/core-capabilities.v1.json",
+    "release/distribution/editions/sim.v1.json",
+    "release/distribution/engine-pack-profiles/sim-only.v1.json",
+    "release/distribution/schemas/capability-policy.schema.json",
+    "release/distribution/schemas/edition-manifest.schema.json",
+    "release/distribution/schemas/engine-pack-profile.schema.json",
+    "release/distribution/schemas/upstream-source-inventory.schema.json",
+    "release/distribution/schemas/vehicle-pack-manifest.schema.json",
+    "release/distribution/schemas/vehicle-pack-profile-registry.schema.json",
+    "release/distribution/tools/distribution_contract.py",
+    "release/distribution/tools/engine_pack_profile_contract.py",
+    "release/distribution/upstream-sources.v1.json",
+    "release/distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json"
+  ],
+  "sourceMappings": [
+    {
+      "payloadPath": "release/distribution/runtime-contract-registry.v1.json",
+      "sourcePath": "release/distribution/runtime-contract-registry.sim-only.v1.json",
+      "sourceSha256": "e3c6a29fb68f27b27643cfdce6c90ec18dfbbdfecaab7bf70488c9c0b3afcb52"
+    },
+    {
+      "payloadPath": "release/distribution/vehicle-packs/registry.v1.json",
+      "sourcePath": "release/distribution/vehicle-packs/registry.sim-only.v1.json",
+      "sourceSha256": "3982b490c9a655474bb7690ab28b66adcd628f4c0cee3a18b65977bd572e2f1a"
+    }
+  ],
+  "forbiddenPayloadPaths": [
+    "release/distribution/editions/field.v1.json",
+    "release/distribution/editions/lab.v1.json",
+    "release/distribution/runtime-contract-registry.sim-only.v1.json",
+    "release/distribution/safety/edition-execution-gate.v1.json",
+    "release/distribution/schemas/edition-execution-authorization.schema.json",
+    "release/distribution/schemas/edition-execution-gate-policy.schema.json",
+    "release/distribution/schemas/vehicle-pack-registry.schema.json",
+    "release/distribution/tools/edition_safety_contract.py",
+    "release/distribution/vehicle-packs/amovlab-mfp450-pixhawk6c.v1.json",
+    "release/distribution/vehicle-packs/amovlab-p450-px4.v1.json",
+    "release/distribution/vehicle-packs/bitcraze-crazyflie-2-1-plus.v1.json",
+    "release/distribution/vehicle-packs/holybro-qav250-pixhawk6c-mini.v1.json",
+    "release/distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json",
+    "release/distribution/vehicle-packs/holybro-x500-v2-pixhawk6.v1.json",
+    "release/distribution/vehicle-packs/holybro-x650-pixhawk6.v1.json",
+    "release/distribution/vehicle-packs/registry.sim-only.v1.json",
+    "services/backend/app/distribution_safety.py"
+  ],
+  "forbiddenPayloadPrefixes": [
+    "release/distribution/build-planning",
+    "release/distribution/build-plans",
+    "release/distribution/tests"
+  ]
+}

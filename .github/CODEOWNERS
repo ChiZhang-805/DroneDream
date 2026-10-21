@@ -6,6 +6,6 @@
 /PRIVACY.md @ChiZhang-805
 /SECURITY.md @ChiZhang-805
 /VERSIONING.md @ChiZhang-805
-/desktop/scripts/ @ChiZhang-805
-/desktop/src-tauri/ @ChiZhang-805
-/website/scripts/ @ChiZhang-805
+/apps/desktop/scripts/ @ChiZhang-805
+/apps/desktop/src-tauri/ @ChiZhang-805
+/release/website/scripts/ @ChiZhang-805

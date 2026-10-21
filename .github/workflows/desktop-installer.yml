@@ -47,9 +47,9 @@ jobs:
       - name: Resolve complete pinned Core inputs
         id: core-inputs
         run: |
-          python3 desktop/scripts/prepare-core-build-inputs.py \
+          python3 apps/desktop/scripts/prepare-core-build-inputs.py \
             --source-reference docs/agent-core-public-source.json \
-            --inputs distribution/desktop/core-build-inputs.json \
+            --inputs release/distribution/desktop/core-build-inputs.json \
             --github-output "$GITHUB_OUTPUT"
 
       - name: Check out exact public Core source
@@ -166,7 +166,7 @@ jobs:
               throw "Formal desktop release tags must point to a commit already merged into main."
             }
           }
-          $contract = ./desktop/scripts/resolve-desktop-edition-release.ps1 `
+          $contract = ./apps/desktop/scripts/resolve-desktop-edition-release.ps1 `
             -ReleaseTag $releaseTag `
             -ValidationEditionId "${{ inputs.edition || 'universal' }}" `
             -PullRequestBaseBranch $env:GITHUB_BASE_REF `
@@ -204,20 +204,20 @@ jobs:
           } else {
             ""
           }
-          ./desktop/scripts/verify-desktop-version.ps1 -ReleaseTag $releaseTag
+          ./apps/desktop/scripts/verify-desktop-version.ps1 -ReleaseTag $releaseTag
           $desktopVersion = (
-            Get-Content -LiteralPath "desktop/src-tauri/tauri.conf.json" -Raw |
+            Get-Content -LiteralPath "apps/desktop/src-tauri/tauri.conf.json" -Raw |
               ConvertFrom-Json
           ).version
           "version=$desktopVersion" |
             Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
           $backendProjectVersionMatch = Select-String `
-            -LiteralPath "backend/pyproject.toml" `
+            -LiteralPath "services/backend/pyproject.toml" `
             -Pattern '^version\s*=\s*"([^"]+)"\s*$' |
             Select-Object -First 1
           $backendCodeVersionMatch = Select-String `
-            -LiteralPath "backend/app/__init__.py" `
+            -LiteralPath "services/backend/app/__init__.py" `
             -Pattern '^__version__\s*=\s*"([^"]+)"\s*$' |
             Select-Object -First 1
           if (-not $backendProjectVersionMatch -or -not $backendCodeVersionMatch) {
@@ -237,8 +237,8 @@ jobs:
           node-version: "22"
           cache: npm
           cache-dependency-path: |
-            frontend/package-lock.json
-            desktop/package-lock.json
+            apps/frontend/package-lock.json
+            apps/desktop/package-lock.json
 
       - name: Set up Rust 1.97.0
         uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # action snapshot, 2026-07-10
@@ -269,9 +269,9 @@ jobs:
       - name: Download exact admitted model input
         shell: pwsh
         run: |
-          python desktop/scripts/prepare-core-build-inputs.py `
+          python apps/desktop/scripts/prepare-core-build-inputs.py `
             --source-reference docs/agent-core-public-source.json `
-            --inputs distribution/desktop/core-build-inputs.json `
+            --inputs release/distribution/desktop/core-build-inputs.json `
             --download-to artifacts/model-input
           if ($LASTEXITCODE -ne 0) { throw 'Pinned model input preparation failed' }
 
@@ -293,7 +293,7 @@ jobs:
       - name: Stage verified Core into product
         shell: pwsh
         run: |
-          ./desktop/scripts/stage-agent-core.ps1 `
+          ./apps/desktop/scripts/stage-agent-core.ps1 `
             -AgentCoreRepository (Join-Path $env:GITHUB_WORKSPACE 'artifacts/agent-core-source')
 
       - name: Verify desktop release workflow contract
@@ -302,18 +302,18 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           python -m pip install "pytest==9.1.1"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -m pytest distribution/tests/test_desktop_release_workflow_contract.py
+          python -m pytest release/distribution/tests/test_desktop_release_workflow_contract.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify desktop browser-auth public configuration
         shell: pwsh
-        run: node ./desktop/scripts/verify-browser-auth-config.mjs
+        run: node ./apps/desktop/scripts/verify-browser-auth-config.mjs
 
       - name: Install JavaScript dependencies
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          npm ci --prefix frontend
+          npm ci --prefix apps/frontend
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm ci --prefix desktop
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -322,9 +322,9 @@ jobs:
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          npm --prefix desktop run verify:updater-build
+          npm --prefix apps/desktop run verify:updater-build
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npm --prefix desktop run verify:updater-signing
+          npm --prefix apps/desktop run verify:updater-signing
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Install backend test dependencies
@@ -335,18 +335,18 @@ jobs:
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          python -m pip install -e "./backend[dev]" `
+          python -m pip install -e "./services/backend[dev]" `
             "ruff==0.15.21" "mypy==2.2.0" "pytest==9.1.1"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify open-source release inventory
         shell: pwsh
-        run: npm --prefix desktop run verify:release-source
+        run: npm --prefix apps/desktop run verify:release-source
 
       - name: Verify backend
         if: ${{ steps.release.outputs.is_release == 'true' }}
         shell: pwsh
-        working-directory: backend
+        working-directory: services/backend
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: |
@@ -363,14 +363,14 @@ jobs:
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          npm --prefix frontend run typecheck
+          npm --prefix apps/frontend run typecheck
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npm --prefix frontend run lint
+          npm --prefix apps/frontend run lint
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           # The Windows hosted runner is materially slower than local jsdom.
           # Keep assertions unchanged while allowing the existing wizard tests
           # enough time to finish under runner load.
-          npm --prefix frontend run test -- --testTimeout 15000
+          npm --prefix apps/frontend run test -- --testTimeout 15000
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify desktop Rust
@@ -378,19 +378,19 @@ jobs:
         shell: pwsh
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          cargo fmt --all --manifest-path desktop/src-tauri/Cargo.toml -- --check
+          cargo fmt --all --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo clippy --release --locked --manifest-path desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
+          cargo clippy --release --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets -- -D warnings
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           # Release-profile tests reuse most compiled artifacts in the NSIS build.
-          cargo test --release --locked --manifest-path desktop/src-tauri/Cargo.toml --all-targets
+          cargo test --release --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify pinned NSIS template
         shell: pwsh
         run: |
-          ./desktop/scripts/verify-nsis-template.ps1
-          ./desktop/scripts/verify-installer-removal-wait.ps1
+          ./apps/desktop/scripts/verify-nsis-template.ps1
+          ./apps/desktop/scripts/verify-installer-removal-wait.ps1
 
       - name: Validate SignPath release configuration
         if: ${{ steps.release.outputs.is_release == 'true' }}
@@ -425,20 +425,20 @@ jobs:
         run: |
           $PSNativeCommandUseErrorActionPreference = $false
           $releaseBuild = "${{ steps.release.outputs.is_release }}" -ceq "true"
-          # `npm --prefix desktop` executes Tauri with `desktop` as its working
+          # `npm --prefix apps/desktop` executes Tauri with `desktop` as its working
           # directory, while the resolver deliberately emits repository-root
           # paths for the later release-inventory checks.
-          $configPath = "${{ steps.release.outputs.config_path }}" -replace '^desktop/', ''
+          $configPath = "${{ steps.release.outputs.config_path }}" -replace '^apps/desktop/', ''
           $buildExitCode = 1
           foreach ($attempt in 1..3) {
             if ($releaseBuild) {
               # Sign the application before NSIS embeds it. Tauri's separate
               # bundle command below packages these already signed bytes.
-              npm --prefix desktop run build -- --config $configPath --no-bundle
+              npm --prefix apps/desktop run build -- --config $configPath --no-bundle
             } else {
               # Pull requests exercise a real edition installer without
               # obtaining or publishing either release signature.
-              npm --prefix desktop run build -- `
+              npm --prefix apps/desktop run build -- `
                 --config $configPath `
                 --config '{"bundle":{"createUpdaterArtifacts":false}}'
             }
@@ -460,7 +460,7 @@ jobs:
           archive: false
           if-no-files-found: error
           retention-days: 1
-          path: desktop/src-tauri/target/release/drone-dream-desktop.exe
+          path: apps/desktop/src-tauri/target/release/drone-dream-desktop.exe
 
       - name: Submit application signing request
         if: ${{ steps.release.outputs.is_release == 'true' }}
@@ -474,7 +474,7 @@ jobs:
           github-artifact-id: ${{ steps.upload-unsigned-application.outputs.artifact-id }}
           wait-for-completion: true
           wait-for-completion-timeout-in-seconds: 1800
-          output-artifact-directory: desktop/src-tauri/target/release/signpath/application
+          output-artifact-directory: apps/desktop/src-tauri/target/release/signpath/application
           skip-decompress: true
           parameters: |
             version: "${{ steps.release-version.outputs.version }}"
@@ -484,10 +484,10 @@ jobs:
         if: ${{ steps.release.outputs.is_release == 'true' }}
         shell: pwsh
         run: |
-          $target = "desktop/src-tauri/target/release/drone-dream-desktop.exe"
+          $target = "apps/desktop/src-tauri/target/release/drone-dream-desktop.exe"
           $signed = @(
             Get-ChildItem `
-              -LiteralPath "desktop/src-tauri/target/release/signpath/application" `
+              -LiteralPath "apps/desktop/src-tauri/target/release/signpath/application" `
               -Recurse -Filter "drone-dream-desktop.exe" -File
           )
           if ($signed.Count -ne 1) {
@@ -506,8 +506,8 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $false
           $bundleExitCode = 1
           foreach ($attempt in 1..3) {
-            npm --prefix desktop run tauri -- bundle `
-              --config ("${{ steps.release.outputs.config_path }}" -replace '^desktop/', '') `
+            npm --prefix apps/desktop run tauri -- bundle `
+              --config ("${{ steps.release.outputs.config_path }}" -replace '^apps/desktop/', '') `
               --bundles nsis
             $bundleExitCode = $LASTEXITCODE
             if ($bundleExitCode -eq 0) { break }
@@ -521,17 +521,17 @@ jobs:
       - name: Verify WebView2 installer health gate
         shell: pwsh
         run: |
-          ./desktop/scripts/verify-webview2-installer.ps1 `
-            -GeneratedNsi "desktop/src-tauri/target/release/nsis/x64/installer.nsi"
+          ./apps/desktop/scripts/verify-webview2-installer.ps1 `
+            -GeneratedNsi "apps/desktop/src-tauri/target/release/nsis/x64/installer.nsi"
 
       - name: Verify installer locales and extracted planner
         shell: pwsh
         run: |
-          ./desktop/scripts/verify-installer-path-guard.ps1
-          ./desktop/scripts/verify-installer-locales.ps1 `
-            -GeneratedNsi "desktop/src-tauri/target/release/nsis/x64/installer.nsi"
-          ./desktop/scripts/verify-installer-planner.ps1 `
-            -Application "desktop/src-tauri/target/release/drone-dream-desktop.exe" `
+          ./apps/desktop/scripts/verify-installer-path-guard.ps1
+          ./apps/desktop/scripts/verify-installer-locales.ps1 `
+            -GeneratedNsi "apps/desktop/src-tauri/target/release/nsis/x64/installer.nsi"
+          ./apps/desktop/scripts/verify-installer-planner.ps1 `
+            -Application "apps/desktop/src-tauri/target/release/drone-dream-desktop.exe" `
             -EditionId "${{ steps.release.outputs.edition_id }}"
 
       - name: Upload unsigned installer for SignPath
@@ -543,7 +543,7 @@ jobs:
           archive: false
           if-no-files-found: error
           retention-days: 1
-          path: desktop/src-tauri/target/release/bundle/nsis/${{ steps.release.outputs.bundle_installer }}
+          path: apps/desktop/src-tauri/target/release/bundle/nsis/${{ steps.release.outputs.bundle_installer }}
 
       - name: Submit installer signing request
         if: ${{ steps.release.outputs.is_release == 'true' }}
@@ -557,7 +557,7 @@ jobs:
           github-artifact-id: ${{ steps.upload-unsigned-installer.outputs.artifact-id }}
           wait-for-completion: true
           wait-for-completion-timeout-in-seconds: 1800
-          output-artifact-directory: desktop/src-tauri/target/release/signpath/installer
+          output-artifact-directory: apps/desktop/src-tauri/target/release/signpath/installer
           skip-decompress: true
           parameters: |
             version: "${{ steps.release-version.outputs.version }}"
@@ -567,13 +567,13 @@ jobs:
         if: ${{ steps.release.outputs.is_release == 'true' }}
         shell: pwsh
         run: |
-          $bundleDir = "desktop/src-tauri/target/release/bundle/nsis"
+          $bundleDir = "apps/desktop/src-tauri/target/release/bundle/nsis"
           $target = Join-Path `
             $bundleDir `
             "${{ steps.release.outputs.bundle_installer }}"
           $signed = @(
             Get-ChildItem `
-              -LiteralPath "desktop/src-tauri/target/release/signpath/installer" `
+              -LiteralPath "apps/desktop/src-tauri/target/release/signpath/installer" `
               -Recurse -Filter "${{ steps.release.outputs.bundle_installer }}" -File
           )
           if ($signed.Count -ne 1) {
@@ -591,7 +591,7 @@ jobs:
       - name: Write release inventory and SHA-256 checksum
         shell: pwsh
         run: |
-          $bundleDir = "desktop/src-tauri/target/release/bundle/nsis"
+          $bundleDir = "apps/desktop/src-tauri/target/release/bundle/nsis"
           $installer = Get-Item -LiteralPath (
             Join-Path $bundleDir "${{ steps.release.outputs.bundle_installer }}"
           )
@@ -599,7 +599,7 @@ jobs:
           $checksumPath = "$($installer.FullName).sha256"
           "$($hash.Hash.ToLowerInvariant())  $($installer.Name)" |
             Set-Content -Encoding ascii -LiteralPath $checksumPath
-          npm --prefix desktop run verify:release-source -- `
+          npm --prefix apps/desktop run verify:release-source -- `
             --output "$bundleDir/release-source-inventory.json" `
             --edition-config "${{ steps.release.outputs.config_path }}"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -611,12 +611,12 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
-          $bundleDir = "desktop/src-tauri/target/release/bundle/nsis"
+          $bundleDir = "apps/desktop/src-tauri/target/release/bundle/nsis"
           $installer = Get-Item -LiteralPath (
             Join-Path $bundleDir "${{ steps.release.outputs.bundle_installer }}"
           )
           if (-not $installer) { throw "The signed installer was not produced." }
-          $application = "desktop/src-tauri/target/release/drone-dream-desktop.exe"
+          $application = "apps/desktop/src-tauri/target/release/drone-dream-desktop.exe"
           foreach ($signedFile in @($application, $installer.FullName)) {
             $authenticode = Get-AuthenticodeSignature -LiteralPath $signedFile
             if ($authenticode.Status -ne "Valid") {
@@ -633,16 +633,16 @@ jobs:
               $env:TAURI_SIGNING_PRIVATE_KEY,
               (New-Object Text.UTF8Encoding($false))
             )
-            ./desktop/scripts/invoke-tauri-updater-signer.ps1 `
+            ./apps/desktop/scripts/invoke-tauri-updater-signer.ps1 `
               -NodeExecutable ((Get-Command node.exe).Source) `
               -TauriCliPath (Resolve-Path `
-                "./desktop/node_modules/@tauri-apps/cli/tauri.js") `
+                "./apps/desktop/node_modules/@tauri-apps/cli/tauri.js") `
               -UpdaterKeyPath $updaterKeyPath `
               -InstallerPath $installer.FullName
           } finally {
             Remove-Item -LiteralPath $updaterKeyPath -Force -ErrorAction SilentlyContinue
           }
-          ./desktop/scripts/write-updater-manifest.ps1 `
+          ./apps/desktop/scripts/write-updater-manifest.ps1 `
             -BundleDirectory $bundleDir `
             -EditionId "${{ steps.release.outputs.edition_id }}" `
             -BuildNumber ([UInt64]"${{ steps.release.outputs.build_number }}") `
@@ -685,7 +685,7 @@ jobs:
           # instead of leaving a modal Windows error dialog that looks alive.
           [void][DroneDreamSmokeNative]::SetErrorMode(0x8003)
 
-          $bundleDir = "desktop/src-tauri/target/release/bundle/nsis"
+          $bundleDir = "apps/desktop/src-tauri/target/release/bundle/nsis"
           $installer = Get-Item -LiteralPath (
             Join-Path $bundleDir "${{ steps.release.outputs.bundle_installer }}"
           )
@@ -842,7 +842,7 @@ jobs:
               }
             }
           }
-          ./desktop/scripts/wait-path-removal.ps1 `
+          ./apps/desktop/scripts/wait-path-removal.ps1 `
             -LiteralPath $installDirFull `
             -TimeoutSeconds 30 `
             -PollIntervalMilliseconds 250
@@ -901,8 +901,8 @@ jobs:
       - name: Prepare edition release artifact
         shell: pwsh
         run: |
-          $sourceDir = "desktop/src-tauri/target/release/bundle/nsis"
-          $distDir = "desktop/release-dist"
+          $sourceDir = "apps/desktop/src-tauri/target/release/bundle/nsis"
+          $distDir = "apps/desktop/release-dist"
           if (Test-Path -LiteralPath $distDir) {
             Remove-Item -LiteralPath $distDir -Recurse -Force
           }
@@ -977,7 +977,7 @@ jobs:
           if-no-files-found: error
           retention-days: ${{ github.event_name == 'pull_request' && 3 || (github.event_name == 'workflow_dispatch' && 14 || 30) }}
           compression-level: 0
-          path: desktop/release-dist/*
+          path: apps/desktop/release-dist/*
 
   publish-release:
     name: Publish signed Windows release

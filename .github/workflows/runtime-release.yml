@@ -48,24 +48,24 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          version=$(sed -n 's/^DRONEDREAM_RUNTIME_VERSION=//p' runtime/pins.env)
+          version=$(sed -n 's/^DRONEDREAM_RUNTIME_VERSION=//p' platform/runtime/pins.env)
           if [[ ! "$RELEASE_TAG" =~ ^runtime-v${version}-beta\.[0-9]+$ ]]; then
             echo "release tag must match runtime-v${version}-beta.N" >&2
             exit 2
           fi
           python -m pip install --disable-pip-version-check \
-            --requirement runtime/locks/release-tools-requirements.lock \
+            --requirement platform/runtime/locks/release-tools-requirements.lock \
             "pytest==9.1.1"
           python - <<'PY'
           import importlib.util
           import pathlib
 
-          path = pathlib.Path("runtime/tools/runtime_release.py")
+          path = pathlib.Path("platform/runtime/tools/runtime_release.py")
           spec = importlib.util.spec_from_file_location("runtime_release", path)
           module = importlib.util.module_from_spec(spec)
           assert spec and spec.loader
           spec.loader.exec_module(module)
-          keys = module.validate_keyring(module.load_json(pathlib.Path("runtime/release-public-keys.json")))
+          keys = module.validate_keyring(module.load_json(pathlib.Path("platform/runtime/release-public-keys.json")))
           if not keys:
               raise SystemExit("trusted runtime release keyring is empty")
           PY
@@ -118,27 +118,27 @@ jobs:
             echo "VITE_SUPABASE_URL repository variable is missing or invalid" >&2
             exit 2
           }
-          python runtime/tools/runtime_manifest.py validate-config \
-            --pins runtime/pins.env \
-            --python-lock runtime/locks/python-requirements.lock
-          python -m pytest runtime/tests -q
-          bash -n runtime/build-rootfs.sh runtime/smoke-image.sh runtime/export-rootfs.sh
+          python platform/runtime/tools/runtime_manifest.py validate-config \
+            --pins platform/runtime/pins.env \
+            --python-lock platform/runtime/locks/python-requirements.lock
+          python -m pytest platform/runtime/tests -q
+          bash -n platform/runtime/build-rootfs.sh platform/runtime/smoke-image.sh platform/runtime/export-rootfs.sh
 
       - name: Build immutable linux amd64 runtime image
         shell: bash
-        run: bash runtime/build-rootfs.sh
+        run: bash platform/runtime/build-rootfs.sh
 
       - name: Run the real PX4 and Gazebo smoke gate
         shell: bash
-        run: bash runtime/smoke-image.sh "$IMAGE" runtime/out/smoke-report.json
+        run: bash platform/runtime/smoke-image.sh "$IMAGE" platform/runtime/out/smoke-report.json
 
       - name: Export smoke-promoted WSL rootfs
         shell: bash
         run: |
           set -Eeuo pipefail
-          version=$(sed -n 's/^DRONEDREAM_RUNTIME_VERSION=//p' runtime/pins.env)
-          rootfs="runtime/out/DroneDreamRuntime-${version}-amd64.tar"
-          bash runtime/export-rootfs.sh "$IMAGE" runtime/out/smoke-report.json "$rootfs"
+          version=$(sed -n 's/^DRONEDREAM_RUNTIME_VERSION=//p' platform/runtime/pins.env)
+          rootfs="platform/runtime/out/DroneDreamRuntime-${version}-amd64.tar"
+          bash platform/runtime/export-rootfs.sh "$IMAGE" platform/runtime/out/smoke-report.json "$rootfs"
           test -s "$rootfs"
           test -s "$rootfs.manifest.json"
 
@@ -146,23 +146,23 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          version=$(sed -n 's/^DRONEDREAM_RUNTIME_VERSION=//p' runtime/pins.env)
-          rootfs="runtime/out/DroneDreamRuntime-${version}-amd64.tar"
-          output="runtime/out/release/$RELEASE_TAG"
+          version=$(sed -n 's/^DRONEDREAM_RUNTIME_VERSION=//p' platform/runtime/pins.env)
+          rootfs="platform/runtime/out/DroneDreamRuntime-${version}-amd64.tar"
+          output="platform/runtime/out/release/$RELEASE_TAG"
           base_url="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG"
           build_timestamp=$(docker image inspect --format '{{.Created}}' "$IMAGE")
           test ! -e "$output"
-          python runtime/tools/runtime_release.py package \
+          python platform/runtime/tools/runtime_release.py package \
             --rootfs "$rootfs" \
             --runtime-manifest "$rootfs.manifest.json" \
-            --smoke-report runtime/out/smoke-report.json \
+            --smoke-report platform/runtime/out/smoke-report.json \
             --output-directory "$output" \
             --base-url "$base_url" \
             --build-timestamp "$build_timestamp"
           install -m 0644 LICENSE "$output/DroneDream-LICENSE.txt"
-          install -m 0644 runtime/THIRD_PARTY_NOTICES.md \
+          install -m 0644 platform/runtime/THIRD_PARTY_NOTICES.md \
             "$output/THIRD_PARTY_NOTICES.md"
-          install -m 0644 runtime/licenses/valkey-COPYING \
+          install -m 0644 platform/runtime/licenses/valkey-COPYING \
             "$output/Valkey-COPYING.txt"
           test -s "$output/DroneDream-LICENSE.txt"
           test -s "$output/THIRD_PARTY_NOTICES.md"
@@ -174,19 +174,19 @@ jobs:
           DRONEDREAM_RUNTIME_ED25519_PRIVATE_KEY: ${{ secrets.DRONEDREAM_RUNTIME_ED25519_PRIVATE_KEY }}
         run: |
           set -Eeuo pipefail
-          output="runtime/out/release/$RELEASE_TAG"
-          python runtime/tools/runtime_release.py sign \
+          output="platform/runtime/out/release/$RELEASE_TAG"
+          python platform/runtime/tools/runtime_release.py sign \
             --manifest "$output/runtime-release.json"
 
       - name: Independently verify signed release assets
         shell: bash
         run: |
           set -Eeuo pipefail
-          output="runtime/out/release/$RELEASE_TAG"
-          python runtime/tools/runtime_release.py verify \
+          output="platform/runtime/out/release/$RELEASE_TAG"
+          python platform/runtime/tools/runtime_release.py verify \
             --manifest "$output/runtime-release.json" \
             --signature "$output/runtime-release.json.sig" \
-            --keyring runtime/release-public-keys.json \
+            --keyring platform/runtime/release-public-keys.json \
             --payload-directory "$output"
           find "$output" -maxdepth 1 -type f -printf '%f %s bytes\n' | sort
 
@@ -197,7 +197,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -Eeuo pipefail
-          output="runtime/out/release/$RELEASE_TAG"
+          output="platform/runtime/out/release/$RELEASE_TAG"
           # `package` enforces every part is strictly under GitHub's 2 GiB
           # per-asset ceiling. Assets enter an invisible draft first so a
           # network/upload failure cannot expose a partial public release.
@@ -220,5 +220,5 @@ jobs:
         run: |
           echo "Verified assets remain on this self-hosted runner at:" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          echo "$GITHUB_WORKSPACE/runtime/out/release/$RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo "$GITHUB_WORKSPACE/platform/runtime/out/release/$RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"

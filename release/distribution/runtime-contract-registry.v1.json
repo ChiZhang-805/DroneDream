@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-runtime-contract-registry",
+  "contractPaths": [
+    "release/distribution/schemas/edition-execution-authorization.schema.json",
+    "release/distribution/schemas/edition-execution-gate-policy.schema.json",
+    "release/distribution/tools/distribution_contract.py",
+    "release/distribution/tools/edition_safety_contract.py"
+  ]
+}
