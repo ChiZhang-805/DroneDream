@@ -9,10 +9,10 @@ on:
       - "CODE_SIGNING_POLICY.md"
       - "PRIVACY.md"
       - "TERMS.md"
-      - "desktop/src-tauri/tauri.conf.json"
-      - "frontend/**"
-      - "website/pages-release.json"
-      - "website/scripts/build-pages-site.ps1"
+      - "apps/desktop/src-tauri/tauri.conf.json"
+      - "apps/frontend/**"
+      - "release/website/pages-release.json"
+      - "release/website/scripts/build-pages-site.ps1"
   workflow_dispatch:
 
 permissions:
@@ -38,13 +38,13 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: apps/frontend/package-lock.json
 
       - name: Verify Pages deployment retention
-        run: node --test website/scripts/prune-github-pages-deployments.test.mjs
+        run: node --test release/website/scripts/prune-github-pages-deployments.test.mjs
 
       - name: Install frontend dependencies
-        run: npm ci --prefix frontend
+        run: npm ci --prefix apps/frontend
 
       - name: Build the version-pinned Pages site
         shell: pwsh
@@ -55,7 +55,7 @@ jobs:
           VITE_AUTH_GOOGLE_ENABLED: ${{ vars.VITE_AUTH_GOOGLE_ENABLED }}
           VITE_AUTH_GITHUB_ENABLED: ${{ vars.VITE_AUTH_GITHUB_ENABLED }}
           VITE_AUTH_SLACK_ENABLED: ${{ vars.VITE_AUTH_SLACK_ENABLED }}
-        run: ./website/scripts/build-pages-site.ps1
+        run: ./release/website/scripts/build-pages-site.ps1
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
@@ -63,7 +63,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4.0.0
         with:
-          path: frontend/site-dist
+          path: apps/frontend/site-dist
 
   deploy:
     name: Publish global website
@@ -105,4 +105,4 @@ jobs:
         env:
           DRONEDREAM_DEPLOYMENT_ENVIRONMENT: github-pages
           GITHUB_TOKEN: ${{ github.token }}
-        run: node website/scripts/prune-github-pages-deployments.mjs
+        run: node release/website/scripts/prune-github-pages-deployments.mjs

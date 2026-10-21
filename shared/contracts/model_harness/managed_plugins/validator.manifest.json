@@ -1,0 +1,18 @@
+{
+  "api_contract": {
+    "contract_id": "dronedream.managed.validator.v1",
+    "input_schema_version": "dronedream.model-harness-input.v1",
+    "output_schema_version": "dronedream.model-harness-output.v1"
+  },
+  "implementation": {
+    "entrypoint": "validate_output_against_control_plane",
+    "module": "app.model_harness.control_plane",
+    "source_path": "services/backend/app/model_harness/control_plane.py",
+    "source_sha256": "295de99abe7e52073104f4b0c5d84f94a62fc010320d301e08d01b0836981352"
+  },
+  "plugin_id": "dronedream.managed.validator",
+  "schema_version": "dronedream.managed-plugin-manifest.v1",
+  "slot": "validator",
+  "trust": "managed",
+  "version": "1.0.0"
+}

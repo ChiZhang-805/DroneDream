@@ -1,0 +1,18 @@
+{
+  "api_contract": {
+    "contract_id": "dronedream.managed.simulator-adapter.v1",
+    "input_schema_version": "dronedream.model-harness-input.v1",
+    "output_schema_version": "dronedream.model-harness-output.v1"
+  },
+  "implementation": {
+    "entrypoint": "get_simulator_adapter",
+    "module": "app.simulator.factory",
+    "source_path": "services/backend/app/simulator/factory.py",
+    "source_sha256": "3ad22b9f8dd3e925760817edcdd3b0ae18c5aba00a8d1d784ecdc0d37074eff6"
+  },
+  "plugin_id": "dronedream.managed.simulator-adapter",
+  "schema_version": "dronedream.managed-plugin-manifest.v1",
+  "slot": "simulator_adapter",
+  "trust": "managed",
+  "version": "1.0.0"
+}

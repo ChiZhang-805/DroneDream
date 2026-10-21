@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-vehicle-pack-registry",
+  "registryId": "initial-vehicle-packs",
+  "registryVersion": "1.0.0",
+  "auditDate": "2026-08-05",
+  "policy": {
+    "minimumPackCount": 6,
+    "maximumPackCount": 8,
+    "goldenCandidateCount": 3,
+    "validatedRequiresSignedReceipt": true,
+    "stockDoesNotImplyCompatibility": true,
+    "hardwareActionsRequireValidatedTier": true,
+    "parameterBoundsAreProvisionalUntilValidated": true,
+    "mutableAvailabilityEvidenceRequiresObservedDate": true
+  },
+  "packs": [
+    {
+      "packId": "px4-gazebo-x500-reference",
+      "manifestPath": "release/distribution/vehicle-packs/px4-gazebo-x500-reference.v1.json",
+      "manifestSha256": "b81752b215be13b8369f89fdf7ddd65ba67490aa10f62dbb05b188d4a394a485",
+      "currentValidationStatus": "contract-only",
+      "currentValidationTier": "contract-only",
+      "segments": ["simulation-reference", "research"],
+      "goldenCandidate": true,
+      "productAvailability": "simulation-only",
+      "supportRegions": ["cn", "global"],
+      "availabilityEvidence": [
+        {
+          "url": "https://docs.px4.io/v1.17/en/sim_gazebo_gz/vehicles",
+          "scope": "Official PX4 documentation lists the new-Gazebo X500 family and its launch targets; this is simulator support evidence, not a physical-product listing.",
+          "observedDate": "2026-08-05"
+        }
+      ]
+    },
+    {
+      "packId": "holybro-x500-v2-pixhawk6",
+      "manifestPath": "release/distribution/vehicle-packs/holybro-x500-v2-pixhawk6.v1.json",
+      "manifestSha256": "30b275c651089106443aeadf5477beb358c81cdc2c1369b53c03d5d42294eefd",
+      "currentValidationStatus": "contract-only",
+      "currentValidationTier": "contract-only",
+      "segments": ["research"],
+      "goldenCandidate": true,
+      "productAvailability": "listed-available",
+      "supportRegions": ["global"],
+      "availabilityEvidence": [
+        {
+          "url": "https://holybro.com/products/px4-development-kit-x500-v2",
+          "scope": "Official Holybro product page listed X500 v2 kit variants with Pixhawk 6-series controllers; stock is mutable and does not establish DroneDream compatibility.",
+          "observedDate": "2026-08-05"
+        },
+        {
+          "url": "https://docs.holybro.com/drone-development-kit/px4-development-kit-x500v2",
+          "scope": "Official Holybro documentation describes the X500 v2 development kit and supported controller variants.",
+          "observedDate": "2026-08-05"
+        }
+      ]
+    },
+    {
+      "packId": "holybro-s500-v2-pixhawk6c",
+      "manifestPath": "release/distribution/vehicle-packs/holybro-s500-v2-pixhawk6c.v1.json",
+      "manifestSha256": "cd68561d99b84f46f6650e770e13ecc43019aba5760896740fd239989ef144c0",
+      "currentValidationStatus": "contract-only",
+      "currentValidationTier": "contract-only",
+      "segments": ["student", "research"],
+      "goldenCandidate": true,
+      "productAvailability": "listed-available",
+      "supportRegions": ["global"],
+      "availabilityEvidence": [
+        {
+          "url": "https://holybro.com/products/s500-v2-development-kit",
+          "scope": "Official Holybro product page listed the S500 v2 development kit and Pixhawk 6C configuration; listing status is not a validation receipt.",
+          "observedDate": "2026-08-05"
+        },
+        {
+          "url": "https://docs.px4.io/v1.16/en/frames_multicopter/kits",
+          "scope": "Official PX4 kit documentation includes the S500 family as a documented multicopter kit.",
+          "observedDate": "2026-08-05"
+        }
+      ]
+    },
+    {
+      "packId": "holybro-qav250-pixhawk6c-mini",
+      "manifestPath": "release/distribution/vehicle-packs/holybro-qav250-pixhawk6c-mini.v1.json",
+      "manifestSha256": "0ce165af8c6c3e6a0498f2189f772b769d98a1aa27e71b98c6c6c91b01bf450c",
+      "currentValidationStatus": "contract-only",
+      "currentValidationTier": "contract-only",
+      "segments": ["student", "racing"],
+      "goldenCandidate": false,
+      "productAvailability": "variant-limited",
+      "supportRegions": ["global"],
+      "availabilityEvidence": [
+        {
+          "url": "https://holybro.com/products/qav250-kit",
+          "scope": "Official Holybro page showed differing availability by QAV250 variant; the registry records a variant-limited listing without claiming any DroneDream validation.",
+          "observedDate": "2026-08-05"
+        }
+      ]
+    },
+    {
+      "packId": "holybro-x650-pixhawk6",
+      "manifestPath": "release/distribution/vehicle-packs/holybro-x650-pixhawk6.v1.json",
+      "manifestSha256": "1092abff8df727562eafa502587d24e40b9839d4e8e279a4ed36865377066b8c",
+      "currentValidationStatus": "contract-only",
+      "currentValidationTier": "contract-only",
+      "segments": ["research"],
+      "goldenCandidate": false,
+      "productAvailability": "listed-sold-out",
+      "supportRegions": ["global"],
+      "availabilityEvidence": [
+        {
+          "url": "https://holybro.com/products/x650-development-kit",
+          "scope": "Official Holybro product page listed X650 controller variants but showed the product sold out at the observation date.",
+          "observedDate": "2026-08-05"
+        }
+      ]
+    },
+    {
+      "packId": "amovlab-p450-px4",
+      "manifestPath": "release/distribution/vehicle-packs/amovlab-p450-px4.v1.json",
+      "manifestSha256": "c10b4be345b266b484896e520a83fd37384ba2545c293b87da318f9da2861325",
+      "currentValidationStatus": "planned",
+      "currentValidationTier": "planned",
+      "segments": ["research"],
+      "goldenCandidate": false,
+      "productAvailability": "documentation-only",
+      "supportRegions": ["cn"],
+      "availabilityEvidence": [
+        {
+          "url": "https://wiki.amovlab.com/public/prometheuswiki/P450%E4%BD%BF%E7%94%A8%E6%89%8B%E5%86%8C/%E7%A1%AC%E4%BB%B6%E4%BB%8B%E7%BB%8D.html",
+          "scope": "Official Amovlab documentation describes the P450 hardware platform; no current stock or exact DroneDream controller compatibility is inferred.",
+          "observedDate": "2026-08-05"
+        }
+      ]
+    },
+    {
+      "packId": "amovlab-mfp450-pixhawk6c",
+      "manifestPath": "release/distribution/vehicle-packs/amovlab-mfp450-pixhawk6c.v1.json",
+      "manifestSha256": "81f68008e93e562088d13d497d2ced20e29705cb8a293a5ef5a6271e4c749bfc",
+      "currentValidationStatus": "planned",
+      "currentValidationTier": "planned",
+      "segments": ["student", "research"],
+      "goldenCandidate": false,
+      "productAvailability": "documentation-only",
+      "supportRegions": ["cn"],
+      "availabilityEvidence": [
+        {
+          "url": "https://wiki.amovlab.com/public/mfp-v1-wiki/",
+          "scope": "Official Amovlab F450/MFP family manual documents a Pixhawk 6C configuration; it does not establish current stock or DroneDream validation.",
+          "observedDate": "2026-08-05"
+        }
+      ]
+    },
+    {
+      "packId": "bitcraze-crazyflie-2-1-plus",
+      "manifestPath": "release/distribution/vehicle-packs/bitcraze-crazyflie-2-1-plus.v1.json",
+      "manifestSha256": "8ecda457a7dfdcfc2b5d568df5ff17414ad9e039e3f56e89fe164c4519780ad8",
+      "currentValidationStatus": "planned",
+      "currentValidationTier": "planned",
+      "segments": ["student", "teaching", "research"],
+      "goldenCandidate": false,
+      "productAvailability": "listed-available",
+      "supportRegions": ["global"],
+      "availabilityEvidence": [
+        {
+          "url": "https://www.bitcraze.io/products/crazyflie-2-1-plus/",
+          "scope": "Official Bitcraze product page listed Crazyflie 2.1+ for education and research; it remains a separate autopilot and transport family with no DroneDream adapter validation.",
+          "observedDate": "2026-08-05"
+        }
+      ]
+    }
+  ]
+}

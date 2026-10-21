@@ -42,8 +42,8 @@ corresponding plan, but does not store full payment-card details.
 
 Our hosting, authentication, storage, and security providers may process IP
 addresses, browser or device information, request timestamps, security events,
-and service logs needed to deliver and protect the service. DroneDream does not
-use first-party behavioral advertising or sell personal information.
+and service logs needed to deliver and protect the service. DroneDream does not include first-party advertising,
+use behavioral advertising, or sell personal information.
 
 ## How we use information
 
@@ -82,7 +82,7 @@ jobs, parameters, tracks, scenarios, metrics, run history, logs, simulation
 telemetry, reports, Runtime installation state, and application caches on your
 computer.
 
-Model-provider API keys are excluded from persistent preference storage. A key
+Each model-provider API key is excluded from persistent preference storage. A key
 may be held during the current session and, when a model-guided local job needs
 it, an encrypted per-job copy may remain in the local backend database until
 that job reaches a terminal state.
@@ -113,7 +113,10 @@ We may disclose information when reasonably necessary to comply with law,
 protect users and the service, investigate abuse, or complete a business
 transfer. We do not sell personal information.
 
-## Retention, access, and deletion
+Official desktop applications may check GitHub Releases for signed software and
+Runtime updates. That request may disclose ordinary network metadata to GitHub.
+
+## User control and deletion
 
 We keep account and cloud information for as long as needed to provide the
 service, meet legal obligations, resolve disputes, and protect the service.
