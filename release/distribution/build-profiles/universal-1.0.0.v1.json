@@ -36,7 +36,7 @@
     "sourceFiles": [
       {
         "path": "apps/frontend/src/AppShell.tsx",
-        "sha256": "02bedcbbb5a8c238801e7f1cb413635a03df17b7d1cb40d073814599e196b563"
+        "sha256": "a4fe109f066cecd6d44eb18c509ac782e24b05846c1ae0b468b39a060e012bab"
       },
       {
         "path": "apps/frontend/src/components/EditionSettingsSurface.tsx",
@@ -44,11 +44,11 @@
       },
       {
         "path": "apps/frontend/src/components/SettingsUpdateCenter.tsx",
-        "sha256": "661fa14cafc38446f26331539bbef6cd5bb6dc4bc122727b1b1c8990a6397c5a"
+        "sha256": "b5358d7d2b338812340bcd060342571de99575c2e6f78c2e0714285f09aa7e1c"
       },
       {
         "path": "apps/frontend/src/components/DroneLaunchScene.tsx",
-        "sha256": "488458516876384ec00d562227fbc5783583a243a559f02e0aba7374b9e1a210"
+        "sha256": "f3b14a9814a2a93597c550e95adffd10f7a1401def2e06ceef3c40b0ae8ffdbd"
       },
       {
         "path": "apps/frontend/src/features/distribution/universalMode.ts",
@@ -56,15 +56,15 @@
       },
       {
         "path": "apps/frontend/src/styles.css",
-        "sha256": "4b89030be59d365e6551824eb9230536175e610847fb39592b58a35518a6c85a"
+        "sha256": "95a4a9c7112e769648bf7c2c09538c4555bfdb03b000d7baaa6f31c52e6da7e6"
       },
       {
         "path": "apps/frontend/src/theme/EditionThemeProvider.tsx",
-        "sha256": "005f21c91389c0507ff3539d5e3322f12681d7130674d32781930f0e8cf84da5"
+        "sha256": "e87b428957529b89cdb16f94e21e1703765eb6b21d559dfb4bf7b2d0e8935aaa"
       },
       {
         "path": "apps/frontend/src/theme/editionTheme.ts",
-        "sha256": "a1029cca9c30e80cccf21b96f20916c6b8808b98a1dfe6aeb1fb71e4a2109df0"
+        "sha256": "0f81f718c40abd161168a74b80f063c1f615b0084d1bc9e953c47e87b0c9cf2a"
       }
     ],
     "visualEvidence": {
@@ -90,7 +90,7 @@
   "integratedWorkspaceUiContract": {
     "contractId": "dronedream-universal-integrated-workspaces/v2",
     "manifest": "release/distribution/universal/integrated-workspaces.v2.json",
-    "sha256": "5cef11a50f0c6e1223fb26062e40b166d6dc0348ced3473d019d0d734855a3ff",
+    "sha256": "f6bac9f0ca6ce5e05b5c895c76a2b5eeda06bf6a463da06d357fa9f0ce83565d",
     "sourceFileCount": 12,
     "workspaceModes": ["sim", "lab", "field", "autonomy"],
     "createsCrossEditionHarnessOrchestrator": false,
