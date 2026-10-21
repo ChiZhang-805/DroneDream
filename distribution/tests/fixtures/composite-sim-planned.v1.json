@@ -8,7 +8,7 @@
   "edition": {
     "editionId": "sim",
     "editionVersion": "1.0.0",
-    "manifestSha256": "74bf27e5e607c180cc939d0e38b65149ba8c4d6bb455fb4ca78d00a04c53c95b"
+    "manifestSha256": "5d87fe593d456df7c67ddd26da0fa95620742c377fcb5f8caf5d3d299ca20f07"
   },
   "region": "global",
   "targetArchitecture": "windows-x86_64",

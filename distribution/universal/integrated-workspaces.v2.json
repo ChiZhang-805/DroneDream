@@ -87,7 +87,7 @@
     },
     {
       "path": "frontend/src/lab/lab.css",
-      "sha256": "6c551a02078e50395fa88bcb3d66b67a6dec20b947e6510fdcce2de28524b3ee",
+      "sha256": "e21690e3c4ef1c359ca7c71909f13c92a5100aaeb1ec36e3436ea809234890bc",
       "donorEdition": "lab",
       "donorBlob": "5968461d1f67e16551c88888a93fee137a481e68",
       "integration": "semantic-universal-layout-and-theme-adaptation"
@@ -101,7 +101,7 @@
     },
     {
       "path": "frontend/src/styles.css",
-      "sha256": "c8c8d669cd16b28ec1666474bf6f2d04279030ad507f7e0bf3e8ce4b81f6765e",
+      "sha256": "4b89030be59d365e6551824eb9230536175e610847fb39592b58a35518a6c85a",
       "donorEdition": "lab",
       "donorBlob": "96deedb311f92dc2b7a058f9a61324509f9dd702",
       "integration": "semantic-universal-workspaces-and-canonical-navigation-theme"
@@ -115,7 +115,7 @@
     },
     {
       "path": "frontend/src/router.tsx",
-      "sha256": "d4907d306eaf589e1f5383588fb02ea9eeb4b3456cbc5b14c7e94770e829b206",
+      "sha256": "de9af01fb2bf3c1bb67bf6e0afc25841641006ed894ab100ef95fd19dc00837f",
       "donorEdition": "universal",
       "donorBlob": "307f4e0784ff125f883031daefe7d2c1cd4ea7dc",
       "integration": "semantic-universal-workspace-routing-and-shared-locale"
