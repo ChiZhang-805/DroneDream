@@ -1,54 +1,41 @@
 # Contributing to DroneDream
 
-Thanks for helping improve DroneDream. Changes should preserve its central
-contract: repeatable, evidence-backed PX4/Gazebo experiments with explicit
-safety and reproducibility boundaries.
+Keep each change focused and preserve the repository boundaries described in
+the root README.
 
-## Before submitting a change
+## Before opening a pull request
 
-1. Create a focused branch and keep credentials and generated build output out
-   of the repository.
-2. Add or update tests for every behavior change.
-3. Keep Chinese and English UI strings semantically equivalent and fully
-   separated; do not mix languages inside one localized interface.
-4. For simulator effects, provide machine-readable launcher evidence. Merely
-   accepting a configuration field is not a physical implementation.
-5. Update the relevant manual or architecture document when a public contract,
-   workflow, environment variable, or safety boundary changes.
+1. Start from the long-lived branch that owns the change.
+2. Keep credentials, generated builds, Runtime images, and user data outside
+   the repository.
+3. Update tests when behavior or a public contract changes.
+4. Keep Chinese and English UI strings complete and separate.
+5. Update the relevant guide when commands, environment variables, or
+   workflows change.
 
-## Local quality gates
-
-Run the repository-level checks before opening a pull request:
+## Local checks
 
 ```bash
-python scripts/check-repository.py
-cd backend
-python -m ruff check app tests alembic scripts ../worker ../scripts/simulators
-python -m mypy app
-python -m pytest -q
-cd ..
-npm --prefix frontend run lint
-npm --prefix frontend run typecheck
-npm --prefix frontend run test
-npm --prefix frontend run build
-npm --prefix frontend run site:build
+python tools/check-repository.py
+python -m ruff check services/backend services/worker tools/simulators
+python -m mypy services/backend/app services/worker/drone_dream_worker
+python -m pytest services/backend/tests -q
+python -m pytest shared/brand/tests release/distribution/tests platform/engine-pack/tests platform/runtime/tests -q
+npm --prefix apps/frontend run lint
+npm --prefix apps/frontend run typecheck
+npm --prefix apps/frontend run test
+npm --prefix apps/frontend run build
 ```
 
-Desktop and Runtime changes also require the checks documented in
-[`desktop/README.md`](desktop/README.md) and
-[`docs/14-runtime-release.md`](docs/14-runtime-release.md). GitHub Actions runs
-the complete cross-platform gate, including Rust, Runtime contracts, container
-builds, and deployment configuration checks.
+Desktop and Runtime changes also require the checks in
+[apps/desktop/README.md](apps/desktop/README.md) and
+[docs/guides/14-runtime-release.md](docs/guides/14-runtime-release.md).
 
-## Pull request evidence
+## Pull request description
 
-Describe:
+Explain the user-visible or contract behavior, why the implementation changed,
+and the exact checks run. Include screenshots for visible interface changes.
+State any environment-dependent test that CI must complete.
 
-- what user-visible or contract behavior changed;
-- why the change is safe;
-- the exact tests and builds executed;
-- any test that could not run locally and where CI covers it; and
-- screenshots for layout, localization, visualization, or 3D changes.
-
-Do not claim that a simulated result is safe for real flight. Keep mock,
-dry-run, and physically injected PX4/Gazebo results clearly labelled.
+Simulated results must remain identifiable as simulation results. Real flight
+decisions remain with the operator.

@@ -174,7 +174,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: deploy/Dockerfile.backend
+      dockerfile: release/deploy/Dockerfile.backend
       target: api
     environment:
       <<: *backend-environment
@@ -201,7 +201,7 @@ services:
   worker:
     build:
       context: .
-      dockerfile: deploy/Dockerfile.backend
+      dockerfile: release/deploy/Dockerfile.backend
       target: worker
     environment:
       <<: [*backend-environment, *simulator-environment]
@@ -222,7 +222,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: deploy/Dockerfile.frontend
+      dockerfile: release/deploy/Dockerfile.frontend
       args:
         VITE_API_BASE_URL: ""
         VITE_DEMO_AUTH_TOKEN: "${VITE_DEMO_AUTH_TOKEN:?Set VITE_DEMO_AUTH_TOKEN in .env}"
