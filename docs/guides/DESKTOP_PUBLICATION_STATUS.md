@@ -1,0 +1,162 @@
+# Desktop publication status — 2026-09-16
+
+## Publication order
+
+Publish a tested, consistently versioned installer and its verified signatures
+to the GitHub update channel before updating the daily-use desktop installation.
+Local validation builds must remain explicitly identified as local builds, not
+as already-published releases. Do not disable runtime or model admission checks
+to make a release pass.
+
+Keep the existing public inventory: eight long-lived branches, five updater
+channels, the latest and previous five-edition installer releases, one Runtime
+release, and the latest successful GitHub Pages deployment.
+
+## Source changes in this update
+
+- Chatbot is the new-conversation entry. The first submitted message creates an
+  independently stored conversation and navigates to its sidebar entry.
+- Account- and edition-scoped local conversations preserve failed submissions,
+  reopen saved messages, and keep background responses in their original thread.
+- Model clarification text is preserved independently of the interface locale.
+- Asset binding, interpretation controls, authentication, runtime transport,
+  settings persistence, and boundary validation include the accumulated fixes
+  and regression tests from the source review.
+- Runtime check rows use returned evidence, not animation timing, to indicate
+  success. Update failures expose the affected component and their actual cause.
+
+## Verified scope
+
+The frontend suite passed 1,034 tests in 134 files using two workers and a
+20-second per-test default on the development host. Type checking, scoped lint,
+the AGENT frontend build, and the local desktop build passed. This is not a
+cloud-model flight acceptance result.
+
+The first Pages CI run caught an unreachable `pending` branch in the Runtime
+status display. That branch was removed; the full referenced TypeScript build
+(`tsc -b --force`) and 17 focused conversation/Runtime/updater tests then passed.
+Use the referenced-project build for this check: a root-only `tsc --noEmit` run
+does not validate all frontend projects.
+
+An AGENT client-only local patch was installed on the development host. It
+preserves the existing Core, Runtime, and account data. Conversations currently
+persist locally per account; this change does not claim cross-device chat sync.
+
+## Update channel is not promoted by this source commit
+
+The last published five-edition installer release remains build 1838.
+Two conditions must be resolved before a new complete release can be promoted:
+
+1. The current local-expert package fails the current control-protocol staging
+   check with `LOCAL_POLICY_RUNTIME_CURRENT_CONTROL_REQUIRED`. A genuinely
+   compatible and admitted model package is required; editing its qualification
+   fields or reusing an old receipt is not a remedy.
+2. The repository's production Windows signing workflow lacks its SignPath
+   organization, project, policy/artifact configuration and API-token settings.
+   The Tauri updater signing key exists, but that signature is not a Windows
+   Authenticode publisher signature and cannot be described as one.
+
+The public registered AGENT OAuth client variable was added to GitHub so its
+builds use the same approved login identity as the local client. No credential
+values or private account data are included in this public document.
+
+Existing release assets and update-channel manifests remain unchanged until
+the replacement installers satisfy the release requirements.
+
+## Open-source / SignPath preparation
+
+The maintainer authorized MIT licensing of first-party Core source, including
+modification, redistribution, and commercial use. Core license metadata has been
+published in the clean [DroneDream-Agent-Core repository](https://github.com/ChiZhang-805/DroneDream-Agent-Core).
+The initial public snapshot excludes private history, real session exports,
+developer handoff notes, credentials and model weights. The original private
+repository and its development files remain intact.
+The exact reviewed Core source is recorded in
+[`agent-core-public-source.json`](agent-core-public-source.json); this is a source
+reference, not a binary qualification receipt or an updater manifest.
+
+School Map and My Drone were separately authorized under MIT on 2026-09-16 and
+are included with a hash-scoped external license grant. Historical `NOASSERTION`
+metadata and qualification-bound archive bytes remain unchanged. The later
+permission does not requalify assets or models, grant third-party rights, or
+constitute a new installer release.
+
+The [SignPath application packet](signpath-foundation-application.md) now lists
+all five editions and distinguishes intended signing from actual acceptance.
+`apps/desktop/scripts/check-signpath-readiness.py` reads repository visibility and
+configuration names only; it never retrieves secret values or grants signing
+authority. The original incubation repository remains private. No SignPath
+application, account authorization, certificate, or token is claimed as completed.
+
+## Complete-component build repair
+
+The product workflow now checks out the exact public Core source reference and
+builds the native sensor components from pinned PX4/Gazebo inputs. Windows builds
+the Core sidecar, isolator, official plugins, Runtime and default assets before
+staging them into each edition. It does not reuse a previous private Core EXE or
+skip Core by packaging the frontend alone.
+
+Core staging freezes a bounded build receipt and verifies its exact bytes,
+source commit, and every copied component. Production model preflight loads all
+ten ONNX experts and checks the current feature/control contracts, training
+lineage, independent spatial holdouts, admission and content-bound distribution
+license records. Universal builds require new UI evidence bound to their actual
+source revision; old visual evidence remains historical, not recertified.
+
+The model-download lock is deliberately unpopulated until a complete current
+package passes these checks. The historical complete package lacks current
+continuous-control outputs; older partial candidates have stale feature
+contracts. Neither filenames nor edited receipts can make them compatible.
+Current-source teacher calibration has produced real sensor/control records,
+but this is not a trained ten-expert package or autonomous flight acceptance.
+
+The final publication-contract suite passed 419 tests and 15 subtests with the
+public Core reference pinned to `e4496d73230ce5593ea44e42e8e9bb146462bc07`.
+The closed native-output/configuration tests are included in that result.
+The later source pin includes camera-training validation, JSON-safe camera
+readback, bounded preflight timing diagnostics and a strict ensemble CLI.
+Focused regressions passed; they do not relabel the earlier full-suite result
+as having run against this newer revision. Actual camera readback and preflight
+stability have passed in new teacher runs. In-flight perception expiry still
+prevented completion of the longer route; those runs safely landed and remain
+failed, not qualified model-training or autonomous-flight evidence.
+The latest repair reuses only source-identical, same-sized prepared camera pixels
+for learning records, and freezes static map geometry with bounded candidate
+index caching. Distances, uncertainty and freshness checks remain active.
+468 local perception, observation-recording and adapter regressions passed;
+Core lint, 68 schema exports and seven shared Runtime source checks passed.
+The next Core revision batches map-validated rays with bounded temporary arrays,
+preserves scalar voxel ordering and adds separate current-thread CPU diagnostics.
+Its 236 focused tests passed; this does not grant flight or model qualification.
+The product publication suite was also rerun with the preceding `615732b` pin:
+419 tests and 15 subtests passed. Current-source simulation failures remain
+visible and do not advance the updater channel.
+These source checks do not claim a completed Windows installer build. Model
+training/admission, third-party weight redistribution rights, current UI
+acceptance, and approved production signing remain release prerequisites.
+No installer assets or update-channel manifests were promoted by this repair.
+
+## Desktop cancellation and model computation checks (2026-09-17)
+
+The current Core pin unifies desktop cancellation, tracking-failure and shutdown
+requests with the executor's stop contract. The previous requests omitted the
+mandatory `world_paused` flag and contained fields the evidence reader rejected.
+The repaired path retains the first safety stop, including a paused-world state,
+and does not describe sending a stop request as proof of landing.
+
+Package assembly and installer preflight now actually execute every expert's
+required outputs using bounded, synthetic interface inputs. They check current
+tensor dimensions, float32 values, finiteness, risk/scale bounds and four-axis
+control bounds using the same output validators as live inference. Probe inputs
+never enter control history or a training dataset and grant no flight authority.
+440 focused Core regressions passed; lint, 68 exported schemas and seven shared
+Runtime files also passed. All 419 distribution regressions passed with this
+Core pin. These results do not attest trained model quality.
+
+The maintainer requested manual flight acceptance rather than further automatic
+flight runs. The last started collection was stopped before arming and all of its
+resources were closed. No new collection, model promotion or installed desktop
+replacement has been performed since that request. A compatible trained model
+bundle is still absent, and the read-only signing check still reports missing
+SignPath configuration. Source fixes are not advertised as a completed installer
+update; further data collection requires the maintainer's direction.

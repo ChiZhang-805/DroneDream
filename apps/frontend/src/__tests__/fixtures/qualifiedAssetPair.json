@@ -1,0 +1,176 @@
+{
+  "evidence": {
+    "schema_version": "dronedream.asset-qualification-evidence.v1",
+    "job_id": "asset-qualification-job-008785030e3b69b88338deda",
+    "qualification_id": "asset-qualification-9968cd42eaf394ff55ce5792",
+    "map_asset_id": "dronedream.school-map.v1",
+    "map_content_sha256": "bc88b79228ec7ae4c974957b6b692d7941607885c5489fc1d9f5f925dba10f2d",
+    "vehicle_asset_id": "dronedream.my-drone.v1",
+    "vehicle_content_sha256": "7be3c22e426acf7f0f794a6d8a8de6fb839544fd2362e2ede96b68e98f6419fd",
+    "evidence_sha256": "1b63265a27d66d4d3dae0d918349d2b08816383e241f1f9a35df4992029713fa",
+    "receipt": {
+      "schema_version": "dronedream.asset-pair-qualification-receipt.v1",
+      "qualification_id": "asset-qualification-9968cd42eaf394ff55ce5792",
+      "status": "verified",
+      "map_asset_id": "dronedream.school-map.v1",
+      "map_content_sha256": "f5e6e1e2d7997c2bac1fd12274774ccccf412903eb0e4a4d58a85792341cacde",
+      "vehicle_asset_id": "dronedream.my-drone.v1",
+      "vehicle_content_sha256": "cc576b3000346dfeb7b8cf91a6e8353db57c3b9c9460d19a790d07513ad8c4e9",
+      "environment_versions": {
+        "gazebo_sim": "8.14.0",
+        "px4_commit": "6ea3539157ca358c70a515878b77077af7d4611d",
+        "ros_distribution": "jazzy",
+        "runtime_manifest_sha256": "7A5EDA6F65A26E8616D379C5F7E695F3BF10F3E060FB9C180C0E8FEA115E977F"
+      },
+      "runtime_evidence_sha256": "41e5b9ef097ec4b6dcbf0a42b4e4f63d56c541a3b28423e98c87f7ac63ba7e67",
+      "qualified_at": "2026-09-06T13:06:17.942112Z",
+      "runtime_evidence": {
+        "schema_version": "dronedream.default-assets-real-gazebo-px4.v1",
+        "status": "verified",
+        "gates": {
+          "executor_completed": true,
+          "goal_observed": true,
+          "landing_confirmed": true,
+          "native_terminal_lifecycle_published": true,
+          "no_live_abort": true,
+          "offboard_timing_complete": true,
+          "px4_ulog_present": true,
+          "ros_observations_present": true,
+          "runtime_pose_samples_present": true,
+          "static_route_clearance_bound": true
+        }
+      }
+    },
+    "runtime_contracts": {
+      "schema_version": "dronedream.asset-pair-runtime-contracts.v1",
+      "map": {
+        "asset_id": "dronedream.school-map.v1",
+        "content_sha256": "bc88b79228ec7ae4c974957b6b692d7941607885c5489fc1d9f5f925dba10f2d",
+        "coordinate_frame": "ENU",
+        "node_count": 59,
+        "edge_count": 65,
+        "named_entity_count": 8,
+        "navigation_bounds_m": {
+          "minimum": {
+            "x": -55.6,
+            "y": -43,
+            "z": 1.0499999999999998
+          },
+          "maximum": {
+            "x": 52,
+            "y": 35.4,
+            "z": 8.27
+          },
+          "span": {
+            "x": 107.6,
+            "y": 78.4,
+            "z": 7.22
+          }
+        },
+        "semantic_layers": [
+          "navigation",
+          "collision"
+        ],
+        "simulation_targets": [
+          {
+            "target_id": "gazebo-harmonic",
+            "simulator": "gazebo-harmonic",
+            "simulator_version": "runtime-detected",
+            "ros_distribution": null,
+            "autopilot": "none",
+            "entrypoint": "normalized/map/gazebo/world.sdf"
+          }
+        ]
+      },
+      "vehicle": {
+        "schema_version": "dronedream.vehicle.v1",
+        "asset_id": "dronedream.my-drone.v1",
+        "name": "My Drone",
+        "coordinate_frame": "base_link_frd",
+        "dry_mass_kg": 2.1253076923076923,
+        "max_takeoff_mass_kg": 2.1653076923076924,
+        "body_radius_m": 0.38,
+        "body_height_m": 0.43,
+        "collision_center_offset_model_m": {
+          "x": 0,
+          "y": 0,
+          "z": 0.228
+        },
+        "max_speed_mps": 1.2,
+        "max_acceleration_mps2": 0.8,
+        "qualified_range_m": 413.2125080792488,
+        "reserve_battery_percent": 30,
+        "max_pickup_payload_kg": 0.04,
+        "sensors": [
+          "imu",
+          "magnetometer",
+          "barometer",
+          "gps",
+          "odometry",
+          "oakd-lite-depth"
+        ],
+        "content_sha256": "7be3c22e426acf7f0f794a6d8a8de6fb839544fd2362e2ede96b68e98f6419fd",
+        "vehicle_class": "multirotor",
+        "simulation_targets": [
+          {
+            "target_id": "gazebo-harmonic",
+            "simulator": "gazebo-harmonic",
+            "simulator_version": "runtime-detected",
+            "ros_distribution": null,
+            "autopilot": "px4",
+            "entrypoint": "normalized/vehicle/gazebo/model.sdf"
+          }
+        ]
+      }
+    }
+  },
+  "job": {
+    "schema_version": "dronedream.asset-pair-qualification-job.v1",
+    "job_id": "asset-qualification-job-008785030e3b69b88338deda",
+    "owner_id": "bundled-release",
+    "map_asset_id": "dronedream.school-map.v1",
+    "map_content_sha256": "f5e6e1e2d7997c2bac1fd12274774ccccf412903eb0e4a4d58a85792341cacde",
+    "vehicle_asset_id": "dronedream.my-drone.v1",
+    "vehicle_content_sha256": "cc576b3000346dfeb7b8cf91a6e8353db57c3b9c9460d19a790d07513ad8c4e9",
+    "state": "qualified",
+    "progress_percent": 100,
+    "revision": 1,
+    "qualification_id": "asset-qualification-9968cd42eaf394ff55ce5792",
+    "result_map_content_sha256": "bc88b79228ec7ae4c974957b6b692d7941607885c5489fc1d9f5f925dba10f2d",
+    "result_vehicle_content_sha256": "7be3c22e426acf7f0f794a6d8a8de6fb839544fd2362e2ede96b68e98f6419fd",
+    "issue_codes": [],
+    "cancel_requested": false,
+    "created_at": "2026-09-06T13:06:17.942112Z",
+    "updated_at": "2026-09-06T13:06:17.942112Z"
+  },
+  "versions": [
+    {
+      "asset_id": "dronedream.my-drone.v1",
+      "content_sha256": "7be3c22e426acf7f0f794a6d8a8de6fb839544fd2362e2ede96b68e98f6419fd",
+      "kind": "vehicle",
+      "maturity": "qualified",
+      "imported_at": "2026-09-16T16:26:38.637343+08:00",
+      "asset_ir": {
+        "name": "My Drone",
+        "source": {
+          "application": "DroneDream",
+          "source_format": "ddpkg"
+        }
+      }
+    },
+    {
+      "asset_id": "dronedream.school-map.v1",
+      "content_sha256": "bc88b79228ec7ae4c974957b6b692d7941607885c5489fc1d9f5f925dba10f2d",
+      "kind": "map",
+      "maturity": "qualified",
+      "imported_at": "2026-09-16T16:26:38.634809+08:00",
+      "asset_ir": {
+        "name": "School Map",
+        "source": {
+          "application": "DroneDream",
+          "source_format": "ddpkg"
+        }
+      }
+    }
+  ]
+}

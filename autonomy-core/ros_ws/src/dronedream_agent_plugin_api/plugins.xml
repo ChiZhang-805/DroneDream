@@ -1,8 +1,0 @@
-<library path="dronedream_runtime_plugins">
-  <class
-    name="dronedream_agent_plugin_api/SafeHoldCapability"
-    type="dronedream_agent_plugin_api::SafeHoldCapability"
-    base_class_type="dronedream_agent_plugin_api::CapabilityPlugin">
-    <description>Certified reversible safe-hold policy capability.</description>
-  </class>
-</library>

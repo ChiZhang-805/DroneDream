@@ -29,10 +29,10 @@ jobs:
         with:
           python-version: "3.11"
           cache: pip
-          cache-dependency-path: backend/pyproject.toml
+          cache-dependency-path: services/backend/pyproject.toml
 
       - name: Install backend quality dependencies
-        working-directory: backend
+        working-directory: services/backend
         run: |
           python -m pip install --disable-pip-version-check \
             --editable ".[dev]" \
@@ -41,63 +41,24 @@ jobs:
             --editable "../worker[dev]"
 
       - name: Validate repository-owned text, JSON, and Markdown links
-        run: python scripts/check-repository.py
+        run: python tools/check-repository.py
 
       - name: Lint, type-check, and test backend
-        working-directory: backend
+        working-directory: services/backend
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: |
           python -m ruff check app tests alembic scripts ../worker \
-            ../scripts/check-repository.py ../scripts/simulators
-          python -m ruff check app ../worker/drone_dream_worker \
-            ../scripts/simulators --select S
-          python -m ruff format --check ../scripts/check-repository.py \
-            ../scripts/simulators
+            ../../tools/check-repository.py ../../tools/simulators
+          python -m ruff check app ../../services/worker/drone_dream_worker \
+            ../../tools/simulators --select S
+          python -m ruff format --check ../../tools/check-repository.py \
+            ../../tools/simulators
           python -m mypy app
-          python -m mypy ../worker/drone_dream_worker
+          python -m mypy ../../services/worker/drone_dream_worker
           python -m compileall -q app tests alembic scripts ../worker \
-            ../scripts/check-repository.py ../scripts/simulators
+            ../../tools/check-repository.py ../../tools/simulators
           python -m pytest
-
-  autonomy-core:
-    name: AUTONOMY / Harness and plugins
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    steps:
-      - name: Check out source
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-
-      - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: autonomy-core/pyproject.toml
-
-      - name: Install AUTONOMY quality dependencies
-        working-directory: autonomy-core
-        run: |
-          python -m pip install --disable-pip-version-check \
-            --editable ".[dev]" \
-            "ruff==0.15.21" "pytest==9.1.1"
-
-      - name: Lint and test the promoted Harness
-        working-directory: autonomy-core
-        run: |
-          python -m ruff check src tests scripts
-          python -m ruff format --check src tests scripts
-          python -m compileall -q src tests scripts
-          python -m pytest
-
-      - name: Validate ROS 2 shell entrypoints
-        shell: bash
-        run: |
-          set -euo pipefail
-          find autonomy-core/scripts -type f -name '*.sh' -print0 \
-            | xargs -0 -n1 bash -n
 
   frontend:
     name: Frontend / Node.js 22
@@ -120,34 +81,34 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: apps/frontend/package-lock.json
 
       - name: Validate exact allowance-cycle contract
-        run: node scripts/verify-exact-30-day-allowance.mjs
+        run: node tools/verify-exact-30-day-allowance.mjs
 
       - name: Install frontend dependencies
-        run: npm ci --prefix frontend
+        run: npm ci --prefix apps/frontend
 
       - name: Lint, type-check, test, and build frontend
         env:
           CI: "true"
         run: |
-          npm --prefix frontend run audit:dependencies
-          npm --prefix desktop audit --audit-level=high
-          npm --prefix frontend run lint
-          npm --prefix frontend run typecheck
-          npm --prefix frontend run test -- --testTimeout 15000
-          npm --prefix frontend run build
-          npm --prefix frontend run site:build
+          npm --prefix apps/frontend run audit:dependencies
+          npm --prefix apps/desktop audit --audit-level=high
+          npm --prefix apps/frontend run lint
+          npm --prefix apps/frontend run typecheck
+          npm --prefix apps/frontend run test -- --testTimeout 15000
+          npm --prefix apps/frontend run build
+          npm --prefix apps/frontend run site:build
 
       - name: Install Chromium for the public-site visual contract
-        run: npx --prefix frontend playwright install --with-deps chromium
+        run: npx --prefix apps/frontend playwright install --with-deps chromium
 
       - name: Enforce bilingual copy rhythm and responsive layout
         shell: bash
         run: |
           set -euo pipefail
-          npm --prefix frontend run site:preview -- --host 127.0.0.1 --port 4174 >"$RUNNER_TEMP/dronedream-site-preview.log" 2>&1 &
+          npm --prefix apps/frontend run site:preview -- --host 127.0.0.1 --port 4174 >"$RUNNER_TEMP/dronedream-site-preview.log" 2>&1 &
           preview_pid=$!
           trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
           for attempt in {1..30}; do
@@ -164,9 +125,35 @@ jobs:
             fi
             sleep 1
           done
-          node website/scripts/audit-site-typography.mjs http://127.0.0.1:4174/site.html 1440 1000 0.80 "$RUNNER_TEMP/site-audit-1440.json"
-          node website/scripts/audit-site-typography.mjs http://127.0.0.1:4174/site.html 2048 1280 0.80 "$RUNNER_TEMP/site-audit-2048.json"
-          node website/scripts/audit-site-typography.mjs http://127.0.0.1:4174/site.html 390 844 0.80 "$RUNNER_TEMP/site-audit-mobile.json" layout-only
+          node release/website/scripts/audit-site-typography.mjs http://127.0.0.1:4174/site.html 1440 1000 0.80 "$RUNNER_TEMP/site-audit-1440.json"
+          node release/website/scripts/audit-site-typography.mjs http://127.0.0.1:4174/site.html 2048 1280 0.80 "$RUNNER_TEMP/site-audit-2048.json"
+          node release/website/scripts/audit-site-typography.mjs http://127.0.0.1:4174/site.html 390 844 0.80 "$RUNNER_TEMP/site-audit-mobile.json" layout-only
+
+  supabase-contracts:
+    name: Supabase / Deno 2.9.6
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.9.6
+
+      - name: Type-check and test account, memory, usage, and Edge Function contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' tests < <(find services/supabase/functions services/supabase/tests -type f -name '*.test.ts' -print0)
+          if (( ${#tests[@]} == 0 )); then
+            echo "No Supabase contract tests were found" >&2
+            exit 1
+          fi
+          deno test --allow-env --allow-net --allow-read "${tests[@]}"
 
   repository-contracts:
     name: Repository contracts / Windows
@@ -185,24 +172,24 @@ jobs:
           python-version: "3.11"
           cache: pip
           cache-dependency-path: |
-            backend/pyproject.toml
-            worker/pyproject.toml
+            services/backend/pyproject.toml
+            services/worker/pyproject.toml
 
       - name: Install repository-contract dependencies
         shell: pwsh
         run: |
           python -m pip install --disable-pip-version-check `
-            --editable "./backend[dev]" `
-            --editable "./worker[dev]" `
+            --editable "./services/backend[dev]" `
+            --editable "./services/worker[dev]" `
             "pytest==9.1.1"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Test cross-edition and Windows build contracts
         shell: pwsh
         run: |
-          $env:PYTHONPATH = "$PWD\worker;$PWD"
-          python -m pytest brand/tests distribution/tests engine-pack/tests `
-            runtime/tests -q
+          $env:PYTHONPATH = "$PWD\services\worker;$PWD"
+          python -m pytest shared/brand/tests release/distribution/tests platform/engine-pack/tests `
+            platform/runtime/tests -q
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   runtime-contract:
@@ -220,34 +207,34 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-          cache-dependency-path: runtime/locks/release-tools-requirements.lock
+          cache-dependency-path: platform/runtime/locks/release-tools-requirements.lock
 
       - name: Install Runtime contract dependencies
         run: |
           python -m pip install --disable-pip-version-check \
-            --requirement runtime/locks/release-tools-requirements.lock \
+            --requirement platform/runtime/locks/release-tools-requirements.lock \
             "ruff==0.15.21" "pip-audit==2.10.1" "pytest==9.1.1"
 
       - name: Audit locked Python dependencies
         run: |
           python -m pip_audit \
-            --requirement deploy/requirements.backend.lock \
+            --requirement release/deploy/requirements.backend.lock \
             --disable-pip --strict
           python -m pip_audit \
-            --requirement runtime/locks/python-requirements.lock \
+            --requirement platform/runtime/locks/python-requirements.lock \
             --no-deps --disable-pip --strict
 
       - name: Validate Runtime Python and manifests
         run: |
-          python -m ruff check runtime/tools runtime/tests runtime/scripts scripts/simulators
-          python -m ruff check runtime/tools runtime/scripts scripts/simulators --select S
-          python -m ruff format --check runtime/tools runtime/tests runtime/scripts \
-            scripts/simulators
-          python -m compileall -q runtime/tools runtime/tests runtime/scripts scripts/simulators
-          python runtime/tools/runtime_manifest.py validate-config \
-            --pins runtime/pins.env \
-            --python-lock runtime/locks/python-requirements.lock
-          python -m pytest runtime/tests -q
+          python -m ruff check platform/runtime/tools platform/runtime/tests platform/runtime/scripts tools/simulators
+          python -m ruff check platform/runtime/tools platform/runtime/scripts tools/simulators --select S
+          python -m ruff format --check platform/runtime/tools platform/runtime/tests platform/runtime/scripts \
+            tools/simulators
+          python -m compileall -q platform/runtime/tools platform/runtime/tests platform/runtime/scripts tools/simulators
+          python platform/runtime/tools/runtime_manifest.py validate-config \
+            --pins platform/runtime/pins.env \
+            --python-lock platform/runtime/locks/python-requirements.lock
+          python -m pytest platform/runtime/tests -q
 
       - name: Validate every Runtime shell script
         shell: bash
@@ -290,8 +277,8 @@ jobs:
             ~/.cargo/registry/cache
             ~/.cargo/git/db
             ~/.cargo/bin/cargo-audit.exe
-            desktop/src-tauri/target
-          key: ${{ runner.os }}-rust-1.97.0-audit-0.22.2-${{ hashFiles('desktop/src-tauri/Cargo.lock') }}
+            apps/desktop/src-tauri/target
+          key: ${{ runner.os }}-rust-1.97.0-audit-0.22.2-${{ hashFiles('apps/desktop/src-tauri/Cargo.lock') }}
 
       - name: Audit desktop Rust dependencies
         shell: pwsh
@@ -302,7 +289,7 @@ jobs:
             cargo install cargo-audit --version 0.22.2 --locked
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           }
-          cargo audit --file desktop/src-tauri/Cargo.lock
+          cargo audit --file apps/desktop/src-tauri/Cargo.lock
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Format, lint, and test desktop Rust
@@ -310,18 +297,18 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
           $PSNativeCommandUseErrorActionPreference = $true
-          cargo fmt --all --manifest-path desktop/src-tauri/Cargo.toml -- --check
+          cargo fmt --all --manifest-path apps/desktop/src-tauri/Cargo.toml -- --check
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo clippy --locked --manifest-path desktop/src-tauri/Cargo.toml `
+          cargo clippy --locked --manifest-path apps/desktop/src-tauri/Cargo.toml `
             --all-targets -- -D warnings
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          cargo test --locked --manifest-path desktop/src-tauri/Cargo.toml `
+          cargo test --locked --manifest-path apps/desktop/src-tauri/Cargo.toml `
             --all-targets
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify installer ownership and uninstall contracts
         shell: pwsh
-        run: ./desktop/scripts/verify-nsis-template.ps1
+        run: ./apps/desktop/scripts/verify-nsis-template.ps1
 
   deployment-images:
     name: Deployment / Hardened images
@@ -338,9 +325,9 @@ jobs:
           grep -qxF '**/target' .dockerignore
           grep -qxF '**/.env*' .dockerignore
           grep -qxF '**/.ssh' .dockerignore
-          find website/scripts -type f -name '*.sh' -print0 \
+          find release/website/scripts -type f -name '*.sh' -print0 \
             | xargs -0 -n1 bash -n
-          node --check website/scripts/capture-site.mjs
+          node --check release/website/scripts/capture-site.mjs
 
       - name: Verify production configuration fails closed without secrets
         run: |
@@ -386,9 +373,9 @@ jobs:
 
       - name: Build and inspect API and worker images
         run: |
-          docker build --file deploy/Dockerfile.backend --target api \
+          docker build --file release/deploy/Dockerfile.backend --target api \
             --tag dronedream-api:quality-gate .
-          docker build --file deploy/Dockerfile.backend --target worker \
+          docker build --file release/deploy/Dockerfile.backend --target worker \
             --tag dronedream-worker:quality-gate .
           docker run --rm --entrypoint sh dronedream-api:quality-gate -c \
             'test "$(id -u)" = 10001 && python -c "import app.main"'
@@ -397,16 +384,16 @@ jobs:
 
       - name: Build and validate frontend image
         run: |
-          docker build --file deploy/Dockerfile.frontend \
+          docker build --file release/deploy/Dockerfile.frontend \
             --build-arg VITE_DEMO_AUTH_TOKEN=quality-gate-only \
             --tag dronedream-frontend:quality-gate .
           docker run --rm --add-host api:127.0.0.1 --entrypoint nginx \
             dronedream-frontend:quality-gate -t
           docker run --rm --entrypoint nginx \
             --tmpfs /www/wwwlogs \
-            --volume "$PWD/website/nginx/baota/dronedream-public.conf:/etc/nginx/conf.d/default.conf:ro" \
+            --volume "$PWD/release/website/nginx/baota/dronedream-public.conf:/etc/nginx/conf.d/default.conf:ro" \
             dronedream-frontend:quality-gate -t
           docker run --rm --entrypoint nginx \
             --tmpfs /www/wwwlogs \
-            --volume "$PWD/website/nginx/baota/dronedream-staging.conf:/etc/nginx/conf.d/default.conf:ro" \
+            --volume "$PWD/release/website/nginx/baota/dronedream-staging.conf:/etc/nginx/conf.d/default.conf:ro" \
             dronedream-frontend:quality-gate -t

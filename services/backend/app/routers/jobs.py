@@ -1,0 +1,749 @@
+"""Job-related routes under /api/v1."""
+
+from __future__ import annotations
+
+import csv
+import io
+import json
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
+from fastapi.responses import PlainTextResponse
+from sqlalchemy.orm import Session
+
+from app import models, schemas
+from app.api_idempotency import begin_mutation, inspect_mutation
+from app.auth import get_current_user
+from app.benchmarking.physical_stability_job_evidence import (
+    compile_physical_stability_job_evidence,
+)
+from app.db import get_db
+from app.orchestration.experience_memory import (
+    HARNESS_EXPERIENCE_MEMORY_SCHEMA_VERSION,
+    HARNESS_EXPERIENCE_RETENTION_DAYS,
+    HARNESS_EXPERIENCE_RETRIEVAL_POLICY_VERSION,
+    revoke_cross_job_experiences,
+)
+from app.orchestration.winner_freeze import (
+    WinnerFreezeError,
+    require_winner_freeze_receipt,
+)
+from app.response import ok
+from app.services import jobs as job_service
+
+router = APIRouter(tags=["jobs"])
+
+_PageQ = Query(1, ge=1)
+_PageSizeQ = Query(20, ge=1, le=200)
+_TrialPageSizeQ = Query(200, ge=1, le=500)
+_StatusQ: schemas.JobStatus | None = Query(None)
+
+
+def _raise(err: job_service.JobServiceError) -> None:
+    """Preserve the service's ownership/state error classification at the HTTP boundary."""
+    raise HTTPException(
+        status_code=err.http_status,
+        detail={"code": err.code, "message": err.message},
+    )
+
+
+def _job_payload_with_alias(job_schema: schemas.Job) -> dict[str, object]:
+    """Serialize a Job and include a ``job_id`` alias equal to ``id``.
+
+    The canonical field is ``id`` (matches the rest of the API surface and
+    what the frontend reads). The ``job_id`` alias is preserved on
+    create/rerun responses for backward compatibility with older clients
+    that expected the original ``04_API_SPEC.md`` wording.
+    """
+
+    payload = job_schema.model_dump(mode="json")
+    payload["job_id"] = payload["id"]
+    return payload
+
+
+@router.post("/jobs")
+def create_job(
+    req: schemas.JobCreateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> dict[str, object]:
+    """Create one owned job and commit its replay receipt in the same transaction."""
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="jobs.create",
+        idempotency_key=idempotency_key,
+        payload=req.model_dump(mode="json"),
+    )
+    if gate.replay is not None:
+        return gate.replay
+    try:
+        job = job_service.create_job(db, req, user=user, commit=False)
+    except job_service.JobServiceError as err:
+        db.rollback()
+        _raise(err)
+    response = ok(_job_payload_with_alias(job_service.to_job_schema(job)))
+    return gate.complete(response, resource_type="job", resource_id=job.id)
+
+
+@router.get("/jobs/physical-stability-dispatches/{idempotency_key}")
+def inspect_physical_stability_dispatch(
+    idempotency_key: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Inspect a P5 create receipt without replaying the original POST."""
+
+    try:
+        parsed_key = UUID(idempotency_key)
+    except ValueError:
+        parsed_key = None
+    if parsed_key is None or parsed_key.version != 5 or str(parsed_key) != idempotency_key:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "PHYSICAL_STABILITY_IDEMPOTENCY_KEY_INVALID",
+                "message": "The dispatch key is not a canonical P5 version-5 UUID.",
+            },
+        )
+    inspection = inspect_mutation(
+        db,
+        user=user,
+        operation="jobs.create",
+        idempotency_key=idempotency_key,
+    )
+    payload: dict[str, object] = {
+        "schema_id": "dronedream.physical-stability-dispatch-inspection/v1",
+        "state": inspection.state,
+        "idempotency_key_sha256": inspection.idempotency_key_sha256,
+        "mutation_request_sha256": inspection.request_hash,
+        "observed_job_id": None,
+    }
+    if inspection.state == "completed":
+        if (
+            inspection.resource_type != "job"
+            or inspection.resource_id is None
+            or inspection.response_status != 200
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "PHYSICAL_STABILITY_DISPATCH_RECEIPT_INVALID",
+                    "message": "The dispatch receipt does not bind a Job.",
+                },
+            )
+        try:
+            job = job_service.get_job(db, inspection.resource_id, user=user)
+        except job_service.JobServiceError as err:
+            _raise(err)
+        payload["observed_job_id"] = job.id
+    return ok(payload)
+
+
+@router.get("/jobs")
+def list_jobs(
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+    page: int = _PageQ,
+    page_size: int = _PageSizeQ,
+    status: schemas.JobStatus | None = _StatusQ,
+) -> dict[str, object]:
+    """Return an owner-scoped page with a total computed by the same service filter."""
+    try:
+        items, total = job_service.list_jobs(
+            db, user=user, page=page, page_size=page_size, status=status
+        )
+    except job_service.JobServiceError as err:
+        _raise(err)
+
+    page_data = schemas.PaginatedJobs(
+        items=[job_service.to_job_schema(j) for j in items],
+        page=page,
+        page_size=page_size,
+        total=total,
+    )
+    return ok(page_data.model_dump(mode="json"))
+
+
+@router.post("/jobs/compare")
+def compare_jobs(
+    req: schemas.JobsCompareRequest,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Compare only authorized jobs; this read-only operation does not rerun them."""
+    try:
+        data = job_service.compare_jobs(db, req, user=user)
+    except job_service.JobServiceError as err:
+        _raise(err)
+    return ok(data.model_dump(mode="json"))
+
+
+@router.get("/jobs/compare.csv", response_class=PlainTextResponse)
+def compare_jobs_csv(
+    job_ids: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+) -> PlainTextResponse:
+    """Serialize the same authorized comparison into CSV with proper field escaping."""
+    req = schemas.JobsCompareRequest(job_ids=[item for item in job_ids.split(",") if item])
+    try:
+        data = job_service.compare_jobs(db, req, user=user)
+    except job_service.JobServiceError as err:
+        _raise(err)
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        [
+            "job_id",
+            "status",
+            "track_type",
+            "simulator_backend",
+            "optimizer_strategy",
+            "optimization_outcome",
+            "baseline_metrics",
+            "optimized_metrics",
+            "best_parameters",
+            "trial_count",
+            "completed_trial_count",
+            "failed_trial_count",
+            "best_candidate_id",
+            "created_at",
+            "completed_at",
+        ]
+    )
+    for item in data.items:
+        writer.writerow(
+            [
+                item.job_id,
+                item.status,
+                item.track_type,
+                item.simulator_backend,
+                item.optimizer_strategy,
+                item.optimization_outcome or "",
+                json.dumps(item.baseline_metrics) if item.baseline_metrics is not None else "",
+                json.dumps(item.optimized_metrics) if item.optimized_metrics is not None else "",
+                json.dumps(item.best_parameters),
+                item.trial_count,
+                item.completed_trial_count,
+                item.failed_trial_count,
+                item.best_candidate_id or "",
+                item.created_at.isoformat(),
+                item.completed_at.isoformat() if item.completed_at is not None else "",
+            ]
+        )
+    return PlainTextResponse(buf.getvalue(), media_type="text/csv")
+
+
+@router.get("/jobs/{job_id}")
+def get_job(
+    job_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Resolve caller ownership before exposing state, inputs or result metadata."""
+    try:
+        job = job_service.get_job(db, job_id, user=user)
+    except job_service.JobServiceError as err:
+        _raise(err)
+    return ok(job_service.to_job_schema(job).model_dump(mode="json"))
+
+
+@router.get("/jobs/{job_id}/physical-stability-evidence")
+def get_physical_stability_evidence(
+    job_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Return server-derived, byte-verified P5 terminal evidence only."""
+
+    try:
+        job = job_service.get_job(db, job_id, user=user)
+        evidence = compile_physical_stability_job_evidence(job)
+    except job_service.JobServiceError as err:
+        _raise(err)
+    except ValueError as err:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "PHYSICAL_STABILITY_EVIDENCE_NOT_READY",
+                "message": "Physical stability evidence is incomplete or invalid.",
+            },
+        ) from err
+    return ok(evidence.model_dump(mode="json"))
+
+
+@router.patch("/jobs/{job_id}")
+def update_job(
+    job_id: str,
+    req: schemas.JobUpdateRequest,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    control_version: Annotated[
+        int | None,
+        Query(alias="control_version", ge=1),
+    ] = None,
+) -> dict[str, object]:
+    """Apply a version-checked mutation; commit=False lets the replay gate own the commit."""
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="jobs.update",
+        idempotency_key=idempotency_key,
+        payload={
+            "job_id": job_id,
+            "control_version": control_version,
+            "request": req.model_dump(mode="json"),
+        },
+    )
+    if gate.replay is not None:
+        return gate.replay
+    try:
+        job = job_service.update_job(
+            db,
+            job_id,
+            req,
+            user=user,
+            commit=False,
+            expected_control_version=control_version,
+        )
+    except job_service.JobServiceError as err:
+        db.rollback()
+        _raise(err)
+    response = ok(job_service.to_job_schema(job).model_dump(mode="json"))
+    return gate.complete(response, resource_type="job", resource_id=job.id)
+
+
+@router.post("/jobs/{job_id}/rerun")
+def rerun_job(
+    job_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+    req: schemas.JobRerunRequest | None = None,
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> dict[str, object]:
+    """Create a separate run from an owned source, with explicitly supplied model access."""
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="jobs.rerun",
+        idempotency_key=idempotency_key,
+        payload={
+            "job_id": job_id,
+            "request": req.model_dump(mode="json") if req is not None else None,
+        },
+    )
+    if gate.replay is not None:
+        return gate.replay
+    try:
+        job = job_service.rerun_job(
+            db,
+            job_id,
+            user=user,
+            openai=(req.openai if req else None),
+            llm=(req.llm if req else None),
+            commit=False,
+        )
+    except job_service.JobServiceError as err:
+        db.rollback()
+        _raise(err)
+    response = ok(_job_payload_with_alias(job_service.to_job_schema(job)))
+    return gate.complete(response, resource_type="job", resource_id=job.id)
+
+
+@router.post("/jobs/{job_id}/continue-exploration")
+def continue_exploration(
+    job_id: str,
+    req: schemas.ContinueExplorationRequest,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    control_version: Annotated[
+        int | None,
+        Query(alias="control_version", ge=1),
+    ] = None,
+) -> dict[str, object]:
+    """Create a child exploration from current parent evidence without overwriting its history."""
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="jobs.continue_exploration",
+        idempotency_key=idempotency_key,
+        payload={
+            "job_id": job_id,
+            "control_version": control_version,
+            "request": req.model_dump(mode="json"),
+        },
+    )
+    if gate.replay is not None:
+        return gate.replay
+    try:
+        child = job_service.continue_exploration(
+            db,
+            job_id,
+            req,
+            user=user,
+            expected_control_version=control_version,
+            commit=False,
+        )
+    except job_service.JobServiceError as err:
+        db.rollback()
+        _raise(err)
+    response = ok(_job_payload_with_alias(job_service.to_job_schema(child)))
+    return gate.complete(response, resource_type="job", resource_id=child.id)
+
+
+@router.post("/jobs/{job_id}/cancel")
+def cancel_job(
+    job_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    control_version: Annotated[
+        int | None,
+        Query(alias="control_version", ge=1),
+    ] = None,
+) -> dict[str, object]:
+    """Persist cancellation intent with stale-control protection, not an immediate motor command."""
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="jobs.cancel",
+        idempotency_key=idempotency_key,
+        payload={"job_id": job_id, "control_version": control_version},
+    )
+    if gate.replay is not None:
+        return gate.replay
+    try:
+        job = job_service.cancel_job(
+            db,
+            job_id,
+            user=user,
+            commit=False,
+            expected_control_version=control_version,
+        )
+    except job_service.JobServiceError as err:
+        db.rollback()
+        _raise(err)
+    response = ok(job_service.to_job_schema(job).model_dump(mode="json"))
+    return gate.complete(response, resource_type="job", resource_id=job.id)
+
+
+@router.delete("/jobs/{job_id}")
+def delete_job(
+    job_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+    control_version: Annotated[
+        int | None,
+        Query(alias="control_version", ge=1),
+    ] = None,
+) -> dict[str, object]:
+    """Commit owned metadata deletion before attempting cleanup of its artifact payloads."""
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="jobs.delete",
+        idempotency_key=idempotency_key,
+        payload={"job_id": job_id, "control_version": control_version},
+    )
+    if gate.replay is not None:
+        return gate.replay
+    deferred_artifact_cleanup: list[job_service.DeletedArtifactPayload] = []
+    try:
+        payload = job_service.delete_job(
+            db,
+            job_id,
+            user=user,
+            commit=False,
+            expected_control_version=control_version,
+            deferred_artifact_cleanup=deferred_artifact_cleanup,
+        )
+    except job_service.JobServiceError as err:
+        db.rollback()
+        _raise(err)
+    response = ok(payload)
+    committed_response = gate.complete(
+        response,
+        resource_type="job",
+        resource_id=job_id,
+    )
+    # Files cannot be rolled back with SQL. Never erase them before metadata and
+    # the idempotency receipt commit successfully.
+    job_service.cleanup_deleted_job_artifacts(deferred_artifact_cleanup)
+    return committed_response
+
+
+@router.delete("/jobs/{job_id}/harness-experiences")
+def revoke_job_harness_experiences(
+    job_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> dict[str, object]:
+    """Revoke retrievable cross-Job observations sourced from one owned Job."""
+
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="harness_experiences.revoke_job",
+        idempotency_key=idempotency_key,
+        payload={"job_id": job_id},
+    )
+    if gate.replay is not None:
+        return gate.replay
+    try:
+        job = job_service.get_job(db, job_id, user=user)
+    except job_service.JobServiceError as err:
+        db.rollback()
+        _raise(err)
+    revoked = revoke_cross_job_experiences(
+        db,
+        user_id=user.id,
+        source_job_id=job.id,
+    )
+    response = ok(
+        {
+            "job_id": job.id,
+            "revoked_count": revoked,
+            "memory_schema_version": HARNESS_EXPERIENCE_MEMORY_SCHEMA_VERSION,
+            "retrieval_policy_version": (
+                HARNESS_EXPERIENCE_RETRIEVAL_POLICY_VERSION
+            ),
+            "retention_days": HARNESS_EXPERIENCE_RETENTION_DAYS,
+        }
+    )
+    return gate.complete(
+        response,
+        resource_type="harness_experience_memory",
+        resource_id=job.id,
+    )
+
+
+@router.delete("/harness-experiences")
+def revoke_all_harness_experiences(
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> dict[str, object]:
+    """Revoke every still-active cross-Job observation owned by the caller."""
+
+    gate = begin_mutation(
+        db,
+        user=user,
+        operation="harness_experiences.revoke_all",
+        idempotency_key=idempotency_key,
+        payload={},
+    )
+    if gate.replay is not None:
+        return gate.replay
+    revoked = revoke_cross_job_experiences(db, user_id=user.id)
+    response = ok(
+        {
+            "revoked_count": revoked,
+            "memory_schema_version": HARNESS_EXPERIENCE_MEMORY_SCHEMA_VERSION,
+            "retrieval_policy_version": (
+                HARNESS_EXPERIENCE_RETRIEVAL_POLICY_VERSION
+            ),
+            "retention_days": HARNESS_EXPERIENCE_RETENTION_DAYS,
+        }
+    )
+    return gate.complete(
+        response,
+        resource_type="harness_experience_memory",
+        resource_id=user.id,
+    )
+
+
+@router.get("/jobs/{job_id}/trials")
+def list_job_trials(
+    job_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+    response: Response,
+    page: int = _PageQ,
+    page_size: int = _TrialPageSizeQ,
+) -> dict[str, object]:
+    """Paginate an owned job's trials, preserving list compatibility via pagination headers."""
+    try:
+        trials, total = job_service.list_job_trials(
+            db,
+            job_id,
+            user=user,
+            page=page,
+            page_size=page_size,
+        )
+    except job_service.JobServiceError as err:
+        _raise(err)
+    response.headers["X-Total-Count"] = str(total)
+    response.headers["X-Page"] = str(page)
+    response.headers["X-Page-Size"] = str(page_size)
+    summaries = [job_service.to_trial_summary(t) for t in trials]
+    return ok([s.model_dump(mode="json") for s in summaries])
+
+
+@router.get("/jobs/{job_id}/candidates")
+def list_job_candidates(
+    job_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Return every generation plus constraint-aware Pareto recommendations."""
+
+    try:
+        job = job_service.get_job(db, job_id, user=user)
+    except job_service.JobServiceError as err:
+        _raise(err)
+    history = job_service.optimization_history(job)
+    return ok(history.model_dump(mode="json"))
+
+
+@router.get("/jobs/{job_id}/report")
+def get_job_report(
+    job_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """Return a ready owned report, rechecking any bound winner receipt before serialization."""
+    try:
+        job = job_service.get_job(db, job_id, user=user)
+    except job_service.JobServiceError as err:
+        _raise(err)
+
+    # Surface user-readable failure context when the job did not produce a
+    # report. These are all 409 (the job exists, the report simply isn't and
+    # will never be available in this form). See docs/guides/05-api-reference.md.
+    #
+    # FAILED GPT jobs can still have a best-so-far READY report
+    # (e.g. MAX_ITERATIONS_REACHED). Prefer returning that report over
+    # JOB_FAILED when it exists so the UI can render best-so-far metrics
+    # alongside the failure banner.
+    report = job.report
+    has_ready_report = report is not None and report.report_status == "READY"
+
+    if job.status == "FAILED" and not has_ready_report:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "JOB_FAILED",
+                "message": (
+                    job.latest_error_message
+                    or f"Job {job.id} failed before a report could be generated."
+                ),
+                "details": {
+                    "failure_code": job.latest_error_code,
+                    "failure_message": job.latest_error_message,
+                    "failed_at": job.failed_at.isoformat() if job.failed_at else None,
+                },
+            },
+        )
+    if job.status == "CANCELLED":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "JOB_CANCELLED",
+                "message": f"Job {job.id} was cancelled; no report was generated.",
+                "details": {
+                    "cancelled_at": (
+                        job.cancelled_at.isoformat() if job.cancelled_at else None
+                    ),
+                },
+            },
+        )
+
+    if report is None or report.report_status != "READY":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "REPORT_NOT_READY",
+                "message": f"Report for job {job.id} is not ready yet.",
+                "details": {"job_status": job.status},
+            },
+        )
+
+    verified_winner = None
+    if report.winner_freeze_receipt is not None:
+        try:
+            verified_winner = require_winner_freeze_receipt(
+                report.winner_freeze_receipt,
+                job=job,
+                evidence=report.winner_evidence_json,
+            )
+        except WinnerFreezeError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "REPORT_EVIDENCE_INVALID",
+                    "message": (
+                        "Winner freeze receipt no longer matches the report."
+                    ),
+                },
+            ) from exc
+
+    data = schemas.JobReport(
+        job_id=job.id,
+        best_candidate_id=report.best_candidate_id or "",
+        summary_text=report.summary_text or "",
+        baseline_metrics=schemas.AggregatedMetrics(**(report.baseline_metric_json or {})),
+        optimized_metrics=schemas.AggregatedMetrics(**(report.optimized_metric_json or {})),
+        comparison=[
+            schemas.ComparisonPoint(**c) for c in (report.comparison_metric_json or [])
+        ],
+        best_parameters=report.best_parameter_json or {},
+        winner_evidence_id=(
+            verified_winner.evidence_id
+            if verified_winner is not None
+            else (
+                report.winner_evidence_json.get("evidence_id")
+                if isinstance(report.winner_evidence_json, dict)
+                else None
+            )
+        ),
+        winner_freeze_receipt_id=report.winner_freeze_receipt_id,
+        report_status=report.report_status,  # type: ignore[arg-type]
+        created_at=report.created_at,
+        updated_at=report.updated_at,
+    )
+    return ok(data.model_dump(mode="json"))
+
+
+@router.get("/jobs/{job_id}/artifacts")
+def list_job_artifacts(
+    job_id: str,
+    db: Annotated[Session, Depends(get_db)],
+    user: Annotated[models.User, Depends(get_current_user)],
+) -> dict[str, object]:
+    """List job and child-trial artifacts without granting their separate download permission."""
+    try:
+        job = job_service.get_job(db, job_id, user=user)
+    except job_service.JobServiceError as err:
+        _raise(err)
+
+    # Surface both job-scoped artifacts (report/global) AND
+    # trial-scoped artifacts (e.g. trajectory_plot / telemetry_json / worker_log
+    # written by the real_cli simulator adapter). ``owner_type`` and
+    # ``owner_id`` are preserved on the payload so callers can still scope
+    # per-trial. See docs/guides/05-api-reference.md §7.5.
+    trial_ids = [t.id for t in job.trials]
+    artifacts = (
+        db.query(models.Artifact)
+        .filter(
+            (
+                (models.Artifact.owner_type == "job")
+                & (models.Artifact.owner_id == job.id)
+            )
+            | (
+                (models.Artifact.owner_type == "trial")
+                & (models.Artifact.owner_id.in_(trial_ids) if trial_ids else False)
+            )
+        )
+        .order_by(models.Artifact.created_at.desc())
+        .all()
+    )
+    return ok(
+        [job_service.to_artifact_schema(a).model_dump(mode="json") for a in artifacts]
+    )

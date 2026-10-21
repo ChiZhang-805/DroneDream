@@ -1,7 +1,0 @@
-{
-  "schema_version": "dronedream.mission-request.v1",
-  "conversation_id": "school-map-office-takeout-001",
-  "message": "从办公室无人机起降坪起飞，到外卖取餐点取一份外卖，然后把外卖送回办公室起降坪并安全降落。",
-  "start_entity": "办公室无人机起降坪",
-  "locale": "zh-CN"
-}

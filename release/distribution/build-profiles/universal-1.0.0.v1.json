@@ -1,0 +1,188 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-universal-build-profile",
+  "profileVersion": "1.0.0",
+  "productDisplayVersion": "1.0.0",
+  "artifactFileName": "DroneDream-Universal-1.0.0.exe",
+  "tauriConfigOverlay": "apps/desktop/src-tauri/tauri.universal.conf.json",
+  "enginePackProfile": "unified-sim-lab",
+  "enginePackProfileMeaning": "backward-compatible Runtime profile identifier for the full Universal payload",
+  "enginePackPayloadContract": {
+    "contractId": "dronedream-universal-engine-payload/v1",
+    "requiredEditionIds": ["sim", "lab", "field", "autonomy"],
+    "requiredVehiclePackRegistry": "release/distribution/vehicle-packs/registry.v1.json",
+    "requiredSafetyPolicy": "release/distribution/safety/edition-execution-gate.v1.json",
+    "forbiddenPathPrefixes": [
+      "release/distribution/build-planning",
+      "release/distribution/build-plans",
+      "release/distribution/tests"
+    ],
+    "profileIdIsCompatibilityIdentity": true,
+    "uiModeNeverGrantsCapability": true
+  },
+  "brand": {
+    "editionId": "universal",
+    "displayName": "DroneDream",
+    "manifest": "shared/brand/editions.json",
+    "windowsIcon": "apps/desktop/src-tauri/gen/brand/universal/windows/icon.ico",
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false
+  },
+  "sharedUiContract": {
+    "contractId": "dronedream-shared-edition-ui/v1",
+    "donorCommit": "62ac2345828f50a221c1aaed0ea7273a628c9d5d",
+    "sourceFilesPurpose": "current-build-inputs-not-visual-qualification",
+    "currentVisualEvidenceRequired": true,
+    "sourceFiles": [
+      {
+        "path": "apps/frontend/src/AppShell.tsx",
+        "sha256": "02bedcbbb5a8c238801e7f1cb413635a03df17b7d1cb40d073814599e196b563"
+      },
+      {
+        "path": "apps/frontend/src/components/EditionSettingsSurface.tsx",
+        "sha256": "691d89a78f561a3a188c22d480dfcac84cfe9e53c82efe90fe1a2cc3d0e080ef"
+      },
+      {
+        "path": "apps/frontend/src/components/SettingsUpdateCenter.tsx",
+        "sha256": "661fa14cafc38446f26331539bbef6cd5bb6dc4bc122727b1b1c8990a6397c5a"
+      },
+      {
+        "path": "apps/frontend/src/components/DroneLaunchScene.tsx",
+        "sha256": "488458516876384ec00d562227fbc5783583a243a559f02e0aba7374b9e1a210"
+      },
+      {
+        "path": "apps/frontend/src/features/distribution/universalMode.ts",
+        "sha256": "cb2065eb7bcaf5fa72945580445f32536754c805a98ef3efb6e0ce31c50cd2e8"
+      },
+      {
+        "path": "apps/frontend/src/styles.css",
+        "sha256": "4b89030be59d365e6551824eb9230536175e610847fb39592b58a35518a6c85a"
+      },
+      {
+        "path": "apps/frontend/src/theme/EditionThemeProvider.tsx",
+        "sha256": "005f21c91389c0507ff3539d5e3322f12681d7130674d32781930f0e8cf84da5"
+      },
+      {
+        "path": "apps/frontend/src/theme/editionTheme.ts",
+        "sha256": "a1029cca9c30e80cccf21b96f20916c6b8808b98a1dfe6aeb1fb71e4a2109df0"
+      }
+    ],
+    "visualEvidence": {
+      "path": "artifacts/test-runs/common-ui-theme-settings-7cf37d7-exact/software-ui-layout-receipt.json",
+      "sha256": "f5bce9cc9a166be53c790cbd22e2b6e5f2f5a91ea3c81f7600a9be53b2d73700",
+      "subjectCommit": "7cf37d728211a92bbcbb411c3ce8cca904d4c38a",
+      "caseCount": 7,
+      "locales": ["en", "zh-CN"],
+      "viewportWidths": [390, 760, 1440],
+      "coveredSettingsTabs": ["general", "memory", "model"],
+      "runtimePanelHeadedValidationStatus": "pending-exact-desktop-runtime-red-validation"
+    },
+    "minimumDesktopViewport": {
+      "width": 390,
+      "height": 700,
+      "scalePercent": 100
+    },
+    "settingsDialogVerticalOverflowAllowed": false,
+    "activeSettingsPanelVerticalOverflowAllowed": false,
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false,
+    "fieldLightweightEntryIntegrationStatus": "integrated-in-universal"
+  },
+  "integratedWorkspaceUiContract": {
+    "contractId": "dronedream-universal-integrated-workspaces/v2",
+    "manifest": "release/distribution/universal/integrated-workspaces.v2.json",
+    "sha256": "5cef11a50f0c6e1223fb26062e40b166d6dc0348ced3473d019d0d734855a3ff",
+    "sourceFileCount": 12,
+    "workspaceModes": ["sim", "lab", "field", "autonomy"],
+    "createsCrossEditionHarnessOrchestrator": false,
+    "presentationOnly": true,
+    "grantsHardwareAuthority": false
+  },
+  "workspaceModes": ["sim", "lab", "field", "autonomy"],
+  "sharedCapabilities": {
+    "externalAssetQualification": {
+      "ownerEdition": "autonomy",
+      "routes": ["/autonomy/maps", "/autonomy/aircraft"],
+      "productSourceCommit": "7cf37d728211a92bbcbb411c3ce8cca904d4c38a",
+      "contract": "release/distribution/shared/external-asset-qualification.v1.json",
+      "shareTargets": ["universal", "sim", "lab", "field", "autonomy"],
+      "transport": "agent-core-asset-ir-and-receipts",
+      "sourceKinds": ["file", "directory", "direct_url", "git"],
+      "qualificationTargets": ["ROS 2 Jazzy", "Gazebo Harmonic", "PX4 SITL"],
+      "builtInModeling": false,
+      "automaticReceiverInstallation": false,
+      "modelHarnessStartsOnImport": false,
+      "unqualifiedAssetCanExecute": false,
+      "grantsSimulationExecution": false,
+      "grantsHardwareAuthority": false,
+      "sourceFilesPurpose": "current-build-inputs-not-visual-qualification",
+      "sourceFiles": [
+        {"path": "apps/frontend/src/pages/AutonomyPlatform.tsx", "sha256": "3d6e68813ef8401c02a5202f69c86558a2db56cd2e3ee9ae7b26f6acba16e1f8"},
+        {"path": "apps/frontend/src/features/autonomy/agentCore.ts", "sha256": "a0d477cd912213fc06e7adca1934de24e5e109777fa71fb812940b513383499b"},
+        {"path": "apps/frontend/src/features/autonomy/agentCorePlanning.ts", "sha256": "9fdd6bed6950b98dcaa79242e790d989c0194352a0118a004d6cb6461cda41cd"},
+        {"path": "apps/frontend/src/features/autonomy/assetLibraryStore.ts", "sha256": "845bcda6344ac22153f1ef948ff8170c32d3b36398fadc1f5a03285f35c645f7"},
+        {"path": "apps/frontend/src/features/autonomy/autonomyPlanning.ts", "sha256": "5ecb70cfcba1e01a1bf51a3c936405c3a0bb0335a8e2e7b377ffc4c7de9a89ab"},
+        {"path": "services/backend/app/task_workflows.py", "sha256": "5352eb0f955d12da7727fc95dfd2c14cc15c3798698785c58b6400d971da9e49"},
+        {"path": "apps/desktop/src-tauri/src/agent_core.rs", "sha256": "aab83bab33dbea648808028b1997f7b9e25b3bca0e9863b85135dd9f0c747e98"},
+        {"path": "docs/guides/25-autonomy-external-asset-connectors.md", "sha256": "378c64111fa3009410f95e11e39065da05fb5391c5a354bdafda15331b525fa5"},
+        {"path": "services/supabase/migrations/20260822020000_replace_modeling_with_external_asset_qualification.sql", "sha256": "636d13ddd896e09faf3b27567ce3e24d66f95ae868f3851807b97562a28a5a71"},
+        {"path": "release/distribution/shared/external-asset-qualification.v1.json", "sha256": "7aea83ea999b7e37a42324a0b790618d7bac5a4e0cacb2f461078053527a7d3a"}
+      ]
+    }
+  },
+  "desktopContracts": {
+    "coexistence": "release/distribution/desktop/edition-coexistence.v1.json",
+    "browserAuth": "release/distribution/desktop/edition-browser-auth.v1.json",
+    "runtimeAndUpdaterFamilies": "release/distribution/desktop/edition-runtime-update-families.v1.json",
+    "editionId": "universal",
+    "authClientId": "dronedream-desktop-universal",
+    "bundleIdentifier": "io.dronedream.desktop.universal",
+    "credentialVaultNamespace": "DroneDream/Auth/universal/v1",
+    "updaterMetadataFileName": "latest-universal.json"
+  },
+  "capabilityAuthority": {
+    "frontendCanAuthorize": false,
+    "requiredDecisionLayers": ["native", "backend", "runtime"],
+    "validatedVehiclePackCount": 0,
+    "hardwareActionDecision": "deny"
+  },
+  "build": {
+    "sharedScript": "apps/desktop/scripts/build-windows-msvc.ps1",
+    "wrapperScript": "apps/desktop/scripts/build-universal-installer.ps1",
+    "targetTriple": "x86_64-pc-windows-msvc",
+    "fallbackScript": "apps/desktop/scripts/build-windows-llvm.ps1",
+    "fallbackTargetTriple": "x86_64-pc-windows-gnullvm",
+    "cargoTargetMustBeOutsideRepository": true,
+    "updaterSignatureRequired": true,
+    "authenticodeRequiredForInternalTest": false,
+    "exactCleanSourceRequired": true,
+    "buildCountPerAuthorization": 1
+  },
+  "websiteHandoff": {
+    "contract": "release/distribution/universal/release/website-exact-exe-handoff.v1.json",
+    "recipientBranch": "website",
+    "receiverMayRebuild": false,
+    "receiverMayRename": false,
+    "publishedFiles": [
+      "DroneDream-Universal-1.0.0.exe",
+      "DroneDream-Universal-1.0.0.exe.sha256",
+      "DroneDream-Universal-1.0.0.exe.sig",
+      "DroneDream-Universal-1.0.0.exe.receipt.json"
+    ]
+  },
+  "lifecycle": {
+    "freshInstall": "requires isolated RED validation before releaseReady",
+    "upgrade": "requires isolated RED validation without replacing the user's current install",
+    "uninstall": "must preserve separately owned Runtime and user data",
+    "shortcut": "must use the canonical Universal icon",
+    "webView2": "embedded bootstrapper and post-install health check required",
+    "locales": ["en", "zh-CN"]
+  },
+  "releaseGates": {
+    "installerLifecycleReceiptRequired": true,
+    "exactEditionBrowserAuthReceiptRequired": true,
+    "browserAuthMayUseExistingBrowserCookie": true,
+    "crossEditionSessionReuseAllowed": false,
+    "releaseReadyBeforeBothReceipts": false
+  }
+}
