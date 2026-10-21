@@ -28,8 +28,8 @@ npm --prefix apps/frontend run build
 ```
 
 Desktop and Runtime changes also require the checks in
-[apps/desktop/README.md](apps/desktop/README.md) and
-[docs/guides/14-runtime-release.md](docs/guides/14-runtime-release.md).
+[apps/desktop/README.md](../apps/desktop/README.md) and
+[docs/guides/14-runtime-release.md](../docs/guides/14-runtime-release.md).
 
 ## Pull request description
 

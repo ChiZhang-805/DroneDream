@@ -5,12 +5,12 @@
   "productDisplayVersion": "1.0.0",
   "targetArchitecture": "windows-x86_64",
   "commonCorePaths": [
-    "backend",
-    "desktop",
-    "engine-pack",
-    "frontend",
-    "runtime",
-    "worker"
+    "services/backend",
+    "apps/desktop",
+    "platform/engine-pack",
+    "apps/frontend",
+    "platform/runtime",
+    "services/worker"
   ],
   "policyPaths": {
     "capabilityPolicy": "release/distribution/capabilities/core-capabilities.v1.json",

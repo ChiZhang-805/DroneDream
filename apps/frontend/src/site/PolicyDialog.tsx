@@ -2,9 +2,9 @@ import { useEffect, useRef, useState, type AnchorHTMLAttributes } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import codeSigningPolicy from "../../../../CODE_SIGNING_POLICY.md?raw";
-import privacyPolicy from "../../../../PRIVACY.md?raw";
-import termsOfService from "../../../../TERMS.md?raw";
+import codeSigningPolicy from "../../../../docs/release/code-signing.md?raw";
+import privacyPolicy from "../../../../docs/legal/privacy.md?raw";
+import termsOfService from "../../../../docs/legal/terms.md?raw";
 
 type PolicySection = "privacy" | "terms" | "code-signing";
 
@@ -18,15 +18,15 @@ const policySections: Array<{
   id: PolicySection;
   label: string;
   source: string;
-  sourcePath: "PRIVACY.md" | "TERMS.md" | "CODE_SIGNING_POLICY.md";
+  sourcePath: "docs/legal/privacy.md" | "docs/legal/terms.md" | "docs/release/code-signing.md";
 }> = [
-  { id: "privacy", label: "Privacy", source: privacyPolicy, sourcePath: "PRIVACY.md" },
-  { id: "terms", label: "Terms", source: termsOfService, sourcePath: "TERMS.md" },
+  { id: "privacy", label: "Privacy", source: privacyPolicy, sourcePath: "docs/legal/privacy.md" },
+  { id: "terms", label: "Terms", source: termsOfService, sourcePath: "docs/legal/terms.md" },
   {
     id: "code-signing",
     label: "Code signing",
     source: codeSigningPolicy,
-    sourcePath: "CODE_SIGNING_POLICY.md",
+    sourcePath: "docs/release/code-signing.md",
   },
 ];
 

@@ -212,7 +212,7 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
 
     def test_pages_build_verifies_policy_source_and_compiled_policy_links(self) -> None:
         builder = self.read("release/website/scripts/build-pages-site.ps1")
-        policy = self.read("CODE_SIGNING_POLICY.md")
+        policy = self.read("docs/release/code-signing.md")
 
         self.assertIn('"SignPath.io"', builder)
         self.assertIn('"SignPath Foundation"', builder)
@@ -220,8 +220,8 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
             "The code signing policy is missing required attribution",
             builder,
         )
-        self.assertIn('"CODE_SIGNING_POLICY.md"', builder)
-        self.assertIn('"PRIVACY.md"', builder)
+        self.assertIn('"docs/release/code-signing.md"', builder)
+        self.assertIn('"docs/legal/privacy.md"', builder)
         self.assertNotRegex(
             builder,
             re.compile(

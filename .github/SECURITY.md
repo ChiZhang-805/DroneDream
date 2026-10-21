@@ -1,9 +1,9 @@
 # Security policy
 
 Release signatures follow the repository's
-[Code signing policy](CODE_SIGNING_POLICY.md). Local data, optional network
+[Code signing policy](../docs/release/code-signing.md). Local data, optional network
 connections, third-party providers, and deletion behavior are documented in
-the [Privacy policy](PRIVACY.md).
+the [Privacy policy](../docs/legal/privacy.md).
 
 ## Supported releases
 

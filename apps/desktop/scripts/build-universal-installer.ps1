@@ -152,7 +152,8 @@ if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     $sharedUi.sourceFilesPurpose -cne "current-build-inputs-not-visual-qualification" -or
     $sharedUi.currentVisualEvidenceRequired -ne $true -or
     $sharedUi.donorCommit -cnotmatch "^[0-9a-f]{40}$" -or
-    $sharedUi.visualEvidence.subjectCommit -cnotmatch "^[0-9a-f]{40}$" -or
+    $sharedUi.visualEvidence.storage -cne "external-release-validation" -or
+    $sharedUi.visualEvidence.trackedInRepository -ne $false -or
     $sharedUi.visualEvidence.caseCount -ne 7 -or
     $sharedUi.visualEvidence.runtimePanelHeadedValidationStatus -cne "pending-exact-desktop-runtime-red-validation" -or
     $sharedUi.minimumDesktopViewport.width -ne 390 -or
@@ -176,11 +177,9 @@ if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     throw "Universal build identity or safety policy drifted."
 }
 Invoke-GitText @("merge-base", "--is-ancestor", [string]$sharedUi.donorCommit, $sourceCommit) | Out-Null
-Invoke-GitText @("merge-base", "--is-ancestor", [string]$sharedUi.visualEvidence.subjectCommit, $sourceCommit) | Out-Null
-# A donor receipt remains historical evidence. Updating the input hash list
-# never extends that old receipt to the latest desktop source.
-if ($Build -and (-not $CurrentUiEvidencePath -or $CurrentUiEvidenceSha256 -cnotmatch '^[0-9a-f]{64}$')) {
-    throw "Current Universal UI validation is required; historical donor evidence cannot authorize this build."
+# UI validation is generated in release staging and must never be committed to the source tree.
+if (-not $CurrentUiEvidencePath -or $CurrentUiEvidenceSha256 -cnotmatch '^[0-9a-f]{64}$') {
+    throw "Current Universal UI validation must be supplied from external release staging."
 }
 $sharedUiSourceRefs = @()
 foreach ($expectedRef in @($sharedUi.sourceFiles)) {
@@ -197,30 +196,18 @@ foreach ($expectedRef in @($sharedUi.sourceFiles)) {
 if ($sharedUiSourceRefs.Count -ne 8) {
     throw "Universal shared UI contract must bind exactly eight source files."
 }
-# Keep current evidence outside the tracked profile: embedding the commit of
-# that same profile would create an impossible self-referential Git hash.
-$expectedUiEvidenceCommit = [string]$sharedUi.visualEvidence.subjectCommit
-$expectedUiEvidenceSha256 = [string]$sharedUi.visualEvidence.sha256
-if ($CurrentUiEvidencePath) {
-    if ($CurrentUiEvidenceSha256 -cnotmatch '^[0-9a-f]{64}$') {
-        throw "Current UI evidence requires an explicit SHA256."
-    }
-    $currentUiFile = Get-Item -LiteralPath $CurrentUiEvidencePath
-    if ($currentUiFile.PSIsContainer -or $currentUiFile.Length -gt 4MB -or
-        ($currentUiFile.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-        throw "Current UI evidence must be a bounded ordinary file."
-    }
-    $sharedUiEvidenceRef = [ordered]@{
-        path = $currentUiFile.FullName
-        sha256 = Get-FileSha256Lower $currentUiFile.FullName
-    }
-    $expectedUiEvidenceCommit = $sourceCommit
-    $expectedUiEvidenceSha256 = $CurrentUiEvidenceSha256
-    $sharedUiEvidencePath = $currentUiFile.FullName
-} else {
-    $sharedUiEvidenceRef = New-RepoFileRef ([string]$sharedUi.visualEvidence.path)
-    $sharedUiEvidencePath = Join-Path $repoRoot $sharedUiEvidenceRef.path
+$currentUiFile = Get-Item -LiteralPath $CurrentUiEvidencePath
+if ($currentUiFile.PSIsContainer -or $currentUiFile.Length -gt 4MB -or
+    ($currentUiFile.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+    throw "Current UI evidence must be a bounded ordinary file."
 }
+$sharedUiEvidenceRef = [ordered]@{
+    path = $currentUiFile.FullName
+    sha256 = Get-FileSha256Lower $currentUiFile.FullName
+}
+$expectedUiEvidenceCommit = $sourceCommit
+$expectedUiEvidenceSha256 = $CurrentUiEvidenceSha256
+$sharedUiEvidencePath = $currentUiFile.FullName
 if ($sharedUiEvidenceRef.sha256 -cne $expectedUiEvidenceSha256) {
     throw "Universal shared UI visual evidence hash drifted."
 }

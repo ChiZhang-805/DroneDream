@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import subprocess
 from pathlib import Path
 
@@ -191,12 +190,16 @@ def test_headed_tools_parse_without_execution() -> None:
     assert node_parse.returncode == 0, node_parse.stderr or node_parse.stdout
 
 
-def test_offline_layout_receipt_remains_exact_and_non_substitutive() -> None:
-    receipt = ROOT / (
-        "artifacts/test-runs/common-ui-theme-settings-4933e21-exact/software-ui-layout-receipt.json"
+def test_offline_layout_receipts_are_local_outputs() -> None:
+    tracked = subprocess.run(
+        ["git", "ls-files", "artifacts"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
     )
-    payload = json.loads(receipt.read_text(encoding="utf-8"))
-    assert payload
+    assert tracked.stdout.strip() == ""
+    assert "artifacts/" in (ROOT / ".gitignore").read_text(encoding="utf-8")
     script = POWERSHELL.read_text(encoding="utf-8-sig")
     assert "ExpectedOfflineLayoutReceiptSha256" in script
     assert "offline-layout-contract-only-not-installed-app-evidence" in script
