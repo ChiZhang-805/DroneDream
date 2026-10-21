@@ -17,7 +17,7 @@
     "compositeManifestSha256": "3a95397cb3c9cd897bbc2986061e5b8fad249446096285fea217e1f4dae57dff"
   },
   "branchPolicy": {
-    "targetBranch": "codex/software-sim",
+    "targetBranch": "software-sim",
     "creationState": "long-lived-product-branch",
     "proposedHeadCommit": "6b50f86ed80c190b816f19d06de143a328bda7e2",
     "headClassification": "exact-source",

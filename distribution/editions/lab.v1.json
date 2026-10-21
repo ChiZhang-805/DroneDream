@@ -72,14 +72,14 @@
     "receiptCompatibilityFailClosed": true
   },
   "sourcePolicy": {
-    "developmentBranch": "codex/software-lab",
+    "developmentBranch": "software-lab",
     "integrationBranch": "main",
     "editionSourceDivergenceAllowed": false,
     "hotfixMustReturnToCore": true,
     "commonCoreHashRequired": true
   },
   "releaseChannel": {
-    "branch": "codex/software-lab",
+    "branch": "software-lab",
     "creationState": "long-lived-product-branch",
     "promotionManifestRequired": true,
     "forcePushAllowed": false

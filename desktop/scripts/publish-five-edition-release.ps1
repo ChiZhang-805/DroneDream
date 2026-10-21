@@ -318,13 +318,13 @@ try {
             Assert-ExactStringSet -Label "GitHub Tag inventory" -Actual $remoteTags -Expected $expectedPublicTags
             $expectedBranches = @(
                 "main",
-                "codex/software",
-                "codex/software-agent",
-                "codex/software-field",
-                "codex/software-lab",
-                "codex/software-sim",
-                "codex/technical-report",
-                "codex/website"
+                "software",
+                "software-agent",
+                "software-field",
+                "software-lab",
+                "software-sim",
+                "technical-report",
+                "website"
             )
             $remoteBranchOutput = Invoke-GitHubCli -Arguments @(
                 "api", "--paginate", "repos/$Repository/branches?per_page=100",

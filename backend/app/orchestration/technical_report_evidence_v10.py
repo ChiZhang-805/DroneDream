@@ -475,7 +475,7 @@ def _verify_online_routing(
     )
     if (
         campaign.get("exit_code") != 0
-        or campaign.get("source_branch") != "codex/software"
+        or campaign.get("source_branch") != "software"
         or campaign.get("source_tree_clean") is not True
         or campaign.get("provider_calls") != len(cases)
         or campaign.get("network_calls") != len(cases)

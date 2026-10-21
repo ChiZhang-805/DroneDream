@@ -48,8 +48,8 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $branch = Invoke-GitText @("branch", "--show-current")
 $toolHead = Invoke-GitText @("rev-parse", "--verify", "HEAD")
 $sourceStatus = Invoke-GitText @("status", "--porcelain=v1", "--untracked-files=all")
-if ($branch -cne "codex/software" -or $sourceStatus) {
-    throw "Universal candidate finalization requires clean codex/software."
+if ($branch -cne "software" -or $sourceStatus) {
+    throw "Universal candidate finalization requires clean software."
 }
 & git -C $repoRoot cat-file -e "$ProductSourceCommit`^{commit}"
 if ($LASTEXITCODE -ne 0) {

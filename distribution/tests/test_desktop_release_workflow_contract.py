@@ -212,11 +212,11 @@ def test_manual_validation_resolves_a_real_unsigned_edition(
     ("base_branch", "edition"),
     [
         ("main", "universal"),
-        ("codex/software", "universal"),
-        ("codex/software-sim", "sim"),
-        ("codex/software-lab", "lab"),
-        ("codex/software-field", "field"),
-        ("codex/software-agent", "autonomy"),
+        ("software", "universal"),
+        ("software-sim", "sim"),
+        ("software-lab", "lab"),
+        ("software-field", "field"),
+        ("software-agent", "autonomy"),
     ],
 )
 def test_pull_request_target_branch_selects_its_owned_edition(
@@ -240,7 +240,7 @@ def test_pull_request_rejects_a_branch_without_product_ownership(tmp_path: Path)
     result = _run_resolver(
         "",
         tmp_path / "invalid-branch.txt",
-        pull_request_base_branch="codex/website",
+        pull_request_base_branch="website",
     )
     assert result.returncode != 0
     assert "does not own a product edition" in result.stderr

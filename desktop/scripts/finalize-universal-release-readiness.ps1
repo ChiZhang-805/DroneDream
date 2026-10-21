@@ -89,8 +89,8 @@ $branch = Get-GitText @("branch", "--show-current")
 $toolHead = Get-GitText @("rev-parse", "HEAD")
 $upstream = Get-GitText @("rev-parse", "@{u}")
 $status = Get-GitText @("status", "--porcelain=v1", "--untracked-files=all")
-if ($branch -cne "codex/software" -or $toolHead -cne $upstream -or $status) {
-    throw "Final readiness requires clean, upstream-exact codex/software."
+if ($branch -cne "software" -or $toolHead -cne $upstream -or $status) {
+    throw "Final readiness requires clean, upstream-exact software."
 }
 & git -C $repoRoot merge-base --is-ancestor $ProductSourceCommit $toolHead
 if ($LASTEXITCODE -ne 0) { throw "Finalizer tool source does not descend from the product source." }

@@ -7,9 +7,9 @@ Git commit count is the update build number.
 ## Permanent public layout
 
 - Exactly eight long-lived branches: `main`, the five edition branches
-  (`codex/software`, `codex/software-sim`, `codex/software-lab`,
-  `codex/software-field`, `codex/software-agent`), `codex/website`, and
-  `codex/technical-report`. Feature branches are temporary and must not become
+  (`software`, `software-sim`, `software-lab`,
+  `software-field`, `software-agent`), `website`, and
+  `technical-report`. Feature branches are temporary and must not become
   additional permanent channels.
 - An immutable build release for each retained desktop build:
   `five-edition-v<version>-build-<buildNumber>`.

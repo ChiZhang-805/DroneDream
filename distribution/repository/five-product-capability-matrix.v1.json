@@ -17,7 +17,7 @@
     {
       "productId": "universal",
       "displayName": "DroneDream Universal",
-      "branch": "codex/software",
+      "branch": "software",
       "primaryPurpose": "modeling-and-five-product-orchestration",
       "executionDomains": ["simulation", "qualified-hardware-orchestration"],
       "navigationSections": ["autonomous-tasks", "workspace"],
@@ -29,7 +29,7 @@
     {
       "productId": "sim",
       "displayName": "DroneDream SIM",
-      "branch": "codex/software-sim",
+      "branch": "software-sim",
       "primaryPurpose": "repeatable-simulation-experiments",
       "executionDomains": ["simulation"],
       "navigationSections": ["autonomous-tasks", "experiments-validation", "workspace"],
@@ -41,7 +41,7 @@
     {
       "productId": "lab",
       "displayName": "DroneDream LAB",
-      "branch": "codex/software-lab",
+      "branch": "software-lab",
       "primaryPurpose": "bidirectional-simulation-and-hardware-validation",
       "executionDomains": ["simulation", "qualified-hardware-validation"],
       "navigationSections": ["autonomous-tasks", "experiments-validation", "records"],
@@ -53,7 +53,7 @@
     {
       "productId": "field",
       "displayName": "DroneDream FIELD",
-      "branch": "codex/software-field",
+      "branch": "software-field",
       "primaryPurpose": "safe-real-hardware-operation-and-tuning",
       "executionDomains": ["qualified-real-hardware"],
       "navigationSections": ["autonomous-tasks", "field-operations", "records"],
@@ -65,7 +65,7 @@
     {
       "productId": "autonomy",
       "displayName": "DroneDream AUTONOMY",
-      "branch": "codex/software-agent",
+      "branch": "software-agent",
       "primaryPurpose": "natural-language-autonomous-mission-workflow",
       "executionDomains": ["simulation", "qualified-real-hardware"],
       "navigationSections": ["autonomous-tasks", "workspace", "records"],

@@ -5,7 +5,7 @@
   "editionId": "universal",
   "state": "awaiting-exact-build-and-lifecycle-handoff",
   "recipient": {
-    "branch": "codex/website",
+    "branch": "website",
     "productSourceCommit": "afdcdee5b60883290c9d1cc0c036141920066659",
     "evidenceCommit": "1a82e36b362c95983473c4a0d0d967d8c7415f92",
     "evidenceCommitIsProductSource": false,

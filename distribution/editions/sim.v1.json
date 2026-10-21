@@ -72,14 +72,14 @@
     "receiptCompatibilityFailClosed": true
   },
   "sourcePolicy": {
-    "developmentBranch": "codex/software-sim",
+    "developmentBranch": "software-sim",
     "integrationBranch": "main",
     "editionSourceDivergenceAllowed": false,
     "hotfixMustReturnToCore": true,
     "commonCoreHashRequired": true
   },
   "releaseChannel": {
-    "branch": "codex/software-sim",
+    "branch": "software-sim",
     "creationState": "long-lived-product-branch",
     "promotionManifestRequired": true,
     "forcePushAllowed": false

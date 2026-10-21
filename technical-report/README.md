@@ -16,7 +16,7 @@ path, and SHA-256; it does not copy them.
 
 The software chain is:
 
-- branch: `codex/software`
+- branch: `software`
 - cross-Job memory implementation: `abb9002746e061af44a164fe749243d68d098e10`
 - v9 software subject: `c1222c9215e01a56351f6588af0d2b8694bca831`
 - v9 receipt-only evidence head: `8102ffecb37b1f1b0e25c80d6b02db05325ca986`

@@ -95,8 +95,8 @@ if ($Build -and -not $ExpectedSourceCommit) {
     throw "Universal builds require an explicit -ExpectedSourceCommit pin."
 }
 $branch = Invoke-GitText @("branch", "--show-current")
-if ($branch -cne "codex/software") {
-    throw "Universal builds must run from codex/software."
+if ($branch -cne "software") {
+    throw "Universal builds must run from software."
 }
 $sourceStatus = Invoke-GitText @("status", "--porcelain=v1", "--untracked-files=all")
 if ($sourceStatus) {

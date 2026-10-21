@@ -10,13 +10,13 @@ SCHEMA = ROOT / "distribution" / "schemas" / "public-branch-topology.schema.json
 
 EXPECTED = {
     "main": ("protected-integration", None),
-    "codex/software": ("long-lived-product", "universal"),
-    "codex/software-sim": ("long-lived-product", "sim"),
-    "codex/software-lab": ("long-lived-product", "lab"),
-    "codex/software-field": ("long-lived-product", "field"),
-    "codex/software-agent": ("long-lived-product", "autonomy"),
-    "codex/website": ("long-lived-delivery", "website"),
-    "codex/technical-report": ("long-lived-delivery", "technical-report"),
+    "software": ("long-lived-product", "universal"),
+    "software-sim": ("long-lived-product", "sim"),
+    "software-lab": ("long-lived-product", "lab"),
+    "software-field": ("long-lived-product", "field"),
+    "software-agent": ("long-lived-product", "autonomy"),
+    "website": ("long-lived-delivery", "website"),
+    "technical-report": ("long-lived-delivery", "technical-report"),
 }
 
 
@@ -27,6 +27,7 @@ def test_public_repository_has_one_exact_eight_branch_contract() -> None:
     assert schema["additionalProperties"] is False
     assert topology["schemaVersion"] == 1
     assert topology["kind"] == "dronedream-public-branch-topology"
+    assert topology["topologyVersion"] == "1.1.0"
     assert topology["requiredBranchCount"] == 8
     observed = {
         branch["name"]: (branch["role"], branch["productId"]) for branch in topology["branches"]

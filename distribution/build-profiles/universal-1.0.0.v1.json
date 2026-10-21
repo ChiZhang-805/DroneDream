@@ -160,7 +160,7 @@
   },
   "websiteHandoff": {
     "contract": "distribution/universal/release/website-exact-exe-handoff.v1.json",
-    "recipientBranch": "codex/website",
+    "recipientBranch": "website",
     "receiverMayRebuild": false,
     "receiverMayRename": false,
     "publishedFiles": [

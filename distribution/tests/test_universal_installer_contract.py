@@ -374,7 +374,7 @@ def test_universal_build_is_single_source_bound_signed_attempt_with_external_tar
         "Universal builds require an explicit -ExpectedSourceCommit pin.",
         "Universal HEAD does not match ExpectedSourceCommit.",
         "explicitSourcePinRequiredForBuild = $true",
-        '$branch -cne "codex/software"',
+        '$branch -cne "software"',
         "Universal builds require an exact clean source tree.",
         "DroneDream-Universal-1.0.0.exe",
         "universal-cargo-target",
