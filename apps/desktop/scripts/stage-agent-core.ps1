@@ -45,6 +45,58 @@ function Read-BoundCoreReceipt([string]$Path) {
     return $result
 }
 
+# The Core build may omit the optional local expert package entirely. If any
+# part is present, keep the same catalog/scope contract and require its package,
+# receipt and license files in the hash-bound Runtime manifest.
+function Read-OptionalLocalPolicyCatalog {
+    param(
+        [Parameter(Mandatory = $true)][string]$RuntimeSource,
+        [Parameter(Mandatory = $true)][AllowEmptyCollection()][string[]]$RuntimePaths
+    )
+    $policyPaths = @($RuntimePaths | Where-Object { $_ -clike 'local-policy/*' })
+    $policyRoot = Join-Path $RuntimeSource 'local-policy'
+    if ($policyPaths.Count -eq 0) {
+        if (Test-Path -LiteralPath $policyRoot) {
+            throw 'The optional local expert package is present without a Runtime manifest binding.'
+        }
+        return $null
+    }
+    foreach ($requiredPath in @('local-policy/catalog.json', 'local-policy/licenses.json')) {
+        if ($RuntimePaths -cnotcontains $requiredPath -or
+            -not (Test-Path -LiteralPath (Join-Path $RuntimeSource $requiredPath) -PathType Leaf)) {
+            throw 'The optional local expert package is incomplete.'
+        }
+    }
+    $catalog = Get-Content -LiteralPath (Join-Path $policyRoot 'catalog.json') -Raw | ConvertFrom-Json
+    $entries = @($catalog.entries)
+    if ($catalog.schema_version -cne 'dronedream.local-policy-runtime-catalog.v2' -or
+        $catalog.deployment_scope -cnotin @('simulation-only', 'production-qualified') -or
+        $entries.Count -ne 1) {
+        throw 'The AGENT Core local expert catalog is not the current single-package contract.'
+    }
+    $receiptKind = [string]$entries[0].receipt.kind
+    if (($catalog.deployment_scope -ceq 'simulation-only' -and $receiptKind -cne 'simulation-admission') -or
+        ($catalog.deployment_scope -ceq 'production-qualified' -and $receiptKind -cne 'qualification')) {
+        throw 'The AGENT Core local expert catalog scope and receipt kind disagree.'
+    }
+    foreach ($relative in @([string]$entries[0].package, [string]$entries[0].receipt.path)) {
+        if ([string]::IsNullOrWhiteSpace($relative) -or [IO.Path]::IsPathRooted($relative) -or
+            $relative -match '(^|[\\/])\.\.([\\/]|$)') {
+            throw 'The optional local expert catalog contains an unsafe path.'
+        }
+    }
+    foreach ($requiredPath in @(
+        "local-policy/$($entries[0].package)/manifest.json",
+        "local-policy/$($entries[0].receipt.path)"
+    )) {
+        if ($RuntimePaths -cnotcontains $requiredPath -or
+            -not (Test-Path -LiteralPath (Join-Path $RuntimeSource $requiredPath) -PathType Leaf)) {
+            throw 'The optional local expert package is incomplete.'
+        }
+    }
+    return $catalog
+}
+
 # 功能：
 #   核对单份资源的相对路径、大小和摘要，复制后再次校验内容。
 # 输入：
@@ -177,7 +229,6 @@ $required = @(
     $isolatorBinary,
     $consoleBinary,
     (Join-Path $sourceResources "runtime\runtime-manifest.json"),
-    (Join-Path $sourceResources "runtime\local-policy\catalog.json"),
     (Join-Path $sourceResources "official-plugins\index.json"),
     (Join-Path $sourceResources "default-assets\index.json"),
     (Join-Path $sourceResources "default-assets\school-map.ddpkg"),
@@ -188,6 +239,21 @@ foreach ($path in $required) {
         throw "The AGENT Core package is incomplete: $path"
     }
 }
+
+$runtimeSource = Join-Path $sourceResources "runtime"
+$runtimeManifestPath = Join-Path $runtimeSource "runtime-manifest.json"
+$runtimeManifest = Get-Content -LiteralPath $runtimeManifestPath -Raw | ConvertFrom-Json
+$runtimeEntries = @($runtimeManifest.files)
+if (-not $runtimeManifest.files -or $runtimeEntries.Count -eq 0) {
+    throw "The AGENT Core Runtime manifest contains no files."
+}
+$runtimePaths = @($runtimeEntries | ForEach-Object { [string]$_.path })
+if (@($runtimePaths | Where-Object {
+    $_ -match '(^|/)__pycache__(/|$)' -or $_ -match '\.pyc$'
+}).Count -ne 0) {
+    throw "The AGENT Core Runtime manifest contains a Python cache."
+}
+$localPolicyCatalog = Read-OptionalLocalPolicyCatalog -RuntimeSource $runtimeSource -RuntimePaths $runtimePaths
 
 $targetBinaryRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "apps\desktop\src-tauri\binaries"))
 $targetResourceRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "apps\desktop\src-tauri\agent-core-resources"))
@@ -221,38 +287,7 @@ Copy-Item -LiteralPath $isolatorBinary -Destination (Join-Path $targetBinaryRoot
 Copy-Item -LiteralPath $consoleBinary -Destination (Join-Path $targetBinaryRoot $stagedConsoleName)
 Copy-Item -LiteralPath $isolatorBinary -Destination (Join-Path $targetResourceRoot "dronedream-plugin-isolator.exe")
 
-$runtimeSource = Join-Path $sourceResources "runtime"
 $runtimeTarget = Join-Path $targetResourceRoot "runtime"
-$runtimeManifestPath = Join-Path $runtimeSource "runtime-manifest.json"
-$runtimeManifest = Get-Content -LiteralPath $runtimeManifestPath -Raw | ConvertFrom-Json
-$runtimeEntries = @($runtimeManifest.files)
-if (-not $runtimeManifest.files -or $runtimeEntries.Count -eq 0) {
-    throw "The AGENT Core Runtime manifest contains no files."
-}
-$runtimePaths = @($runtimeEntries | ForEach-Object { [string]$_.path })
-if ($runtimePaths -cnotcontains "local-policy/catalog.json") {
-    throw "The AGENT Core Runtime manifest omits its local expert catalog."
-}
-if (@($runtimePaths | Where-Object {
-    $_ -match '(^|/)__pycache__(/|$)' -or $_ -match '\.pyc$'
-}).Count -ne 0) {
-    throw "The AGENT Core Runtime manifest contains a Python cache."
-}
-$localPolicyCatalogPath = Join-Path $runtimeSource "local-policy\catalog.json"
-$localPolicyCatalog = Get-Content -LiteralPath $localPolicyCatalogPath -Raw | ConvertFrom-Json
-$localPolicyEntries = @($localPolicyCatalog.entries)
-if ($localPolicyCatalog.schema_version -cne "dronedream.local-policy-runtime-catalog.v2" -or
-    $localPolicyCatalog.deployment_scope -cnotin @("simulation-only", "production-qualified") -or
-    $localPolicyEntries.Count -ne 1) {
-    throw "The AGENT Core local expert catalog is not the current single-package contract."
-}
-$localPolicyReceiptKind = [string]$localPolicyEntries[0].receipt.kind
-if (($localPolicyCatalog.deployment_scope -ceq "simulation-only" -and
-        $localPolicyReceiptKind -cne "simulation-admission") -or
-    ($localPolicyCatalog.deployment_scope -ceq "production-qualified" -and
-        $localPolicyReceiptKind -cne "qualification")) {
-    throw "The AGENT Core local expert catalog scope and receipt kind disagree."
-}
 New-Item -ItemType Directory -Path $runtimeTarget -Force | Out-Null
 Copy-Item -LiteralPath $runtimeManifestPath -Destination (Join-Path $runtimeTarget "runtime-manifest.json")
 foreach ($file in $runtimeEntries) {
@@ -360,9 +395,11 @@ $receipt = [ordered]@{
     defaultAssetIndexSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath (
         Join-Path $targetResourceRoot "default-assets\index.json"
     )).Hash.ToLowerInvariant()
-    localPolicyCatalogSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath (
-        Join-Path $targetResourceRoot "runtime\local-policy\catalog.json"
-    )).Hash.ToLowerInvariant()
+    localPolicyCatalogSha256 = if ($null -ne $localPolicyCatalog) {
+        (Get-FileHash -Algorithm SHA256 -LiteralPath (
+            Join-Path $targetResourceRoot "runtime\local-policy\catalog.json"
+        )).Hash.ToLowerInvariant()
+    } else { $null }
     stagedAt = [DateTimeOffset]::UtcNow.ToString("o")
 }
 [IO.File]::WriteAllBytes((Join-Path $targetResourceRoot 'core-components-build.json'), $boundReceiptBytes)
