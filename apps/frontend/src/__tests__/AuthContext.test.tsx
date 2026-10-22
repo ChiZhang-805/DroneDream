@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
+import { getAuthAccessToken, setAuthAccessToken } from "../features/auth/authTokenStore";
 
 import {
   AuthProvider,
@@ -45,6 +46,7 @@ const authMock = vi.hoisted(() => {
     remove: removeAvatar,
   }));
   return {
+    activeDesktopSession: false,
     state,
     getSession,
     onAuthStateChange,
@@ -87,6 +89,7 @@ vi.mock("../features/auth/supabaseClient", () => ({
     publishableKey: "public-browser-key",
   }),
   cloudAuthConfigured: true,
+  hasActiveDesktopAuthSession: () => authMock.activeDesktopSession,
   githubAuthEnabled: false,
   googleAuthEnabled: false,
   slackAuthEnabled: false,
@@ -113,6 +116,7 @@ function AccountProbe() {
   const [registrationError, setRegistrationError] = useState("");
   const [recoveryError, setRecoveryError] = useState("");
   const [profileError, setProfileError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   return (
     <>
       <output aria-label="username">{auth.account?.displayName ?? ""}</output>
@@ -122,6 +126,7 @@ function AccountProbe() {
       <output aria-label="registration-error">{registrationError}</output>
       <output aria-label="recovery-error">{recoveryError}</output>
       <output aria-label="profile-error">{profileError}</output>
+      <output aria-label="password-error">{passwordError}</output>
       <output aria-label="password-recovery">{String(auth.passwordRecovery)}</output>
       <button
         type="button"
@@ -146,6 +151,7 @@ function AccountProbe() {
         type="button"
         onClick={() =>
           void auth.signInWithPassword("pilot@example.com", "correct-horse")
+            .catch((error: Error) => setPasswordError(error.message))
         }
       >
         Password sign in
@@ -314,6 +320,8 @@ describe("AuthContext account profile", () => {
   });
 
   afterEach(() => {
+    authMock.activeDesktopSession = false;
+    setAuthAccessToken(null);
     authMock.state.user = {
       id: "user-1",
       email: "pilot.name@example.com",
@@ -664,6 +672,124 @@ describe("AuthContext account profile", () => {
     expect(screen.getByLabelText("auth-loading")).toHaveTextContent("false");
     expect(loadingHistory).not.toContain(true);
   });
+
+  it("adopts the returned password session in desktop and tracks its refresh and sign-out", async () => {
+    const invoke = vi.fn(async () => undefined);
+    window.__TAURI__ = { core: { invoke } };
+    const session = { user: authMock.state.user, access_token: "direct-password-token" };
+    authMock.signInWithPassword.mockResolvedValueOnce({ data: { session }, error: null });
+    render(<AuthProvider><AccountProbe /></AuthProvider>);
+    expect(authMock.getSession).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("username")).toBeEmptyDOMElement();
+
+    fireEvent.click(screen.getByRole("button", { name: "Password sign in" }));
+    await waitFor(() => expect(screen.getByLabelText("username")).toHaveTextContent("pilot.name"));
+    expect(getAuthAccessToken()).toBe("direct-password-token");
+    expect(authMock.getSession).not.toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalledWith("begin_browser_auth", expect.anything());
+
+    act(() => authMock.emitAuthStateChange("TOKEN_REFRESHED", {
+      user: { ...authMock.state.user, user_metadata: { display_name: "Refreshed Pilot" } },
+      access_token: "refreshed-password-token",
+    }));
+    expect(getAuthAccessToken()).toBe("refreshed-password-token");
+    expect(screen.getByLabelText("username")).toHaveTextContent("Refreshed Pilot");
+    act(() => authMock.emitAuthStateChange("SIGNED_OUT", null));
+    expect(getAuthAccessToken()).toBeNull();
+    expect(screen.getByLabelText("username")).toBeEmptyDOMElement();
+  });
+
+  it("does not publish a desktop identity when password sign-in returns no session", async () => {
+    window.__TAURI__ = { core: { invoke: vi.fn(async () => undefined) } };
+    authMock.signInWithPassword.mockResolvedValueOnce({ data: { session: null }, error: null });
+    render(<AuthProvider><AccountProbe /></AuthProvider>);
+    fireEvent.click(screen.getByRole("button", { name: "Password sign in" }));
+    await waitFor(() => expect(screen.getByLabelText("password-error"))
+      .toHaveTextContent("The account service returned no session."));
+    expect(screen.getByLabelText("username")).toBeEmptyDOMElement();
+    expect(getAuthAccessToken()).toBeNull();
+    expect(authMock.onAuthStateChange).not.toHaveBeenCalled();
+  });
+
+  it.each(["Finish registration", "Reset with recovery code"])(
+    "publishes the desktop code session only after the password write succeeds: %s",
+    async (button) => {
+      window.__TAURI__ = { core: { invoke: vi.fn(async () => undefined) } };
+      const session = { user: authMock.state.user, access_token: "verified-code-token" };
+      authMock.verifyOtp.mockResolvedValueOnce({ data: { session }, error: null });
+      let finishPassword!: (result: { data: { user: typeof authMock.state.user }; error: null }) => void;
+      authMock.updateUser.mockImplementationOnce(() => new Promise((resolve) => { finishPassword = resolve; }));
+      render(<AuthProvider><AccountProbe /></AuthProvider>);
+      fireEvent.click(screen.getByRole("button", { name: button }));
+      await waitFor(() => expect(authMock.updateUser).toHaveBeenCalled());
+      expect(screen.getByLabelText("username")).toBeEmptyDOMElement();
+      expect(getAuthAccessToken()).toBeNull();
+      await act(async () => finishPassword({ data: { user: authMock.state.user }, error: null }));
+      expect(screen.getByLabelText("username")).toHaveTextContent("pilot.name");
+      expect(getAuthAccessToken()).toBe("verified-code-token");
+    },
+  );
+
+  it.each([
+    ["Finish registration", "registration-error"],
+    ["Reset with recovery code", "recovery-error"],
+  ])("keeps desktop signed out when the verified-code password write fails: %s", async (button, errorLabel) => {
+    window.__TAURI__ = { core: { invoke: vi.fn(async () => undefined) } };
+    authMock.verifyOtp.mockResolvedValueOnce({
+      data: { session: { user: authMock.state.user, access_token: "uncommitted-code-token" } }, error: null,
+    });
+    authMock.updateUser.mockResolvedValueOnce({ data: { user: authMock.state.user }, error: new Error("password write failed") });
+    render(<AuthProvider><AccountProbe /></AuthProvider>);
+    fireEvent.click(screen.getByRole("button", { name: button }));
+    await waitFor(() => expect(screen.getByLabelText(errorLabel)).toHaveTextContent("password write failed"));
+    expect(authMock.signOut).toHaveBeenCalledWith({ scope: "local" });
+    expect(screen.getByLabelText("username")).toBeEmptyDOMElement();
+    expect(getAuthAccessToken()).toBeNull();
+  });
+
+  it("hydrates an already active process session after the desktop document reloads", async () => {
+    window.__TAURI__ = { core: { invoke: vi.fn(async () => undefined) } };
+    authMock.activeDesktopSession = true;
+    render(<AuthProvider><AccountProbe /></AuthProvider>);
+    await waitFor(() => expect(screen.getByLabelText("username")).toHaveTextContent("pilot.name"));
+    expect(authMock.getSession).toHaveBeenCalledTimes(1);
+    expect(authMock.onAuthStateChange).toHaveBeenCalledTimes(1);
+    expect(getAuthAccessToken()).toBe("session-token");
+  });
+
+  it.each(["resolve", "reject"])(
+    "keeps a newer native account when restored SDK hydration is late and then %ss",
+    async (outcome) => {
+      window.__TAURI__ = { core: { invoke: vi.fn(async () => undefined) } };
+      authMock.activeDesktopSession = true;
+      let complete!: (value: Awaited<ReturnType<typeof authMock.getSession>>) => void;
+      let fail!: (reason: Error) => void;
+      authMock.getSession.mockImplementationOnce(() => new Promise((resolve, reject) => {
+        complete = resolve;
+        fail = reject;
+      }));
+      render(<AuthProvider><AccountProbe /></AuthProvider>);
+      act(() => window.dispatchEvent(new CustomEvent(ADOPT_DESKTOP_AUTH_EVENT, {
+        detail: {
+          user: { id: "native-user", email: "native@example.com", user_metadata: {} },
+          accessToken: "native-account-token",
+        },
+      })));
+      expect(screen.getByLabelText("email")).toHaveTextContent("native@example.com");
+      await act(async () => {
+        if (outcome === "resolve") complete({
+          data: { session: { user: authMock.state.user, access_token: "stale-sdk-token" } }, error: null,
+        });
+        else fail(new Error("late hydration failed"));
+      });
+      act(() => authMock.emitAuthStateChange("TOKEN_REFRESHED", {
+        user: authMock.state.user, access_token: "stale-refresh-token",
+      }));
+      act(() => authMock.emitAuthStateChange("SIGNED_OUT", null));
+      expect(screen.getByLabelText("email")).toHaveTextContent("native@example.com");
+      expect(getAuthAccessToken()).toBe("native-account-token");
+    },
+  );
 
   it("updates a desktop username with the native-adopted access token", async () => {
     const request = vi.fn(async () => new Response("{}", { status: 200 }));

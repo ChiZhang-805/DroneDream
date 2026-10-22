@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   BROWSER_AUTH_STORAGE_KEY,
@@ -50,5 +50,82 @@ describe("desktop Supabase session namespace", () => {
     expect(editionAuthStorageKey(undefined)).toBeNull();
     expect(editionAuthStorageKey("")).toBeNull();
     expect(editionAuthStorageKey("unknown")).toBeNull();
+  });
+});
+
+describe("desktop session hydration", () => {
+  const currentKey = "dronedream-desktop-auth:autonomy:v1";
+  const session = JSON.stringify({
+    access_token: "active-access-token",
+    refresh_token: "active-refresh-token",
+    user: { id: "pilot-1" },
+  });
+
+  beforeEach(() => {
+    vi.resetModules();
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    window.__TAURI__ = { core: { invoke: vi.fn() } };
+    vi.stubEnv("VITE_DRONEDREAM_EDITION", "autonomy");
+    // These storage tests must not create a live cloud client.
+    vi.stubEnv("VITE_SUPABASE_URL", "");
+    vi.stubEnv("VITE_SUPABASE_PUBLISHABLE_KEY", "");
+  });
+
+  afterEach(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    delete window.__TAURI__;
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it("resumes an existing session only within the current edition's WebView", async () => {
+    window.sessionStorage.setItem(currentKey, session);
+    const { hasActiveDesktopAuthSession } = await import("../features/auth/supabaseClient");
+
+    expect(hasActiveDesktopAuthSession()).toBe(true);
+    window.sessionStorage.removeItem(currentKey);
+    expect(hasActiveDesktopAuthSession()).toBe(false);
+  });
+
+  it("does not use another edition or persistent browser storage to bypass sign-in", async () => {
+    window.sessionStorage.setItem("dronedream-desktop-auth:sim:v1", session);
+    window.sessionStorage.setItem(BROWSER_AUTH_STORAGE_KEY, session);
+    window.localStorage.setItem(currentKey, session);
+    window.localStorage.setItem(BROWSER_AUTH_STORAGE_KEY, session);
+    const { hasActiveDesktopAuthSession } = await import("../features/auth/supabaseClient");
+
+    expect(hasActiveDesktopAuthSession()).toBe(false);
+  });
+
+  it.each([
+    "not-json",
+    "null",
+    "{}",
+    JSON.stringify({ access_token: "", refresh_token: "refresh", user: {} }),
+    JSON.stringify({ access_token: "access", refresh_token: "", user: {} }),
+    JSON.stringify({ access_token: "access", refresh_token: "refresh", user: null }),
+  ])("ignores a malformed stored session: %s", async (stored) => {
+    window.sessionStorage.setItem(currentKey, stored);
+    const { hasActiveDesktopAuthSession } = await import("../features/auth/supabaseClient");
+
+    expect(hasActiveDesktopAuthSession()).toBe(false);
+  });
+
+  it("does not activate desktop hydration in a normal browser", async () => {
+    delete window.__TAURI__;
+    window.sessionStorage.setItem(currentKey, session);
+    const { hasActiveDesktopAuthSession } = await import("../features/auth/supabaseClient");
+
+    expect(hasActiveDesktopAuthSession()).toBe(false);
+  });
+
+  it("requires a known edition identity even when a session exists", async () => {
+    vi.stubEnv("VITE_DRONEDREAM_EDITION", "unknown");
+    window.sessionStorage.setItem(currentKey, session);
+    const { hasActiveDesktopAuthSession } = await import("../features/auth/supabaseClient");
+
+    expect(hasActiveDesktopAuthSession()).toBe(false);
   });
 });
