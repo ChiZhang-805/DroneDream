@@ -108,7 +108,7 @@ export function OAuthConsentPage({
     return () => {
       active = false;
     };
-  }, [account, authorizationId, onDesktopRedirect, text.requestFailed]);
+  }, [account, authorizationId, onDesktopRedirect, retryCycle, text.requestFailed]);
 
   useEffect(() => {
     approvalAttemptRef.current = null;
@@ -166,7 +166,12 @@ export function OAuthConsentPage({
           <button
             type="button"
             className="site-button site-button-primary"
-            onClick={() => setRetryCycle((cycle) => cycle + 1)}
+            onClick={() => {
+              // Revalidate the request before another approval; never reuse
+              // details left by the failed cycle while the new lookup runs.
+              setDetails(null);
+              setRetryCycle((cycle) => cycle + 1);
+            }}
           >
             {text.retry}
           </button>
