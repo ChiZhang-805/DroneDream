@@ -11,6 +11,9 @@ const authMock = vi.hoisted(() => ({
   signInWithPassword: vi.fn(async () => undefined),
   sendRegistrationCode: vi.fn(async () => undefined),
   verifyRegistrationCode: vi.fn(async () => undefined),
+  sendRecoveryCode: vi.fn(async () => undefined),
+  verifyRecoveryCode: vi.fn(async () => undefined),
+  signInWithProvider: vi.fn(async () => undefined),
 }));
 
 const desktopSignInMock = vi.hoisted(() => ({
@@ -32,14 +35,16 @@ vi.mock("../features/auth/AuthContext", () => ({
     configured: true,
     loading: false,
     account: null,
-    googleEnabled: false,
-    githubEnabled: false,
-    slackEnabled: false,
+    googleEnabled: true,
+    githubEnabled: true,
+    slackEnabled: true,
     appleEnabled: false,
     signInWithPassword: authMock.signInWithPassword,
     sendRegistrationCode: authMock.sendRegistrationCode,
     verifyRegistrationCode: authMock.verifyRegistrationCode,
-    signInWithProvider: vi.fn(),
+    sendRecoveryCode: authMock.sendRecoveryCode,
+    verifyRecoveryCode: authMock.verifyRecoveryCode,
+    signInWithProvider: authMock.signInWithProvider,
     updateDisplayName: vi.fn(),
     updateAvatar: vi.fn(),
     signOut: vi.fn(),
@@ -70,6 +75,9 @@ describe("workspace email and password authentication", () => {
     authMock.signInWithPassword.mockClear();
     authMock.sendRegistrationCode.mockClear();
     authMock.verifyRegistrationCode.mockClear();
+    authMock.sendRecoveryCode.mockClear();
+    authMock.verifyRecoveryCode.mockClear();
+    authMock.signInWithProvider.mockClear();
     desktopSignInMock.complete.mockClear();
     desktopSignInMock.cancel.mockClear();
     delete window.__TAURI__;
@@ -103,7 +111,7 @@ describe("workspace email and password authentication", () => {
 
     fireEvent.click(
       within(signInDialog).getByRole("button", {
-        name: "New to DroneDream? Register now",
+        name: "Register",
       }),
     );
     const registerDialog = screen.getByRole("dialog", { name: "Create account" });
@@ -137,6 +145,51 @@ describe("workspace email and password authentication", () => {
     await waitFor(() => {
       expect(authMock.verifyRegistrationCode).toHaveBeenCalledWith(
         "new@example.com",
+        "123456",
+        "new-password",
+      );
+    });
+
+    router.dispose();
+  });
+
+  it("matches the full account card with social sign-in and password recovery", async () => {
+    window.localStorage.setItem("drone-dream:locale", "en");
+    const { router } = renderWorkspace();
+
+    fireEvent.click(screen.getByRole("button", { name: "Account" }));
+    let dialog = screen.getByRole("dialog", { name: "Sign in to DroneDream" });
+    expect(within(dialog).getByRole("button", { name: "Continue with GitHub" })).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "Continue with Google" })).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "Continue with Slack" })).toBeVisible();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Continue with Google" }));
+    await waitFor(() => {
+      expect(authMock.signInWithProvider).toHaveBeenCalledWith("google");
+    });
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Forgot password" }));
+    dialog = screen.getByRole("dialog", { name: "Reset password" });
+    fireEvent.change(within(dialog).getByLabelText("Email address"), {
+      target: { value: "pilot@example.com" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Password"), {
+      target: { value: "new-password" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Confirm password"), {
+      target: { value: "new-password" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Send code" }));
+    await waitFor(() => {
+      expect(authMock.sendRecoveryCode).toHaveBeenCalledWith("pilot@example.com");
+    });
+    fireEvent.change(within(dialog).getByLabelText("Verification code"), {
+      target: { value: "123456" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Reset password and sign in" }));
+    await waitFor(() => {
+      expect(authMock.verifyRecoveryCode).toHaveBeenCalledWith(
+        "pilot@example.com",
         "123456",
         "new-password",
       );

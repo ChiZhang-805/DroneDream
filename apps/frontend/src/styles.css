@@ -3474,6 +3474,170 @@ code {
   margin-top: 0.75rem;
 }
 
+.account-dialog-brand {
+  display: block;
+  width: auto;
+  max-width: 14rem;
+  height: 2.65rem;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.account-dialog-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.account-dialog.is-auth-entry {
+  display: grid;
+  width: min(100%, 38rem);
+  gap: 0.95rem;
+  padding: 1.45rem 1.55rem 1.5rem;
+  border-color: rgba(150, 171, 255, 0.2);
+  color: #eff2ff;
+  background:
+    linear-gradient(150deg, rgba(255, 255, 255, 0.035), transparent 45%),
+    #0d1020;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.52);
+}
+
+.account-dialog.is-auth-entry > header { margin-bottom: 0; }
+
+.account-dialog.is-auth-entry h2 {
+  margin: 0.2rem 0 0.05rem;
+  color: #fff;
+  font-size: clamp(1.55rem, 3vw, 1.9rem);
+  letter-spacing: -0.035em;
+  text-align: center;
+}
+
+.account-dialog.is-auth-entry .account-dialog-close,
+.account-dialog.is-auth-entry .account-auth-mode {
+  min-height: 2.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.7rem;
+  color: #e7e9ff;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.account-dialog.is-auth-entry .account-dialog-close:hover,
+.account-dialog.is-auth-entry .account-dialog-close:focus-visible,
+.account-dialog.is-auth-entry .account-auth-mode:hover:not(:disabled),
+.account-dialog.is-auth-entry .account-auth-mode:focus-visible {
+  border-color: rgba(104, 232, 255, 0.42);
+  color: #fff;
+  background: rgba(104, 232, 255, 0.08);
+  text-decoration: none;
+  outline: none;
+}
+
+.account-dialog.is-auth-entry .account-auth-mode {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0 0.75rem;
+  font-size: 0.84rem;
+  font-weight: 720;
+}
+
+.account-dialog.is-auth-entry .account-auth-mode svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.account-dialog.is-auth-entry .account-email-form { gap: 0.78rem; }
+
+.account-dialog.is-auth-entry .account-email-form label > span {
+  color: rgba(235, 237, 249, 0.82);
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+.account-dialog.is-auth-entry .account-email-form input {
+  min-height: 2.95rem;
+  border-color: rgba(184, 188, 223, 0.25);
+  border-radius: 0.75rem;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.account-dialog.is-auth-entry .account-email-form input:focus {
+  border-color: #68e8ff;
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(104, 232, 255, 0.12);
+}
+
+.account-dialog.is-auth-entry .account-email-form > .btn-primary {
+  min-height: 3rem;
+  margin-top: 0.15rem;
+  border: 0;
+  border-radius: 0.75rem;
+  color: #07101b;
+  background: linear-gradient(110deg, #68e8ff, #a6a0ff 55%, #e652cb);
+  box-shadow: none;
+  font-weight: 760;
+}
+
+.account-dialog.is-auth-entry .account-recovery-copy {
+  margin: -0.15rem 0 0;
+  color: rgba(235, 237, 249, 0.72);
+  text-align: center;
+}
+
+.account-forgot-password {
+  justify-self: center;
+  padding: 0.4rem 0.2rem;
+  border: 0;
+  color: #c9d0ff;
+  background: transparent;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.account-forgot-password:hover:not(:disabled),
+.account-forgot-password:focus-visible {
+  color: #fff;
+  outline: none;
+}
+
+.account-dialog.is-auth-entry .account-social-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  margin-top: 0.05rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(184, 188, 223, 0.24);
+}
+
+.account-provider-icon {
+  display: grid;
+  width: 2.9rem;
+  height: 2.9rem;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(184, 188, 223, 0.3);
+  border-radius: 50%;
+  color: #12131a;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.account-provider-icon svg { width: 1.4rem; height: 1.4rem; }
+.account-provider-icon:hover:not(:disabled),
+.account-provider-icon:focus-visible {
+  border-color: rgba(104, 232, 255, 0.72);
+  box-shadow: 0 0 0 3px rgba(104, 232, 255, 0.1), 0 8px 22px rgba(3, 8, 24, 0.22);
+  transform: translateY(-1px);
+  outline: none;
+}
+.account-provider-icon:disabled { opacity: 0.52; cursor: default; }
+
 .account-profile-wrap {
   display: grid;
   gap: 1rem;

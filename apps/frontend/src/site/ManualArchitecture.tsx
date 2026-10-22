@@ -1,11 +1,11 @@
 import {
-  ArrowRight,
   BrainCircuit,
   Database,
   Map,
   Network,
   Route,
   ShieldCheck,
+  type LucideIcon,
 } from "lucide-react";
 
 import type { ArchitectureSectionId } from "./manualArchitectureData";
@@ -20,17 +20,22 @@ interface ManualArchitectureProps {
 const architectureCopy = {
   en: {
     map: {
-      eyebrow: "01 · WORLD MODEL",
       title: "Map is not a map",
-      lead: "A person sees a campus image. DroneDream reads named places, pickup points, and the corridors that connect them.",
+      paragraphs: [
+        "A person begins with one continuous aerial view. Buildings, trees, roads, courtyards, and entrances make sense together because the image preserves their visual context.",
+        "DroneDream turns that view into explicit geometry and meaning. It first aligns recognized roads, places, and pickup points with the source image, then removes the photographic layer to leave an agent-readable world model.",
+      ],
       human: "Human view",
       humanBody: "The orthophoto preserves buildings, trees, roads, courtyards, and visual context.",
+      processing: "Semantic processing",
+      processingBody: "Recognized roads, named places, and pickup points are aligned with the same geographic footprint.",
       agent: "Agent view",
       agentBody: "The same footprint becomes a connected graph with named buildings, pickup points, and bidirectional routes.",
+      firstTransition: "From visual context to recognized structure",
+      secondTransition: "From recognized structure to an agent-readable graph",
       formula: "Map = geometry + semantics + topology",
     },
     places: {
-      eyebrow: "02 · SEMANTIC PLACES",
       title: "A place becomes a node",
       lead: "Each visible destination is stored as a small, explicit record that tools can query and routes can reference.",
       cardTitle: "Chemicum",
@@ -44,7 +49,6 @@ const architectureCopy = {
       note: "Names give the model meaning. Coordinates give the runtime a place. Edges make the place reachable.",
     },
     execution: {
-      eyebrow: "03 · AGENT AND RUNTIME",
       title: "From intent to flight",
       lead: "The model translates a goal into a checked mission. Deterministic flight software executes it and remains in control of the aircraft.",
       steps: [
@@ -57,17 +61,22 @@ const architectureCopy = {
   },
   "zh-CN": {
     map: {
-      eyebrow: "01 · 世界模型",
       title: "Map is not a map",
-      lead: "人看到的是一张校园图片；DroneDream 读取的是地点名称、取件点，以及把它们连接起来的道路。",
-      human: "人眼中的地图",
+      paragraphs: [
+        "人首先看到的是一张连续的校园俯视图。建筑、树木、道路、庭院和入口共同保留在视觉环境中，因此彼此之间的关系一目了然。",
+        "DroneDream 会把这张图转换成明确的几何信息和语义信息：先把道路、地点和取件点准确贴回原图，再移除影像底层，留下智能体能够读取和计算的世界模型。",
+      ],
+      human: "人眼视图",
       humanBody: "俯视图保留建筑、树木、道路、庭院和完整的视觉环境。",
-      agent: "大模型使用的地图",
+      processing: "语义处理",
+      processingBody: "识别出的道路、地点名称和取件点被对齐到同一地理范围。",
+      agent: "智能体视图",
       agentBody: "同一范围被转换为连通图：有名称的建筑、蓝色取件点和双向道路。",
+      firstTransition: "从视觉环境到可识别结构",
+      secondTransition: "从可识别结构到智能体可读图",
       formula: "地图 = 几何信息 + 语义信息 + 连通关系",
     },
     places: {
-      eyebrow: "02 · 语义地点",
       title: "地点如何成为节点",
       lead: "每个可见目的地都会保存成清晰的小型记录，工具可以查询，路线可以直接引用。",
       cardTitle: "Chemicum",
@@ -81,7 +90,6 @@ const architectureCopy = {
       note: "名称提供含义，坐标提供位置，道路连接让地点真正可达。",
     },
     execution: {
-      eyebrow: "03 · 智能体与运行时",
       title: "从意图到飞行",
       lead: "大模型把自然语言目标转换为经过检查的任务；确定性的飞控软件负责执行，并始终控制无人机。",
       steps: [
@@ -94,41 +102,73 @@ const architectureCopy = {
   },
 } as const;
 
+function ArchitectureIntro({
+  id,
+  title,
+  paragraphs,
+  icon: Icon,
+}: {
+  id: string;
+  title: string;
+  paragraphs: readonly string[];
+  icon: LucideIcon;
+}) {
+  return (
+    <header className="manual-architecture-intro">
+      <h2 id={id}>
+        <span className="manual-chapter-icon" aria-hidden="true"><Icon /></span>
+        <span>{title}</span>
+        <i aria-hidden="true" />
+      </h2>
+      <div className="manual-architecture-prose">
+        {paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+      </div>
+    </header>
+  );
+}
+
 function ArchitectureMap({ locale }: { locale: SiteLocale }) {
   const copy = architectureCopy[locale].map;
+  const processingImage = "/docs/downloads/manual-assets/architecture-map-processing.webp";
   return (
     <section className="manual-architecture-page is-map" aria-labelledby="architecture-map-title">
-      <header className="manual-architecture-intro">
-        <p><Map aria-hidden="true" />{copy.eyebrow}</p>
-        <h2 id="architecture-map-title">{copy.title}</h2>
-        <span>{copy.lead}</span>
-      </header>
-      <div className="architecture-map-comparison">
-        <figure>
-          <div className="architecture-map-frame">
-            <img
-              src="/docs/downloads/manual-assets/architecture-map-human.webp"
-              alt={copy.human}
-            />
+      <ArchitectureIntro id="architecture-map-title" title={copy.title} paragraphs={copy.paragraphs} icon={Map} />
+      <div className="architecture-map-sequence">
+        <section className="architecture-map-transition" aria-labelledby="architecture-map-transition-one">
+          <header><span>01</span><h3 id="architecture-map-transition-one">{copy.firstTransition}</h3></header>
+          <div className="architecture-map-pair">
+            <figure>
+              <div className="architecture-map-frame">
+                <img src="/docs/downloads/manual-assets/architecture-map-human.webp" alt={copy.human} loading="lazy" />
+              </div>
+              <figcaption><strong>{copy.human}</strong><p>{copy.humanBody}</p></figcaption>
+            </figure>
+            <figure>
+              <div className="architecture-map-frame">
+                <img src={processingImage} alt={copy.processing} loading="lazy" />
+              </div>
+              <figcaption><strong>{copy.processing}</strong><p>{copy.processingBody}</p></figcaption>
+            </figure>
           </div>
-          <figcaption>
-            <span>01</span>
-            <div><strong>{copy.human}</strong><p>{copy.humanBody}</p></div>
-          </figcaption>
-        </figure>
-        <div className="architecture-map-arrow" aria-hidden="true"><ArrowRight /></div>
-        <figure>
-          <div className="architecture-map-frame">
-            <img
-              src="/docs/downloads/manual-assets/architecture-map-structured.webp"
-              alt={copy.agent}
-            />
+        </section>
+
+        <section className="architecture-map-transition" aria-labelledby="architecture-map-transition-two">
+          <header><span>02</span><h3 id="architecture-map-transition-two">{copy.secondTransition}</h3></header>
+          <div className="architecture-map-pair">
+            <figure>
+              <div className="architecture-map-frame">
+                <img src={processingImage} alt={copy.processing} loading="lazy" />
+              </div>
+              <figcaption><strong>{copy.processing}</strong><p>{copy.processingBody}</p></figcaption>
+            </figure>
+            <figure>
+              <div className="architecture-map-frame">
+                <img src="/docs/downloads/manual-assets/architecture-map-structured.webp" alt={copy.agent} loading="lazy" />
+              </div>
+              <figcaption><strong>{copy.agent}</strong><p>{copy.agentBody}</p></figcaption>
+            </figure>
           </div>
-          <figcaption>
-            <span>02</span>
-            <div><strong>{copy.agent}</strong><p>{copy.agentBody}</p></div>
-          </figcaption>
-        </figure>
+        </section>
       </div>
       <div className="architecture-formula"><Network aria-hidden="true" />{copy.formula}</div>
     </section>
@@ -139,11 +179,7 @@ function ArchitecturePlaces({ locale }: { locale: SiteLocale }) {
   const copy = architectureCopy[locale].places;
   return (
     <section className="manual-architecture-page is-places" aria-labelledby="architecture-places-title">
-      <header className="manual-architecture-intro">
-        <p><Database aria-hidden="true" />{copy.eyebrow}</p>
-        <h2 id="architecture-places-title">{copy.title}</h2>
-        <span>{copy.lead}</span>
-      </header>
+      <ArchitectureIntro id="architecture-places-title" title={copy.title} paragraphs={[copy.lead]} icon={Database} />
       <div className="architecture-place-layout">
         <div className="architecture-node-card">
           <div><i aria-hidden="true" /><small>PLACE / 33270</small></div>
@@ -175,11 +211,7 @@ function ArchitectureExecution({ locale }: { locale: SiteLocale }) {
   const icons = [BrainCircuit, Route, ShieldCheck];
   return (
     <section className="manual-architecture-page is-execution" aria-labelledby="architecture-execution-title">
-      <header className="manual-architecture-intro">
-        <p><Route aria-hidden="true" />{copy.eyebrow}</p>
-        <h2 id="architecture-execution-title">{copy.title}</h2>
-        <span>{copy.lead}</span>
-      </header>
+      <ArchitectureIntro id="architecture-execution-title" title={copy.title} paragraphs={[copy.lead]} icon={Route} />
       <ol className="architecture-execution-flow">
         {copy.steps.map(([title, body], index) => {
           const Icon = icons[index];
