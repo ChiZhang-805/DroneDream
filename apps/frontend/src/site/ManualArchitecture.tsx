@@ -2,7 +2,6 @@ import {
   BrainCircuit,
   Database,
   Map,
-  Network,
   Route,
   ShieldCheck,
   type LucideIcon,
@@ -22,8 +21,7 @@ const architectureCopy = {
     map: {
       title: "Map is not a map",
       paragraphs: [
-        "A person begins with one continuous aerial view. Buildings, trees, roads, courtyards, and entrances make sense together because the image preserves their visual context.",
-        "DroneDream turns that view into explicit geometry and meaning. It first aligns recognized roads, places, and pickup points with the source image, then removes the photographic layer to leave an agent-readable world model.",
+        "To a person, this is an aerial map whose buildings, trees, roads, courtyards, and entrances make sense as one visual scene. DroneDream structures that scene into named places, pickup points, and connected bidirectional routes, preserving where every element belongs while turning the image into information an agent can query and use.",
       ],
       human: "Human view",
       humanBody: "The orthophoto preserves buildings, trees, roads, courtyards, and visual context.",
@@ -32,8 +30,9 @@ const architectureCopy = {
       agent: "Agent view",
       agentBody: "The same footprint becomes a connected graph with named buildings, pickup points, and bidirectional routes.",
       firstTransition: "From visual context to recognized structure",
+      firstTransitionBody: "DroneDream identifies the roads that connect the campus, recognizes buildings and their entrances, places pickup points at those entrances, and aligns every extracted element with the same geographic footprint.",
       secondTransition: "From recognized structure to an agent-readable graph",
-      formula: "Map = geometry + semantics + topology",
+      secondTransitionBody: "The aligned observations are converted into an agent-readable network: named places become nodes, pickup points become access nodes, and bidirectional roads become connected edges that the planner can follow.",
     },
     places: {
       title: "A place becomes a node",
@@ -63,8 +62,7 @@ const architectureCopy = {
     map: {
       title: "Map is not a map",
       paragraphs: [
-        "人首先看到的是一张连续的校园俯视图。建筑、树木、道路、庭院和入口共同保留在视觉环境中，因此彼此之间的关系一目了然。",
-        "DroneDream 会把这张图转换成明确的几何信息和语义信息：先把道路、地点和取件点准确贴回原图，再移除影像底层，留下智能体能够读取和计算的世界模型。",
+        "从人的视角看，这是一张连续的校园俯视地图，建筑、树木、道路、庭院和入口共同构成完整的视觉环境；对 DroneDream 来说，它会把同一幅图结构化为有名称的地点、取件点和彼此连通的双向道路，在保留每项信息真实位置的同时，将地图转换为智能体能够查询和使用的数据。",
       ],
       human: "人眼视图",
       humanBody: "俯视图保留建筑、树木、道路、庭院和完整的视觉环境。",
@@ -73,8 +71,9 @@ const architectureCopy = {
       agent: "智能体视图",
       agentBody: "同一范围被转换为连通图：有名称的建筑、蓝色取件点和双向道路。",
       firstTransition: "从视觉环境到可识别结构",
+      firstTransitionBody: "DroneDream 会识别连接校园的道路、建筑及其入口，把取件点放到对应入口处，并将提取出的每一个元素准确对齐到同一地理范围。",
       secondTransition: "从可识别结构到智能体可读图",
-      formula: "地图 = 几何信息 + 语义信息 + 连通关系",
+      secondTransitionBody: "对齐后的观察结果会被转换成智能体可读的网络：有名称的地点成为节点，取件点成为访问节点，双向道路成为规划器可以沿着行进的连通边。",
     },
     places: {
       title: "地点如何成为节点",
@@ -136,6 +135,7 @@ function ArchitectureMap({ locale }: { locale: SiteLocale }) {
       <div className="architecture-map-sequence">
         <section className="architecture-map-transition" aria-labelledby="architecture-map-transition-one">
           <header><span>01</span><h3 id="architecture-map-transition-one">{copy.firstTransition}</h3></header>
+          <p>{copy.firstTransitionBody}</p>
           <div className="architecture-map-pair">
             <figure>
               <div className="architecture-map-frame">
@@ -154,6 +154,7 @@ function ArchitectureMap({ locale }: { locale: SiteLocale }) {
 
         <section className="architecture-map-transition" aria-labelledby="architecture-map-transition-two">
           <header><span>02</span><h3 id="architecture-map-transition-two">{copy.secondTransition}</h3></header>
+          <p>{copy.secondTransitionBody}</p>
           <div className="architecture-map-pair">
             <figure>
               <div className="architecture-map-frame">
@@ -170,7 +171,6 @@ function ArchitectureMap({ locale }: { locale: SiteLocale }) {
           </div>
         </section>
       </div>
-      <div className="architecture-formula"><Network aria-hidden="true" />{copy.formula}</div>
     </section>
   );
 }

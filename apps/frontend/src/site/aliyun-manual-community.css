@@ -3006,16 +3006,11 @@ html[lang="zh-CN"] .manual-architecture-prose p {
 }
 
 .architecture-map-transition > header > span {
-  display: grid;
-  width: 32px;
-  height: 32px;
   flex: 0 0 auto;
-  border-radius: 10px;
-  color: #fff;
-  background: linear-gradient(135deg, #c73ed1, #6559eb);
-  font-size: 0.68rem;
+  color: #8a4ce6;
+  font-size: var(--manual-section-title-size);
   font-weight: 820;
-  place-items: center;
+  line-height: 1;
 }
 
 .architecture-map-transition h3 {
@@ -3025,8 +3020,25 @@ html[lang="zh-CN"] .manual-architecture-prose p {
   letter-spacing: -0.018em;
 }
 
+.architecture-map-transition > p {
+  width: min(100%, var(--manual-prose-max-width));
+  margin: 0;
+  color: #485569;
+  font-size: inherit;
+  line-height: var(--manual-copy-line-height);
+  text-align: justify;
+  text-justify: inter-word;
+  hyphens: auto;
+}
+
+html[lang="zh-CN"] .architecture-map-transition > p {
+  text-justify: inter-ideograph;
+  word-break: normal;
+}
+
 .architecture-map-pair {
   display: grid;
+  width: min(100%, var(--manual-prose-max-width));
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 2px;
   overflow: hidden;

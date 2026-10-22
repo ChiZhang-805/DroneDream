@@ -54,6 +54,9 @@ describe("manual sidebar stylesheet contract", () => {
     expect(stylesheet).toMatch(
       /\.manual-architecture-intro h2\s*\{[\s\S]*?font-size:\s*var\(--manual-chapter-title-size\);/u,
     );
+    expect(stylesheet).toMatch(
+      /\.architecture-map-pair\s*\{[\s\S]*?width:\s*min\(100%,\s*var\(--manual-prose-max-width\)\);/u,
+    );
   });
 
   it("ships both same-footprint map views used by the architecture comparison", () => {
@@ -68,5 +71,15 @@ describe("manual sidebar stylesheet contract", () => {
       expect(statSync(assetPath).size).toBeGreaterThan(100_000);
       expect(architecturePage).toContain(`/docs/downloads/manual-assets/${asset}`);
     }
+  });
+
+  it("keeps the map explanation narrative and removes the formula card", () => {
+    expect(architecturePage).toContain("firstTransitionBody");
+    expect(architecturePage).toContain("secondTransitionBody");
+    expect(architecturePage).not.toContain("architecture-formula");
+    expect(architecturePage).not.toContain("Map = geometry + semantics + topology");
+    expect(stylesheet).toMatch(
+      /\.architecture-map-transition > header > span\s*\{[\s\S]*?font-size:\s*var\(--manual-section-title-size\);/u,
+    );
   });
 });
