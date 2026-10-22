@@ -106,7 +106,7 @@ const architectureCopy = {
       processing: "Semantic processing",
       processingBody: "Recognized roads, named places, and pickup points align with the same geographic footprint.",
       agent: "Agent view",
-      agentBody: "The footprint becomes a connected graph with named buildings, pickup points, and bidirectional routes.",
+      agentBody: "The footprint becomes a graph with named buildings, pickup points, and bidirectional routes.",
       firstTransition: "From visual context to recognized structure",
       firstTransitionBody: "DroneDream identifies the roads that connect the campus, recognizes buildings and their entrances, places pickup points at those entrances, and aligns every extracted element with the same geographic footprint.",
       secondTransition: "From recognized structure to an agent-readable graph",
