@@ -1,4 +1,4 @@
-export type ArchitectureSectionId = "map" | "drone";
+export type ArchitectureSectionId = "map" | "drone" | "model";
 
 type SiteLocale = "en" | "zh-CN";
 
@@ -32,6 +32,18 @@ const sectionLabels: Record<
         { id: "architecture-drone-transition-three", label: "Fit it to the map" },
       ],
     },
+    {
+      id: "model",
+      label: "The model is not the system",
+      anchorId: "architecture-model-title",
+      subsections: [
+        { id: "architecture-model-transition-one", label: "Understand the request" },
+        { id: "architecture-model-transition-two", label: "Call bounded tools" },
+        { id: "architecture-model-transition-three", label: "Keep I/O structured" },
+        { id: "architecture-model-transition-four", label: "Use visual evidence" },
+        { id: "architecture-model-transition-five", label: "Run the Harness" },
+      ],
+    },
   ],
   "zh-CN": [
     {
@@ -52,6 +64,18 @@ const sectionLabels: Record<
         { id: "architecture-drone-transition-one", label: "读懂无人机" },
         { id: "architecture-drone-transition-two", label: "建立机型契约" },
         { id: "architecture-drone-transition-three", label: "适配地图空域" },
+      ],
+    },
+    {
+      id: "model",
+      label: "The model is not the system",
+      anchorId: "architecture-model-title",
+      subsections: [
+        { id: "architecture-model-transition-one", label: "理解自然语言任务" },
+        { id: "architecture-model-transition-two", label: "调用受限工具" },
+        { id: "architecture-model-transition-three", label: "保持结构化输入输出" },
+        { id: "architecture-model-transition-four", label: "读取视觉证据" },
+        { id: "architecture-model-transition-five", label: "运行 Harness" },
       ],
     },
   ],

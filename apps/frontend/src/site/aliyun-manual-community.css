@@ -3113,10 +3113,11 @@ html[lang="zh-CN"] .architecture-map-transition > p {
 }
 
 .architecture-json-example pre {
-  max-height: 540px;
+  max-height: none;
   margin: 0;
   padding: 3.35rem 1.25rem 1.3rem;
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   color: #e5ecff;
   background: transparent;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
@@ -3145,7 +3146,7 @@ html[lang="zh-CN"] .architecture-map-transition > p {
   position: relative;
   display: grid;
   min-height: 438px;
-  grid-template-columns: minmax(0, 68%) minmax(230px, 32%);
+  grid-template-columns: minmax(0, 70%) minmax(220px, 30%);
   isolation: isolate;
 }
 
@@ -3158,15 +3159,16 @@ html[lang="zh-CN"] .architecture-map-transition > p {
     linear-gradient(145deg, rgba(240, 250, 255, 0.92), rgba(250, 244, 255, 0.82));
 }
 
-.architecture-drone-visual svg {
+.architecture-drone-visual img {
   display: block;
   width: 100%;
   height: 100%;
+  object-fit: contain;
 }
 
 .architecture-drone-connectors {
   position: absolute;
-  z-index: 2;
+  z-index: 5;
   inset: 0;
   width: 100%;
   height: 100%;
@@ -3180,6 +3182,27 @@ html[lang="zh-CN"] .architecture-map-transition > p {
   vector-effect: non-scaling-stroke;
 }
 
+.architecture-drone-connectors .architecture-drone-baseline {
+  stroke: rgba(126, 80, 218, 0.42);
+  stroke-width: 1;
+}
+
+.architecture-drone-connectors circle {
+  vector-effect: non-scaling-stroke;
+}
+
+.architecture-drone-source {
+  fill: #7550d8;
+  stroke: #fff;
+  stroke-width: 3;
+}
+
+.architecture-drone-target {
+  fill: #fff;
+  stroke: #7550d8;
+  stroke-width: 3;
+}
+
 .architecture-drone-facts {
   position: relative;
   z-index: 3;
@@ -3187,7 +3210,7 @@ html[lang="zh-CN"] .architecture-map-transition > p {
   min-width: 0;
   grid-template-rows: repeat(5, 1fr);
   margin: 0;
-  padding: 1.2rem 1.15rem 1.2rem 2.2rem;
+  padding: 1.2rem 1.15rem 1.2rem 3.55rem;
   border-left: 1px solid rgba(101, 92, 167, 0.12);
   background: rgba(255, 255, 255, 0.76);
   backdrop-filter: blur(10px);
@@ -3221,16 +3244,18 @@ html[lang="zh-CN"] .architecture-map-transition > p {
 }
 
 .architecture-airspace-scene {
-  min-height: 420px;
+  aspect-ratio: 16 / 9;
+  min-height: 0;
   background:
     radial-gradient(circle at 62% 38%, rgba(137, 111, 233, 0.16), transparent 34%),
     linear-gradient(152deg, rgba(242, 250, 255, 0.96), rgba(250, 244, 255, 0.92));
 }
 
-.architecture-airspace-scene svg {
+.architecture-airspace-scene img {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
 }
 
 .architecture-airspace-diagram figcaption {
@@ -3264,6 +3289,214 @@ html[lang="zh-CN"] .architecture-map-transition > p {
   font-size: 0.72rem;
   line-height: 1.45;
 }
+
+.architecture-json-example .token-comment { color: #7181a5; font-style: italic; }
+.architecture-json-example .token-string { color: #8ee0bd; }
+.architecture-json-example .token-keyword { color: #d589ff; font-weight: 700; }
+.architecture-json-example .token-literal { color: #67c9f3; }
+.architecture-json-example .token-number { color: #f1bb78; }
+
+.architecture-model-request,
+.architecture-tool-examples,
+.architecture-structured-io,
+.architecture-vision-evidence,
+.architecture-harness-flow {
+  width: min(100%, var(--manual-prose-max-width));
+}
+
+.architecture-model-request {
+  display: grid;
+  gap: 1rem;
+}
+
+.architecture-model-request blockquote {
+  position: relative;
+  margin: 0;
+  padding: 1.15rem 1.3rem 1.15rem 1.55rem;
+  border: 1px solid rgba(118, 92, 202, 0.16);
+  border-radius: 18px;
+  color: #27314a;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 14px 34px rgba(67, 66, 112, 0.08);
+  font-family: "Space Grotesk Variable", "Space Grotesk", Inter, sans-serif;
+  font-size: clamp(1rem, 1.25vw, 1.15rem);
+  font-weight: 620;
+  line-height: 1.65;
+}
+
+.architecture-model-request blockquote::before {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.62rem;
+  color: #8a58e3;
+  content: "“";
+  font-size: 1.65rem;
+  line-height: 1;
+}
+
+.architecture-tool-examples {
+  display: grid;
+  gap: 1.35rem;
+}
+
+.architecture-tool-examples article {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.architecture-tool-examples h4 {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  margin: 0;
+  color: #20273a;
+  font-size: 1.02rem;
+}
+
+.architecture-tool-examples h4 > span {
+  color: #8a55e7;
+  font-family: "Space Grotesk Variable", "Space Grotesk", Inter, sans-serif;
+}
+
+.architecture-tool-examples article > p {
+  margin: 0;
+  color: #687488;
+  font-size: var(--manual-supporting-size);
+  line-height: 1.65;
+}
+
+.architecture-tool-examples .architecture-json-example pre {
+  font-size: 0.78rem;
+}
+
+.architecture-structured-io {
+  display: grid;
+  gap: 1.2rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.architecture-structured-io .architecture-json-example {
+  width: 100%;
+}
+
+.architecture-structured-io pre {
+  font-size: 0.72rem;
+  line-height: 1.62;
+}
+
+.architecture-vision-evidence {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid rgba(101, 92, 167, 0.18);
+  border-radius: clamp(18px, 2vw, 28px);
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 24px 60px rgba(67, 66, 112, 0.12);
+}
+
+.architecture-vision-evidence figure {
+  min-width: 0;
+  margin: 0;
+  border-right: 1px solid rgba(101, 92, 167, 0.12);
+}
+
+.architecture-vision-evidence figure:last-child { border-right: 0; }
+
+.architecture-vision-evidence figure > div {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: #eef2f8;
+}
+
+.architecture-vision-evidence img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.architecture-vision-evidence figure > div > span {
+  position: absolute;
+  top: 0.7rem;
+  left: 0.7rem;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(32, 23, 58, 0.78);
+  font-size: 0.7rem;
+  font-weight: 800;
+  place-items: center;
+  backdrop-filter: blur(8px);
+}
+
+.architecture-vision-evidence figcaption {
+  min-height: 128px;
+  padding: 0.85rem;
+}
+
+.architecture-vision-evidence figcaption strong {
+  display: block;
+  color: #20273a;
+  font-size: 0.86rem;
+}
+
+.architecture-vision-evidence figcaption p {
+  margin: 0.3rem 0 0;
+  color: #687488;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.architecture-harness-flow {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(101, 92, 167, 0.18);
+  border-radius: clamp(18px, 2vw, 28px);
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 24px 60px rgba(67, 66, 112, 0.11);
+  list-style: none;
+}
+
+.architecture-harness-flow li {
+  position: relative;
+  min-width: 0;
+  padding: 1rem 0.7rem 1.1rem;
+  border-right: 1px solid rgba(101, 92, 167, 0.12);
+}
+
+.architecture-harness-flow li:last-child { border-right: 0; }
+
+.architecture-harness-flow li:not(:last-child)::after {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: -5px;
+  width: 9px;
+  height: 9px;
+  border-top: 1px solid #8a58e3;
+  border-right: 1px solid #8a58e3;
+  background: #fff;
+  content: "";
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.architecture-harness-flow li > span {
+  color: #8a55e7;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.architecture-harness-flow strong,
+.architecture-harness-flow p { display: block; }
+.architecture-harness-flow strong { margin-top: 0.28rem; color: #20273a; font-size: 0.78rem; }
+.architecture-harness-flow p { margin: 0.25rem 0 0; color: #687488; font-size: 0.64rem; line-height: 1.42; }
 
 .architecture-formula,
 .architecture-boundary {
@@ -3470,6 +3703,10 @@ html[lang="zh-CN"] .architecture-map-transition > p {
   .architecture-place-layout,
   .architecture-execution-flow { grid-template-columns: minmax(0, 1fr); }
   .architecture-execution-flow li { min-height: 210px; }
+  .architecture-harness-flow { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .architecture-harness-flow li:nth-child(4) { border-right: 0; }
+  .architecture-harness-flow li:nth-child(-n + 4) { border-bottom: 1px solid rgba(101, 92, 167, 0.12); }
+  .architecture-harness-flow li:nth-child(4)::after { display: none; }
   .manual-sidebar nav a {
     border-color: rgba(74, 83, 112, 0.12);
     color: #656a7a;
@@ -3554,6 +3791,18 @@ html[lang="zh-CN"] .architecture-map-transition > p {
   .architecture-airspace-diagram figcaption { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .architecture-airspace-diagram figcaption > div:nth-child(2) { border-right: 0; }
   .architecture-airspace-diagram figcaption > div:nth-child(-n + 2) { border-bottom: 1px solid rgba(101, 92, 167, 0.1); }
+  .architecture-structured-io { grid-template-columns: minmax(0, 1fr); }
+  .architecture-vision-evidence { grid-template-columns: minmax(0, 1fr); }
+  .architecture-vision-evidence figure { border-right: 0; border-bottom: 1px solid rgba(101, 92, 167, 0.12); }
+  .architecture-vision-evidence figure:last-child { border-bottom: 0; }
+  .architecture-vision-evidence figure > div { aspect-ratio: 16 / 9; }
+  .architecture-vision-evidence figcaption { min-height: 0; }
+  .architecture-harness-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .architecture-harness-flow li { border-right: 1px solid rgba(101, 92, 167, 0.12); border-bottom: 1px solid rgba(101, 92, 167, 0.12); }
+  .architecture-harness-flow li:nth-child(even) { border-right: 0; }
+  .architecture-harness-flow li:nth-child(4)::after { display: block; }
+  .architecture-harness-flow li:nth-child(even)::after { display: none; }
+  .architecture-harness-flow li:last-child { border-bottom: 0; }
   .architecture-node-card dl > div { grid-template-columns: 1fr; gap: 0.25rem; }
 }
 
