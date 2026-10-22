@@ -415,8 +415,9 @@ export function parseAutonomyPlannerArtifact(value: unknown): AutonomyPlannerArt
   if (
     !Number.isSafeInteger(artifact.repair.attempt)
     || artifact.repair.attempt < 0
-    || artifact.repair.attempt > 3
-    || artifact.repair.max_attempts !== 3
+    || !Number.isSafeInteger(artifact.repair.max_attempts)
+    || ![3, 5].includes(artifact.repair.max_attempts)
+    || artifact.repair.attempt > artifact.repair.max_attempts
     || !Number.isSafeInteger(artifact.repair.repeated_plan_hashes)
     || artifact.repair.repeated_plan_hashes < 0
     || artifact.repair.repeated_plan_hashes > 2
