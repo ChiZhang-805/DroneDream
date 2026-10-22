@@ -7,6 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { X } from "lucide-react";
 import type {
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
@@ -56,7 +57,6 @@ export function AvatarCropDialog({
   onSourceError,
 }: AvatarCropDialogProps) {
   const titleId = useId();
-  const instructionsId = useId();
   const dialogRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -243,13 +243,9 @@ export function AvatarCropDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        aria-describedby={instructionsId}
       >
         <header>
-          <div>
-            <h3 id={titleId}>{copy.title}</h3>
-            <p id={instructionsId}>{copy.instructions}</p>
-          </div>
+          <h3 id={titleId}>{copy.title}</h3>
           <button
             ref={closeRef}
             type="button"
@@ -258,7 +254,7 @@ export function AvatarCropDialog({
             disabled={pending}
             onClick={onCancel}
           >
-            <span aria-hidden="true">×</span>
+            <X aria-hidden="true" strokeWidth={2.2} />
           </button>
         </header>
 

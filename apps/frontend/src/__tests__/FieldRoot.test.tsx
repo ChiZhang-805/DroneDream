@@ -20,15 +20,15 @@ vi.mock("../field/FieldApp", () => ({
   FieldApp: ({
     initialLocale,
     focusOnMount,
+    onSignedOut,
   }: {
     initialLocale: string;
     focusOnMount: boolean;
+    onSignedOut: () => void;
   }) => (
-    <div
-      data-testid="field-workspace"
-      data-locale={initialLocale}
-      data-focus-on-mount={String(focusOnMount)}
-    />
+    <div data-testid="field-workspace" data-locale={initialLocale} data-focus-on-mount={String(focusOnMount)}>
+      <button type="button" onClick={onSignedOut}>Sign out probe</button>
+    </div>
   ),
 }));
 
@@ -142,6 +142,18 @@ describe("FieldRoot", () => {
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "0");
     expect(screen.getByRole("button", { name: "Enter workspace" })).toBeDisabled();
     expect(screen.queryByTestId("field-workspace")).not.toBeInTheDocument();
+  });
+
+  it("returns to the Field launch screen after signing out", async () => {
+    vi.useFakeTimers();
+    render(<FieldLocaleProvider><FieldRoot /></FieldLocaleProvider>);
+    await finishLoading();
+    fireEvent.click(screen.getByRole("button", { name: "Enter workspace" }));
+    expect(screen.getByTestId("field-workspace")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sign out probe" }));
+    expect(screen.queryByTestId("field-workspace")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Enter workspace" })).toBeVisible();
   });
 
 });

@@ -3113,12 +3113,14 @@ function AccountMenuPopover({
   onEditProfile,
   onOpenAllowance,
   onOpenSettings,
+  onSignedOut,
 }: {
   menuRef: RefObject<HTMLDivElement>;
   onClose: () => void;
   onEditProfile: () => void;
   onOpenAllowance: () => void;
   onOpenSettings: () => void;
+  onSignedOut: () => void;
 }) {
   const auth = useAuth();
   const { interfaceLocale } = useI18n();
@@ -3161,6 +3163,7 @@ function AccountMenuPopover({
     try {
       await auth.signOut();
       onClose();
+      onSignedOut();
     } catch {
       setSignOutError(true);
       setSignOutPending(false);
@@ -3204,6 +3207,7 @@ export function AccountDialog({
   desktopBrowserAuthReady = false,
   onOpenDesktopSetup,
   onClose,
+  onSignedOut,
 }: {
   closeRef: RefObject<HTMLButtonElement>;
   required: boolean;
@@ -3211,6 +3215,7 @@ export function AccountDialog({
   desktopBrowserAuthReady?: boolean;
   onOpenDesktopSetup?: () => void;
   onClose: () => void;
+  onSignedOut: () => void;
 }) {
   const { locale } = useI18n();
   const copy = ACCOUNT_COPY[locale];
@@ -3480,7 +3485,8 @@ export function AccountDialog({
       className={`account-dialog${auth.configured && !auth.account ? " is-auth-entry" : ""}`}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="account-dialog-title"
+      aria-labelledby={auth.account ? undefined : "account-dialog-title"}
+      aria-label={auth.account ? copy.title : undefined}
     >
       <header>
         <BrandLockup edition="universal" className="account-dialog-brand" />
@@ -3510,17 +3516,15 @@ export function AccountDialog({
         </div>
       </header>
 
-      <h2 id="account-dialog-title">
+      {!auth.account ? <h2 id="account-dialog-title">
         {!auth.configured
           ? copy.localTitle
-          : auth.account
-            ? copy.title
-            : authMode === "register"
+          : authMode === "register"
               ? copy.registerTitle
               : authMode === "recovery"
                 ? copy.recoveryTitle
                 : copy.signInTitle}
-      </h2>
+      </h2> : null}
 
       {!auth.configured ? (
         <p className="account-dialog-copy">{copy.localBody}</p>
@@ -3548,7 +3552,10 @@ export function AccountDialog({
               type="button"
               className="btn account-sign-out"
               disabled={pending}
-              onClick={() => void run(auth.signOut)}
+              onClick={() => void run(async () => {
+                await auth.signOut();
+                onSignedOut();
+              })}
             >
               {copy.signOut}
             </button>
@@ -4335,6 +4342,15 @@ function AppShellContent() {
     });
   }, [accountRequired, mobileNavigationEnabled]);
 
+  const returnToLauncherAfterSignOut = useCallback(() => {
+    setAccountMenuOpen(false);
+    setAccountOpen(false);
+    setLauncherSettingsOpen(false);
+    setSettingsWorkspaceOpen(false);
+    setMobileMenuOpen(false);
+    navigate(desktopRuntime ? "/desktop/setup" : "/", { replace: true });
+  }, [desktopRuntime, navigate]);
+
   useEffect(() => {
     if (!mobileMenuExpanded) return;
     const closeMobileMenu = (restoreFocus: boolean) => {
@@ -4624,6 +4640,7 @@ function AppShellContent() {
         desktopBrowserAuthReady={runtimeAccess.canUseRuntime}
         onOpenDesktopSetup={() => navigate("/desktop/setup")}
         onClose={closeAccount}
+        onSignedOut={returnToLauncherAfterSignOut}
       />
     </div>
   ) : null;
@@ -4858,6 +4875,7 @@ function AppShellContent() {
                 onOpenSettings={() => {
                   openSettingsWorkspace("general", "account");
                 }}
+                onSignedOut={returnToLauncherAfterSignOut}
               />
             ) : null}
             <button

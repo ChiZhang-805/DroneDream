@@ -114,6 +114,10 @@ describe("manual sidebar stylesheet contract", () => {
     expect(manualPage).toContain('className="manual-nav-chapter-row"');
     expect(manualPage).toContain('className="manual-nav-subsections"');
     expect(manualPage).toContain("toggleArchitectureChapter");
+    expect(manualPage).toContain("previousArchitectureSection");
+    expect(manualPage).toContain("nextArchitectureSection");
+    expect(manualPage).toContain("previousArchitectureSection?.label ?? copy.beginning");
+    expect(manualPage).toContain("nextArchitectureSection?.label ?? copy.ending");
   });
 
   it("documents the real aircraft contract and its map-specific 3D corridor", () => {
