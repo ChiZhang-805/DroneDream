@@ -769,6 +769,7 @@ export interface AgentCoreMissionPrepareSummary {
   capability_broker_receipts_sha256: string;
   integration_artifact: AutonomyPlannerArtifact;
   integration_artifact_sha256: string;
+  integration_artifact_canonical_json: string;
   notifications?: Array<{ kind: "plan" | "status"; content: string; metadata?: Record<string, unknown> }>;
 }
 

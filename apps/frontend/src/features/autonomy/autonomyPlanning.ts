@@ -13,6 +13,7 @@ import {
 import {
   autonomyAssetBlockerMessage,
   autonomyCanonicalSha256,
+  autonomyTextSha256,
   autonomyHarnessRequest,
   autonomyModelContext,
   autonomyPlannerBindingIssues,
@@ -348,9 +349,22 @@ export async function planAutonomyMission(
         inputChannel: input.inputChannel,
         transcriptSource: input.transcriptSource,
       });
-      plannerArtifact = parseAutonomyPlannerArtifact(coreSummary.integration_artifact);
+      let canonicalArtifact: unknown;
+      try {
+        canonicalArtifact = JSON.parse(coreSummary.integration_artifact_canonical_json);
+      } catch {
+        throw new Error("AGENT Core returned invalid canonical planner JSON.");
+      }
+      plannerArtifact = parseAutonomyPlannerArtifact(canonicalArtifact);
       if (!plannerArtifact) throw new Error("AGENT Core returned an invalid planner artifact.");
-      const localArtifactSha256 = await autonomyCanonicalSha256(plannerArtifact);
+      const receivedArtifactSha256 = await autonomyCanonicalSha256(coreSummary.integration_artifact);
+      const canonicalArtifactSha256 = await autonomyCanonicalSha256(canonicalArtifact);
+      if (receivedArtifactSha256 !== canonicalArtifactSha256) {
+        throw new Error("AGENT Core planner artifact payload mismatch.");
+      }
+      const localArtifactSha256 = await autonomyTextSha256(
+        coreSummary.integration_artifact_canonical_json,
+      );
       if (localArtifactSha256 !== coreSummary.integration_artifact_sha256) {
         throw new Error("AGENT Core planner artifact digest mismatch.");
       }

@@ -93,12 +93,16 @@ function canonicalJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
-export async function autonomyCanonicalSha256(value: unknown): Promise<string> {
-  const bytes = new TextEncoder().encode(canonicalJson(value));
+export async function autonomyTextSha256(value: string): Promise<string> {
+  const bytes = new TextEncoder().encode(value);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return [...new Uint8Array(digest)]
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
+}
+
+export async function autonomyCanonicalSha256(value: unknown): Promise<string> {
+  return autonomyTextSha256(canonicalJson(value));
 }
 
 export function autonomyHarnessRequest(
