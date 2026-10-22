@@ -157,7 +157,8 @@ export async function interpretAgentCoreAsset(input: Pick<AgentCorePlanningInput
   const version = latestAssetVersion(bootstrap.asset_versions, input.assetId, input.contentSha256, input.kind);
   const thread = await createAgentCoreThread({ title: input.locale === "zh-CN" ? "资产解析" : "Asset interpretation", selected_model: modelId });
   const grant = input.accessMode === "platform"
-    ? await issueManagedModelGrant("assistant", thread.thread_id, input.provider as "openai" | "deepseek" | "qwen" | "kimi", input.model)
+    // Asset interpretation spans validation and bounded retries, so it needs a job grant.
+    ? await issueManagedModelGrant("job", thread.thread_id, input.provider as "openai" | "deepseek" | "qwen" | "kimi", input.model)
     : await issueAgentCoreCustomModelGrant(input.agentCoreProfileId!, thread.thread_id);
   const result = await requestAgentCoreAssetInterpretation(thread.thread_id, {
     expected_owner_account_id: input.accountId, source_edition: input.edition,
@@ -457,7 +458,8 @@ export async function planWithAgentCore(
   }
   const grant = input.accessMode === "platform"
     ? await issueManagedModelGrant(
-        "assistant",
+        // One natural-language mission spans multiple model stages.
+        "job",
         thread.thread_id,
         input.provider as "openai" | "deepseek" | "qwen" | "kimi",
         input.model,
@@ -573,7 +575,8 @@ export async function executeBoundAgentCoreMission(input: AgentCoreExecutionInpu
   }
   const grant = input.accessMode === "platform"
     ? await issueManagedModelGrant(
-        "assistant",
+        // Execution may invoke review and replanning after explicit confirmation.
+        "job",
         threadId,
         input.provider as "openai" | "deepseek" | "qwen" | "kimi",
         input.model,
