@@ -253,6 +253,33 @@ describe("desktop bridge", () => {
     expect(invoke).toHaveBeenNthCalledWith(4, "restore_browser_auth_vault", undefined);
   });
 
+  it.each(["google", "github", "slack_oidc"] as const)(
+    "passes only the allowed %s provider and locale to native browser authentication",
+    async (provider) => {
+      const invoke = vi.fn(async () => browserAuthSession);
+      window.__TAURI__ = { core: { invoke } };
+      const request = {
+        locale: "en" as const,
+        provider,
+        redirectTo: "https://untrusted.example.test/callback",
+        accessToken: "must-not-be-forwarded",
+      };
+      await expect(beginBrowserAuth(request)).resolves.toEqual(browserAuthSession);
+      expect(invoke).toHaveBeenCalledWith("begin_browser_auth", { request: { locale: "en", provider } });
+    },
+  );
+
+  it("rejects an unknown social provider before starting a native transaction", async () => {
+    const invoke = vi.fn();
+    window.__TAURI__ = { core: { invoke } };
+    await expect(beginBrowserAuth({
+      locale: "en",
+      // @ts-expect-error Runtime validation must reject untrusted provider values.
+      provider: "https://untrusted.example.test",
+    })).rejects.toThrow(/provider/i);
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
   it("routes a source-bound distribution preview and preserves every native deny", async () => {
     const invoke = vi.fn(async () => distributionPlan);
     window.__TAURI__ = { core: { invoke } };

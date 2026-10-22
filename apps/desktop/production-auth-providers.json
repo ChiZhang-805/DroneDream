@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "providers": {
+    "google": true,
+    "github": true,
+    "slack_oidc": true
+  }
+}

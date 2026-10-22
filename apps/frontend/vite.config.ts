@@ -26,7 +26,7 @@ export default defineConfig(() => {
       __DRONEDREAM_BUILD_EDITION__: JSON.stringify(edition),
     },
     build: {
-      // Three.js is intentionally kept behind the launcher's lazy boundary. Its
+      // Three.js remains behind the workspace 3D views' lazy boundary. Its
       // dedicated minified vendor chunk is ~500.1 kB (~125 kB gzip), so use a
       // narrow threshold that still catches accidental growth elsewhere.
       chunkSizeWarningLimit: 510,

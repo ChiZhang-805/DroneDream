@@ -7,7 +7,6 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { chromium } from "playwright";
-import { PNG } from "pngjs";
 import { createServer } from "vite";
 
 const frontendRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -18,10 +17,11 @@ const args = new Map(process.argv.slice(2).map((argument) => {
 }));
 const edition = String(args.get("--edition") || "sim");
 assert(
-  ["universal", "sim", "lab", "autonomy"].includes(edition),
+  ["universal", "sim", "lab", "autonomy", "field"].includes(edition),
   `Unsupported shared desktop launcher edition: ${edition}`,
 );
 const desktopOnly = Boolean(args.get("--desktop-only"));
+const progressOnly = Boolean(args.get("--progress-only"));
 const label = String(args.get("--label") || "working-tree");
 const outputRoot = path.resolve(
   repoRoot,
@@ -43,6 +43,10 @@ process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
 process.env.VITE_DRONEDREAM_EDITION = edition;
 process.env.VITE_SUPABASE_URL = "https://visual-fixture.supabase.co";
 process.env.VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_visual_fixture";
+// Exercise the same three enabled providers as the production account service.
+process.env.VITE_AUTH_GOOGLE_ENABLED = "true";
+process.env.VITE_AUTH_GITHUB_ENABLED = "true";
+process.env.VITE_AUTH_SLACK_ENABLED = "true";
 const productionEnvironment = await readFile(
   path.join(frontendRoot, ".env.production"),
   "utf8",
@@ -64,16 +68,13 @@ const viewports = desktopOnly
       { id: "mobile", width: 390, height: 700 },
     ];
 const cases = ["en", "zh-CN"].flatMap((locale) =>
-  ["dark", "light"].flatMap((appearance) =>
-    viewports.flatMap((viewport) =>
-      ["missing", "ready"].map((scenario) => ({
-        id: `${viewport.id}-${locale === "en" ? "en" : "zh"}-${appearance}-${scenario}`,
-        locale,
-        appearance,
-        scenario,
-        viewport,
-      })),
-    ),
+  viewports.flatMap((viewport) =>
+    ["missing", "ready"].map((scenario) => ({
+      id: `${viewport.id}-${locale === "en" ? "en" : "zh"}-${scenario}`,
+      locale,
+      scenario,
+      viewport,
+    })),
   ),
 );
 
@@ -128,9 +129,8 @@ function desktopFixture(scenario) {
 }
 
 async function installDesktopFixture(context, testCase) {
-  await context.addInitScript(({ locale, appearance, fixture }) => {
+  await context.addInitScript(({ locale, fixture }) => {
     window.localStorage.setItem("drone-dream:locale", locale);
-    window.localStorage.setItem("dronedream:appearance", appearance);
     const calls = [];
     window.__SIM_VISUAL_CALLS__ = calls;
     const readinessTransitions = [];
@@ -237,9 +237,9 @@ async function installDesktopFixture(context, testCase) {
           calls.push(command);
           if (command === "probe_system_prerequisites") return prerequisites;
           if (command === "probe_runtime_status") {
-            return fixture.scenario === "missing" ? fixture.missing : fixture.ready;
+            return fixture.scenario === "starting" ? { ...fixture.ready, running: false, ready: false } : fixture.scenario === "missing" ? fixture.missing : fixture.ready;
           }
-          if (command === "start_runtime") return fixture.ready;
+          if (command === "start_runtime") return fixture.scenario === "starting" ? new Promise(() => {}) : fixture.ready;
           if (command === "get_runtime_install_progress") return idleInstall;
           if (command === "get_runtime_install_plan") return installPlan;
           if (command === "get_installer_runtime_intent") {
@@ -271,8 +271,7 @@ async function installDesktopFixture(context, testCase) {
     };
   }, {
     locale: testCase.locale,
-    appearance: testCase.appearance,
-    fixture: desktopFixture(testCase.scenario),
+    fixture: desktopFixture(progressOnly ? "starting" : testCase.scenario),
   });
 }
 
@@ -291,74 +290,68 @@ async function verifyCase(browser, testCase) {
     // Packaged desktop builds use hash history so a WebView reload never asks a
     // nonexistent HTTP server to resolve an application route. Exercise the
     // same URL shape here instead of accidentally testing the hosted router.
-    await page.goto(`${origin}/#/desktop/setup`, { waitUntil: "networkidle" });
-    const progress = page.getByRole("progressbar");
-    const expectedPercent = testCase.scenario === "ready" ? "100" : null;
-    if (expectedPercent !== null) {
-      await progress.waitFor();
-      try {
-        await page.waitForFunction((expected) => {
-          return document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow") === expected;
-        }, expectedPercent, { timeout: 26_000 });
-      } catch (error) {
-        const diagnosticPath = path.join(outputRoot, `${testCase.id}-progress-diagnostic.png`);
-        await page.screenshot({ path: diagnosticPath, fullPage: false });
-        const diagnostic = await page.evaluate(() => ({
-          value: document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow"),
-          calls: window.__SIM_VISUAL_CALLS__,
-          text: document.body.innerText,
-        }));
-        throw new Error(`Startup progress did not reach ${expectedPercent}: ${JSON.stringify(diagnostic)}`, { cause: error });
-      }
+    await page.goto(`${origin}/${edition === "field" ? "field.html" : ""}#/desktop/setup`, { waitUntil: "networkidle" });
+    if (progressOnly) {
+      await page.goto(origin + (edition === 'field' ? '/field.html' : '/') + '?docsPreview=1#/desktop/setup', { waitUntil: 'networkidle' });
+      await page.locator('.launcher-stage-list').waitFor();
+      assert.equal(await page.locator('.launcher-stage-list li').count(), 4);
+      const marker = page.locator('.launcher-stage-list li[aria-current="step"] > span');
+      assert.equal(await marker.count(), 1);
+      const before = await marker.evaluate(el => getComputedStyle(el, '::before').transform);
+      await page.waitForTimeout(160);
+      const after = await marker.evaluate(el => getComputedStyle(el, '::before').transform);
+      assert.notEqual(before, after, 'The active checkpoint must visibly rotate');
+      const heading = await page.locator('.launcher-status-card-heading h2').evaluate(el => ({ height: el.getBoundingClientRect().height, lineHeight: parseFloat(getComputedStyle(el).lineHeight), width:el.clientWidth, scrollWidth:el.scrollWidth }));
+      assert(heading.height <= heading.lineHeight + 1 && heading.scrollWidth <= heading.width + 1, 'Startup title must fit one line');
+      const panel = await page.locator('.launcher-progress-panel').evaluate(el=>({height:el.clientHeight,scrollHeight:el.scrollHeight}));
+      assert(panel.scrollHeight <= panel.height + 1, 'All four checkpoints must fit the card');
+      assert.equal(pageErrors.length, 0);
+      await page.screenshot({path:path.join(outputRoot, testCase.id + '-progress.png')});
+      return { case: testCase, status:'pass', heading, panel, animated:true };
     }
-
-    const installText = testCase.locale === "en"
-      ? "Install DroneDreamRuntime"
-      : "安装 DroneDreamRuntime";
-    const signInText = {
-      universal: ["Sign in and enter DroneDream", "登录并进入 DroneDream"],
-      sim: ["Sign in and enter simulation workspace", "登录并进入仿真工作区"],
-      lab: ["Sign in and enter laboratory workspace", "登录并进入实验室工作区"],
-      autonomy: ["Sign in and enter autonomous mission workspace", "登录并进入自主任务工作区"],
-    }[edition][testCase.locale === "en" ? 0 : 1];
-    const install = page.getByRole("button", { name: installText });
-    const signIn = page.getByRole("button", { name: signInText });
-    const startRuntime = page.getByRole("button", { name: /Start Runtime|启动 Runtime/i });
-    const repairRuntime = page.getByRole("button", { name: /Repair Runtime|修复 Runtime/i });
-
-    if (testCase.scenario === "missing") {
-      try {
-        await install.waitFor({ timeout: 30_000 });
-      } catch (error) {
-        const diagnosticPath = path.join(outputRoot, `${testCase.id}-diagnostic.png`);
-        await page.screenshot({ path: diagnosticPath, fullPage: false });
-        const diagnostic = await page.evaluate(() => ({
-          progress: document.querySelector('[role="progressbar"]')?.getAttribute("aria-valuenow"),
-          calls: window.__SIM_VISUAL_CALLS__,
-          text: document.body.innerText,
-        }));
-        throw new Error(`Missing Runtime install action did not appear: ${JSON.stringify(diagnostic)}`, { cause: error });
-      }
-      if (!(await install.isVisible())) {
-        const diagnosticPath = path.join(outputRoot, `${testCase.id}-diagnostic.png`);
-        await page.screenshot({ path: diagnosticPath, fullPage: false });
-        const detailsButton = page.getByRole("button", { name: /View error information|查看错误信息/ });
-        if (await detailsButton.count()) await detailsButton.click();
-        throw new Error(`Missing Runtime did not expose its install action. Visible text: ${await page.locator("body").innerText()}`);
-      }
-      if (await progress.count()) {
-        const missingPercent = await progress.getAttribute("aria-valuenow");
-        assert.notEqual(missingPercent, "100");
-      }
-      assert.equal(await signIn.count(), 0);
-    } else {
-      await signIn.waitFor();
-      assert.equal(await install.count(), 0);
+    const form = page.locator(".launcher-account-form");
+    await form.waitFor();
+    const socialButtons = form.locator(".launcher-social-button");
+    assert.equal(await socialButtons.count(), 3, "All configured social providers must be visible on the first screen");
+    for (const provider of ["Google", "GitHub", "Slack"]) {
+      const button = form.getByRole("button", { name: testCase.locale === "en" ? `Continue with ${provider}` : `使用 ${provider} 登录` });
+      assert.equal(await button.isEnabled(), true);
     }
-    assert.equal(await startRuntime.count(), 0);
-    assert.equal(await repairRuntime.count(), 0);
-    assert.equal(await install.count() > 0 && await signIn.count() > 0, false);
-
+    const before = await page.locator(".launcher-progress-panel").boundingBox();
+    assert.equal(await page.getByRole("progressbar").count(), 0);
+    const email = form.locator('input[type="email"]');
+    const password = form.locator('input[type="password"]');
+    await email.fill("launcher-fixture@example.test");
+    await password.fill("fixture-password");
+    await context.route("https://visual-fixture.supabase.co/**", route => route.fulfill({
+      status: 400, contentType: "application/json", body: JSON.stringify({ error: "invalid_grant", error_description: "Invalid login credentials" }),
+    }));
+    await form.locator('button[type="submit"]').click();
+    await form.getByRole("alert").waitFor();
+    const after = await page.locator(".launcher-progress-panel").boundingBox();
+    assert.deepEqual(after, before, "Authentication errors must not move or resize the card");
+    await form.getByRole("tab", { name: testCase.locale === "en" ? "Create account" : "注册", exact: true }).click();
+    const registrationBounds = await page.locator(".launcher-progress-panel").boundingBox();
+    assert(registrationBounds.height > before.height, "Registration expands for all four fields");
+    assert.equal(await form.locator('input:visible').count(), 4);
+    assert.equal(await password.first().getAttribute("autocomplete"), "new-password");
+    assert.equal(await form.locator('button[type="submit"]').textContent(), testCase.locale === "en" ? "Create account" : "完成注册");
+    const registrationSubmit = await form.locator('button[type="submit"]').boundingBox();
+    const codeBounds = await form.locator('input[autocomplete="one-time-code"]').boundingBox();
+    assert(registrationSubmit.y - codeBounds.y - codeBounds.height <= 16);
+    assert(registrationSubmit.y + registrationSubmit.height < registrationBounds.y + registrationBounds.height);
+    await page.screenshot({ path: path.join(outputRoot, `${testCase.id}-registration.png`), fullPage: false });
+    await form.getByRole("tab", { name: testCase.locale === "en" ? "Sign in" : "登录", exact: true }).click();
+    assert.equal(await form.getByRole("button", { name: /browser|浏览器/i }).count(), 0);
+    await form.getByRole("button", { name: testCase.locale === "en" ? "Forgot password?" : "忘记密码？" }).click();
+    await form.getByRole("heading", { name: testCase.locale === "en" ? "Reset your password" : "找回密码" }).waitFor();
+    const recoveryBounds = await page.locator(".launcher-progress-panel").boundingBox();
+    assert.equal(recoveryBounds.width, before.width);
+    assert(recoveryBounds.height <= before.height, "Recovery must not reserve empty tab space");
+    const recoverySubmit = await form.locator('button[type="submit"]').boundingBox();
+    assert(recoverySubmit.y + recoverySubmit.height < recoveryBounds.y + recoveryBounds.height);
+    await form.getByRole("button", { name: testCase.locale === "en" ? "Back to sign in" : "返回登录" }).click();
+    const expectedPercent = null;
     const dimensions = await page.evaluate(() => ({
       documentWidth: document.documentElement.clientWidth,
       scrollWidth: document.documentElement.scrollWidth,
@@ -371,172 +364,50 @@ async function verifyCase(browser, testCase) {
       calls: window.__SIM_VISUAL_CALLS__,
       readinessTransitions: window.__SIM_READINESS_TRANSITIONS__,
       primaryActionAppearances: window.__SIM_PRIMARY_ACTION_APPEARANCES__,
-      sceneStars: document.querySelector(".drone-launch-scene")?.getAttribute("data-scene-stars"),
-      sceneParticles: document.querySelector(".drone-launch-scene")
-        ?.getAttribute("data-scene-particles"),
-      tagline: (() => {
-        const heading = document.querySelector(".drone-launch-tagline");
-        if (!heading) return null;
+      launcher: (() => {
+        const illustration = document.querySelector(".launcher-flight-illustration");
+        const heading = illustration?.querySelector(".launcher-flight-copy h1");
+        const bounds = illustration?.getBoundingClientRect();
+        const headingBounds = heading?.getBoundingClientRect();
         return {
-          text: heading.getAttribute("aria-label") ?? heading.textContent?.trim() ?? "",
-          lineCount: Number(heading.getAttribute("data-line-count")),
-          lines: Array.from(heading.querySelectorAll(".drone-launch-tagline-line")).map((line) => {
-            const bounds = line.getBoundingClientRect();
-            return {
-              text: line.textContent?.trim() ?? "",
-              left: bounds.left,
-              right: bounds.right,
-              top: bounds.top,
-              bottom: bounds.bottom,
-              clientWidth: line.clientWidth,
-              scrollWidth: line.scrollWidth,
-            };
-          }),
-        };
-      })(),
-      lightContrast: (() => {
-        const runtimeIndicator = document.querySelector(".launcher-runtime-indicator");
-        const settingsButton = document.querySelector(".launcher-settings-button");
-        const leftHud = document.querySelector(".drone-launch-hud-left");
-        const leftHudStrong = leftHud?.querySelector("strong");
-        if (!runtimeIndicator || !settingsButton || !leftHud || !leftHudStrong) return null;
-        return {
-          runtimeIndicatorColor: getComputedStyle(runtimeIndicator).color,
-          settingsButtonColor: getComputedStyle(settingsButton).color,
-          hudColor: getComputedStyle(leftHud).color,
-          hudStrongColor: getComputedStyle(leftHudStrong).color,
-          hudBackground: getComputedStyle(leftHud).backgroundImage,
+          illustrationCount: document.querySelectorAll(".launcher-flight-illustration").length,
+          imageLoaded: Boolean(illustration?.querySelector("img.launcher-flight-image")?.naturalWidth),
+          imageSource: illustration?.querySelector("img.launcher-flight-image")?.getAttribute("src"),
+          svgCount: illustration?.querySelectorAll("svg").length ?? 0,
+          chromeBackground: getComputedStyle(document.querySelector(".launcher-chrome")).backgroundColor,
+          colorScheme: getComputedStyle(document.querySelector(".app-shell-launcher")).colorScheme,
+          panelBackground: getComputedStyle(document.querySelector(".launcher-progress-panel")).backgroundColor,
+          canvasCount: document.querySelectorAll(".desktop-launcher canvas").length,
+          width: bounds?.width ?? 0,
+          height: bounds?.height ?? 0,
+          headingLeft: headingBounds?.left ?? -1,
+          headingRight: headingBounds?.right ?? -1,
         };
       })(),
     }));
     assert.equal(dimensions.scrollWidth, dimensions.documentWidth);
     assert(dimensions.scrollHeight <= dimensions.documentHeight + 1);
-    assert.equal(dimensions.appearance, testCase.appearance);
+    // Workspace appearance is a separate persisted preference. The launcher
+    // remains light without overwriting the user's workspace theme.
+    assert.equal(dimensions.launcher.colorScheme, "light");
+    assert.equal(dimensions.launcher.panelBackground, "rgba(255, 255, 255, 0.97)");
     assert.equal(dimensions.brandEdition, edition);
     assert.equal(dimensions.grantsHardwareAuthority, "false");
-    assert.equal(dimensions.sceneStars, testCase.appearance === "light" ? "false" : "true");
-    assert.equal(dimensions.sceneParticles, testCase.appearance === "light" ? "false" : "true");
-    assert(dimensions.tagline, `${testCase.id}: launcher tagline is missing`);
-    const expectedTaglineLines = testCase.locale === "en" ? 2 : 1;
-    assert.equal(
-      dimensions.tagline.lineCount,
-      expectedTaglineLines,
-      `${testCase.id}: launcher tagline changed line count`,
-    );
-    assert.equal(dimensions.tagline.lines.length, expectedTaglineLines);
-    assert(
-      dimensions.tagline.lines.every((line) => (
-        line.left >= 0
-        && line.right <= testCase.viewport.width + 1
-        && line.scrollWidth <= line.clientWidth + 1
-      )),
-      `${testCase.id}: launcher tagline is clipped`,
-    );
-    if (testCase.appearance === "light") {
-      assert(dimensions.lightContrast, `${testCase.id}: light contrast metrics are missing`);
-      if (edition === "sim") {
-        assert.equal(
-          dimensions.lightContrast.runtimeIndicatorColor,
-          testCase.scenario === "ready" ? "rgb(16, 40, 59)" : "rgb(23, 51, 75)",
-        );
-        assert.equal(dimensions.lightContrast.settingsButtonColor, "rgb(23, 51, 75)");
-      }
-      assert.equal(dimensions.lightContrast.hudColor, "rgba(255, 255, 255, 0.82)");
-      assert.equal(dimensions.lightContrast.hudStrongColor, "rgb(255, 255, 255)");
-      assert.match(dimensions.lightContrast.hudBackground, /rgba\(7, 42, 86, 0\.96\)/u);
-    }
+    assert.equal(dimensions.launcher.illustrationCount, 1);
+    assert.equal(dimensions.launcher.svgCount, 0);
+    assert.equal(dimensions.launcher.imageLoaded, true);
+    assert(dimensions.launcher.imageSource.includes(edition === "autonomy" ? "launcher-campus.png" : `launcher-campus-${edition}.png`), "The background artwork must match the edition, independently of the logo");
+    assert.equal(dimensions.launcher.chromeBackground, "rgba(0, 0, 0, 0)");
+    assert.equal(dimensions.launcher.canvasCount, 0,
+      `${testCase.id}: desktop startup must not create a WebGL canvas`);
+    if (testCase.viewport.width > 850) assert(dimensions.launcher.width > 100 && dimensions.launcher.height > 100,
+      `${testCase.id}: lightweight launcher illustration has no visible area`);
+    assert.equal(await page.locator(".launcher-flight-copy, .launcher-runtime-indicator").count(), 0);
+    const inputBounds = await password.boundingBox();
+    const submitBounds = await form.locator('button[type="submit"]').boundingBox();
+    assert(submitBounds.y - inputBounds.y - inputBounds.height <= 16, "No blank error row below password");
     const imagePath = path.join(outputRoot, `${testCase.id}.png`);
     await page.screenshot({ path: imagePath, fullPage: false });
-    const canvasScreenshot = await page.locator(".drone-launch-canvas").screenshot({ type: "png" });
-    const canvasFrame = PNG.sync.read(canvasScreenshot);
-    const points = [
-      [0.03, 0.03], [0.25, 0.08], [0.5, 0.08], [0.75, 0.08], [0.97, 0.03],
-      [0.08, 0.4], [0.33, 0.4], [0.5, 0.5], [0.67, 0.4], [0.92, 0.4],
-      [0.08, 0.72], [0.33, 0.72], [0.5, 0.72], [0.67, 0.72], [0.92, 0.72],
-    ];
-    const samples = points.map(([x, y]) => {
-      const pixelX = Math.min(canvasFrame.width - 1, Math.floor(canvasFrame.width * x));
-      const pixelY = Math.min(canvasFrame.height - 1, Math.floor(canvasFrame.height * y));
-      const offset = (pixelY * canvasFrame.width + pixelX) * 4;
-      return [...canvasFrame.data.subarray(offset, offset + 4)];
-    });
-    const canvasPixels = {
-      width: canvasFrame.width,
-      height: canvasFrame.height,
-      samples,
-      distinctSamples: new Set(samples.map((sample) => sample.join(","))).size,
-      upperBrightRatio: (() => {
-        let bright = 0;
-        let total = 0;
-        const upperLimit = Math.max(1, Math.floor(canvasFrame.height * 0.3));
-        for (let y = 0; y < upperLimit; y += 12) {
-          for (let x = 0; x < canvasFrame.width; x += 12) {
-            const offset = (y * canvasFrame.width + x) * 4;
-            total += 1;
-            if (
-              canvasFrame.data[offset] >= 245
-              && canvasFrame.data[offset + 1] >= 245
-              && canvasFrame.data[offset + 2] >= 245
-            ) bright += 1;
-          }
-        }
-        return total > 0 ? bright / total : 0;
-      })(),
-    };
-    assert(canvasPixels.width > 100 && canvasPixels.height > 100);
-    assert(canvasPixels.distinctSamples >= 6, `${testCase.id}: 3D canvas appears blank`);
-    if (testCase.appearance === "light") {
-      assert(canvasPixels.upperBrightRatio >= 0.6,
-        `${testCase.id}: light scene is not predominantly white: ${canvasPixels.upperBrightRatio}`);
-    }
-    if (testCase.scenario === "ready") {
-      assert.equal(
-        dimensions.calls.filter((command) => command === "start_runtime").length,
-        1,
-        `${testCase.id}: an installed Runtime must auto-start exactly once`,
-      );
-      assert.equal(
-        dimensions.readinessTransitions.at(-1)?.percent,
-        100,
-        `${testCase.id}: an already-ready Runtime did not render 100% readiness`,
-      );
-      assert.equal(
-        dimensions.readinessTransitions.some((transition) => transition.percent === 99),
-        false,
-        `${testCase.id}: the prohibited 99% action point was rendered`,
-      );
-      for (let index = 1; index < dimensions.readinessTransitions.length; index += 1) {
-        assert(
-          dimensions.readinessTransitions[index].percent
-            >= dimensions.readinessTransitions[index - 1].percent,
-          `${testCase.id}: evidence-driven readiness must never move backwards`,
-        );
-      }
-      assert(
-        dimensions.readinessTransitions.every((transition) =>
-          transition.percent === 0 ||
-          (transition.percent >= 20 && transition.percent <= 100)),
-        `${testCase.id}: readiness rendered a value without completed native evidence`,
-      );
-      assert(
-        dimensions.primaryActionAppearances.length >= 1,
-        `${testCase.id}: sign-in action never appeared`,
-      );
-      assert(
-        dimensions.primaryActionAppearances.every((appearance) => appearance.percent === 100),
-        `${testCase.id}: a primary action appeared before 100% readiness`,
-      );
-    } else {
-      assert.equal(dimensions.calls.includes("start_runtime"), false);
-      assert.equal(
-        dimensions.readinessTransitions.some((transition) => transition.percent === 100),
-        false,
-      );
-      assert(
-        dimensions.primaryActionAppearances.every((appearance) => appearance.percent === 0),
-        `${testCase.id}: the Runtime install action must remain at 0%`,
-      );
-    }
     assert.equal(pageErrors.length, 0);
 
     return {
@@ -544,12 +415,15 @@ async function verifyCase(browser, testCase) {
       status: "pass",
       expectedPercent: expectedPercent === null ? null : Number(expectedPercent),
       dimensions,
-      canvasPixels,
+      launcherRenderer: "approved-raster",
       image: {
         path: path.relative(repoRoot, imagePath).replaceAll("\\", "/"),
         sha256: await sha256File(imagePath),
       },
     };
+  } catch (error) {
+    await page.screenshot({ path: path.join(outputRoot, `${testCase.id}-failure.png`) });
+    throw error;
   } finally {
     await context.close();
   }
@@ -567,7 +441,7 @@ const results = [];
 let failure;
 
 try {
-  for (const testCase of cases) {
+  for (const testCase of (progressOnly ? cases.filter(item => item.scenario === "ready") : cases)) {
     try {
       results.push(await verifyCase(browser, testCase));
     } catch (error) {

@@ -92,6 +92,28 @@ describe("desktop browser sign-in transaction", () => {
     });
   });
 
+  it.each(["google", "github", "slack_oidc"] as const)(
+    "carries the selected %s provider through the native PKCE transaction before adoption",
+    async (provider) => {
+      vi.mocked(beginBrowserAuth).mockResolvedValue(SESSION);
+      vi.mocked(adoptBrowserAuthSession).mockResolvedValue(undefined);
+      const onAdopting = vi.fn();
+      const controller = new AbortController();
+      await completeDesktopBrowserSignIn("zh-CN", {
+        provider,
+        signal: controller.signal,
+        onAdopting,
+      });
+      expect(beginBrowserAuth).toHaveBeenCalledWith({ locale: "zh-CN", provider });
+      expect(restoreBrowserAuthVault).not.toHaveBeenCalled();
+      expect(clearBrowserAuthVault).toHaveBeenCalledOnce();
+      expect(onAdopting).toHaveBeenCalledOnce();
+      expect(onAdopting.mock.invocationCallOrder[0])
+        .toBeLessThan(vi.mocked(adoptBrowserAuthSession).mock.invocationCallOrder[0]);
+      expect(adoptBrowserAuthSession).toHaveBeenCalledWith(SESSION, { signal: controller.signal });
+    },
+  );
+
   it("silently restores a saved session without opening the browser", async () => {
     vi.mocked(restoreBrowserAuthVault).mockResolvedValue(SESSION);
     vi.mocked(adoptBrowserAuthSession).mockResolvedValue(undefined);
@@ -104,6 +126,31 @@ describe("desktop browser sign-in transaction", () => {
       signal: undefined,
     });
   });
+
+  it("rejects an unknown shortcut before activating authentication or touching the vault", async () => {
+    await expect(completeDesktopBrowserSignIn("en", {
+      // @ts-expect-error Native callers may still supply an unsupported provider.
+      provider: "untrusted",
+    })).rejects.toThrow("not supported");
+    expect(activateDesktopAuthSession).not.toHaveBeenCalled();
+    expect(clearBrowserAuthVault).not.toHaveBeenCalled();
+    expect(restoreBrowserAuthVault).not.toHaveBeenCalled();
+    expect(beginBrowserAuth).not.toHaveBeenCalled();
+    expect(adoptBrowserAuthSession).not.toHaveBeenCalled();
+  });
+
+  it.each(["google", "github", "slack_oidc"] as const)(
+    "never substitutes a saved account for a selected %s sign-in",
+    async (provider) => {
+      await expect(completeDesktopBrowserSignIn("en", { provider, restoreFromVault: true }))
+        .rejects.toThrow("requires a fresh browser sign-in");
+      expect(activateDesktopAuthSession).not.toHaveBeenCalled();
+      expect(clearBrowserAuthVault).not.toHaveBeenCalled();
+      expect(restoreBrowserAuthVault).not.toHaveBeenCalled();
+      expect(beginBrowserAuth).not.toHaveBeenCalled();
+      expect(adoptBrowserAuthSession).not.toHaveBeenCalled();
+    },
+  );
 
   it("leaves browser sign-in idle when no saved session exists", async () => {
     vi.mocked(restoreBrowserAuthVault).mockResolvedValue(null);

@@ -1,0 +1,297 @@
+/* Approved desktop launcher, shared by all five editions. The public site's
+   interactive city scene has its own styles and is not a desktop startup view. */
+.app-shell-launcher,
+.field-launcher {
+  --launcher-accent: color-mix(in srgb, var(--dd-brand-middle) 58%, var(--dd-brand-dark-surface));
+  --launcher-accent-end: color-mix(in srgb, var(--dd-brand-end) 65%, var(--dd-brand-dark-surface));
+  --launcher-soft: color-mix(in srgb, var(--dd-brand-middle) 7%, white);
+  --launcher-line: color-mix(in srgb, var(--dd-brand-middle) 20%, #e4e8ee);
+  color-scheme: light;
+  color: #252c38;
+  background: #f8fafc;
+}
+
+:root[data-dd-appearance] .app-shell-launcher .launcher-chrome,
+.field-launcher .launcher-chrome {
+  color: #252c38;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+:root[data-dd-appearance] .app-shell-launcher .launcher-settings-button,
+.field-launcher .launcher-settings-button {
+  color: #566174;
+  border-color: var(--launcher-line);
+  background: rgb(255 255 255 / 88%);
+  box-shadow: 0 4px 16px #3445620b;
+}
+
+.app-shell-launcher .launcher-settings-button:hover {
+  color: var(--launcher-accent);
+  background: var(--launcher-soft);
+}
+
+.launcher-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 420px;
+  align-items: center;
+  gap: 3vw;
+  padding: 76px 6vw 32px;
+  background: transparent;
+}
+
+.launcher-hero::before,
+.launcher-hero-visual::before,
+.field-launcher .launcher-hero-visual::before {
+  content: none;
+}
+
+.launcher-hero-visual,
+.field-launcher .launcher-hero-visual {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.launcher-flight-illustration,
+.launcher-flight-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.launcher-flight-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.launcher-progress-panel {
+  position: relative;
+  z-index: 7;
+  grid-column: 2;
+  inset: auto;
+  box-sizing: border-box;
+  width: 420px;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+  padding: 26px 32px;
+  border: 1px solid var(--launcher-line);
+  border-radius: 20px;
+  background: rgb(255 255 255 / 97%);
+  box-shadow: 0 18px 60px color-mix(in srgb, var(--dd-brand-dark-surface) 10%, transparent);
+  overflow: visible;
+}
+
+.launcher-progress-panel::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 24px;
+  right: 24px;
+  height: 3px;
+  border-radius: 0 0 3px 3px;
+  background: var(--dd-brand-gradient);
+  pointer-events: none;
+}
+
+.launcher-status-card-heading > span {
+  color: var(--launcher-accent);
+  font-size: 0.7rem;
+  font-weight: 780;
+  letter-spacing: 0.14em;
+}
+
+.launcher-status-card-heading h2 {
+  margin: 0.65rem 0 0;
+  color: #252c38;
+  font-size: clamp(20px, 1.65vw, 25px);
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}
+
+.launcher-stage-list {
+  display: grid;
+  gap: 2px;
+  margin: 16px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.launcher-stage-list li {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 42px;
+  padding: 0.35rem 0.55rem;
+  border-radius: 12px;
+  color: #9a929f;
+}
+
+.launcher-stage-list li > span {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #ddd7e2;
+  border-radius: 50%;
+  background: #fbf9fc;
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.launcher-stage-list li strong { font-size: 0.88rem; }
+.launcher-stage-list li.is-current { color: var(--launcher-accent); background: var(--launcher-soft); }
+.launcher-stage-list li.is-current > span {
+  position: relative;
+  color: var(--launcher-accent);
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.launcher-stage-list li.is-current > span::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-bottom-color: transparent;
+  border-radius: 50%;
+  animation: launcher-step-spin 0.9s linear infinite;
+}
+.launcher-stage-list li.is-complete { color: var(--launcher-accent); }
+.launcher-stage-list li.is-complete > span {
+  color: white;
+  border-color: var(--launcher-accent);
+  background: var(--launcher-accent);
+}
+.launcher-stage-list li[data-paused="true"] > span::before { animation: none; }
+@keyframes launcher-step-spin { to { transform: rotate(360deg); } }
+
+.launcher-progress-track { background: var(--launcher-line); box-shadow: none; }
+.app-shell-launcher .launcher-progress-track > span { background: var(--dd-brand-gradient); box-shadow: none; }
+.launcher-progress-footer {
+  color: #566174;
+  text-shadow: none;
+  margin-top: 12px;
+}
+.app-shell-launcher .launcher-progress-percent { color: var(--launcher-accent); text-shadow: none; }
+.launcher-compact-status { font-size: 0.88rem; }
+.launcher-card-actions { margin-top: 16px; overflow: visible; }
+.launcher-card-actions:empty { display: none; }
+.launcher-card-actions .launcher-ready-actions {
+  position: static;
+  display: block;
+  width: 100%;
+  transform: none;
+  margin: 12px 0 0;
+}
+.launcher-card-actions .btn { width: 100%; min-height: 48px; }
+.launcher-card-actions .alert { margin: 0; font-size: 12px; }
+
+.launcher-account-form { display: flex; flex-direction: column; gap: 10px; height: auto; }
+.launcher-account-form h2 { margin: 0; color: #252c38; font-size: 24px; line-height: 1.3; }
+.launcher-auth-tabs { display: flex; gap: 24px; margin: 0; font-size: 17px; }
+.launcher-auth-tabs button {
+  border: 0; padding: 5px 0; background: transparent; color: #717b8b; font: inherit; cursor: pointer;
+}
+.launcher-auth-tabs button[aria-selected="true"] { color: var(--launcher-accent); box-shadow: 0 2px var(--launcher-accent); }
+.launcher-account-form label { display: grid; gap: 7px; color: #566174; font-size: 15px; }
+.launcher-account-form input {
+  box-sizing: border-box; width: 100%; height: 48px; padding: 0 12px;
+  border: 1px solid #e0e5eb; border-radius: 8px; color: #252c38; background: white; font-size: 16px;
+}
+.launcher-account-form input:focus { outline: 2px solid var(--launcher-line); outline-offset: 2px; border-color: var(--launcher-accent); }
+.launcher-account-form input[aria-invalid="true"] { border-color: #c72e51; }
+.launcher-auth-caption { display: flex; align-items: center; gap: 10px; min-height: 21px; line-height: 21px; }
+.launcher-auth-message {
+  flex: 1; min-width: 0; margin: 0; color: #b33150; text-align: right; font-size: 12px; line-height: 21px;
+}
+.launcher-auth-verification { height: auto; }
+.launcher-account-form [hidden] { display: none; }
+.launcher-account-form > .btn { width: 100%; min-height: 48px; font-size: 16px; }
+.launcher-progress-panel .btn-primary {
+  display: flex; justify-content: center; align-items: center;
+  color: white; border-color: transparent;
+  background: linear-gradient(110deg, var(--launcher-accent), var(--launcher-accent-end));
+  box-shadow: 0 5px 15px color-mix(in srgb, var(--dd-brand-middle) 12%, transparent);
+}
+.app-shell-launcher .launcher-progress-panel .btn-primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+  background: linear-gradient(110deg, var(--launcher-accent), var(--launcher-accent-end));
+}
+.launcher-progress-panel button:focus-visible {
+  outline: 2px solid var(--launcher-accent); outline-offset: 3px;
+}
+.launcher-auth-secondary {
+  border: 0; padding: 0; color: #667387; background: transparent;
+  font: inherit; font-size: 14px; text-align: center; cursor: pointer;
+}
+.launcher-auth-secondary:hover:not(:disabled) { color: var(--launcher-accent); }
+.launcher-registration-code {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 10px;
+}
+.launcher-registration-code .launcher-send-code {
+  height: 48px; min-height: 48px; padding: 0 12px; font-size: 14px; white-space: nowrap;
+  color: var(--launcher-accent); background: var(--launcher-soft); border-color: var(--launcher-line);
+}
+.launcher-registration-message { color: #566174; font-size: 13px; line-height: 1.4; }
+.launcher-registration-message[role="alert"] { color: #b33150; }
+
+.launcher-auth-social {
+  display: grid;
+  gap: 12px;
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 1px solid var(--launcher-line);
+}
+.launcher-social-actions { display: flex; align-items: center; justify-content: center; gap: 14px; }
+.launcher-social-button {
+  display: grid; place-items: center;
+  width: 44px; height: 44px; flex: 0 0 44px; padding: 11px;
+  border: 1px solid #e0e5eb; border-radius: 50%;
+  color: #202631; background: white; cursor: pointer;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.launcher-social-button svg { width: 22px; height: 22px; }
+.launcher-social-button:hover:not(:disabled) {
+  border-color: var(--launcher-accent);
+  box-shadow: 0 3px 12px color-mix(in srgb, var(--dd-brand-middle) 14%, transparent);
+}
+.launcher-social-button:disabled { opacity: 0.55; cursor: wait; }
+.launcher-social-status {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  color: #566174; font-size: 13px; line-height: 1.4;
+}
+.launcher-social-status button {
+  padding: 0; border: 0; background: transparent; color: var(--launcher-accent); font: inherit;
+  cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+}
+
+@media (max-width: 850px) {
+  .launcher-hero { grid-template-columns: minmax(0, 1fr); justify-items: center; padding: 78px 16px 20px; }
+  .launcher-progress-panel { grid-column: 1; width: min(420px, 100%); padding: 26px; }
+  .launcher-flight-art { opacity: 0.6; }
+}
+@media (max-height: 650px) {
+  .launcher-hero { align-items: start; overflow-y: auto; scrollbar-width: none; }
+  .launcher-hero::-webkit-scrollbar { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .launcher-stage-list li.is-current > span::before { animation: none; border-style: dashed; }
+}
