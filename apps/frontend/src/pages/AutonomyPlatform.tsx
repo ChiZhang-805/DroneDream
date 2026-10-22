@@ -2504,6 +2504,20 @@ export function AutonomyLive() {
   const { chinese, workspace } = useAutonomyWorkspace();
   const auth = useOptionalAuth();
   const edition = useEditionTheme().id;
+  const { settings: modelAccess } = useModelAccess();
+  const planningModel: AutonomyPlanningModel = modelAccess.accessMode === "platform"
+    ? {
+        accessMode: "platform",
+        provider: modelAccess.managedProvider,
+        model: modelAccess.managedModel,
+      }
+    : {
+        accessMode: "byok",
+        provider: modelAccess.provider,
+        model: modelAccess.model,
+        agentCoreProfileId: modelAccess.agentCoreProfileId,
+        agentCoreSelectionId: modelAccess.agentCoreSelectionId,
+      };
   const conversationId = workspace.mission.conversationId;
   const binding = useMemo(() => ({
     edition,
@@ -2768,7 +2782,14 @@ export function AutonomyLive() {
   useEffect(() => () => recorderStreamRef.current?.getTracks().forEach((track) => track.stop()), []);
 
   return (
-    <section className="autonomy-live-viewer">
+    <>
+      <AgentCoreLiveMission
+        chinese={chinese}
+        workspace={workspace}
+        planningModel={planningModel}
+        accountId={auth?.account?.id ?? null}
+      />
+      <section className="autonomy-live-viewer">
       <h1 className="sr-only">{chinese ? "实时画面" : "Live"}</h1>
       <div className="autonomy-live-player">
         <div className="autonomy-live-screen" data-playing={playing}>
@@ -2813,6 +2834,7 @@ export function AutonomyLive() {
         </div>
       </div>
       {recordingStatus ? <p className="autonomy-live-recording-status" aria-live="polite">{recordingStatus}</p> : null}
-    </section>
+      </section>
+    </>
   );
 }
