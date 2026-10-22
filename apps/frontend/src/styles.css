@@ -3361,10 +3361,10 @@ code {
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: 1px solid #e1d6e4;
+  border: 1px solid #ccb8d0;
   border-radius: 0.72rem;
-  background: #faf6fb;
-  color: #5b4d60;
+  background: #f5edf7;
+  color: #47384c;
   cursor: pointer;
 }
 
@@ -3373,8 +3373,8 @@ code {
 }
 
 .account-dialog-close svg {
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 1.2rem;
+  height: 1.2rem;
 }
 
 .account-dialog-copy {
@@ -3792,7 +3792,7 @@ code {
 
 .avatar-crop-dialog > header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
 }
@@ -3803,14 +3803,6 @@ code {
   font-size: 1.15rem;
 }
 
-.avatar-crop-dialog > header p {
-  max-width: 49rem;
-  margin: 0.35rem 0 0;
-  color: #6f6373;
-  font-size: 0.84rem;
-  line-height: 1.5;
-}
-
 .avatar-crop-close {
   display: inline-grid;
   width: 2.35rem;
@@ -3819,11 +3811,16 @@ code {
   flex: 0 0 auto;
   place-items: center;
   padding: 0;
-  border: 1px solid #dfd2e1;
+  border: 1px solid #ccb8d0;
   border-radius: 0.7rem;
-  background: #faf6fb;
-  color: #5f5263;
+  background: #f5edf7;
+  color: #47384c;
   cursor: pointer;
+}
+
+.avatar-crop-close svg {
+  width: 1.2rem;
+  height: 1.2rem;
 }
 
 .avatar-crop-close:hover:not(:disabled),

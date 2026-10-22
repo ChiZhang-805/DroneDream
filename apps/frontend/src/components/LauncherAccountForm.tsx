@@ -38,8 +38,8 @@ export function LauncherAccountForm({ locale, onAuthenticated }: {
     ? { confirm: "确认密码", complete: "完成注册", mismatch: "两次输入的密码不一致。", resend: "重新发送", sendFirst: "请先发送邮箱验证码。" }
     : { confirm: "Confirm password", complete: "Create account", mismatch: "Passwords do not match.", resend: "Resend code", sendFirst: "Send an email code first." };
   const socialCopy = locale === "zh-CN"
-    ? { group: "快捷登录", continue: (name: string) => `使用 ${name} 登录`, waiting: (name: string) => `请在浏览器中完成 ${name} 登录…`, adopting: "正在验证账户…", failed: "快捷登录未完成，请重试。", cancel: "取消登录", cancelled: "已取消登录，可以重试。" }
-    : { group: "Social sign-in", continue: (name: string) => `Continue with ${name}`, waiting: (name: string) => `Complete ${name} sign-in in your browser…`, adopting: "Verifying your account…", failed: "Social sign-in could not be completed. Try again.", cancel: "Cancel sign-in", cancelled: "Sign-in cancelled. You can try again." };
+    ? { group: "快捷登录", continue: (name: string) => `使用 ${name} 登录`, waiting: (name: string) => `请在浏览器完成：${name}`, adopting: "正在验证账户…", failed: "快捷登录未完成，请重试。", cancel: "取消", cancelled: "已取消登录，可以重试。" }
+    : { group: "Social sign-in", continue: (name: string) => `Continue with ${name}`, waiting: (name: string) => `Finish in browser: ${name}`, adopting: "Verifying your account…", failed: "Social sign-in could not be completed. Try again.", cancel: "Cancel", cancelled: "Sign-in cancelled. You can try again." };
   const providers = [
     { id: "google" as const, name: "Google", enabled: googleAuthEnabled },
     { id: "github" as const, name: "GitHub", enabled: githubAuthEnabled },

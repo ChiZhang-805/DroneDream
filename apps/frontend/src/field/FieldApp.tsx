@@ -224,6 +224,7 @@ export interface FieldAppProps {
   embeddedInLab?: boolean;
   embeddedInConsole?: boolean;
   activePageOverride?: FieldPageId;
+  onSignedOut?: () => void;
 }
 
 function FieldPageHeading({
@@ -250,6 +251,7 @@ function FieldWorkspace({
   embeddedInLab = false,
   embeddedInConsole = false,
   activePageOverride,
+  onSignedOut,
 }: FieldAppProps) {
   const presentationEdition = embeddedInLab ? "lab" as const : hardwareDomainEdition;
   const [locale, setLocale] = useState<FieldLocale>(initialLocale ?? savedLocale);
@@ -411,7 +413,10 @@ function FieldWorkspace({
     try {
       await auth.signOut();
       setAccountMenuOpen(false);
-      window.requestAnimationFrame(() => settingsButtonRef.current?.focus());
+      onSignedOut?.();
+      if (!onSignedOut) {
+        window.requestAnimationFrame(() => settingsButtonRef.current?.focus());
+      }
     } catch {
       setSignOutError(true);
     } finally {

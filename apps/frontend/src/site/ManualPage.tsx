@@ -248,6 +248,11 @@ export function ManualPage({ locale }: ManualPageProps) {
   );
   const previousChapter = manualChapters[activeChapterIndex - 1];
   const nextChapter = manualChapters[activeChapterIndex + 1];
+  const architectureSectionIndex = architectureSections.findIndex(
+    (section) => section.id === architectureSection,
+  );
+  const previousArchitectureSection = architectureSections[architectureSectionIndex - 1];
+  const nextArchitectureSection = architectureSections[architectureSectionIndex + 1];
   const navigationChapters = useMemo(() => {
     const normalized = normalizeSearch(query, locale);
     const chapters: ManualNavigationChapter[] = [];
@@ -850,7 +855,40 @@ export function ManualPage({ locale }: ManualPageProps) {
 
         <article ref={articleRef} className="manual-reader-document">
           {manualView === "architecture" ? (
-            <ManualArchitecture locale={locale} section={architectureSection} />
+            <div className="manual-chapter-view">
+              <ManualArchitecture locale={locale} section={architectureSection} />
+              <nav className="manual-chapter-pager" aria-label={copy.chapterNavigation}>
+                <button
+                  type="button"
+                  disabled={!previousArchitectureSection}
+                  onClick={() => previousArchitectureSection && navigateToArchitecture(
+                    previousArchitectureSection.id,
+                    previousArchitectureSection.anchorId,
+                  )}
+                >
+                  <ChevronLeft aria-hidden="true" />
+                  <span>
+                    <small>{copy.previousChapter}</small>
+                    <strong>{previousArchitectureSection?.label ?? copy.beginning}</strong>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="is-next"
+                  disabled={!nextArchitectureSection}
+                  onClick={() => nextArchitectureSection && navigateToArchitecture(
+                    nextArchitectureSection.id,
+                    nextArchitectureSection.anchorId,
+                  )}
+                >
+                  <span>
+                    <small>{copy.nextChapter}</small>
+                    <strong>{nextArchitectureSection?.label ?? copy.ending}</strong>
+                  </span>
+                  <ChevronRight aria-hidden="true" />
+                </button>
+              </nav>
+            </div>
           ) : <>
           {state === "loading" ? (
             <div className="manual-reader-state" role="status">

@@ -214,6 +214,7 @@ describe("workspace email and password authentication", () => {
           edition="sim"
           desktopBrowserAuthReady
           onClose={vi.fn()}
+          onSignedOut={vi.fn()}
         />
       </I18nProvider>,
     );
@@ -252,6 +253,7 @@ describe("workspace email and password authentication", () => {
           edition="sim"
           onOpenDesktopSetup={onOpenDesktopSetup}
           onClose={vi.fn()}
+          onSignedOut={vi.fn()}
         />
       </I18nProvider>,
     );

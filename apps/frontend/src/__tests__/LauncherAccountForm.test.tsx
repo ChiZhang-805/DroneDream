@@ -186,7 +186,10 @@ describe("LauncherAccountForm", () => {
     render(<LauncherAccountForm locale="en" onAuthenticated={done} />);
     fireEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
     const signal = social.complete.mock.calls[0][1].signal as AbortSignal;
-    fireEvent.click(screen.getByRole("button", { name: /Cancel/i }));
+    expect(screen.getByText("Finish in browser: Google")).toHaveAttribute("role", "status");
+    const cancel = screen.getByRole("button", { name: "Cancel" });
+    expect(cancel).toHaveTextContent("Cancel");
+    fireEvent.click(cancel);
     await waitFor(() => expect(social.cancel).toHaveBeenCalledOnce());
     expect(signal.aborted).toBe(true);
     await act(async () => finish());

@@ -309,7 +309,15 @@ export function FieldRoot() {
   if (entered || (authCompleted && account && progress === 100)) {
     return (
       <Suspense fallback={null}>
-        <FieldApp initialLocale={locale} focusOnMount />
+        <FieldApp
+          initialLocale={locale}
+          focusOnMount
+          onSignedOut={() => {
+            setEntered(false);
+            setAuthCompleted(false);
+            setSettingsPresentation("closed");
+          }}
+        />
       </Suspense>
     );
   }

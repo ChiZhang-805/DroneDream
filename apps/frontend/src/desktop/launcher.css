@@ -275,12 +275,15 @@
 }
 .launcher-social-button:disabled { opacity: 0.55; cursor: wait; }
 .launcher-social-status {
-  display: flex; align-items: center; justify-content: center; gap: 10px;
+  display: flex; width: 100%; min-width: 0; align-items: center; justify-content: space-between; gap: 12px;
   color: #566174; font-size: 13px; line-height: 1.4;
+}
+.launcher-social-status > span {
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .launcher-social-status button {
   padding: 0; border: 0; background: transparent; color: var(--launcher-accent); font: inherit;
-  cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+  flex: 0 0 auto; cursor: pointer; white-space: nowrap; text-decoration: underline; text-underline-offset: 3px;
 }
 
 @media (max-width: 850px) {
