@@ -206,10 +206,10 @@ const architectureCopy = {
       firstTransition: "Read the aircraft",
       firstTransitionBody: "The physical X500 V2 becomes a set of measurable facts. Its footprint, propulsion, payload, energy, localization, and flight stack are attached to the same aircraft identity before a route is considered.",
       facts: [
-        ["Airframe", "X500 V2 · Quad X"],
-        ["Flight stack", "Pixhawk 6C · PX4 v1.16"],
-        ["Safety envelope", "0.38 m planning radius"],
         ["Performance", "4.0 m/s · 34.19 N thrust"],
+        ["Safety envelope", "0.38 m planning radius"],
+        ["Flight stack", "Pixhawk 6C · PX4 v1.16"],
+        ["Airframe", "X500 V2 · Quad X"],
         ["Energy & payload", "74 Wh · 0.10 kg payload"],
       ],
       secondTransition: "Build its capability contract",
@@ -298,10 +298,10 @@ const architectureCopy = {
       firstTransition: "读懂无人机",
       firstTransitionBody: "实体 X500 V2 会先转换为一组可测量的事实。它的占用空间、动力、载荷、能源、定位方式和飞行栈都会绑定到同一架无人机的身份上，再进入路线规划。",
       facts: [
-        ["机架", "X500 V2 · Quad X"],
-        ["飞行栈", "Pixhawk 6C · PX4 v1.16"],
-        ["安全包络", "0.38 米规划半径"],
         ["性能", "4.0 米/秒 · 34.19 牛推力"],
+        ["安全包络", "0.38 米规划半径"],
+        ["飞行栈", "Pixhawk 6C · PX4 v1.16"],
+        ["机架", "X500 V2 · Quad X"],
         ["能源与载荷", "74 瓦时 · 0.10 千克载荷"],
       ],
       secondTransition: "建立能力契约",
@@ -508,10 +508,10 @@ function ArchitectureMap({ locale }: { locale: SiteLocale }) {
 
 function DroneProductView({ facts }: { facts: readonly (readonly [string, string])[] }) {
   const sourcePoints = [
-    [388, 274],
-    [424, 193],
     [579, 113],
-    [169, 138],
+    [662, 161],
+    [424, 193],
+    [388, 274],
     [403, 343],
   ] as const;
   const targetY = [60, 160, 260, 360, 460] as const;
@@ -525,12 +525,12 @@ function DroneProductView({ facts }: { facts: readonly (readonly [string, string
         />
       </div>
       <svg className="architecture-drone-connectors" viewBox="0 0 1000 520" preserveAspectRatio="none" aria-hidden="true">
-        <path className="architecture-drone-baseline" d="M713 38 V482" />
+        <path className="architecture-drone-baseline" d="M738 38 V482" />
         {sourcePoints.map(([x, y], index) => (
           <Fragment key={`${x}-${y}`}>
-            <path d={`M${x} ${y} L650 ${targetY[index]} L713 ${targetY[index]}`} />
+            <path d={`M${x} ${y} L680 ${targetY[index]} L738 ${targetY[index]}`} />
             <circle className="architecture-drone-source" cx={x} cy={y} r="7" />
-            <circle className="architecture-drone-target" cx="713" cy={targetY[index]} r="7" />
+            <circle className="architecture-drone-target" cx="738" cy={targetY[index]} r="7" />
           </Fragment>
         ))}
       </svg>

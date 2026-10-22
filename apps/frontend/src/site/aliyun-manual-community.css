@@ -3071,7 +3071,7 @@ html[lang="zh-CN"] .architecture-map-transition > p {
   position: absolute;
   z-index: 1;
   top: 0.72rem;
-  right: 0.72rem;
+  right: 1.25rem;
   display: grid;
   width: 38px;
   height: 38px;
