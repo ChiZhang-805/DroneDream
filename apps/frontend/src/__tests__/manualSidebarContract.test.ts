@@ -106,7 +106,7 @@ describe("manual sidebar stylesheet contract", () => {
     expect(architecturePage).toContain("token-keyword");
   });
 
-  it("uses the manual chapter hierarchy for both architecture chapters", () => {
+  it("uses the manual chapter hierarchy for all architecture chapters", () => {
     expect(architectureData).toContain('label: "Map is not a map"');
     expect(architectureData).toContain('label: "Drone is not a drone"');
     expect(architectureData).toContain('id: "architecture-map-transition-three"');
@@ -152,5 +152,26 @@ describe("manual sidebar stylesheet contract", () => {
     expect(architecturePage).toContain("dronedream.autonomy.planner-response.v1");
     expect(architecturePage).toContain("ModelVisionEvidence");
     expect(architecturePage).toContain("HarnessFlow");
+  });
+
+  it("tracks the visible architecture subsection and uses the revised model visuals", () => {
+    expect(manualPage).toContain("updateActiveArchitectureHeading");
+    expect(manualPage).toContain("setArchitectureActiveId");
+    expect(stylesheet).toMatch(
+      /\.architecture-structured-io\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0,\s*1fr\);/u,
+    );
+    expect(stylesheet).toContain(".architecture-vision-card.is-1 img");
+    expect(stylesheet).toContain(".architecture-vision-card.is-3 img");
+    expect(stylesheet).toContain(".architecture-model-request blockquote::after");
+    expect(stylesheet).toContain(".architecture-json-example .code-line");
+
+    const flowAsset = resolve(
+      process.cwd(),
+      "public/docs/downloads/manual-assets/architecture-harness-flow.png",
+    );
+    expect(existsSync(flowAsset)).toBe(true);
+    expect(statSync(flowAsset).size).toBeGreaterThan(50_000);
+    expect(architecturePage).toContain("/docs/downloads/manual-assets/architecture-harness-flow.png");
+    expect(architecturePage).not.toContain('className="architecture-harness-flow"');
   });
 });
