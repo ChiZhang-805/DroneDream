@@ -42,6 +42,20 @@ describe("manual sidebar stylesheet contract", () => {
     );
   });
 
+  it("uses one reader width and typography scale across manual and architecture content", () => {
+    expect(stylesheet).toContain("--manual-reader-max-width: 1080px;");
+    expect(stylesheet).toContain("--manual-prose-max-width: 76ch;");
+    expect(stylesheet).toMatch(
+      /\.site-manual-page\.is-architecture-view \.manual-reader-header,[\s\S]*?var\(--manual-reader-max-width\)/u,
+    );
+    expect(stylesheet).toMatch(
+      /\.manual-architecture-page\s*\{[\s\S]*?font-size:\s*var\(--manual-copy-size\);/u,
+    );
+    expect(stylesheet).toMatch(
+      /\.manual-architecture-intro h2\s*\{[\s\S]*?font-size:\s*var\(--manual-chapter-title-size\);/u,
+    );
+  });
+
   it("ships both same-footprint map views used by the architecture comparison", () => {
     const assets = [
       "architecture-map-human.webp",
