@@ -443,6 +443,26 @@ describe("autonomy mission harness", () => {
     })).not.toBeNull();
     expect(parseAutonomyPlannerArtifact({
       ...valid,
+      task_graph: {
+        nodes: valid.task_graph.nodes.map((node) => (
+          node.node_id === "pickup"
+            ? { ...node, action: "delivery.confirm-custody" }
+            : node
+        )),
+      },
+    })).not.toBeNull();
+    expect(parseAutonomyPlannerArtifact({
+      ...valid,
+      task_graph: {
+        nodes: valid.task_graph.nodes.map((node) => (
+          node.node_id === "pickup"
+            ? { ...node, action: "Delivery.confirm-custody" }
+            : node
+        )),
+      },
+    })).toBeNull();
+    expect(parseAutonomyPlannerArtifact({
+      ...valid,
       safety_policy: { ...valid.safety_policy, actuator_authority: true },
     })).toBeNull();
     expect(parseAutonomyPlannerArtifact({

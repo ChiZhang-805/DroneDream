@@ -23,7 +23,8 @@ export type AutonomyPlannerAction =
   | "inspect"
   | "return"
   | "land"
-  | "abort";
+  | "abort"
+  | `${string}.${string}`;
 
 export interface AutonomyPlannerTaskNode {
   node_id: string;
@@ -428,7 +429,7 @@ export function parseAutonomyPlannerArtifact(value: unknown): AutonomyPlannerArt
   return artifact as AutonomyPlannerArtifact;
 }
 
-const PLANNER_ACTIONS = new Set<AutonomyPlannerAction>([
+const PLANNER_ACTIONS = new Set<string>([
   "resolve",
   "takeoff",
   "navigate",
@@ -439,6 +440,12 @@ const PLANNER_ACTIONS = new Set<AutonomyPlannerAction>([
   "land",
   "abort",
 ]);
+
+const PLANNER_DOMAIN_ACTION = /^[a-z][a-z0-9-]{0,31}(?:\.[a-z][a-z0-9-]{0,31}){1,3}$/u;
+
+function validPlannerAction(value: string): value is AutonomyPlannerAction {
+  return PLANNER_ACTIONS.has(value) || PLANNER_DOMAIN_ACTION.test(value);
+}
 
 function validPlannerTaskGraph(value: unknown, requireNodes: boolean): value is AutonomyPlannerTaskGraph {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
@@ -457,7 +464,7 @@ function validPlannerTaskGraph(value: unknown, requireNodes: boolean): value is 
       || !/^[a-z0-9][a-z0-9-]{0,63}$/u.test(node.node_id)
       || identifiers.has(node.node_id)
       || typeof node.action !== "string"
-      || !PLANNER_ACTIONS.has(node.action as AutonomyPlannerAction)
+      || !validPlannerAction(node.action)
       || typeof node.target !== "string"
       || node.target.trim().length === 0
       || node.target.length > 160
