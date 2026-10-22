@@ -2,6 +2,7 @@ import {
   useCallback,
   createContext,
   useContext,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useState,
@@ -10,19 +11,20 @@ import {
 } from "react";
 
 import type { BrandEditionId } from "../brand/edition-brand.generated";
+import { isDesktopRuntime } from "../desktop/bridge";
 import { applyUniversalMode } from "../features/distribution/universalMode";
 import {
   appReducedMotionEnabled,
   subscribeToAppReducedMotion,
 } from "../desktop/uiMotionPreferences";
 import {
+  DEFAULT_APPEARANCE,
   editionTheme,
   editionThemeForAppearance,
   type AppearanceMode,
   type EditionTheme,
 } from "./editionTheme";
 
-const APPEARANCE_STORAGE_KEY = "dronedream:appearance";
 const CUSTOM_ACCENT_STORAGE_KEY = "dronedream:custom-accent";
 export type AppearancePreference = AppearanceMode;
 
@@ -36,7 +38,7 @@ export type EditionThemeContextValue = EditionTheme & Readonly<{
 
 const fallbackTheme: EditionThemeContextValue = {
   ...editionTheme("universal"),
-  appearancePreference: "dark",
+  appearancePreference: DEFAULT_APPEARANCE,
   customAccent: "#8d72ee",
   setAppearance: () => undefined,
   setCustomAccent: () => undefined,
@@ -44,14 +46,6 @@ const fallbackTheme: EditionThemeContextValue = {
 };
 
 const EditionThemeContext = createContext<EditionThemeContextValue>(fallbackTheme);
-
-/** Invalid or unavailable browser preferences fall back locally, not to a cloud account value. */
-function storedAppearance(): AppearancePreference {
-  let stored: string | null = null;
-  try { stored = window.localStorage.getItem(APPEARANCE_STORAGE_KEY); }
-  catch { /* Browser policy can deny persistence while still allowing the app. */ }
-  return stored === "light" ? "light" : "dark";
-}
 
 /** Permit a hex color token only; arbitrary CSS is never interpolated from persisted text. */
 function storedCustomAccent(): string {
@@ -61,7 +55,7 @@ function storedCustomAccent(): string {
   return /^#[0-9a-f]{6}$/iu.test(stored) ? stored : "#8d72ee";
 }
 
-/** Own document-wide edition tokens and per-device appearance; mount one provider per page. */
+/** Start each app session in light mode; appearance changes belong to this mounted app only. */
 export function EditionThemeProvider({
   edition,
   children,
@@ -70,7 +64,7 @@ export function EditionThemeProvider({
   children: ReactNode;
 }) {
   const [appearancePreference, setAppearanceState] =
-    useState<AppearancePreference>(storedAppearance);
+    useState<AppearancePreference>(DEFAULT_APPEARANCE);
   const [customAccent, setCustomAccentState] = useState(storedCustomAccent);
   const reducedMotion = useSyncExternalStore(
     subscribeToAppReducedMotion,
@@ -78,8 +72,8 @@ export function EditionThemeProvider({
     () => false,
   );
   const setAppearance = useCallback((next: AppearancePreference) => {
-    try { window.localStorage.setItem(APPEARANCE_STORAGE_KEY, next); }
-    catch { /* Apply in this mounted page without claiming durable storage. */ }
+    // Do not restore or replace legacy persisted appearance: every new launch
+    // starts light, while language and other durable preferences stay intact.
     setAppearanceState(next);
   }, []);
   const setCustomAccent = useCallback((next: string) => {
@@ -89,7 +83,7 @@ export function EditionThemeProvider({
     catch { /* State below still makes the selected color usable this session. */ }
     setCustomAccentState(normalized);
   }, []);
-  const resetAppearance = useCallback(() => setAppearance("dark"), [setAppearance]);
+  const resetAppearance = useCallback(() => setAppearance(DEFAULT_APPEARANCE), [setAppearance]);
   const appearance: AppearanceMode = appearancePreference;
   const theme = useMemo<EditionThemeContextValue>(() => ({
     ...editionThemeForAppearance(edition, appearance),
@@ -108,6 +102,18 @@ export function EditionThemeProvider({
     document.documentElement.style.removeProperty("--dd-brand-middle");
     document.documentElement.style.removeProperty("--dd-brand-end");
   }, [appearance, edition, reducedMotion]);
+  useEffect(() => {
+    if (!isDesktopRuntime()) return;
+    let active = true;
+    void import("@tauri-apps/api/window")
+      .then(({ getCurrentWindow }) => {
+        if (active) return getCurrentWindow().setTheme(appearance);
+      })
+      .catch(() => {
+        // Native chrome failure must not prevent the in-app theme from changing.
+      });
+    return () => { active = false; };
+  }, [appearance]);
   return (
     <EditionThemeContext.Provider value={theme}>
       {children}

@@ -54,9 +54,7 @@
   cursor: pointer;
 }
 
-@media (prefers-color-scheme: dark) {
-  .update-blocked-dialog {
-    --app-text: #fff;
-    --app-surface: #181327;
-  }
+:root[data-dd-appearance="dark"] .update-blocked-dialog {
+  --app-text: #fff;
+  --app-surface: #181327;
 }

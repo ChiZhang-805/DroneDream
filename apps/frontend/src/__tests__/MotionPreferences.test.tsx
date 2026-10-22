@@ -25,9 +25,9 @@ describe("motion preferences", () => {
     const { result } = renderHook(() => useEditionTheme(), {
       wrapper: ({ children }) => <EditionThemeProvider edition="sim">{children}</EditionThemeProvider>,
     });
-    expect(result.current.appearancePreference).toBe("dark");
-    act(() => result.current.setAppearance("light"));
     expect(result.current.appearancePreference).toBe("light");
+    act(() => result.current.setAppearance("dark"));
+    expect(result.current.appearancePreference).toBe("dark");
     act(() => result.current.setCustomAccent("#AABBCC"));
     expect(result.current.customAccent).toBe("#aabbcc");
   });

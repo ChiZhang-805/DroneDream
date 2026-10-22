@@ -1005,11 +1005,10 @@ function SettingsDialog({
   presentation?: "quick" | "workspace";
   preferenceSaveQueueRef: MutableRefObject<Promise<boolean>>;
 }) {
-  const { locale, interfaceLocale, setLocale, t } = useI18n();
+  const { locale, interfaceLocale, setLocale, restoreLocale, t } = useI18n();
   const navigate = useNavigate();
   const settingsCopy = SETTINGS_COPY[interfaceLocale];
   const editionTheme = useEditionTheme();
-  const setAppearancePreference = editionTheme.setAppearance;
   const setCustomAccentPreference = editionTheme.setCustomAccent;
   const auth = useAuth();
   const adminAccess = useAdminAccess();
@@ -1267,8 +1266,9 @@ function SettingsDialog({
               ...DEFAULT_NOTIFICATION_PREFERENCES,
               ...preferences.notifications,
             });
-            setLocale(preferences.interface_locale);
-            setAppearancePreference(preferences.appearance_mode === "light" ? "light" : "dark");
+            restoreLocale(preferences.interface_locale);
+            // Appearance is session-only: opening settings must not restore a
+            // previous cloud theme or override the user's current session.
             setCustomAccentPreference(preferences.custom_accent);
           }
         } else {
@@ -1290,9 +1290,8 @@ function SettingsDialog({
     initialPreferenceDraft,
     localDesktopPreferences,
     preferenceBoundary,
-    setAppearancePreference,
     setCustomAccentPreference,
-    setLocale,
+    restoreLocale,
   ]);
   useEffect(() => {
     if (
