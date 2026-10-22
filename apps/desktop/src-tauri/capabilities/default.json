@@ -6,6 +6,7 @@
   "permissions": [
     "core:default",
     "core:window:allow-destroy",
+    "core:window:allow-set-theme",
     "updater:default",
     "process:allow-restart",
     "dialog:allow-open",

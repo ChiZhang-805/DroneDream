@@ -2562,7 +2562,7 @@ fieldset.autonomy-form-grid {
   .autonomy-sensor-mounts article > label.is-id input { min-height: 4.4rem; }
 }
 
-/* Build-edition appearance is persisted by EditionThemeProvider. These
+/* Build-edition appearance is session-scoped by EditionThemeProvider. These
    high-specificity rules keep launch, setup, settings, and the 3D scene on one
    coherent light contract. */
 :root[data-dd-appearance="light"] {

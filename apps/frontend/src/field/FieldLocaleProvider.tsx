@@ -8,7 +8,6 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 
-import { getInstallerLocale, isDesktopRuntime } from "../desktop/bridge";
 import type { FieldLocale } from "./catalog";
 
 const STORAGE_KEY = "dronedream:field:locale";
@@ -36,26 +35,6 @@ const FieldLocaleContext = createContext<FieldLocaleValue>({
 
 export function FieldLocaleProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<FieldLocale>(initialLocale);
-
-  useEffect(() => {
-    if (!isDesktopRuntime()) return;
-    try {
-      const saved = window.localStorage.getItem(STORAGE_KEY);
-      if (saved === "en" || saved === "zh-CN") return;
-    } catch {
-      // Apply the installer language in memory when storage is unavailable.
-    }
-
-    let active = true;
-    void getInstallerLocale()
-      .then((installerLocale) => {
-        if (active) setLocaleState(installerLocale);
-      })
-      .catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const setLocale = useCallback((next: FieldLocale) => {
     setLocaleState(next);

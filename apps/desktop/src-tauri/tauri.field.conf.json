@@ -16,7 +16,9 @@
         "minimizable": true,
         "closable": true,
         "decorations": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "theme": "Light",
+        "backgroundColor": "#ffffff"
       }
     ]
   },
