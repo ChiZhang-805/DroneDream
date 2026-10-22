@@ -98,6 +98,14 @@ describe("manual sidebar stylesheet contract", () => {
     );
   });
 
+  it("expands every code example to its complete height without a vertical scroller", () => {
+    expect(stylesheet).toMatch(
+      /\.architecture-json-example pre\s*\{[\s\S]*?max-height:\s*none;[\s\S]*?overflow-y:\s*hidden;/u,
+    );
+    expect(architecturePage).toContain('language="python"');
+    expect(architecturePage).toContain("token-keyword");
+  });
+
   it("uses the manual chapter hierarchy for both architecture chapters", () => {
     expect(architectureData).toContain('label: "Map is not a map"');
     expect(architectureData).toContain('label: "Drone is not a drone"');
@@ -118,5 +126,31 @@ describe("manual sidebar stylesheet contract", () => {
     expect(architecturePage).toContain('id="architecture-drone-transition-three"');
     expect(stylesheet).toMatch(/\.architecture-drone-product\s*\{[\s\S]*?grid-template-columns:/u);
     expect(stylesheet).toMatch(/\.architecture-airspace-diagram\s*\{[\s\S]*?var\(--manual-prose-max-width\)/u);
+  });
+
+  it("uses rendered aircraft and volumetric corridor assets instead of inline drone drawings", () => {
+    const assets = ["architecture-drone-x500.webp", "architecture-airspace-corridor.webp"];
+    for (const asset of assets) {
+      const assetPath = resolve(process.cwd(), "public/docs/downloads/manual-assets", asset);
+      expect(existsSync(assetPath)).toBe(true);
+      expect(statSync(assetPath).size).toBeGreaterThan(250_000);
+      expect(architecturePage).toContain(`/docs/downloads/manual-assets/${asset}`);
+    }
+    expect(architecturePage).not.toContain("function DroneIllustration");
+    expect(architecturePage).not.toContain('<linearGradient id="airspace-corridor"');
+    expect(architecturePage).toContain('className="architecture-drone-baseline"');
+    expect(architecturePage.match(/className="architecture-drone-target"/gu)).toHaveLength(1);
+  });
+
+  it("opens the architecture contents and ships the five-part model workflow", () => {
+    expect(manualPage).toContain('() => new Set(["map", "drone", "model"])');
+    expect(manualPage).toContain("setSidebarOpen(true);");
+    expect(architectureData).toContain('label: "The model is not the system"');
+    expect(architectureData).toContain('id: "architecture-model-transition-five"');
+    expect(architecturePage).toContain("route.plan_global_corridor");
+    expect(architecturePage).toContain("mission.validate_plan");
+    expect(architecturePage).toContain("dronedream.autonomy.planner-response.v1");
+    expect(architecturePage).toContain("ModelVisionEvidence");
+    expect(architecturePage).toContain("HarnessFlow");
   });
 });

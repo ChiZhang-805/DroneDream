@@ -193,7 +193,7 @@ export function ManualPage({ locale }: ManualPageProps) {
   const [architectureSection, setArchitectureSection] = useState<ArchitectureSectionId>("map");
   const [architectureActiveId, setArchitectureActiveId] = useState("architecture-map-title");
   const [expandedArchitectureIds, setExpandedArchitectureIds] = useState<Set<ArchitectureSectionId>>(
-    () => new Set(["map"]),
+    () => new Set(["map", "drone", "model"]),
   );
   const articleRef = useRef<HTMLElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
@@ -505,6 +505,7 @@ export function ManualPage({ locale }: ManualPageProps) {
     });
   };
   const switchManualView = () => {
+    setSidebarOpen(true);
     setManualView((current) => {
       const next = current === "manual" ? "architecture" : "manual";
       if (next === "architecture") {

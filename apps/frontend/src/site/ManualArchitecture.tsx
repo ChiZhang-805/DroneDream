@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Check, Copy, Map, Plane, type LucideIcon } from "lucide-react";
+import { Fragment, useState, type ReactNode } from "react";
+import { BrainCircuit, Check, Copy, Map, Plane, type LucideIcon } from "lucide-react";
 
 import type { ArchitectureSectionId } from "./manualArchitectureData";
 
@@ -79,6 +79,86 @@ const architectureVehicleExample = `{
   }
 }`;
 
+const modelRequestExample = `{
+  "natural_language": "Take off from the Science High School pickup point, collect the sealed sample at Chemicum, avoid roofs and trees, then return with at least 30% battery.",
+  "grounded_entities": [
+    { "name": "Science High School", "role": "start_and_return" },
+    { "name": "Chemicum", "role": "pickup_destination" }
+  ],
+  "constraints": {
+    "connected_routes_only": true,
+    "minimum_battery_percent": 30,
+    "respect_vehicle_clearance": true
+  },
+  "task_graph": [
+    "resolve", "takeoff", "navigate", "pickup", "return", "land"
+  ]
+}`;
+
+const routeToolExample = `# 1. Resolve names, then search only connected map edges.
+def plan_global_corridor(start_name, goal_name, map_graph):
+    start = map_resolve_entity(start_name)
+    goal = map_resolve_entity(goal_name)
+    route = astar(
+        graph=map_graph,
+        start=start.pickup_node,
+        goal=goal.pickup_node,
+        edge_cost=lambda edge: edge.length_m,
+        allow_edge=lambda edge: edge.status == "verified",
+    )
+    return route_plan_global_corridor(route)`;
+
+const trajectoryToolExample = `# 2. Turn the route into a vehicle-qualified 3D corridor.
+def plan_vehicle_trajectory(route, aircraft):
+    return trajectory_plan_segment(
+        centerline=route.centerline_m,
+        body_radius_m=aircraft.body_radius_m,
+        max_speed_mps=aircraft.maximum_speed_mps,
+        reserve_battery_percent=aircraft.reserve_battery_percent,
+        require_obstacle_clearance=True,
+    )`;
+
+const validationToolExample = `# 3. Deterministic validation retains execution authority.
+def validate_before_confirmation(plan, context):
+    receipt = mission_validate_plan(
+        plan=plan,
+        expected_context_sha256=context.context_sha256,
+        require_connected_segments=True,
+        may_relax_constraints=False,
+    )
+    if receipt.outcome != "accepted":
+        raise PlanBlocked(receipt.issue_codes)
+    return receipt`;
+
+const systemPromptExample = `SYSTEM — dronedream.autonomy.system.v1
+You translate a mission request into a bounded plan.
+Use only the selected, qualified map and aircraft.
+Call only tools listed in eligible_tool_ids.
+Never invent an entrance, route, capability, or receipt.
+Return dronedream.autonomy.planner-response.v1 JSON.
+You have no actuator authority and may not relax constraints.`;
+
+const structuredOutputExample = `{
+  "schema_version": "dronedream.autonomy.planner-response.v1",
+  "status": "draft",
+  "asset_bindings": {
+    "aircraft_id": "aircraft-my-drone",
+    "map_id": "kumpula-campus",
+    "context_sha256": "…"
+  },
+  "tool_requests": [
+    "map.resolve_entity",
+    "route.plan_global_corridor",
+    "trajectory.plan_segment",
+    "mission.validate_plan"
+  ],
+  "safety_policy": {
+    "actuator_authority": false,
+    "may_relax_constraints": false,
+    "execution_requires_deterministic_validation": true
+  }
+}`;
+
 async function copyArchitectureJson(value: string) {
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(value);
@@ -146,6 +226,46 @@ const architectureCopy = {
         ["Execution frame", "ENU waypoints for PX4"],
       ],
     },
+    model: {
+      title: "The model is not the system",
+      paragraphs: [
+        "The model interprets intent and proposes a plan, but DroneDream is the complete workflow around it. Qualified map and aircraft contracts ground the request; approved tools calculate routes and trajectories; strict schemas constrain every exchange; visual evidence resolves what structured data cannot; and the Harness validates, records, and stops the process before any execution is offered to a person.",
+      ],
+      firstTransition: "Understand the request",
+      firstTransitionBody: "A natural-language goal is separated into grounded places, ordered actions, success evidence, and non-negotiable limits. The model reads the selected map and aircraft contracts before it converts the sentence into a task graph, so names point to verified access nodes and every requested motion remains within the selected vehicle's capability.",
+      requestLabel: "Structured interpretation",
+      secondTransition: "Call bounded tools",
+      secondTransitionBody: "The model chooses from a small registry instead of drawing a route itself. Entity resolution binds human names to map nodes; global planning searches verified, connected edges; trajectory planning expands that centerline by the aircraft envelope; and deterministic validation rejects disconnected, stale, or unsafe results.",
+      toolExamples: [
+        ["Resolve and route", "The planner resolves each place to its verified pickup node, then runs A* over the connected topology. Unverified edges and invented shortcuts never enter the search."],
+        ["Shape the flight volume", "The accepted route becomes a 3D trajectory whose radius, speed, clearance, and battery reserve come from the selected aircraft contract."],
+        ["Validate before confirmation", "The final tool checks asset hashes, connectivity, policy, and receipts. A model rationale cannot turn a rejected plan into an accepted one."],
+      ],
+      thirdTransition: "Keep input and output structured",
+      thirdTransitionBody: "DroneDream supplies a versioned system prompt, a content-hashed context, qualified asset contracts, and the exact eligible tool list. The response must match one planner schema with bound asset IDs, a task graph, tool requests, assumptions, blockers, repair state, and a fixed safety policy; malformed or stale output is data to reject, not code to execute.",
+      promptLabel: "System prompt · excerpt",
+      outputLabel: "Structured output · planner response",
+      fourthTransition: "Use visual evidence where it matters",
+      fourthTransitionBody: "Images are evidence for interpretation, not a substitute for geometry. The model may inspect the mission surface, the map-aligned scene, and the live route view to recognize a doorway, verify where a route actually runs, or explain a blocked segment; each observation is then tied back to a named entity, map edge, frame, or receipt before it can affect the plan.",
+      visionCards: [
+        ["Mission context", "The request, selected X500, and selected campus map establish the task boundary."],
+        ["Grounded scene", "Roads, entrances, pickup points, and obstacles are aligned to the same map frame."],
+        ["Runtime evidence", "The planned route, current aircraft state, and destination remain visible for review."],
+      ],
+      fifthTransition: "Run the Harness",
+      fifthTransitionBody: "The Harness is the bounded control loop around every model call. It freezes the request and asset hashes, builds the context, asks for one typed proposal, executes approved read-only planning tools, validates the returned graph, and stores receipts. Repair is limited and cannot weaken policy. Only a plan that survives deterministic checks reaches human confirmation; execution remains a separate authorized step.",
+      harnessSteps: [
+        ["01", "Bind", "Request + asset hashes"],
+        ["02", "Inspect", "Qualification receipts"],
+        ["03", "Plan", "One structured model call"],
+        ["04", "Tool", "Approved calculations"],
+        ["05", "Validate", "Policy + connectivity"],
+        ["06", "Record", "Trace + tool receipts"],
+        ["07", "Confirm", "Human reviews the plan"],
+      ],
+      copyCode: "Copy code example",
+      copiedCode: "Code example copied",
+    },
   },
   "zh-CN": {
     map: {
@@ -198,6 +318,46 @@ const architectureCopy = {
         ["执行坐标", "提供给 PX4 的 ENU 航点"],
       ],
     },
+    model: {
+      title: "The model is not the system",
+      paragraphs: [
+        "模型负责理解意图并提出计划，但 DroneDream 是围绕模型运行的完整流程。经过验证的地图和无人机契约负责为任务提供事实依据，受限工具计算路线与轨迹，严格的数据结构约束每次交换，视觉证据补充结构化数据无法直接表达的场景，而 Harness 会在任何执行交给用户确认前完成验证、记录与停止控制。",
+      ],
+      firstTransition: "理解自然语言任务",
+      firstTransitionBody: "自然语言目标会被拆解为有依据的地点、按顺序执行的动作、成功证据和不可放宽的限制。模型先读取当前选定的地图与无人机契约，再把句子转换成任务图，因此地点名称会落到经过验证的访问节点，所有动作也必须处于该机型的能力范围内。",
+      requestLabel: "结构化理解结果",
+      secondTransition: "调用受限工具",
+      secondTransitionBody: "模型不会自己手画路线，而是从一个有限的工具注册表中选择工具。地点解析把人类名称绑定到地图节点，全局规划只搜索已验证且彼此连通的边，轨迹规划按无人机包络扩展中心线，确定性验证会拒绝断开、过期或不安全的结果。",
+      toolExamples: [
+        ["解析地点并规划路线", "规划器先把每个地点解析到经过验证的取件节点，再在连通拓扑上运行 A*。未验证的边和凭空生成的捷径不会进入搜索。"],
+        ["生成三维飞行空间", "通过验证的路线会被转换成三维轨迹，半径、速度、净空和电池余量都来自当前无人机契约。"],
+        ["确认前执行验证", "最后一个工具检查资产摘要、连通性、策略和回执。模型写出的理由不能把被拒绝的计划变成可接受计划。"],
+      ],
+      thirdTransition: "保持结构化输入输出",
+      thirdTransitionBody: "DroneDream 会提供带版本的系统提示词、内容摘要固定的上下文、经过验证的资产契约和精确的可用工具列表。模型输出必须匹配唯一的规划器结构，其中包含绑定的资产标识、任务图、工具请求、假设、阻塞项、修复状态和固定安全策略；格式错误或上下文过期的输出只会被拒绝，不会被当成代码执行。",
+      promptLabel: "系统提示词 · 节选",
+      outputLabel: "结构化输出 · 规划器响应",
+      fourthTransition: "在关键位置使用视觉证据",
+      fourthTransitionBody: "图片是用于理解的证据，不能代替几何数据。模型可以检查任务界面、与地图对齐的场景和实时路线画面，用来识别入口、核对道路实际位置或解释某段为何被阻塞；每项观察随后都必须重新绑定到有名称的地点、地图边、坐标系或回执，才能影响计划。",
+      visionCards: [
+        ["任务上下文", "任务描述、选定的 X500 和校园地图共同限定此次任务。"],
+        ["场景对齐", "道路、入口、取件点和障碍物被对齐到同一地图坐标。"],
+        ["运行证据", "规划路线、无人机当前状态和目标地点持续可供复核。"],
+      ],
+      fifthTransition: "运行 Harness",
+      fifthTransitionBody: "Harness 是围绕每次模型调用运行的受限控制循环。它会固定任务与资产摘要、构建上下文、请求一次结构化提案、执行允许的只读规划工具、验证返回的任务图并保存回执。修复次数受到限制，也不能放宽安全策略。只有通过确定性检查的计划才会进入人工确认，执行始终属于另一个需要授权的步骤。",
+      harnessSteps: [
+        ["01", "绑定", "任务与资产摘要"],
+        ["02", "检查", "资格验证回执"],
+        ["03", "规划", "一次结构化模型调用"],
+        ["04", "工具", "受限的确定性计算"],
+        ["05", "验证", "策略与连通性检查"],
+        ["06", "记录", "调用轨迹与工具回执"],
+        ["07", "确认", "用户审阅最终计划"],
+      ],
+      copyCode: "复制代码示例",
+      copiedCode: "已复制代码示例",
+    },
   },
 } as const;
 
@@ -230,11 +390,41 @@ function ArchitectureSectionHeading({ number, id, title }: { number: string; id:
   return <header><span>{number}</span><h3 id={id}>{title}</h3></header>;
 }
 
-function CopyableJson({ value, label, copyLabel, copiedLabel }: {
+function highlightedCode(value: string, language: "json" | "python" | "text"): ReactNode {
+  if (language === "text") return value;
+  const pattern = language === "python"
+    ? /(#[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:def|return|raise|if|else|for|in|and|or|not|lambda|True|False|None)\b|\b\d+(?:\.\d+)?\b)/gu
+    : /("(?:\\.|[^"\\])*"|\b(?:true|false|null)\b|-?\b\d+(?:\.\d+)?\b)/gu;
+  return value.split("\n").map((line, lineIndex) => {
+    const parts: ReactNode[] = [];
+    let lastIndex = 0;
+    for (const match of line.matchAll(pattern)) {
+      const index = match.index ?? 0;
+      if (index > lastIndex) parts.push(line.slice(lastIndex, index));
+      const token = match[0];
+      const className = token.startsWith("#")
+        ? "token-comment"
+        : /^['"]/u.test(token)
+          ? "token-string"
+          : /^(?:def|return|raise|if|else|for|in|and|or|not|lambda)$/u.test(token)
+            ? "token-keyword"
+            : /^(?:True|False|None|true|false|null)$/u.test(token)
+              ? "token-literal"
+              : "token-number";
+      parts.push(<span className={className} key={`${lineIndex}-${index}`}>{token}</span>);
+      lastIndex = index + token.length;
+    }
+    if (lastIndex < line.length) parts.push(line.slice(lastIndex));
+    return <Fragment key={lineIndex}>{parts}{lineIndex < value.split("\n").length - 1 ? "\n" : null}</Fragment>;
+  });
+}
+
+function CopyableCode({ value, label, copyLabel, copiedLabel, language = "json" }: {
   value: string;
   label: string;
   copyLabel: string;
   copiedLabel: string;
+  language?: "json" | "python" | "text";
 }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = async () => {
@@ -244,7 +434,7 @@ function CopyableJson({ value, label, copyLabel, copiedLabel }: {
   };
 
   return (
-    <div className="architecture-json-example">
+    <div className={`architecture-json-example language-${language}`}>
       <span>{label}</span>
       <button
         type="button"
@@ -255,7 +445,7 @@ function CopyableJson({ value, label, copyLabel, copiedLabel }: {
       >
         {copied ? <Check aria-hidden="true" /> : <Copy aria-hidden="true" />}
       </button>
-      <pre><code>{value}</code></pre>
+      <pre><code>{highlightedCode(value, language)}</code></pre>
     </div>
   );
 }
@@ -298,47 +488,40 @@ function ArchitectureMap({ locale }: { locale: SiteLocale }) {
         <section className="architecture-map-transition" aria-labelledby="architecture-map-transition-three">
           <ArchitectureSectionHeading number="03" id="architecture-map-transition-three" title={copy.thirdTransition} />
           <p>{copy.thirdTransitionBody}</p>
-          <CopyableJson value={architecturePlaceExample} label={copy.jsonLabel} copyLabel={copy.copyJson} copiedLabel={copy.copiedJson} />
+          <CopyableCode value={architecturePlaceExample} label={copy.jsonLabel} copyLabel={copy.copyJson} copiedLabel={copy.copiedJson} />
         </section>
       </div>
     </section>
   );
 }
 
-function DroneIllustration() {
-  return (
-    <svg viewBox="0 0 680 520" role="img" aria-label="X500 V2 quadrotor product view">
-      <defs>
-        <linearGradient id="drone-body" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#202a43" /><stop offset="1" stopColor="#0e1426" /></linearGradient>
-        <linearGradient id="drone-accent" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#6bd8f3" /><stop offset="0.48" stopColor="#8b7df2" /><stop offset="1" stopColor="#e85cc5" /></linearGradient>
-        <filter id="drone-shadow" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dx="0" dy="18" stdDeviation="18" floodColor="#2f315b" floodOpacity="0.24" /></filter>
-      </defs>
-      <ellipse cx="328" cy="434" rx="224" ry="26" fill="#756bd2" opacity="0.12" />
-      <g filter="url(#drone-shadow)">
-        <g fill="none" stroke="#252c44" strokeWidth="16" strokeLinecap="round"><path d="M292 238 L136 140" /><path d="M366 238 L524 140" /><path d="M292 280 L136 374" /><path d="M366 280 L524 374" /></g>
-        <g fill="none" stroke="#59647b" strokeWidth="5" strokeLinecap="round" opacity="0.78"><path d="M292 238 L136 140" /><path d="M366 238 L524 140" /><path d="M292 280 L136 374" /><path d="M366 280 L524 374" /></g>
-        <g fill="#11182b" stroke="#68748e" strokeWidth="5"><circle cx="126" cy="132" r="32" /><circle cx="534" cy="132" r="32" /><circle cx="126" cy="382" r="32" /><circle cx="534" cy="382" r="32" /></g>
-        <g fill="none" stroke="url(#drone-accent)" strokeWidth="7" opacity="0.82"><ellipse cx="126" cy="132" rx="92" ry="18" /><ellipse cx="534" cy="132" rx="92" ry="18" /><ellipse cx="126" cy="382" rx="92" ry="18" /><ellipse cx="534" cy="382" rx="92" ry="18" /></g>
-        <path d="M255 220 L292 187 H369 L405 220 V302 L369 335 H292 L255 302 Z" fill="url(#drone-body)" stroke="#737f99" strokeWidth="4" />
-        <path d="M281 229 H379 V295 H281 Z" fill="#151d32" stroke="#8792a7" strokeWidth="3" />
-        <path d="M304 209 H356 L368 230 H292 Z" fill="url(#drone-accent)" opacity="0.9" />
-        <circle cx="330" cy="260" r="26" fill="#070b16" stroke="#4fd4ee" strokeWidth="4" /><circle cx="330" cy="260" r="8" fill="#e76bcc" />
-        <path d="M282 319 L268 399 H298 L318 329 M378 319 L392 399 H362 L342 329" fill="none" stroke="#323b54" strokeWidth="9" strokeLinecap="round" />
-        <path d="M300 400 H256 M404 400 H360" fill="none" stroke="#11182b" strokeWidth="8" strokeLinecap="round" />
-      </g>
-      <g fill="#7d51df" stroke="#fff" strokeWidth="4"><circle cx="530" cy="132" r="8" /><circle cx="391" cy="224" r="8" /><circle cx="403" cy="316" r="8" /><circle cx="359" cy="391" r="8" /><circle cx="512" cy="382" r="8" /></g>
-    </svg>
-  );
-}
-
 function DroneProductView({ facts }: { facts: readonly (readonly [string, string])[] }) {
+  const sourcePoints = [
+    [388, 274],
+    [424, 193],
+    [579, 113],
+    [169, 138],
+    [403, 343],
+  ] as const;
+  const targetY = [60, 160, 260, 360, 460] as const;
   return (
     <div className="architecture-drone-product">
-      <div className="architecture-drone-visual"><DroneIllustration /></div>
+      <div className="architecture-drone-visual">
+        <img
+          src="/docs/downloads/manual-assets/architecture-drone-x500.webp"
+          alt="Realistic X500 V2 quadrotor product view"
+          loading="lazy"
+        />
+      </div>
       <svg className="architecture-drone-connectors" viewBox="0 0 1000 520" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M530 132 L682 72 L724 72" /><path d="M391 224 L650 170 L724 170" />
-        <path d="M403 316 L650 268 L724 268" /><path d="M359 391 L658 366 L724 366" />
-        <path d="M512 382 L682 464 L724 464" />
+        <path className="architecture-drone-baseline" d="M713 38 V482" />
+        {sourcePoints.map(([x, y], index) => (
+          <Fragment key={`${x}-${y}`}>
+            <path d={`M${x} ${y} L650 ${targetY[index]} L713 ${targetY[index]}`} />
+            <circle className="architecture-drone-source" cx={x} cy={y} r="7" />
+            <circle className="architecture-drone-target" cx="713" cy={targetY[index]} r="7" />
+          </Fragment>
+        ))}
       </svg>
       <dl className="architecture-drone-facts">
         {facts.map(([term, value]) => <div key={term}><dt>{term}</dt><dd>{value}</dd></div>)}
@@ -351,23 +534,72 @@ function AirspaceDiagram({ title, metrics }: { title: string; metrics: readonly 
   return (
     <figure className="architecture-airspace-diagram">
       <div className="architecture-airspace-scene">
-        <svg viewBox="0 0 980 510" role="img" aria-label={title}>
-          <defs>
-            <linearGradient id="airspace-corridor" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#58d7ef" stopOpacity="0.52" /><stop offset="0.55" stopColor="#8b77ef" stopOpacity="0.38" /><stop offset="1" stopColor="#eb63c8" stopOpacity="0.3" /></linearGradient>
-            <linearGradient id="airspace-route" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stopColor="#2cb9ed" /><stop offset="1" stopColor="#c74fd2" /></linearGradient>
-          </defs>
-          <g fill="none" stroke="#8f97ac" strokeOpacity="0.22" strokeWidth="1.4"><path d="M80 420 L470 190 L900 420" /><path d="M80 420 L500 500 L900 420" /><path d="M158 374 L576 454" /><path d="M236 328 L652 408" /><path d="M314 282 L730 362" /><path d="M392 236 L808 316" /><path d="M164 436 L554 206" /><path d="M250 452 L640 222" /><path d="M336 468 L726 238" /><path d="M422 484 L812 254" /></g>
-          <g fill="#cfd5e4" opacity="0.46"><path d="M120 363 L230 299 L332 319 L222 384 Z" /><path d="M604 371 L741 291 L864 314 L727 394 Z" /><path d="M331 422 L438 359 L525 376 L418 440 Z" /><path d="M509 275 L599 222 L676 237 L586 290 Z" /></g>
-          <g fill="url(#airspace-corridor)" stroke="#8d6be6" strokeWidth="2.4"><path d="M158 342 L301 253 L449 309 L608 211 L829 301 L829 355 L608 265 L449 363 L301 307 L158 396 Z" /><path d="M158 342 L158 281 L301 192 L449 248 L608 150 L829 240 L829 301 L608 211 L449 309 L301 253 Z" opacity="0.56" /><path d="M158 281 L301 192 L449 248 L608 150 L829 240 L829 355 L608 265 L449 363 L301 307 L158 396 Z" fill="none" opacity="0.72" /></g>
-          <path d="M175 336 L302 260 L448 316 L608 219 L811 301" fill="none" stroke="url(#airspace-route)" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" />
-          <g fill="#fff" stroke="#774fd9" strokeWidth="5"><circle cx="175" cy="336" r="10" /><circle cx="302" cy="260" r="10" /><circle cx="448" cy="316" r="10" /><circle cx="608" cy="219" r="10" /><circle cx="811" cy="301" r="10" /></g>
-          <g transform="translate(567 171)"><ellipse cx="40" cy="54" rx="50" ry="11" fill="#232c45" opacity="0.14" /><path d="M15 28 L-18 8 M65 28 L98 8 M15 38 L-18 58 M65 38 L98 58" stroke="#212a42" strokeWidth="7" strokeLinecap="round" /><g fill="none" stroke="#8f67e7" strokeWidth="4"><ellipse cx="-22" cy="6" rx="29" ry="7" /><ellipse cx="102" cy="6" rx="29" ry="7" /><ellipse cx="-22" cy="60" rx="29" ry="7" /><ellipse cx="102" cy="60" rx="29" ry="7" /></g><rect x="15" y="20" width="50" height="27" rx="7" fill="#172037" stroke="#55cce9" strokeWidth="3" /></g>
-          <g fill="#31394d" fontFamily="Inter, sans-serif" fontSize="18" fontWeight="700"><text x="106" y="257">z min</text><text x="842" y="236">z max</text></g>
-          <g stroke="#59647b" strokeWidth="2" strokeDasharray="6 7"><path d="M148 278 V401" /><path d="M839 235 V363" /></g>
-        </svg>
+        <img src="/docs/downloads/manual-assets/architecture-airspace-corridor.webp" alt={title} loading="lazy" />
       </div>
       <figcaption>{metrics.map(([term, value]) => <div key={term}><strong>{term}</strong><span>{value}</span></div>)}</figcaption>
     </figure>
+  );
+}
+
+function ModelRequestCard({ label, copyLabel, copiedLabel }: { label: string; copyLabel: string; copiedLabel: string }) {
+  return (
+    <div className="architecture-model-request">
+      <blockquote>“Take off from the Science High School pickup point, collect the sealed sample at Chemicum, avoid roofs and trees, then return with at least 30% battery.”</blockquote>
+      <CopyableCode value={modelRequestExample} label={label} copyLabel={copyLabel} copiedLabel={copiedLabel} />
+    </div>
+  );
+}
+
+function ModelToolExamples({ examples, copyLabel, copiedLabel }: {
+  examples: readonly (readonly [string, string])[];
+  copyLabel: string;
+  copiedLabel: string;
+}) {
+  const snippets = [routeToolExample, trajectoryToolExample, validationToolExample] as const;
+  return (
+    <div className="architecture-tool-examples">
+      {examples.map(([title, body], index) => (
+        <article key={title}>
+          <h4><span>{String(index + 1).padStart(2, "0")}</span>{title}</h4>
+          <p>{body}</p>
+          <CopyableCode
+            value={snippets[index]}
+            label={`Python · ${title}`}
+            copyLabel={copyLabel}
+            copiedLabel={copiedLabel}
+            language="python"
+          />
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function ModelVisionEvidence({ cards }: { cards: readonly (readonly [string, string])[] }) {
+  const images = [
+    "/docs/downloads/manual-assets/software-mission-chat.webp",
+    "/docs/downloads/manual-assets/architecture-map-processing.webp",
+    "/docs/downloads/manual-assets/runtime-route-live.webp",
+  ] as const;
+  return (
+    <div className="architecture-vision-evidence">
+      {cards.map(([title, body], index) => (
+        <figure key={title}>
+          <div><img src={images[index]} alt={title} loading="lazy" /><span>{String(index + 1).padStart(2, "0")}</span></div>
+          <figcaption><strong>{title}</strong><p>{body}</p></figcaption>
+        </figure>
+      ))}
+    </div>
+  );
+}
+
+function HarnessFlow({ steps }: { steps: readonly (readonly [string, string, string])[] }) {
+  return (
+    <ol className="architecture-harness-flow">
+      {steps.map(([number, title, body]) => (
+        <li key={number}><span>{number}</span><div><strong>{title}</strong><p>{body}</p></div></li>
+      ))}
+    </ol>
   );
 }
 
@@ -384,7 +616,7 @@ function ArchitectureDrone({ locale }: { locale: SiteLocale }) {
         <section className="architecture-map-transition" aria-labelledby="architecture-drone-transition-two">
           <ArchitectureSectionHeading number="02" id="architecture-drone-transition-two" title={copy.secondTransition} />
           <p>{copy.secondTransitionBody}</p>
-          <CopyableJson value={architectureVehicleExample} label={copy.jsonLabel} copyLabel={copy.copyJson} copiedLabel={copy.copiedJson} />
+          <CopyableCode value={architectureVehicleExample} label={copy.jsonLabel} copyLabel={copy.copyJson} copiedLabel={copy.copiedJson} />
         </section>
         <section className="architecture-map-transition" aria-labelledby="architecture-drone-transition-three">
           <ArchitectureSectionHeading number="03" id="architecture-drone-transition-three" title={copy.thirdTransition} />
@@ -395,6 +627,47 @@ function ArchitectureDrone({ locale }: { locale: SiteLocale }) {
   );
 }
 
+function ArchitectureModel({ locale }: { locale: SiteLocale }) {
+  const copy = architectureCopy[locale].model;
+  return (
+    <section className="manual-architecture-page is-model" aria-labelledby="architecture-model-title">
+      <ArchitectureIntro id="architecture-model-title" title={copy.title} paragraphs={copy.paragraphs} icon={BrainCircuit} />
+      <div className="architecture-map-sequence">
+        <section className="architecture-map-transition" aria-labelledby="architecture-model-transition-one">
+          <ArchitectureSectionHeading number="01" id="architecture-model-transition-one" title={copy.firstTransition} />
+          <p>{copy.firstTransitionBody}</p>
+          <ModelRequestCard label={copy.requestLabel} copyLabel={copy.copyCode} copiedLabel={copy.copiedCode} />
+        </section>
+        <section className="architecture-map-transition" aria-labelledby="architecture-model-transition-two">
+          <ArchitectureSectionHeading number="02" id="architecture-model-transition-two" title={copy.secondTransition} />
+          <p>{copy.secondTransitionBody}</p>
+          <ModelToolExamples examples={copy.toolExamples} copyLabel={copy.copyCode} copiedLabel={copy.copiedCode} />
+        </section>
+        <section className="architecture-map-transition" aria-labelledby="architecture-model-transition-three">
+          <ArchitectureSectionHeading number="03" id="architecture-model-transition-three" title={copy.thirdTransition} />
+          <p>{copy.thirdTransitionBody}</p>
+          <div className="architecture-structured-io">
+            <CopyableCode value={systemPromptExample} label={copy.promptLabel} copyLabel={copy.copyCode} copiedLabel={copy.copiedCode} language="text" />
+            <CopyableCode value={structuredOutputExample} label={copy.outputLabel} copyLabel={copy.copyCode} copiedLabel={copy.copiedCode} />
+          </div>
+        </section>
+        <section className="architecture-map-transition" aria-labelledby="architecture-model-transition-four">
+          <ArchitectureSectionHeading number="04" id="architecture-model-transition-four" title={copy.fourthTransition} />
+          <p>{copy.fourthTransitionBody}</p>
+          <ModelVisionEvidence cards={copy.visionCards} />
+        </section>
+        <section className="architecture-map-transition" aria-labelledby="architecture-model-transition-five">
+          <ArchitectureSectionHeading number="05" id="architecture-model-transition-five" title={copy.fifthTransition} />
+          <p>{copy.fifthTransitionBody}</p>
+          <HarnessFlow steps={copy.harnessSteps} />
+        </section>
+      </div>
+    </section>
+  );
+}
+
 export default function ManualArchitecture({ locale, section }: ManualArchitectureProps) {
-  return section === "drone" ? <ArchitectureDrone locale={locale} /> : <ArchitectureMap locale={locale} />;
+  if (section === "drone") return <ArchitectureDrone locale={locale} />;
+  if (section === "model") return <ArchitectureModel locale={locale} />;
+  return <ArchitectureMap locale={locale} />;
 }
