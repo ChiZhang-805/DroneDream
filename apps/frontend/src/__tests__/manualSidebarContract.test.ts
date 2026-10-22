@@ -34,12 +34,18 @@ describe("manual sidebar stylesheet contract", () => {
   it("offers an accessible two-way switch between the manual and architecture views", () => {
     expect(manualPage).toContain('aria-label={manualView === "manual" ? copy.openArchitecture : copy.openManual}');
     expect(manualPage).toContain('<ManualArchitecture locale={locale} section={architectureSection} />');
-    expect(stylesheet).toMatch(/\.manual-mode-switch\s*\{[\s\S]*?justify-content:\s*flex-end;/u);
+    expect(stylesheet).toMatch(
+      /\.manual-mode-switch\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?right:[^;]+;[\s\S]*?bottom:[^;]+;/u,
+    );
+    expect(manualPage.indexOf('className="manual-mode-switch"')).toBeGreaterThan(
+      manualPage.indexOf("</aside>"),
+    );
   });
 
   it("ships both same-footprint map views used by the architecture comparison", () => {
     const assets = [
       "architecture-map-human.webp",
+      "architecture-map-processing.webp",
       "architecture-map-structured.webp",
     ];
     for (const asset of assets) {

@@ -721,17 +721,6 @@ export function ManualPage({ locale }: ManualPageProps) {
           </nav>
         )}
 
-        <div className="manual-mode-switch">
-          <button
-            type="button"
-            aria-label={manualView === "manual" ? copy.openArchitecture : copy.openManual}
-            title={manualView === "manual" ? copy.openArchitecture : copy.openManual}
-            onClick={switchManualView}
-          >
-            {manualView === "manual" ? <Network aria-hidden="true" /> : <BookOpen aria-hidden="true" />}
-            <span>{manualView === "manual" ? copy.architectureContents : copy.contents}</span>
-          </button>
-        </div>
       </aside>
 
       <section className="manual-reader" aria-labelledby="manual-reader-title">
@@ -820,6 +809,18 @@ export function ManualPage({ locale }: ManualPageProps) {
           </>}
         </article>
       </section>
+
+      <div className="manual-mode-switch">
+        <button
+          type="button"
+          aria-label={manualView === "manual" ? copy.openArchitecture : copy.openManual}
+          title={manualView === "manual" ? copy.openArchitecture : copy.openManual}
+          onClick={switchManualView}
+        >
+          {manualView === "manual" ? <Network aria-hidden="true" /> : <BookOpen aria-hidden="true" />}
+          <span>{manualView === "manual" ? copy.architectureContents : copy.contents}</span>
+        </button>
+      </div>
     </div>
   );
 }
