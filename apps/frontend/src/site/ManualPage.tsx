@@ -191,6 +191,10 @@ export function ManualPage({ locale }: ManualPageProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [manualView, setManualView] = useState<"manual" | "architecture">("manual");
   const [architectureSection, setArchitectureSection] = useState<ArchitectureSectionId>("map");
+  const [architectureActiveId, setArchitectureActiveId] = useState("architecture-map-title");
+  const [expandedArchitectureIds, setExpandedArchitectureIds] = useState<Set<ArchitectureSectionId>>(
+    () => new Set(["map"]),
+  );
   const articleRef = useRef<HTMLElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const pendingHeadingIdRef = useRef("");
@@ -481,11 +485,34 @@ export function ManualPage({ locale }: ManualPageProps) {
   };
 
   const architectureSections = getArchitectureSections(locale);
+  const navigateToArchitecture = (sectionId: ArchitectureSectionId, anchorId: string) => {
+    setArchitectureSection(sectionId);
+    setArchitectureActiveId(anchorId);
+    setExpandedArchitectureIds((current) => new Set(current).add(sectionId));
+    window.history.replaceState(null, "", `#${anchorId}`);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        document.getElementById(anchorId)?.scrollIntoView({ behavior: "auto", block: "start" });
+      });
+    });
+  };
+  const toggleArchitectureChapter = (sectionId: ArchitectureSectionId) => {
+    setExpandedArchitectureIds((current) => {
+      const next = new Set(current);
+      if (next.has(sectionId)) next.delete(sectionId);
+      else next.add(sectionId);
+      return next;
+    });
+  };
   const switchManualView = () => {
     setManualView((current) => {
       const next = current === "manual" ? "architecture" : "manual";
       if (next === "architecture") {
         setQuery("");
+        setArchitectureActiveId(
+          architectureSections.find((item) => item.id === architectureSection)?.anchorId
+            ?? "architecture-map-title",
+        );
         window.history.replaceState(null, "", window.location.pathname + window.location.search);
       }
       document.documentElement.scrollTop = 0;
@@ -702,22 +729,58 @@ export function ManualPage({ locale }: ManualPageProps) {
         </nav>
         </> : (
           <nav className="manual-architecture-nav" aria-label={copy.architectureContents}>
-            {architectureSections.map((section, index) => (
-              <button
-                key={section.id}
-                type="button"
-                className={architectureSection === section.id ? "is-active" : ""}
-                aria-current={architectureSection === section.id ? "page" : undefined}
-                onClick={() => {
-                  setArchitectureSection(section.id);
-                  document.documentElement.scrollTop = 0;
-                  document.body.scrollTop = 0;
-                }}
-              >
-                <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
-                <strong>{section.label}</strong>
-              </button>
-            ))}
+            {architectureSections.map((section, index) => {
+              const expanded = expandedArchitectureIds.has(section.id);
+              const active = architectureSection === section.id;
+              const panelId = `architecture-${section.id}-subsections`;
+              return (
+                <div
+                  key={section.id}
+                  className={`manual-nav-chapter${active ? " contains-active" : ""}`}
+                >
+                  <div className="manual-nav-chapter-row">
+                    <a
+                      href={`#${section.anchorId}`}
+                      className={architectureActiveId === section.anchorId ? "is-active" : ""}
+                      aria-current={architectureActiveId === section.anchorId ? "location" : undefined}
+                      onClick={(event) => {
+                        event.preventDefault();
+                        navigateToArchitecture(section.id, section.anchorId);
+                      }}
+                    >
+                      <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+                      <strong>{section.label}</strong>
+                    </a>
+                    <button
+                      type="button"
+                      className="manual-nav-toggle"
+                      aria-expanded={expanded}
+                      aria-controls={panelId}
+                      aria-label={`${expanded ? copy.collapseChapter : copy.expandChapter}: ${section.label}`}
+                      onClick={() => toggleArchitectureChapter(section.id)}
+                    >
+                      <ChevronRight aria-hidden="true" />
+                    </button>
+                  </div>
+                  <div id={panelId} className="manual-nav-subsections" hidden={!expanded}>
+                    {section.subsections.map((subsection) => (
+                      <a
+                        key={subsection.id}
+                        href={`#${subsection.id}`}
+                        className={`is-subsection${architectureActiveId === subsection.id ? " is-active" : ""}`}
+                        aria-current={architectureActiveId === subsection.id ? "location" : undefined}
+                        onClick={(event) => {
+                          event.preventDefault();
+                          navigateToArchitecture(section.id, subsection.id);
+                        }}
+                      >
+                        <strong>{subsection.label}</strong>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </nav>
         )}
 

@@ -16,6 +16,10 @@ describe("manual sidebar stylesheet contract", () => {
     resolve(process.cwd(), "src/site/ManualArchitecture.tsx"),
     "utf8",
   );
+  const architectureData = readFileSync(
+    resolve(process.cwd(), "src/site/manualArchitectureData.ts"),
+    "utf8",
+  );
 
   it("hides the sidebar scrollbar while keeping the contents scrollable", () => {
     expect(stylesheet).toMatch(/\.manual-sidebar\s*\{[\s\S]*?scrollbar-width:\s*none;/u);
@@ -54,6 +58,9 @@ describe("manual sidebar stylesheet contract", () => {
     expect(stylesheet).toMatch(
       /\.manual-architecture-intro h2\s*\{[\s\S]*?font-size:\s*var\(--manual-chapter-title-size\);/u,
     );
+    expect(stylesheet).toMatch(
+      /\.architecture-map-pair\s*\{[\s\S]*?width:\s*min\(100%,\s*var\(--manual-prose-max-width\)\);/u,
+    );
   });
 
   it("ships both same-footprint map views used by the architecture comparison", () => {
@@ -68,5 +75,48 @@ describe("manual sidebar stylesheet contract", () => {
       expect(statSync(assetPath).size).toBeGreaterThan(100_000);
       expect(architecturePage).toContain(`/docs/downloads/manual-assets/${asset}`);
     }
+  });
+
+  it("keeps the map explanation narrative and removes the formula card", () => {
+    expect(architecturePage).toContain("firstTransitionBody");
+    expect(architecturePage).toContain("secondTransitionBody");
+    expect(architecturePage).not.toContain("architecture-formula");
+    expect(architecturePage).not.toContain("Map = geometry + semantics + topology");
+    expect(stylesheet).toMatch(
+      /\.architecture-map-transition > header > span\s*\{[\s\S]*?font-size:\s*var\(--manual-section-title-size\);/u,
+    );
+  });
+
+  it("presents the backend map contracts as a copyable JSON example", () => {
+    expect(architecturePage).toContain("MapFeaturePoint and MapRouteEdge contracts");
+    expect(architecturePage).toContain('"point_id": "chemicum"');
+    expect(architecturePage).toContain('"direction": "bidirectional"');
+    expect(architecturePage).toContain("navigator.clipboard?.writeText");
+    expect(architecturePage).toContain('copied ? <Check aria-hidden="true" />');
+    expect(stylesheet).toMatch(
+      /\.architecture-json-example:hover > button,[\s\S]*?opacity:\s*1;/u,
+    );
+  });
+
+  it("uses the manual chapter hierarchy for both architecture chapters", () => {
+    expect(architectureData).toContain('label: "Map is not a map"');
+    expect(architectureData).toContain('label: "Drone is not a drone"');
+    expect(architectureData).toContain('id: "architecture-map-transition-three"');
+    expect(architectureData).toContain('id: "architecture-drone-transition-three"');
+    expect(manualPage).toContain('className="manual-nav-chapter-row"');
+    expect(manualPage).toContain('className="manual-nav-subsections"');
+    expect(manualPage).toContain("toggleArchitectureChapter");
+  });
+
+  it("documents the real aircraft contract and its map-specific 3D corridor", () => {
+    expect(architecturePage).toContain("Drone is not a drone");
+    expect(architecturePage).toContain('"asset_id": "aircraft-my-drone"');
+    expect(architecturePage).toContain('"body_radius_m": 0.38');
+    expect(architecturePage).toContain('"simulation_targets": ["PX4 v1.16", "MAVSDK"]');
+    expect(architecturePage).toContain('id="architecture-drone-transition-one"');
+    expect(architecturePage).toContain('id="architecture-drone-transition-two"');
+    expect(architecturePage).toContain('id="architecture-drone-transition-three"');
+    expect(stylesheet).toMatch(/\.architecture-drone-product\s*\{[\s\S]*?grid-template-columns:/u);
+    expect(stylesheet).toMatch(/\.architecture-airspace-diagram\s*\{[\s\S]*?var\(--manual-prose-max-width\)/u);
   });
 });
