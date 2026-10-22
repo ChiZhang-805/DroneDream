@@ -3127,8 +3127,16 @@ html[lang="zh-CN"] .architecture-map-transition > p {
 }
 
 .architecture-json-example code {
+  display: block;
   font: inherit;
-  white-space: pre;
+  white-space: normal;
+}
+
+.architecture-json-example .code-line {
+  display: block;
+  min-height: 1.65em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .architecture-drone-product,
@@ -3300,7 +3308,7 @@ html[lang="zh-CN"] .architecture-map-transition > p {
 .architecture-tool-examples,
 .architecture-structured-io,
 .architecture-vision-evidence,
-.architecture-harness-flow {
+.architecture-harness-diagram {
   width: min(100%, var(--manual-prose-max-width));
 }
 
@@ -3312,7 +3320,7 @@ html[lang="zh-CN"] .architecture-map-transition > p {
 .architecture-model-request blockquote {
   position: relative;
   margin: 0;
-  padding: 1.15rem 1.3rem 1.15rem 1.55rem;
+  padding: 1.15rem 2.05rem 1.15rem 2.05rem;
   border: 1px solid rgba(118, 92, 202, 0.16);
   border-radius: 18px;
   color: #27314a;
@@ -3326,10 +3334,20 @@ html[lang="zh-CN"] .architecture-map-transition > p {
 
 .architecture-model-request blockquote::before {
   position: absolute;
-  top: 0.75rem;
-  left: 0.62rem;
+  top: 0.68rem;
+  left: 0.72rem;
   color: #8a58e3;
   content: "“";
+  font-size: 1.65rem;
+  line-height: 1;
+}
+
+.architecture-model-request blockquote::after {
+  position: absolute;
+  right: 0.72rem;
+  bottom: 0.5rem;
+  color: #8a58e3;
+  content: "”";
   font-size: 1.65rem;
   line-height: 1;
 }
@@ -3372,7 +3390,7 @@ html[lang="zh-CN"] .architecture-map-transition > p {
 .architecture-structured-io {
   display: grid;
   gap: 1.2rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
 }
 
@@ -3416,6 +3434,16 @@ html[lang="zh-CN"] .architecture-map-transition > p {
   object-fit: cover;
 }
 
+.architecture-vision-card.is-1 img {
+  transform: scale(1.58);
+  transform-origin: 58% 57%;
+}
+
+.architecture-vision-card.is-3 img {
+  transform: scale(1.34);
+  transform-origin: 50% 54%;
+}
+
 .architecture-vision-evidence figure > div > span {
   position: absolute;
   top: 0.7rem;
@@ -3434,7 +3462,7 @@ html[lang="zh-CN"] .architecture-map-transition > p {
 }
 
 .architecture-vision-evidence figcaption {
-  min-height: 128px;
+  min-height: 0;
   padding: 0.85rem;
 }
 
@@ -3451,52 +3479,20 @@ html[lang="zh-CN"] .architecture-map-transition > p {
   line-height: 1.5;
 }
 
-.architecture-harness-flow {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+.architecture-harness-diagram {
   margin: 0;
-  padding: 0;
   overflow: hidden;
   border: 1px solid rgba(101, 92, 167, 0.18);
   border-radius: clamp(18px, 2vw, 28px);
-  background: rgba(255, 255, 255, 0.84);
+  background: #f6f7fd;
   box-shadow: 0 24px 60px rgba(67, 66, 112, 0.11);
-  list-style: none;
 }
 
-.architecture-harness-flow li {
-  position: relative;
-  min-width: 0;
-  padding: 1rem 0.7rem 1.1rem;
-  border-right: 1px solid rgba(101, 92, 167, 0.12);
+.architecture-harness-diagram img {
+  display: block;
+  width: 100%;
+  height: auto;
 }
-
-.architecture-harness-flow li:last-child { border-right: 0; }
-
-.architecture-harness-flow li:not(:last-child)::after {
-  position: absolute;
-  z-index: 1;
-  top: 50%;
-  right: -5px;
-  width: 9px;
-  height: 9px;
-  border-top: 1px solid #8a58e3;
-  border-right: 1px solid #8a58e3;
-  background: #fff;
-  content: "";
-  transform: translateY(-50%) rotate(45deg);
-}
-
-.architecture-harness-flow li > span {
-  color: #8a55e7;
-  font-size: 0.72rem;
-  font-weight: 800;
-}
-
-.architecture-harness-flow strong,
-.architecture-harness-flow p { display: block; }
-.architecture-harness-flow strong { margin-top: 0.28rem; color: #20273a; font-size: 0.78rem; }
-.architecture-harness-flow p { margin: 0.25rem 0 0; color: #687488; font-size: 0.64rem; line-height: 1.42; }
 
 .architecture-formula,
 .architecture-boundary {
@@ -3703,10 +3699,6 @@ html[lang="zh-CN"] .architecture-map-transition > p {
   .architecture-place-layout,
   .architecture-execution-flow { grid-template-columns: minmax(0, 1fr); }
   .architecture-execution-flow li { min-height: 210px; }
-  .architecture-harness-flow { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .architecture-harness-flow li:nth-child(4) { border-right: 0; }
-  .architecture-harness-flow li:nth-child(-n + 4) { border-bottom: 1px solid rgba(101, 92, 167, 0.12); }
-  .architecture-harness-flow li:nth-child(4)::after { display: none; }
   .manual-sidebar nav a {
     border-color: rgba(74, 83, 112, 0.12);
     color: #656a7a;
@@ -3797,12 +3789,6 @@ html[lang="zh-CN"] .architecture-map-transition > p {
   .architecture-vision-evidence figure:last-child { border-bottom: 0; }
   .architecture-vision-evidence figure > div { aspect-ratio: 16 / 9; }
   .architecture-vision-evidence figcaption { min-height: 0; }
-  .architecture-harness-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .architecture-harness-flow li { border-right: 1px solid rgba(101, 92, 167, 0.12); border-bottom: 1px solid rgba(101, 92, 167, 0.12); }
-  .architecture-harness-flow li:nth-child(even) { border-right: 0; }
-  .architecture-harness-flow li:nth-child(4)::after { display: block; }
-  .architecture-harness-flow li:nth-child(even)::after { display: none; }
-  .architecture-harness-flow li:last-child { border-bottom: 0; }
   .architecture-node-card dl > div { grid-template-columns: 1fr; gap: 0.25rem; }
 }
 

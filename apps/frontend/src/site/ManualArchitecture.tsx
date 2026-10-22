@@ -1,4 +1,4 @@
-import { Fragment, useState, type ReactNode } from "react";
+import { Fragment, useState, type CSSProperties, type ReactNode } from "react";
 import { BrainCircuit, Check, Copy, Map, Plane, type LucideIcon } from "lucide-react";
 
 import type { ArchitectureSectionId } from "./manualArchitectureData";
@@ -80,7 +80,8 @@ const architectureVehicleExample = `{
 }`;
 
 const modelRequestExample = `{
-  "natural_language": "Take off from the Science High School pickup point, collect the sealed sample at Chemicum, avoid roofs and trees, then return with at least 30% battery.",
+  "natural_language":
+    "Take off from the Science High School pickup point, collect the sealed sample at Chemicum, avoid roofs and trees, then return with at least 30% battery.",
   "grounded_entities": [
     { "name": "Science High School", "role": "start_and_return" },
     { "name": "Chemicum", "role": "pickup_destination" }
@@ -391,16 +392,25 @@ function ArchitectureSectionHeading({ number, id, title }: { number: string; id:
 }
 
 function highlightedCode(value: string, language: "json" | "python" | "text"): ReactNode {
-  if (language === "text") return value;
+  const lines = value.split("\n");
+  if (language === "text") {
+    return lines.map((line, lineIndex) => {
+      const indent = line.match(/^\s*/u)?.[0].length ?? 0;
+      const style = { paddingInlineStart: `${indent}ch` } as CSSProperties;
+      return <span className="code-line" style={style} key={lineIndex}>{line.trimStart()}</span>;
+    });
+  }
   const pattern = language === "python"
     ? /(#[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:def|return|raise|if|else|for|in|and|or|not|lambda|True|False|None)\b|\b\d+(?:\.\d+)?\b)/gu
     : /("(?:\\.|[^"\\])*"|\b(?:true|false|null)\b|-?\b\d+(?:\.\d+)?\b)/gu;
-  return value.split("\n").map((line, lineIndex) => {
+  return lines.map((line, lineIndex) => {
+    const indent = line.match(/^\s*/u)?.[0].length ?? 0;
+    const content = line.trimStart();
     const parts: ReactNode[] = [];
     let lastIndex = 0;
-    for (const match of line.matchAll(pattern)) {
+    for (const match of content.matchAll(pattern)) {
       const index = match.index ?? 0;
-      if (index > lastIndex) parts.push(line.slice(lastIndex, index));
+      if (index > lastIndex) parts.push(content.slice(lastIndex, index));
       const token = match[0];
       const className = token.startsWith("#")
         ? "token-comment"
@@ -414,8 +424,9 @@ function highlightedCode(value: string, language: "json" | "python" | "text"): R
       parts.push(<span className={className} key={`${lineIndex}-${index}`}>{token}</span>);
       lastIndex = index + token.length;
     }
-    if (lastIndex < line.length) parts.push(line.slice(lastIndex));
-    return <Fragment key={lineIndex}>{parts}{lineIndex < value.split("\n").length - 1 ? "\n" : null}</Fragment>;
+    if (lastIndex < content.length) parts.push(content.slice(lastIndex));
+    const style = { paddingInlineStart: `${indent}ch` } as CSSProperties;
+    return <span className="code-line" style={style} key={lineIndex}>{parts}</span>;
   });
 }
 
@@ -544,7 +555,7 @@ function AirspaceDiagram({ title, metrics }: { title: string; metrics: readonly 
 function ModelRequestCard({ label, copyLabel, copiedLabel }: { label: string; copyLabel: string; copiedLabel: string }) {
   return (
     <div className="architecture-model-request">
-      <blockquote>“Take off from the Science High School pickup point, collect the sealed sample at Chemicum, avoid roofs and trees, then return with at least 30% battery.”</blockquote>
+      <blockquote><span>Take off from the Science High School pickup point, collect the sealed sample at Chemicum, avoid roofs and trees, then return with at least 30% battery.</span></blockquote>
       <CopyableCode value={modelRequestExample} label={label} copyLabel={copyLabel} copiedLabel={copiedLabel} />
     </div>
   );
@@ -584,7 +595,7 @@ function ModelVisionEvidence({ cards }: { cards: readonly (readonly [string, str
   return (
     <div className="architecture-vision-evidence">
       {cards.map(([title, body], index) => (
-        <figure key={title}>
+        <figure className={`architecture-vision-card is-${index + 1}`} key={title}>
           <div><img src={images[index]} alt={title} loading="lazy" /><span>{String(index + 1).padStart(2, "0")}</span></div>
           <figcaption><strong>{title}</strong><p>{body}</p></figcaption>
         </figure>
@@ -593,13 +604,11 @@ function ModelVisionEvidence({ cards }: { cards: readonly (readonly [string, str
   );
 }
 
-function HarnessFlow({ steps }: { steps: readonly (readonly [string, string, string])[] }) {
+function HarnessFlow({ alt }: { alt: string }) {
   return (
-    <ol className="architecture-harness-flow">
-      {steps.map(([number, title, body]) => (
-        <li key={number}><span>{number}</span><div><strong>{title}</strong><p>{body}</p></div></li>
-      ))}
-    </ol>
+    <figure className="architecture-harness-diagram">
+      <img src="/docs/downloads/manual-assets/architecture-harness-flow.png" alt={alt} loading="lazy" />
+    </figure>
   );
 }
 
@@ -659,7 +668,7 @@ function ArchitectureModel({ locale }: { locale: SiteLocale }) {
         <section className="architecture-map-transition" aria-labelledby="architecture-model-transition-five">
           <ArchitectureSectionHeading number="05" id="architecture-model-transition-five" title={copy.fifthTransition} />
           <p>{copy.fifthTransitionBody}</p>
-          <HarnessFlow steps={copy.harnessSteps} />
+          <HarnessFlow alt={`${copy.fifthTransition} flowchart`} />
         </section>
       </div>
     </section>

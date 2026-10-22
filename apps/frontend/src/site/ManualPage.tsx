@@ -176,6 +176,7 @@ function extractManualChapterSource(source: string, chapterIndex: number): strin
 
 export function ManualPage({ locale }: ManualPageProps) {
   const copy = manualCopy[locale];
+  const architectureSections = getArchitectureSections(locale);
   const documentRoot = locale === "en"
     ? "/docs/downloads/DroneDream-Manual-en"
     : "/docs/downloads/DroneDream-Manual-zh-CN";
@@ -395,6 +396,53 @@ export function ManualPage({ locale }: ManualPageProps) {
   }, [activeChapterIndex, headings, manualView, state]);
 
   useEffect(() => {
+    if (manualView !== "architecture") return;
+    const root = articleRef.current;
+    const currentSection = architectureSections.find((section) => section.id === architectureSection);
+    if (!root || !currentSection) return;
+
+    const anchorIds = [currentSection.anchorId, ...currentSection.subsections.map((item) => item.id)];
+    const anchors = anchorIds
+      .map((id) => document.getElementById(id))
+      .filter((element): element is HTMLElement => element instanceof HTMLElement);
+    if (!anchors.length) return;
+
+    let frame = 0;
+    const updateActiveArchitectureHeading = () => {
+      frame = 0;
+      const headerHeight = document.querySelector<HTMLElement>(".site-header")?.offsetHeight ?? 78;
+      const readingLine = Math.max(headerHeight + 74, Math.min(window.innerHeight * 0.58, 720));
+      let currentAnchor = anchors[0];
+      for (const anchor of anchors) {
+        if (anchor.getBoundingClientRect().top <= readingLine) currentAnchor = anchor;
+        else break;
+      }
+
+      const pageBottom = window.scrollY + window.innerHeight;
+      if (pageBottom >= document.documentElement.scrollHeight - 4) {
+        currentAnchor = anchors[anchors.length - 1];
+      }
+      setArchitectureActiveId((current) => current === currentAnchor.id ? current : currentAnchor.id);
+    };
+    const scheduleUpdate = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(updateActiveArchitectureHeading);
+    };
+
+    scheduleUpdate();
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate);
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(scheduleUpdate);
+    resizeObserver?.observe(root);
+    return () => {
+      window.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+      window.cancelAnimationFrame(frame);
+      resizeObserver?.disconnect();
+    };
+  }, [architectureSection, architectureSections, manualView]);
+
+  useEffect(() => {
     if (manualView !== "manual") return;
     if (state !== "ready" || !pendingHeadingIdRef.current) return;
     const root = articleRef.current;
@@ -435,7 +483,8 @@ export function ManualPage({ locale }: ManualPageProps) {
   }, [activeChapterIndex, activeChapterSource, manualView, state]);
 
   useEffect(() => {
-    if (!activeId || !sidebarOpen) return;
+    const currentId = manualView === "architecture" ? architectureActiveId : activeId;
+    if (!currentId || !sidebarOpen) return;
     const sidebar = sidebarRef.current;
     const activeLink = sidebar?.querySelector<HTMLElement>(
       'a[aria-current="location"]',
@@ -455,7 +504,7 @@ export function ManualPage({ locale }: ManualPageProps) {
     ) {
       activeLink.scrollIntoView({ block: "nearest", inline: "nearest" });
     }
-  }, [activeId, sidebarOpen]);
+  }, [activeId, architectureActiveId, manualView, sidebarOpen]);
 
   const navigateToHeading = (heading: ManualHeading) => {
     pendingHeadingIdRef.current = heading.id;
@@ -484,7 +533,6 @@ export function ManualPage({ locale }: ManualPageProps) {
     });
   };
 
-  const architectureSections = getArchitectureSections(locale);
   const navigateToArchitecture = (sectionId: ArchitectureSectionId, anchorId: string) => {
     setArchitectureSection(sectionId);
     setArchitectureActiveId(anchorId);
