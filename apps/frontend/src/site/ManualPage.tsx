@@ -1,10 +1,12 @@
 import {
+  BookOpen,
   ChevronLeft,
   ChevronRight,
   FileDown,
   FileText,
   Languages,
   LoaderCircle,
+  Network,
   PanelLeftClose,
   PanelLeftOpen,
   RotateCw,
@@ -17,6 +19,11 @@ import {
   stripManualFrontmatter,
   type ManualHeading,
 } from "./manualParser";
+import ManualArchitecture from "./ManualArchitecture";
+import {
+  getArchitectureSections,
+  type ArchitectureSectionId,
+} from "./manualArchitectureData";
 
 const ManualDocument = lazy(() => import("./ManualDocument"));
 
@@ -75,6 +82,11 @@ const manualCopy = {
     nextChapter: "Next chapter",
     beginning: "Beginning",
     ending: "End of manual",
+    architectureContents: "Core architecture",
+    architectureOnline: "CORE ARCHITECTURE",
+    architectureTitle: "How DroneDream sees the world",
+    openArchitecture: "Open core architecture",
+    openManual: "Return to manual",
   },
   "zh-CN": {
     ariaLabel: "DroneDream 说明书目录",
@@ -100,6 +112,11 @@ const manualCopy = {
     nextChapter: "下一章",
     beginning: "手册开篇",
     ending: "手册结尾",
+    architectureContents: "核心架构",
+    architectureOnline: "核心架构",
+    architectureTitle: "DroneDream 如何理解世界",
+    openArchitecture: "打开核心架构",
+    openManual: "返回说明书",
   },
 } as const;
 
@@ -172,6 +189,8 @@ export function ManualPage({ locale }: ManualPageProps) {
   );
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [manualView, setManualView] = useState<"manual" | "architecture">("manual");
+  const [architectureSection, setArchitectureSection] = useState<ArchitectureSectionId>("map");
   const articleRef = useRef<HTMLElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const pendingHeadingIdRef = useRef("");
@@ -317,6 +336,7 @@ export function ManualPage({ locale }: ManualPageProps) {
   }, [navigationChapters]);
 
   useEffect(() => {
+    if (manualView !== "manual") return;
     if (!headings.length) return;
     const hashId = decodeURIComponent(window.location.hash.replace(/^#/u, ""));
     const initialHeading = headings.find((heading) => heading.id === hashId) ?? headings[0];
@@ -368,9 +388,10 @@ export function ManualPage({ locale }: ManualPageProps) {
       window.cancelAnimationFrame(frame);
       mutationObserver.disconnect();
     };
-  }, [activeChapterIndex, headings, state]);
+  }, [activeChapterIndex, headings, manualView, state]);
 
   useEffect(() => {
+    if (manualView !== "manual") return;
     if (state !== "ready" || !pendingHeadingIdRef.current) return;
     const root = articleRef.current;
     if (!root) return;
@@ -407,7 +428,7 @@ export function ManualPage({ locale }: ManualPageProps) {
       window.cancelAnimationFrame(frame);
       window.clearTimeout(releaseTimer);
     };
-  }, [activeChapterIndex, activeChapterSource, state]);
+  }, [activeChapterIndex, activeChapterSource, manualView, state]);
 
   useEffect(() => {
     if (!activeId || !sidebarOpen) return;
@@ -459,11 +480,29 @@ export function ManualPage({ locale }: ManualPageProps) {
     });
   };
 
+  const architectureSections = getArchitectureSections(locale);
+  const switchManualView = () => {
+    setManualView((current) => {
+      const next = current === "manual" ? "architecture" : "manual";
+      if (next === "architecture") {
+        setQuery("");
+        window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      }
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      return next;
+    });
+  };
+
   return (
-    <div className={`site-portal site-manual-page${sidebarOpen ? "" : " is-sidebar-collapsed"}`}>
-      <aside ref={sidebarRef} className="manual-sidebar" aria-label={copy.ariaLabel}>
+    <div className={`site-portal site-manual-page${sidebarOpen ? "" : " is-sidebar-collapsed"}${manualView === "architecture" ? " is-architecture-view" : ""}`}>
+      <aside
+        ref={sidebarRef}
+        className="manual-sidebar"
+        aria-label={manualView === "manual" ? copy.ariaLabel : copy.architectureContents}
+      >
         <header className="manual-sidebar-title">
-          <strong>{copy.contents}</strong>
+          <strong>{manualView === "manual" ? copy.contents : copy.architectureContents}</strong>
           <button
             type="button"
             className="manual-sidebar-toggle"
@@ -475,6 +514,7 @@ export function ManualPage({ locale }: ManualPageProps) {
           </button>
         </header>
 
+        {manualView === "manual" ? <>
         <label className="manual-search">
           <Search aria-hidden="true" />
           <span className="site-sr-only">{copy.search}</span>
@@ -660,6 +700,38 @@ export function ManualPage({ locale }: ManualPageProps) {
             <p className="manual-no-results">{copy.noMatches}</p>
           ) : null}
         </nav>
+        </> : (
+          <nav className="manual-architecture-nav" aria-label={copy.architectureContents}>
+            {architectureSections.map((section, index) => (
+              <button
+                key={section.id}
+                type="button"
+                className={architectureSection === section.id ? "is-active" : ""}
+                aria-current={architectureSection === section.id ? "page" : undefined}
+                onClick={() => {
+                  setArchitectureSection(section.id);
+                  document.documentElement.scrollTop = 0;
+                  document.body.scrollTop = 0;
+                }}
+              >
+                <span aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
+                <strong>{section.label}</strong>
+              </button>
+            ))}
+          </nav>
+        )}
+
+        <div className="manual-mode-switch">
+          <button
+            type="button"
+            aria-label={manualView === "manual" ? copy.openArchitecture : copy.openManual}
+            title={manualView === "manual" ? copy.openArchitecture : copy.openManual}
+            onClick={switchManualView}
+          >
+            {manualView === "manual" ? <Network aria-hidden="true" /> : <BookOpen aria-hidden="true" />}
+            <span>{manualView === "manual" ? copy.architectureContents : copy.contents}</span>
+          </button>
+        </div>
       </aside>
 
       <section className="manual-reader" aria-labelledby="manual-reader-title">
@@ -667,13 +739,18 @@ export function ManualPage({ locale }: ManualPageProps) {
           <div>
             <p>
               <Languages aria-hidden="true" />
-              {copy.online}
+              {manualView === "manual" ? copy.online : copy.architectureOnline}
             </p>
-            <h1 id="manual-reader-title">{copy.title}</h1>
+            <h1 id="manual-reader-title">
+              {manualView === "manual" ? copy.title : copy.architectureTitle}
+            </h1>
           </div>
         </header>
 
         <article ref={articleRef} className="manual-reader-document">
+          {manualView === "architecture" ? (
+            <ManualArchitecture locale={locale} section={architectureSection} />
+          ) : <>
           {state === "loading" ? (
             <div className="manual-reader-state" role="status">
               <LoaderCircle className="is-spinning" aria-hidden="true" />
@@ -740,6 +817,7 @@ export function ManualPage({ locale }: ManualPageProps) {
               </div>
             </Suspense>
           ) : null}
+          </>}
         </article>
       </section>
     </div>
