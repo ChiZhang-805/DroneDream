@@ -439,6 +439,10 @@ describe("autonomy mission harness", () => {
     expect(parseAutonomyPlannerArtifact(valid)).not.toBeNull();
     expect(parseAutonomyPlannerArtifact({
       ...valid,
+      repair: { ...valid.repair, attempt: 1, max_attempts: 2 },
+    })).not.toBeNull();
+    expect(parseAutonomyPlannerArtifact({
+      ...valid,
       repair: { ...valid.repair, attempt: 1, max_attempts: 5 },
     })).not.toBeNull();
     expect(parseAutonomyPlannerArtifact({
