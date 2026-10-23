@@ -278,9 +278,9 @@ describe("DroneDream public website", () => {
       "aria-selected",
       "true",
     );
-    expect(screen.getByText(/300,000 managed AI credits/i)).toBeVisible();
-    expect(screen.getByText(/3,000,000 managed AI credits/i)).toBeVisible();
-    expect(screen.getByText(/15,000,000 managed AI credits/i)).toBeVisible();
+    expect(screen.getByText(/6,000,000 managed AI credits/i)).toBeVisible();
+    expect(screen.getByText(/60,000,000 managed AI credits/i)).toBeVisible();
+    expect(screen.getByText(/300,000,000 managed AI credits/i)).toBeVisible();
     expect(screen.getAllByText(
       "Team AURORA optimization Harness",
     )).toHaveLength(3);
