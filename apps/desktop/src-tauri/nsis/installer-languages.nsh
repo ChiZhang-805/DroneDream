@@ -67,6 +67,8 @@ LangString DD_UpdateIsolationInvalid ${LANG_ENGLISH} "Unable to validate safe Ru
 LangString DD_UpdateIsolationInvalid ${LANG_SIMPCHINESE} "无法验证安全的 Runtime 升级隔离，应用程序未被覆盖。"
 LangString DD_UpdateAppStillRunning ${LANG_ENGLISH} "DroneDream is still closing and its application file is in use. Setup stopped without replacing the installed application. Close DroneDream completely, then try the update again."
 LangString DD_UpdateAppStillRunning ${LANG_SIMPCHINESE} "DroneDream 仍在关闭，应用程序文件正被占用。安装程序已安全停止，未替换当前软件。请完全关闭 DroneDream 后重新尝试更新。"
+LangString DD_AgentCoreResourceCleanupFailed ${LANG_ENGLISH} "The previous AGENT Core resources are still in use. Setup stopped before copying the update. Close DroneDream completely, then try again."
+LangString DD_AgentCoreResourceCleanupFailed ${LANG_SIMPCHINESE} "旧版 AGENT Core 资源仍在使用中。安装程序已在复制更新前安全停止。请完全关闭 DroneDream 后重试。"
 LangString DD_LegacyRuntimeBusy ${LANG_ENGLISH} "DroneDreamRuntime is busy. Cancel or wait for it in DroneDream, then try again."
 LangString DD_LegacyRuntimeBusy ${LANG_SIMPCHINESE} "DroneDreamRuntime 正在运行安装或维护。请先在软件中取消任务或等待完成后重试。"
 LangString DD_RuntimeStateUnknown ${LANG_ENGLISH} "Unable to verify the DroneDreamRuntime operation state. Setup stopped safely."

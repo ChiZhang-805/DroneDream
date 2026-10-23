@@ -63,6 +63,18 @@ def test_every_installer_publishes_one_shared_native_cli_command() -> None:
         assert f'$LOCALAPPDATA\\{product}\\dronedream-live.exe' in hook
 
 
+def test_installer_replaces_manifest_bound_agent_core_resources_before_copy() -> None:
+    hook = (ROOT / "apps" / "desktop" / "src-tauri" / "nsis" / "webview2-health.nsh").read_text(
+        encoding="utf-8-sig"
+    )
+    cleanup = 'RMDir /r "$INSTDIR\\agent-core"'
+    preinstall_start = hook.index("!macro NSIS_HOOK_PREINSTALL")
+    preinstall_end = hook.index("!macroend", preinstall_start)
+
+    assert cleanup in hook[preinstall_start:preinstall_end]
+    assert 'Abort "$(DD_AgentCoreResourceCleanupFailed)"' in hook[preinstall_start:preinstall_end]
+
+
 def test_five_edition_build_forwards_one_explicit_agent_core_repository() -> None:
     script = (
         ROOT / "apps" / "desktop" / "scripts" / "build-five-edition-installers.ps1"

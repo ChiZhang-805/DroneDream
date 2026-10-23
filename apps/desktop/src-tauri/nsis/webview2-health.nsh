@@ -166,6 +166,18 @@
     dronedream_main_binary_ready:
   ${EndIf}
 
+  ; Resource manifests intentionally reject files left behind by an older
+  ; release. Tauri's update path overwrites packaged files but does not prune
+  ; resources whose names disappeared, so replace the installer-owned AGENT
+  ; Core resource tree as one unit before copying the new closure. User data
+  ; and DroneDreamRuntime are owned outside $INSTDIR and remain untouched.
+  IfFileExists "$INSTDIR\agent-core\*.*" 0 dronedream_agent_core_resources_clean
+    RMDir /r "$INSTDIR\agent-core"
+    IfFileExists "$INSTDIR\agent-core\*.*" 0 dronedream_agent_core_resources_clean
+      Call DroneDreamBestEffortEndRuntimeQuiesce
+      Abort "$(DD_AgentCoreResourceCleanupFailed)"
+  dronedream_agent_core_resources_clean:
+
   Pop $1
   Pop $0
 !macroend

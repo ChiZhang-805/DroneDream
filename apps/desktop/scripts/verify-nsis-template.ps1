@@ -250,11 +250,22 @@ foreach ($required in @(
     '${AndIf} $PassiveMode == 0',
     '${AndIf} $UpdateMode == 0',
     'IfSilent dronedream_skip_runtime_handoff 0',
-    'dronedream_skip_runtime_handoff:'
+    'dronedream_skip_runtime_handoff:',
+    'RMDir /r "$INSTDIR\agent-core"',
+    'Abort "$(DD_AgentCoreResourceCleanupFailed)"'
 )) {
     if (-not $installerHook.Contains($required)) {
         throw "Installer Runtime handoff guard is missing: $required"
     }
+}
+if ($installerHook.IndexOf(
+        'RMDir /r "$INSTDIR\agent-core"',
+        [StringComparison]::Ordinal
+    ) -gt $installerHook.IndexOf(
+        'Pop $1',
+        [StringComparison]::Ordinal
+    )) {
+    throw "AGENT Core resource cleanup must finish inside the pre-install hook"
 }
 if ($installerHook.IndexOf(
         'IfSilent dronedream_skip_runtime_handoff 0',
