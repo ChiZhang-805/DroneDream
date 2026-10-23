@@ -51,6 +51,7 @@ import { openAppSettings } from "../appSettings";
 import { AssetInterpretButton } from "../features/autonomy/AssetInterpretButton";
 import { LiveMapView } from "../features/autonomy/LiveMapView";
 import { MapRefinementNotice } from "../features/autonomy/MapRefinementNotice";
+import { migrateStoredBundledAssets, prepareBundledAssetMigration } from "../features/autonomy/bundledAssetMigration";
 import { AUTONOMY_CONVERSATIONS_CHANGED, autonomyConversationId, autonomyConversationPath, loadAutonomyConversation, newAutonomyConversation, preserveLegacyAutonomyConversation, saveAutonomyConversation } from "../features/autonomy/conversationStore";
 import { acquireAutonomyPlanning, useAutonomyPlanning } from "../features/autonomy/conversationActivity";
 import { bindVerifiedAssetPair, externalAssetReferenceFromVersion, reconcileAgentCoreWorkspace } from "../features/autonomy/assetPairBinding";
@@ -1107,7 +1108,10 @@ export function AutonomyPlatform() {
     publicDemoConsole ? "browser" : "checking",
   );
   const [agentCoreRestarting, setAgentCoreRestarting] = useState(false);
+  const [assetBootstrapRevision, setAssetBootstrapRevision] = useState(0);
   useEffect(() => {
+    let active = true;
+    let ready = false;
     const id = autonomyConversationId(location.pathname);
     const loadView = () => {
       try {
@@ -1125,15 +1129,37 @@ export function AutonomyPlatform() {
         setWorkspaceError(chinese ? "无法读取或保存此会话，请检查本机存储后重试。" : "This conversation could not be read or saved. Check local storage and retry.");
       }
     };
-    loadView();
+    setLoadedViewKey(null);
+    setWorkspaceError(null);
+    // No task/Live child may use a saved plan until retired bundled pins are migrated.
+    void (async () => {
+      if (!publicDemoConsole) {
+        const bootstrap = await getAgentCoreBootstrap();
+        const migration = await prepareBundledAssetMigration(bootstrap);
+        if (!active) return;
+        migrateStoredBundledAssets(ownerId, edition, migration);
+        setAgentCorePlugins(bootstrap.plugins);
+      }
+      if (!active) return;
+      ready = true;
+      loadView();
+    })().catch(() => {
+      if (!active) return;
+      setWorkspaceError(chinese
+        ? "无法同步已更新的地图和无人机。请检查本地服务后重试；旧方案尚未恢复。"
+        : "Updated maps and aircraft could not be synchronized. Check the local service and retry; saved plans have not been restored.");
+    });
     setMissionComposerDraft("");
     const onChange = (event: Event) => {
       const detail = (event as CustomEvent).detail;
-      if (id && detail?.ownerId === ownerId && detail?.edition === edition && detail?.id === id) loadView();
+      if (ready && id && detail?.ownerId === ownerId && detail?.edition === edition && detail?.id === id) loadView();
     };
     window.addEventListener(AUTONOMY_CONVERSATIONS_CHANGED, onChange);
-    return () => window.removeEventListener(AUTONOMY_CONVERSATIONS_CHANGED, onChange);
-  }, [edition, ownerId, location.pathname, chinese]);
+    return () => {
+      active = false;
+      window.removeEventListener(AUTONOMY_CONVERSATIONS_CHANGED, onChange);
+    };
+  }, [edition, ownerId, location.pathname, chinese, assetBootstrapRevision]);
 
   useEffect(() => {
     if (publicDemoConsole) {
@@ -1152,26 +1178,13 @@ export function AutonomyPlatform() {
     };
   }, []);
 
-  useEffect(() => {
-    let active = true;
-    void getAgentCoreBootstrap().then((bootstrap) => {
-      if (active) setAgentCorePlugins(bootstrap.plugins);
-    }).catch(() => {
-      if (active) setAgentCorePlugins([]);
-    });
-    return () => {
-      active = false;
-    };
-  }, [edition, location.pathname]);
-
   const retryAgentCore = useCallback(async () => {
     setAgentCoreRestarting(true);
     try {
       const status = await restartAgentCore();
       setAgentCoreHealth(status.available ? "ready" : "unavailable");
       if (status.available) {
-        const bootstrap = await getAgentCoreBootstrap();
-        setAgentCorePlugins(bootstrap.plugins);
+        setAssetBootstrapRevision((revision) => revision + 1);
       }
     } catch {
       setAgentCoreHealth("unavailable");
@@ -1397,7 +1410,7 @@ export function AutonomyPlatform() {
 
       <main className="autonomy-platform-content">
         {usesSidebarNavigation ? healthAlert : null}
-        {workspaceError ? <div role="alert">{workspaceError}</div> : loadedViewKey !== viewKey ? null : <Outlet context={{
+        {workspaceError ? <div role="alert">{workspaceError}<button type="button" className="btn" onClick={() => setAssetBootstrapRevision((revision) => revision + 1)}>{chinese ? "重试" : "Retry"}</button></div> : loadedViewKey !== viewKey ? <div role="status">{chinese ? "正在同步地图和无人机…" : "Synchronizing maps and aircraft…"}</div> : <Outlet context={{
           edition,
           chinese,
           workspace,

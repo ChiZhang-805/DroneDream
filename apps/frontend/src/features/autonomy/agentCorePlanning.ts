@@ -21,6 +21,7 @@ import {
   type AgentCoreAssetQualificationEvidence,
   type AgentCoreAssetQualificationJob,
   type AgentCoreAssetVersion,
+  type AgentCoreBootstrap,
   type AgentCoreMissionPrepareResult,
   type AgentCoreThread,
 } from "./agentCore";
@@ -96,6 +97,14 @@ function readThreadBinding(input: Pick<AgentCorePlanningInput, "edition" | "acco
   } catch {
     return null;
   }
+}
+
+/** Retired asset plans must be rebuilt in a new Core thread, not resumed by Live. */
+export function forgetAgentCoreThreadBinding(
+  input: Pick<AgentCorePlanningInput, "edition" | "accountId" | "conversationId">,
+  storage: Pick<Storage, "removeItem"> = window.localStorage,
+): void {
+  storage.removeItem(bindingKey(input));
 }
 
 /** Persist only a thread identifier; failing to save must not invalidate this turn. */
@@ -304,8 +313,8 @@ function assertVerifiedPairEvidence(
 //   workspace：当前地图与飞机选择；页面缓存的回执标识不作为认证依据。
 // 输出：
 //   pair：通过输入包、输出包、运行契约及回执交叉校验的资产组合。
-export async function resolveAgentCoreAssetPair(workspace: AutonomyWorkspaceState) {
-  const bootstrap = await getAgentCoreBootstrap();
+export async function resolveAgentCoreAssetPair(workspace: AutonomyWorkspaceState, suppliedBootstrap?: AgentCoreBootstrap) {
+  const bootstrap = suppliedBootstrap ?? await getAgentCoreBootstrap();
   const mapVersion = latestAssetVersion(
     bootstrap.asset_versions,
     workspace.mapPack.agentCoreAssetId,

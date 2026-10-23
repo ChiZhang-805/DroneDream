@@ -7,7 +7,7 @@ import { autonomyConversationPath, deleteAutonomyConversation, listAutonomyConve
 import { defaultAutonomyWorkspace, saveAutonomyWorkspace } from "../features/autonomy/workspaceStore";
 import { AutonomyOverview, AutonomyPlatform } from "../pages/AutonomyPlatform";
 
-const mocks = vi.hoisted(() => ({ plan: vi.fn(), reconcile: vi.fn(), owner: null as null | { id: string } }));
+const mocks = vi.hoisted(() => ({ plan: vi.fn(), reconcile: vi.fn(), bootstrap: vi.fn(), owner: null as null | { id: string } }));
 vi.mock("../features/auth/AuthContext", () => ({ useOptionalAuth: () => ({ account: mocks.owner }) }));
 vi.mock("../theme/EditionThemeProvider", () => ({ useEditionTheme: () => ({ id: "autonomy" }) }));
 vi.mock("../features/settings/ModelAccessContext", () => ({ useModelAccess: () => ({
@@ -26,7 +26,7 @@ vi.mock("../features/settings/cloudModelAccess", async (original) => ({
 vi.mock("../features/autonomy/agentCore", async (original) => ({
   ...await original<typeof import("../features/autonomy/agentCore")>(),
   getAgentCoreStatus: async () => ({ available: true }),
-  getAgentCoreBootstrap: async () => ({ plugins: [] }),
+  getAgentCoreBootstrap: mocks.bootstrap,
 }));
 vi.mock("../features/autonomy/assetPairBinding", async (original) => ({
   ...await original<typeof import("../features/autonomy/assetPairBinding")>(),
@@ -70,6 +70,7 @@ function renderWorkspace(initial = "/autonomy") {
 beforeEach(() => {
   localStorage.clear();
   mocks.owner = null;
+  mocks.bootstrap.mockReset().mockResolvedValue({ plugins: [] });
   mocks.plan.mockReset().mockResolvedValue({ compiledPlan: null, planningBrief: "你指的是哪个取件处？", planningRunId: "test-plan" });
   mocks.reconcile.mockReset().mockImplementation(async (workspace) => workspace);
 });
@@ -125,6 +126,26 @@ describe("autonomy conversation persistence", () => {
 });
 
 describe("Chatbot to independent conversation", () => {
+  it("holds saved task routes until the startup asset check completes", async () => {
+    let complete: (value: unknown) => void = () => {};
+    mocks.bootstrap.mockReturnValue(new Promise((resolve) => { complete = resolve; }));
+    saveAutonomyConversation("local", "autonomy", conversation("saved", "Saved mission"));
+    renderWorkspace(autonomyConversationPath("saved"));
+    expect(screen.getByRole("status")).toHaveTextContent("Synchronizing maps and aircraft");
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    await act(async () => { complete({ plugins: [] }); });
+    expect(await screen.findByRole("textbox")).toBeVisible();
+  });
+
+  it("keeps task controls hidden after an upgrade error and retries from the same route", async () => {
+    mocks.bootstrap.mockRejectedValueOnce(new Error("Core not ready"));
+    renderWorkspace();
+    expect(await screen.findByRole("alert")).toHaveTextContent("could not be synchronized");
+    expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByRole("textbox")).toBeVisible();
+  });
+
   it("exposes the desktop pin and delete controls for every conversation", async () => {
     saveAutonomyConversation("local", "autonomy", conversation("saved", "巡检屋顶"));
     const router = renderWorkspace(autonomyConversationPath("saved"));

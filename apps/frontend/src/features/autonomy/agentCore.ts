@@ -686,6 +686,21 @@ export interface AgentCoreAssetVersion {
   imported_at: string;
 }
 
+export interface AgentCoreBundledAssetMigration {
+  schema_version: "dronedream.bundled-asset-migration.v1";
+  kind: "map" | "vehicle";
+  asset_id: string;
+  from_content_sha256: string;
+  to_content_sha256: string;
+  index_sha256: string;
+  receipt_sha256: string;
+  qualification_id: string;
+  map_asset_id: string;
+  map_content_sha256: string;
+  vehicle_asset_id: string;
+  vehicle_content_sha256: string;
+}
+
 export interface AgentCoreBootstrap {
   models: AgentCoreModelEntry[];
   threads: AgentCoreThread[];
@@ -697,6 +712,7 @@ export interface AgentCoreBootstrap {
   asset_source_adapters: AgentCoreAssetSourceAdapter[];
   plugins: AgentCorePluginEntry[];
   settings: Record<string, unknown>;
+  bundled_asset_migrations?: AgentCoreBundledAssetMigration[];
 }
 
 export interface AgentCoreMapRefinementPending {

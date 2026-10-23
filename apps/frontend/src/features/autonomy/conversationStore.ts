@@ -124,6 +124,26 @@ export function listAutonomyConversations(ownerId: string, edition: BrandEdition
   return conversations.sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id));
 }
 
+/** Upgrade valid saved snapshots without changing titles, pins or deletion records. */
+export function migrateAutonomyConversations(
+  ownerId: string,
+  edition: BrandEditionId,
+  migrate: (workspace: AutonomyWorkspaceState) => AutonomyWorkspaceState,
+  storage: ConversationStorage = window.localStorage,
+): number {
+  let changed = 0;
+  for (const { id } of listAutonomyConversations(ownerId, edition, storage)) {
+    const previous = loadAutonomyConversation(ownerId, edition, id, storage);
+    if (!previous) continue;
+    const next = migrate(previous);
+    if (next === previous) continue;
+    storage.setItem(conversationKey(ownerId, edition, id), JSON.stringify(normalizeAutonomyWorkspace(next)));
+    changed += 1;
+  }
+  if (changed) notifyConversationChange(ownerId, edition, "");
+  return changed;
+}
+
 export function setAutonomyConversationPinned(ownerId: string, edition: BrandEditionId, id: string, pinned: boolean, storage: Pick<Storage, "setItem"> = window.localStorage): void {
   storage.setItem(conversationMetaKey(ownerId, edition, id), JSON.stringify({ pinned }));
   notifyConversationChange(ownerId, edition, id);

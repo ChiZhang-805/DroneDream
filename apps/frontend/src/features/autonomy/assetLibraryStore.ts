@@ -159,15 +159,18 @@ export function withCurrentAutonomyAssets(
   workspace: AutonomyWorkspaceState,
 ): AutonomyAssetLibrary {
   const publicAssets = defaultAutonomyWorkspace();
+  // An unbound fallback must not replace a stored, content-pinned default card.
+  const publicAircraft = library.aircraft.find((item) => aircraftAssetKey(item) === aircraftAssetKey(publicAssets.aircraft)) ?? publicAssets.aircraft;
+  const publicMap = library.maps.find((item) => mapAssetKey(item) === mapAssetKey(publicAssets.mapPack)) ?? publicAssets.mapPack;
   return normalizeLibrary({
     schemaVersion: 2,
     aircraft: replaceById(
-      replaceById(library.aircraft, publicAssets.aircraft, MAX_AIRCRAFT),
+      replaceById(library.aircraft, publicAircraft, MAX_AIRCRAFT),
       workspace.aircraft,
       MAX_AIRCRAFT,
     ),
     maps: replaceById(
-      replaceById(library.maps, publicAssets.mapPack, MAX_MAPS),
+      replaceById(library.maps, publicMap, MAX_MAPS),
       workspace.mapPack,
       MAX_MAPS,
     ),
@@ -181,6 +184,15 @@ export function loadAutonomyAssetLibrary(
   workspace: AutonomyWorkspaceState,
   storage: Pick<Storage, "getItem"> = window.localStorage,
 ): AutonomyAssetLibrary {
+  return withCurrentAutonomyAssets(readStoredAutonomyAssetLibrary(ownerId, edition, storage), workspace);
+}
+
+/** Read stored pins before adding fallback cards or the active selection. */
+export function readStoredAutonomyAssetLibrary(
+  ownerId: string,
+  edition: BrandEditionId,
+  storage: Pick<Storage, "getItem"> = window.localStorage,
+): AutonomyAssetLibrary {
   try {
     const raw = JSON.parse(storage.getItem(storageKey(ownerId, edition)) ?? "null") as Partial<AutonomyAssetLibrary> | null;
     const aircraft = Array.isArray(raw?.aircraft)
@@ -192,9 +204,9 @@ export function loadAutonomyAssetLibrary(
     const externalAssets = Array.isArray(raw?.externalAssets)
       ? raw.externalAssets.map(normalizeExternalAsset).filter((item): item is AutonomyExternalAssetReference => Boolean(item))
       : [];
-    return withCurrentAutonomyAssets(normalizeLibrary({ schemaVersion: 2, aircraft, maps, externalAssets }), workspace);
+    return normalizeLibrary({ schemaVersion: 2, aircraft, maps, externalAssets });
   } catch {
-    return withCurrentAutonomyAssets({ schemaVersion: 2, aircraft: [], maps: [], externalAssets: [] }, workspace);
+    return { schemaVersion: 2, aircraft: [], maps: [], externalAssets: [] };
   }
 }
 
