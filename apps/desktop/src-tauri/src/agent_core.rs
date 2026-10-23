@@ -409,13 +409,15 @@ fn shutdown_state(state: &AgentCoreState) {
 #[cfg(target_os = "windows")]
 fn wait_for_process_exit(pid: u32) {
     use windows_sys::Win32::Foundation::CloseHandle;
-    use windows_sys::Win32::System::Threading::{OpenProcess, WaitForSingleObject, SYNCHRONIZE};
+    use windows_sys::Win32::System::Threading::{
+        OpenProcess, WaitForSingleObject, PROCESS_SYNCHRONIZE,
+    };
 
     // CommandChild::kill requests termination but does not wait for Windows to
     // finish tearing the process down. Keep the desktop alive briefly so a
     // window close cannot leave AGENT Core visible in Task Manager after the
     // app itself has disappeared.
-    let handle = unsafe { OpenProcess(SYNCHRONIZE, 0, pid) };
+    let handle = unsafe { OpenProcess(PROCESS_SYNCHRONIZE, 0, pid) };
     if handle.is_null() {
         return;
     }
