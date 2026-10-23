@@ -82,6 +82,14 @@ const authMock = vi.hoisted(() => {
   };
 });
 
+const desktopSignOutMock = vi.hoisted(() => ({
+  restartLauncher: vi.fn(() => false),
+}));
+
+vi.mock("../desktop/signOut", () => ({
+  restartDesktopLauncherAfterSignOut: desktopSignOutMock.restartLauncher,
+}));
+
 vi.mock("../features/auth/supabaseClient", () => ({
   appleAuthEnabled: false,
   browserAuthConfiguration: () => ({
@@ -340,6 +348,7 @@ describe("AuthContext account profile", () => {
     authMock.signOut.mockReset();
     authMock.signOut.mockResolvedValue({ data: {}, error: null });
     authMock.unsubscribe.mockClear();
+    desktopSignOutMock.restartLauncher.mockClear();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();

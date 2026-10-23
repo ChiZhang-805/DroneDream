@@ -140,7 +140,6 @@ import {
   type ManagedModelUsageSnapshot,
 } from "./features/settings/cloudModelAccess";
 import {
-  hasExperimentDraft,
   persistExperimentDraftsForExit,
 } from "./features/experiment/draftStorage";
 import {
@@ -812,14 +811,6 @@ function AllowanceUsageHistory({
       )}
     </section>
   );
-}
-
-interface ExitPromptState {
-  hasDraft: boolean;
-  draftPreserved: boolean;
-  activeJobCount: number;
-  activeJobs: Pick<Job, "id" | "control_version">[];
-  activeJobsUnknown: boolean;
 }
 
 async function listActiveJobsForStatus(status: JobStatus): Promise<{
@@ -2707,140 +2698,6 @@ function SettingsDialog({
   );
 }
 
-function ExitGuardDialog({
-  state,
-  onReturn,
-  onConfirmExit,
-}: {
-  state: ExitPromptState;
-  onReturn: () => void;
-  onConfirmExit: () => void;
-}) {
-  const { t } = useI18n();
-  const backdropRef = useRef<HTMLDivElement>(null);
-  const dialogRef = useRef<HTMLElement>(null);
-  const returnButtonRef = useRef<HTMLButtonElement>(null);
-  const paragraphKey: TranslationKey = state.hasDraft
-    ? state.activeJobsUnknown
-      ? "exitGuard.draftActiveUnknown"
-      : state.activeJobCount > 0
-        ? "exitGuard.draftActive"
-        : "exitGuard.draft"
-    : state.activeJobsUnknown
-      ? "exitGuard.activeUnknown"
-      : "exitGuard.active";
-
-  useEffect(() => {
-    const previousFocus = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
-    const backdrop = backdropRef.current;
-    const parent = backdrop?.parentElement;
-    const siblings = parent && backdrop
-      ? Array.from(parent.children)
-        .filter((element): element is HTMLElement => (
-          element instanceof HTMLElement && element !== backdrop
-        ))
-        .map((element) => ({
-          element,
-          inert: element.hasAttribute("inert"),
-          ariaHidden: element.getAttribute("aria-hidden"),
-        }))
-      : [];
-    for (const { element } of siblings) {
-      element.setAttribute("inert", "");
-      element.setAttribute("aria-hidden", "true");
-    }
-
-    const focusFrame = window.requestAnimationFrame(() => returnButtonRef.current?.focus());
-    const keepFocusInside = (event: globalThis.KeyboardEvent) => {
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onReturn();
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const controls = Array.from(dialog.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      )).filter((element) => !element.closest("[inert]"));
-      if (controls.length === 0) {
-        event.preventDefault();
-        return;
-      }
-      const first = controls[0];
-      const last = controls[controls.length - 1];
-      const active = document.activeElement;
-      if (event.shiftKey && (active === first || !dialog.contains(active))) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", keepFocusInside, true);
-    return () => {
-      window.cancelAnimationFrame(focusFrame);
-      document.removeEventListener("keydown", keepFocusInside, true);
-      for (const { element, inert, ariaHidden } of siblings) {
-        if (!inert) element.removeAttribute("inert");
-        if (ariaHidden === null) element.removeAttribute("aria-hidden");
-        else element.setAttribute("aria-hidden", ariaHidden);
-      }
-      window.requestAnimationFrame(() => {
-        const fallback = document.querySelector<HTMLElement>(
-          '.settings-workspace-sidebar [role="tab"][aria-selected="true"], .launcher-settings-button, .account-button',
-        );
-        const target = previousFocus && previousFocus.isConnected && previousFocus !== document.body
-          ? previousFocus
-          : fallback;
-        if (target && !target.closest("[inert]")) target.focus();
-      });
-    };
-  }, [onReturn]);
-
-  return (
-    <div ref={backdropRef} className="app-exit-backdrop" role="presentation">
-      <section
-        ref={dialogRef}
-        className="app-exit-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="app-exit-title"
-        aria-describedby="app-exit-description"
-      >
-        <h2 id="app-exit-title">{t("exitGuard.title")}</h2>
-        <p id="app-exit-description">
-          {t(paragraphKey, { count: state.activeJobCount })}
-        </p>
-        {state.hasDraft ? (
-          <p role={state.draftPreserved ? "status" : "alert"}>
-            {t(
-              state.draftPreserved
-                ? "exitGuard.draftSaved"
-                : "exitGuard.draftSaveFailed",
-            )}
-          </p>
-        ) : null}
-        <div className="app-exit-actions">
-          <button ref={returnButtonRef} type="button" className="btn" onClick={onReturn}>
-            {t("exitGuard.return")}
-          </button>
-          <button
-            type="button"
-            className="btn app-exit-confirm"
-            onClick={onConfirmExit}
-          >
-            {t(state.hasDraft ? "exitGuard.exitKeep" : "exitGuard.exitAnyway")}
-          </button>
-        </div>
-      </section>
-    </div>
-  );
-}
-
 const ACCOUNT_COPY = {
   en: {
     title: "DroneDream account",
@@ -4038,7 +3895,6 @@ function AppShellContent() {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [externalNavigationError, setExternalNavigationError] = useState<string | null>(null);
-  const [exitPrompt, setExitPrompt] = useState<ExitPromptState | null>(null);
   const launcherSettingsButtonRef = useRef<HTMLButtonElement>(null);
   const launcherSettingsCloseRef = useRef<HTMLButtonElement>(null);
   const accountButtonRef = useRef<HTMLButtonElement>(null);
@@ -4050,7 +3906,6 @@ function AppShellContent() {
   const settingsPreferenceSaveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const desktopWindowRef = useRef<DesktopWindowHandle | null>(null);
   const currentPathRef = useRef(location.pathname);
-  const exitPromptRef = useRef<ExitPromptState | null>(null);
   const exitCheckInFlightRef = useRef(false);
   const exitApprovedRef = useRef(false);
   const launcherMode = desktopRuntime && location.pathname === "/desktop/setup";
@@ -4377,33 +4232,9 @@ function AppShellContent() {
       window.removeEventListener(OPEN_ACCOUNT_DIALOG_EVENT, openAccountDialog);
   }, [launcherMode]);
 
-  const returnFromExitPrompt = useCallback(() => {
-    exitPromptRef.current = null;
-    setExitPrompt(null);
-  }, []);
-
-  const confirmExit = useCallback(async () => {
-    const desktopWindow = desktopWindowRef.current;
-    if (!desktopWindow || exitApprovedRef.current) return;
-    persistExperimentDraftsForExit();
-    exitApprovedRef.current = true;
-    const activeJobs = exitPromptRef.current?.activeJobs ?? [];
-    await stopKnownActiveJobsBeforeExit(activeJobs);
-    await stopDesktopRuntimeBeforeExit();
-    try {
-      await desktopWindow.destroy();
-    } catch {
-      exitApprovedRef.current = false;
-    }
-  }, []);
-
   useEffect(() => {
     currentPathRef.current = location.pathname;
   }, [location.pathname]);
-
-  useEffect(() => {
-    exitPromptRef.current = exitPrompt;
-  }, [exitPrompt]);
 
   useEffect(() => {
     if (!desktopRuntime) return;
@@ -4416,43 +4247,26 @@ function AppShellContent() {
     void desktopWindow.onCloseRequested(async (event) => {
       if (exitApprovedRef.current) return;
       event.preventDefault();
-      if (exitCheckInFlightRef.current || exitPromptRef.current) return;
+      if (exitCheckInFlightRef.current) return;
       exitCheckInFlightRef.current = true;
 
-      const path = currentPathRef.current;
-      const hasDraft = path === "/jobs/new" || hasExperimentDraft();
-      const draftPreserved = hasDraft
-        ? persistExperimentDraftsForExit()
-        : true;
-      let activeJobCount = 0;
+      persistExperimentDraftsForExit();
       let activeJobs: Pick<Job, "id" | "control_version">[] = [];
-      let activeJobsUnknown = false;
-      if (path !== "/desktop/setup") {
+      if (currentPathRef.current !== "/desktop/setup") {
         try {
           const activeJobResult = await findActiveJobsBeforeExit();
-          activeJobCount = activeJobResult.count;
           activeJobs = activeJobResult.jobs;
         } catch {
-          activeJobsUnknown = true;
+          // Native shutdown still releases Runtime and contained helpers when
+          // the local API is unavailable. Closing the window never leaves the
+          // user trapped behind an error or confirmation dialog.
         }
       }
 
-      const state = {
-        hasDraft,
-        draftPreserved,
-        activeJobCount,
-        activeJobs,
-        activeJobsUnknown,
-      };
-      const mustConfirm = hasDraft || activeJobCount > 0 || activeJobsUnknown;
-      if (mustConfirm) {
-        if (!cancelled) {
-          exitPromptRef.current = state;
-          setExitPrompt(state);
-        }
-      } else {
+      await stopKnownActiveJobsBeforeExit(activeJobs);
+      await stopDesktopRuntimeBeforeExit();
+      if (!cancelled) {
         exitApprovedRef.current = true;
-        await stopDesktopRuntimeBeforeExit();
         try {
           await desktopWindow.destroy();
         } catch {
@@ -4601,13 +4415,6 @@ function AppShellContent() {
     };
   }, [accountDialogOpen, accountDialogRequired, closeAccount]);
 
-  const exitGuard = exitPrompt ? (
-    <ExitGuardDialog
-      state={exitPrompt}
-      onReturn={returnFromExitPrompt}
-      onConfirmExit={confirmExit}
-    />
-  ) : null;
   const accountDialog = accountDialogOpen ? (
     <div
       className="account-dialog-backdrop"
@@ -4706,7 +4513,6 @@ function AppShellContent() {
            <Outlet key={activeThemeEdition} />
          </main>
          {settingsWorkspace}
-         {exitGuard}
          </div>
       </EditionThemeProvider>
     );
@@ -4995,7 +4801,6 @@ function AppShellContent() {
         </main>
       </div>
       {settingsWorkspace}
-      {exitGuard}
       <UpdateBlockedDialog
         block={updater.blockedActivity}
         locale={locale}

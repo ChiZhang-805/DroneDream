@@ -14,6 +14,7 @@ import {
   clearBrowserAuthVault,
   isDesktopRuntime,
 } from "../../desktop/bridge";
+import { restartDesktopLauncherAfterSignOut } from "../../desktop/signOut";
 import { clearAllExperimentDrafts } from "../experiment/draftStorage";
 import {
   ACTIVATE_DESKTOP_AUTH_EVENT,
@@ -806,6 +807,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await requireClient().auth.signOut({ scope: "local" });
     if (error) throw error;
     adoptUser(null, null);
+    restartDesktopLauncherAfterSignOut();
     if (vaultClearFailed) {
       throw new Error("The desktop session closed, but its saved sign-in could not be removed.");
     }
