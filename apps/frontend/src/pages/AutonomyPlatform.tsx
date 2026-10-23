@@ -2731,6 +2731,35 @@ export function AutonomyLive() {
     return { latitude, longitude, altitudeM: (origin.altitudeM ?? 0) + (telemetry.up_m ?? 0) };
   }, [telemetry, workspace.mapPack.origin]);
 
+  const liveRouteGeometry = useMemo(() => {
+    const route = (telemetry?.route_points_m ?? []).filter((point) => (
+      point.length >= 2 && Number.isFinite(point[0]) && Number.isFinite(point[1])
+    ));
+    if (route.length < 2) return null;
+    const current: [number, number] | null = typeof telemetry?.east_m === "number" && typeof telemetry?.north_m === "number"
+      ? [telemetry.east_m, telemetry.north_m]
+      : null;
+    const eastValues = route.map((point) => point[0]).concat(current ? [current[0]] : []);
+    const northValues = route.map((point) => point[1]).concat(current ? [current[1]] : []);
+    const minEast = Math.min(...eastValues);
+    const maxEast = Math.max(...eastValues);
+    const minNorth = Math.min(...northValues);
+    const maxNorth = Math.max(...northValues);
+    const spanEast = Math.max(1, maxEast - minEast);
+    const spanNorth = Math.max(1, maxNorth - minNorth);
+    const project = ([east, north]: [number, number]) => ({
+      x: 8 + ((east - minEast) / spanEast) * 84,
+      y: 92 - ((north - minNorth) / spanNorth) * 84,
+    });
+    const projected = route.map((point) => project([point[0], point[1]]));
+    return {
+      points: projected.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" "),
+      start: projected[0],
+      goal: projected.at(-1)!,
+      current: current ? project(current) : null,
+    };
+  }, [telemetry]);
+
   const toggleRecording = async () => {
     if (recording) {
       recorderRef.current?.stop();
@@ -2799,7 +2828,15 @@ export function AutonomyLive() {
           {playing && selectedSource?.kind === "gps" ? (
             <div className="autonomy-live-map" data-ready={Boolean(telemetry)}>
               <div className="autonomy-live-map-grid" />
-              {telemetry ? <MapPin className="autonomy-live-map-marker" aria-hidden="true" /> : null}
+              {liveRouteGeometry ? (
+                <svg className="autonomy-live-route" viewBox="0 0 100 100" role="img" aria-label={chinese ? "规划路线与实时位置" : "Planned route and live position"}>
+                  <polyline className="autonomy-live-route-shadow" points={liveRouteGeometry.points} />
+                  <polyline className="autonomy-live-route-line" points={liveRouteGeometry.points} />
+                  <circle className="autonomy-live-route-start" cx={liveRouteGeometry.start.x} cy={liveRouteGeometry.start.y} r="2.1" />
+                  <circle className="autonomy-live-route-goal" cx={liveRouteGeometry.goal.x} cy={liveRouteGeometry.goal.y} r="2.4" />
+                  {liveRouteGeometry.current ? <circle className="autonomy-live-route-current" cx={liveRouteGeometry.current.x} cy={liveRouteGeometry.current.y} r="2.8" /> : null}
+                </svg>
+              ) : telemetry ? <MapPin className="autonomy-live-map-marker" aria-hidden="true" /> : null}
               <div className="autonomy-live-coordinates">
                 {geographicPosition
                   ? <><strong>{geographicPosition.latitude.toFixed(6)}, {geographicPosition.longitude.toFixed(6)}</strong><span>{geographicPosition.altitudeM?.toFixed(1) ?? "—"} m</span></>

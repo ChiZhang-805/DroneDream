@@ -596,6 +596,7 @@ export interface AgentCoreLiveTelemetry {
   latitude?: number;
   longitude?: number;
   altitude_m?: number;
+  route_points_m?: Array<[number, number, number]>;
   updated_at_unix_ms: number;
 }
 

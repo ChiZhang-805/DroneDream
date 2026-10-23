@@ -23308,6 +23308,56 @@ body {
   background-size: 4rem 4rem;
 }
 
+.autonomy-live-route {
+  position: absolute;
+  inset: 1.4rem;
+  width: calc(100% - 2.8rem);
+  height: calc(100% - 2.8rem);
+  overflow: visible;
+}
+
+.autonomy-live-route polyline {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.autonomy-live-route-shadow {
+  stroke: color-mix(in srgb, #050712 78%, transparent);
+  stroke-width: 3.8;
+}
+
+.autonomy-live-route-line {
+  stroke: var(--brand-accent, #f33e70);
+  stroke-width: 1.45;
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--brand-accent, #f33e70) 68%, transparent));
+}
+
+.autonomy-live-route-start,
+.autonomy-live-route-goal,
+.autonomy-live-route-current {
+  vector-effect: non-scaling-stroke;
+}
+
+.autonomy-live-route-start {
+  fill: #20d5d2;
+  stroke: #fff;
+  stroke-width: 1.15;
+}
+
+.autonomy-live-route-goal {
+  fill: #f1b84b;
+  stroke: #fff;
+  stroke-width: 1.15;
+}
+
+.autonomy-live-route-current {
+  fill: var(--brand-accent, #f33e70);
+  stroke: #fff;
+  stroke-width: 1.35;
+  filter: drop-shadow(0 0 6px var(--brand-accent, #f33e70));
+}
+
 .autonomy-live-map-marker {
   position: absolute;
   top: 50%;
