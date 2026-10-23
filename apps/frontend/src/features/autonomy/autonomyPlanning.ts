@@ -37,6 +37,7 @@ import {
   planWithAgentCore,
 } from "./agentCorePlanning";
 import { AgentCoreRequestError, type AgentCoreMissionPrepareSummary } from "./agentCore";
+import { mapRefinementBrief, mapRefinementSnapshot, type AutonomyMapRefinementState } from "./mapRefinement";
 
 export type AutonomyPlanningModel =
   | {
@@ -71,6 +72,7 @@ export interface AutonomyPlanningInput {
 }
 
 export interface AutonomyPlanningResult {
+  mapRefinement?: AutonomyMapRefinementState | null;
   planningBrief: string;
   planningRunId: string | null;
   planningArtifactSha256: string | null;
@@ -349,6 +351,14 @@ export async function planAutonomyMission(
         inputChannel: input.inputChannel,
         transcriptSource: input.transcriptSource,
       });
+      if (coreSummary.status === "map_refinement_pending") {
+        return {
+          planningBrief: mapRefinementBrief(input.chinese),
+          mapRefinement: mapRefinementSnapshot(coreSummary),
+          planningRunId: null, planningArtifactSha256: null, plannerArtifact: null,
+          harnessInspection, compileRequest: null, compileResult: null, compiledPlan: null,
+        };
+      }
       let canonicalArtifact: unknown;
       try {
         canonicalArtifact = JSON.parse(coreSummary.integration_artifact_canonical_json);

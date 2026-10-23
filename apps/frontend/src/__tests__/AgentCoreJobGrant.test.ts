@@ -59,6 +59,34 @@ it("planning requests a thread-bound job grant before any model stage", async ()
   expect(execute).not.toHaveBeenCalled();
 });
 
+it("keeps a pending map review separate from execution and reuses its bound thread", async () => {
+  const pending: core.AgentCoreMapRefinementPending = {
+    status: "map_refinement_pending", state: "awaiting-observation", thread_id: threadId,
+    actuator_authority: false, next_action: "inspect-map-gaps", message: "More visual detail is needed.",
+  };
+  vi.spyOn(core, "prepareAgentCoreMission").mockResolvedValue(pending);
+  const execute = vi.spyOn(core, "executeAgentCoreMission");
+  expect(await planWithAgentCore(input)).toEqual(pending);
+  const createdThread = vi.mocked(core.createAgentCoreThread).mock.results[0];
+  const thread = await createdThread.value;
+  vi.mocked(core.getAgentCoreBootstrap).mockResolvedValue({
+    models: [{ id: "kimi-k2.6", source: "default", provider: "kimi" }],
+    asset_versions: sample.versions, threads: [thread],
+  } as unknown as Awaited<ReturnType<typeof core.getAgentCoreBootstrap>>);
+  expect(await planWithAgentCore(input)).toEqual(pending);
+  expect(core.createAgentCoreThread).toHaveBeenCalledTimes(1);
+  expect(core.prepareAgentCoreMission).toHaveBeenLastCalledWith(threadId, expect.objectContaining({ message: input.instruction }));
+  expect(execute).not.toHaveBeenCalled();
+});
+
+it("rejects a pending response from a different thread", async () => {
+  vi.spyOn(core, "prepareAgentCoreMission").mockResolvedValue({
+    status: "map_refinement_pending", state: "awaiting-observation", thread_id: "other-thread",
+    actuator_authority: false, next_action: "inspect-map-gaps", message: "More detail is needed.",
+  });
+  await expect(planWithAgentCore(input)).rejects.toThrow("MAP_REFINEMENT_STATE_INVALID");
+});
+
 it("asset interpretation uses a job grant for validation and bounded retries", async () => {
   vi.spyOn(core, "requestAgentCoreAssetInterpretation").mockRejectedValue(new Error("STOP_AT_BACKEND_BOUNDARY"));
   await expect(interpretAgentCoreAsset({ ...input, kind: "map", assetId: input.workspace.mapPack.agentCoreAssetId!, contentSha256: null })).rejects.toThrow("STOP_AT_BACKEND_BOUNDARY");

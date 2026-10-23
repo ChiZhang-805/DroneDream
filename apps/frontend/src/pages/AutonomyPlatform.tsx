@@ -9,7 +9,6 @@ import {
   GitBranch,
   Globe2,
   Layers3,
-  MapPin,
   Mic,
   Paperclip,
   Navigation2,
@@ -50,6 +49,8 @@ import type { BrandEditionId } from "../brand/edition-brand.generated";
 import { apiClient } from "../api/client";
 import { openAppSettings } from "../appSettings";
 import { AssetInterpretButton } from "../features/autonomy/AssetInterpretButton";
+import { LiveMapView } from "../features/autonomy/LiveMapView";
+import { MapRefinementNotice } from "../features/autonomy/MapRefinementNotice";
 import { AUTONOMY_CONVERSATIONS_CHANGED, autonomyConversationId, autonomyConversationPath, loadAutonomyConversation, newAutonomyConversation, preserveLegacyAutonomyConversation, saveAutonomyConversation } from "../features/autonomy/conversationStore";
 import { acquireAutonomyPlanning, useAutonomyPlanning } from "../features/autonomy/conversationActivity";
 import { bindVerifiedAssetPair, externalAssetReferenceFromVersion, reconcileAgentCoreWorkspace } from "../features/autonomy/assetPairBinding";
@@ -1683,10 +1684,10 @@ export function AutonomyOverview() {
     };
   }, [contextMenuOpen]);
 
-  const submitMission = async (event: FormEvent) => {
-    event.preventDefault();
+  const submitMission = async (event?: Pick<FormEvent, "preventDefault">, continuePlanning = false) => {
+    event?.preventDefault();
     if (submitting.current) return;
-    const intent = composer.trim();
+    const intent = (continuePlanning ? workspace.mission.intent : composer).trim();
     if (!intent) return;
     if (intent.length > 2_000) {
       setError(copy.tooLong);
@@ -1709,7 +1710,7 @@ export function AutonomyOverview() {
       const selectedWorkspace = resolveMissionAssets(workspace, assetLibrary, intent);
       const turnId = crypto.randomUUID();
       const followUpPrefix = chinese ? "\n补充指令：" : "\nFollow-up instruction: ";
-      const revisedIntent = selectedWorkspace.mission.messages.length || selectedWorkspace.mission.compiledPlan
+      const revisedIntent = !continuePlanning && (selectedWorkspace.mission.messages.length || selectedWorkspace.mission.compiledPlan)
         ? `${selectedWorkspace.mission.intent.slice(0, Math.max(0, 2_000 - followUpPrefix.length - intent.length))}${followUpPrefix}${intent}`
         : intent;
       const submittedAt = new Date().toISOString();
@@ -1726,17 +1727,21 @@ export function AutonomyOverview() {
         })),
       };
       const priorMessages = selectedWorkspace.mission.messages;
+      // A review continuation reuses the exact task, not a duplicated follow-up
+      // instruction. The same conversation retains its Core thread binding.
+      const submittedMessages = continuePlanning ? priorMessages : [...priorMessages, userMessage];
       const submitted = updatedWorkspace(selectedWorkspace, {
         mission: {
           ...selectedWorkspace.mission,
           intent: revisedIntent,
           conversationId: assistantWorkspaceId,
-          messages: [...priorMessages, userMessage].slice(-100),
+          messages: submittedMessages.slice(-100),
           aircraftProfileId: selectedWorkspace.aircraft.id,
           mapPackId: selectedWorkspace.mapPack.id,
           compiledPlan: null,
           planningRunId: null,
           planningError: null,
+          mapRefinement: null,
           updatedAt: submittedAt,
         },
       });
@@ -1783,8 +1788,9 @@ export function AutonomyOverview() {
             planningModel: selectedPlanningModel,
             planningBrief: planning.planningBrief,
             planningRunId: planning.planningRunId,
+            mapRefinement: planning.mapRefinement ?? null,
             conversationId: assistantWorkspaceId,
-            messages: [...priorMessages, userMessage, assistantMessage].slice(-100),
+            messages: [...submittedMessages, assistantMessage].slice(-100),
             aircraftProfileId: missionWorkspace.aircraft.id,
             mapPackId: missionWorkspace.mapPack.id,
             compiledPlan: null,
@@ -1809,8 +1815,9 @@ export function AutonomyOverview() {
           planningModel: selectedPlanningModel,
           planningBrief: planning.planningBrief,
           planningRunId: planning.planningRunId,
+          mapRefinement: null,
           conversationId: assistantWorkspaceId,
-          messages: [...priorMessages, userMessage, assistantMessage].slice(-100),
+          messages: [...submittedMessages, assistantMessage].slice(-100),
           aircraftProfileId: missionWorkspace.aircraft.id,
           mapPackId: missionWorkspace.mapPack.id,
           compiledPlan: planning.compiledPlan,
@@ -1885,6 +1892,15 @@ export function AutonomyOverview() {
                   ) : null}
                 </article>
               ))}
+              {workspace.mission.mapRefinement && !workspace.mission.compiledPlan && !generating ? (
+                <MapRefinementNotice
+                  state={workspace.mission.mapRefinement}
+                  chinese={chinese}
+                  disabled={!selectedPlanningModel}
+                  onContinue={() => void submitMission(undefined, true)}
+                  onReviewMap={() => navigate("/autonomy/maps")}
+                />
+              ) : null}
               {generating ? (
                 <article className="autonomy-conversation-message is-assistant is-generating" aria-label={chinese ? "正在生成任务计划" : "Generating mission plan"}>
                   <span className="autonomy-conversation-avatar" aria-hidden="true"><Sparkles /></span>
@@ -2717,49 +2733,6 @@ export function AutonomyLive() {
     };
   }, [playing, selectedSource, threadId]);
 
-  const geographicPosition = useMemo(() => {
-    if (!telemetry) return null;
-    if (telemetry.coordinate_frame === "wgs84" && typeof telemetry.latitude === "number" && typeof telemetry.longitude === "number") {
-      return { latitude: telemetry.latitude, longitude: telemetry.longitude, altitudeM: telemetry.altitude_m ?? null };
-    }
-    const origin = workspace.mapPack.origin;
-    if (typeof origin.latitude !== "number" || typeof origin.longitude !== "number") return null;
-    const north = telemetry.north_m ?? 0;
-    const east = telemetry.east_m ?? 0;
-    const latitude = origin.latitude + north / 111_320;
-    const longitude = origin.longitude + east / (111_320 * Math.max(0.01, Math.cos(origin.latitude * Math.PI / 180)));
-    return { latitude, longitude, altitudeM: (origin.altitudeM ?? 0) + (telemetry.up_m ?? 0) };
-  }, [telemetry, workspace.mapPack.origin]);
-
-  const liveRouteGeometry = useMemo(() => {
-    const route = (telemetry?.route_points_m ?? []).filter((point) => (
-      point.length >= 2 && Number.isFinite(point[0]) && Number.isFinite(point[1])
-    ));
-    if (route.length < 2) return null;
-    const current: [number, number] | null = typeof telemetry?.east_m === "number" && typeof telemetry?.north_m === "number"
-      ? [telemetry.east_m, telemetry.north_m]
-      : null;
-    const eastValues = route.map((point) => point[0]).concat(current ? [current[0]] : []);
-    const northValues = route.map((point) => point[1]).concat(current ? [current[1]] : []);
-    const minEast = Math.min(...eastValues);
-    const maxEast = Math.max(...eastValues);
-    const minNorth = Math.min(...northValues);
-    const maxNorth = Math.max(...northValues);
-    const spanEast = Math.max(1, maxEast - minEast);
-    const spanNorth = Math.max(1, maxNorth - minNorth);
-    const project = ([east, north]: [number, number]) => ({
-      x: 8 + ((east - minEast) / spanEast) * 84,
-      y: 92 - ((north - minNorth) / spanNorth) * 84,
-    });
-    const projected = route.map((point) => project([point[0], point[1]]));
-    return {
-      points: projected.map((point) => `${point.x.toFixed(2)},${point.y.toFixed(2)}`).join(" "),
-      start: projected[0],
-      goal: projected.at(-1)!,
-      current: current ? project(current) : null,
-    };
-  }, [telemetry]);
-
   const toggleRecording = async () => {
     if (recording) {
       recorderRef.current?.stop();
@@ -2826,29 +2799,7 @@ export function AutonomyLive() {
         <div className="autonomy-live-screen" data-playing={playing}>
           {playing && selectedSource?.transport === "agent-core-frame" ? <canvas ref={canvasRef} aria-label={selectedSource.label} /> : null}
           {playing && selectedSource?.kind === "gps" ? (
-            <div
-              className="autonomy-live-map"
-              data-ready={Boolean(telemetry)}
-              data-campus-map={/kumpula/iu.test(workspace.mapPack.name)}
-            >
-              <div className="autonomy-live-map-grid" />
-              {liveRouteGeometry ? (
-                <svg className="autonomy-live-route" viewBox="0 0 100 100" role="img" aria-label={chinese ? "规划路线与实时位置" : "Planned route and live position"}>
-                  <polyline className="autonomy-live-route-shadow" points={liveRouteGeometry.points} />
-                  <polyline className="autonomy-live-route-line" points={liveRouteGeometry.points} />
-                  <circle className="autonomy-live-route-start" cx={liveRouteGeometry.start.x} cy={liveRouteGeometry.start.y} r="2.1" />
-                  <circle className="autonomy-live-route-goal" cx={liveRouteGeometry.goal.x} cy={liveRouteGeometry.goal.y} r="2.4" />
-                  {liveRouteGeometry.current ? <circle className="autonomy-live-route-current" cx={liveRouteGeometry.current.x} cy={liveRouteGeometry.current.y} r="2.8" /> : null}
-                </svg>
-              ) : telemetry ? <MapPin className="autonomy-live-map-marker" aria-hidden="true" /> : null}
-              <div className="autonomy-live-coordinates">
-                {geographicPosition
-                  ? <><strong>{geographicPosition.latitude.toFixed(6)}, {geographicPosition.longitude.toFixed(6)}</strong><span>{geographicPosition.altitudeM?.toFixed(1) ?? "—"} m</span></>
-                  : telemetry
-                    ? <><strong>E {(telemetry.east_m ?? 0).toFixed(1)} · N {(telemetry.north_m ?? 0).toFixed(1)}</strong><span>{(telemetry.up_m ?? 0).toFixed(1)} m</span></>
-                    : <span>{chinese ? "等待定位" : "Waiting for position"}</span>}
-              </div>
-            </div>
+            <LiveMapView threadId={threadId} telemetry={telemetry} chinese={chinese} />
           ) : null}
           {playing && selectedSource?.transport === "video" && selectedSource.url ? <video ref={videoRef} src={selectedSource.url} autoPlay playsInline muted controls={false} /> : null}
           {playing && selectedSource?.transport === "image" && selectedSource.url ? <img src={selectedSource.url} alt={selectedSource.label} /> : null}

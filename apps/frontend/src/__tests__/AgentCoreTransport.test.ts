@@ -11,6 +11,13 @@ beforeEach(() => {
 afterEach(() => { delete (window as Window & { __TAURI__?: unknown }).__TAURI__; });
 
 describe("desktop Core identity and typed clarification", () => {
+  it("preserves an HTTP 202 map review response without interpreting it as a mission plan", async () => {
+    const pending = { status: "map_refinement_pending", state: "awaiting-observation", thread_id: "thread-test",
+      actuator_authority: false, next_action: "inspect-map-gaps", message: "Inspect the connecting path." };
+    invoke.mockResolvedValue({ status: 202, contentType: "application/json", bodyBase64: btoa(JSON.stringify(pending)) });
+    expect(await prepareAgentCoreMission("thread-test", {} as Parameters<typeof prepareAgentCoreMission>[1])).toEqual(pending);
+    expect(invoke).toHaveBeenCalledTimes(1);
+  });
   it("forwards the current in-memory identity without persisting a credential", async () => {
     invoke.mockResolvedValue({ status: 200, contentType: "application/json", bodyBase64: btoa("{}") });
     const write = vi.spyOn(Storage.prototype, "setItem");

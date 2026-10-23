@@ -1,5 +1,6 @@
 import type { BrandEditionId } from "../../brand/edition-brand.generated";
 import { MY_DRONE_CONTRACT } from "./myDroneContract";
+import { normalizeMapRefinement, type AutonomyMapRefinementState } from "./mapRefinement";
 import type {
   AutonomyCompileAssetContext,
   AutonomyTaskGraph,
@@ -315,6 +316,7 @@ export interface AutonomyEvidenceRecord {
 }
 
 export interface AutonomyMissionDraft {
+  mapRefinement?: AutonomyMapRefinementState | null;
   schemaVersion: 2;
   id: string;
   intent: string;
@@ -1190,6 +1192,7 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
       planningError: typeof mission.planningError === "string"
         ? boundedText(mission.planningError, "", 2_000) || null
         : null,
+      mapRefinement: normalizedMissionPlan ? null : normalizeMapRefinement(mission.mapRefinement),
       conversationId: typeof mission.conversationId === "string"
         ? boundedText(mission.conversationId, "", 160) || null
         : null,

@@ -21,7 +21,7 @@ import {
   type AgentCoreAssetQualificationEvidence,
   type AgentCoreAssetQualificationJob,
   type AgentCoreAssetVersion,
-  type AgentCoreMissionPrepareSummary,
+  type AgentCoreMissionPrepareResult,
   type AgentCoreThread,
 } from "./agentCore";
 import type {
@@ -449,7 +449,7 @@ async function ensureThread(input: AgentCorePlanningInput): Promise<{
  */
 export async function planWithAgentCore(
   input: AgentCorePlanningInput,
-): Promise<AgentCoreMissionPrepareSummary> {
+): Promise<AgentCoreMissionPrepareResult> {
   if (!input.accountId) throw new Error("AGENT_CORE_ACCOUNT_REQUIRED");
   const { thread, mapVersion, vehicleVersion } = await ensureThread(input);
   const modelSelectionId = selectedModelId(input);
@@ -499,6 +499,17 @@ export async function planWithAgentCore(
       attachment_count: attachmentIds.length,
     },
   });
+  if (summary.status === "map_refinement_pending") {
+    if (
+      summary.thread_id !== thread.thread_id
+      || summary.state !== "awaiting-observation"
+      || summary.actuator_authority !== false
+      || !["inspect-map-gaps", "supply-registered-map-view"].includes(summary.next_action)
+    ) throw new Error("AGENT_CORE_MAP_REFINEMENT_STATE_INVALID");
+    // This is a completed review awaiting new evidence, not an executable plan
+    // or a background job. Keep the selected base asset hashes unchanged.
+    return summary;
+  }
   if (
     summary.mission_plan.asset_bindings.map_asset_id !== mapVersion.asset_id
     || summary.mission_plan.asset_bindings.map_content_sha256 !== mapVersion.content_sha256

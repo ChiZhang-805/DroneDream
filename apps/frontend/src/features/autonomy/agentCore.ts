@@ -597,7 +597,20 @@ export interface AgentCoreLiveTelemetry {
   longitude?: number;
   altitude_m?: number;
   route_points_m?: Array<[number, number, number]>;
+  map_id?: string | null;
+  map_content_sha256?: string | null;
   updated_at_unix_ms: number;
+}
+
+export interface AgentCoreLiveMap {
+  schema_version: "dronedream.live-map.v1";
+  map_id: string;
+  map_content_sha256: string;
+  coordinate_frame: "gazebo-enu";
+  width_px: number;
+  height_px: number;
+  /** x=a*east+b*north+c; y=d*east+e*north+f, in image pixels. */
+  world_to_image: [number, number, number, number, number, number];
 }
 
 export interface AgentCoreExecutionReceipt {
@@ -685,6 +698,30 @@ export interface AgentCoreBootstrap {
   plugins: AgentCorePluginEntry[];
   settings: Record<string, unknown>;
 }
+
+export interface AgentCoreMapRefinementPending {
+  status: "map_refinement_pending";
+  state: "awaiting-observation";
+  thread_id: string;
+  message: string;
+  actuator_authority: false;
+  next_action: "inspect-map-gaps" | "supply-registered-map-view";
+  pending_requests?: Array<{
+    reason: string;
+    focus_node_ids: string[];
+    bounds_xy_m: [number, number, number, number];
+    scale: "detail" | "context" | "expanded" | "alternate";
+  }>;
+  observation_records?: Array<Record<string, unknown>>;
+  physical_calls?: number;
+  issue_codes?: string[];
+  base_map_sha256?: string;
+  base_semantic_sha256?: string;
+  source_image_sha256?: string;
+  focus_nodes?: string[];
+}
+
+export type AgentCoreMissionPrepareResult = AgentCoreMissionPrepareSummary | AgentCoreMapRefinementPending;
 
 export interface AgentCoreMissionPrepareSummary {
   locale: "zh-CN" | "en-US";
@@ -986,6 +1023,18 @@ export function getAgentCoreLiveTelemetry(threadId: string): Promise<AgentCoreLi
   return requestJson(`/v1/threads/${encodeURIComponent(threadId)}/live-telemetry`);
 }
 
+export function getAgentCoreLiveMap(threadId: string): Promise<AgentCoreLiveMap> {
+  return requestJson(`/v1/threads/${encodeURIComponent(threadId)}/live-map`);
+}
+
+export async function getAgentCoreLiveMapImage(threadId: string, mapHash: string): Promise<Blob> {
+  const bytes = await requestBytes(`/v1/threads/${encodeURIComponent(threadId)}/live-map-image?map_content_sha256=${encodeURIComponent(mapHash)}`);
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  // The browser identifies the verified JPEG/PNG/WebP from its signature.
+  return new Blob([copy.buffer]);
+}
+
 export async function uploadAgentCoreAttachment(
   threadId: string,
   file: File,
@@ -1039,7 +1088,7 @@ export function prepareAgentCoreMission(
     input_channel?: "text" | "voice" | "camera" | "api" | "webhook" | "scheduled";
     input_metadata?: Record<string, unknown>;
   },
-): Promise<AgentCoreMissionPrepareSummary> {
+): Promise<AgentCoreMissionPrepareResult> {
   return requestJson(`/v1/threads/${encodeURIComponent(threadId)}/prepare`, {
     method: "POST",
     body: payload,
