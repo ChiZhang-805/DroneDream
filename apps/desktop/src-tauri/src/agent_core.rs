@@ -399,10 +399,34 @@ fn shutdown_state(state: &AgentCoreState) {
     }
     if let Ok(mut child) = state.child.lock() {
         if let Some(process) = child.take() {
+            let pid = process.pid();
             let _ = process.kill();
+            wait_for_process_exit(pid);
         }
     }
 }
+
+#[cfg(target_os = "windows")]
+fn wait_for_process_exit(pid: u32) {
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::Threading::{OpenProcess, WaitForSingleObject, SYNCHRONIZE};
+
+    // CommandChild::kill requests termination but does not wait for Windows to
+    // finish tearing the process down. Keep the desktop alive briefly so a
+    // window close cannot leave AGENT Core visible in Task Manager after the
+    // app itself has disappeared.
+    let handle = unsafe { OpenProcess(SYNCHRONIZE, 0, pid) };
+    if handle.is_null() {
+        return;
+    }
+    unsafe {
+        WaitForSingleObject(handle, 2_000);
+        CloseHandle(handle);
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn wait_for_process_exit(_pid: u32) {}
 
 #[tauri::command]
 pub(crate) async fn agent_core_restart(
