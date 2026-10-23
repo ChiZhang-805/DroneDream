@@ -23298,6 +23298,20 @@ body {
     linear-gradient(135deg, #11141a, #0b0c10);
 }
 
+.autonomy-live-map[data-campus-map="true"] {
+  background:
+    linear-gradient(rgba(5, 8, 14, 0.16), rgba(5, 8, 14, 0.28)),
+    url("/docs/downloads/manual-assets/architecture-map-human.webp") center / cover no-repeat;
+}
+
+.autonomy-live-map[data-campus-map="true"]::after {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  background: radial-gradient(circle at 50% 50%, transparent 46%, rgba(5, 8, 14, 0.24) 100%);
+}
+
 .autonomy-live-map-grid {
   position: absolute;
   inset: -2px;
@@ -23308,12 +23322,17 @@ body {
   background-size: 4rem 4rem;
 }
 
+.autonomy-live-map[data-campus-map="true"] .autonomy-live-map-grid {
+  opacity: 0.12;
+}
+
 .autonomy-live-route {
   position: absolute;
   inset: 1.4rem;
   width: calc(100% - 2.8rem);
   height: calc(100% - 2.8rem);
   overflow: visible;
+  z-index: 1;
 }
 
 .autonomy-live-route polyline {
@@ -23377,6 +23396,12 @@ body {
   gap: 0.7rem;
   align-items: baseline;
   color: #c9c9d1;
+  z-index: 2;
+  padding: 0.42rem 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.55rem;
+  background: rgba(7, 9, 15, 0.76);
+  backdrop-filter: blur(8px);
 }
 
 .autonomy-live-coordinates strong { color: #fff; font-variant-numeric: tabular-nums; }

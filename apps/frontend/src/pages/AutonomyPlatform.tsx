@@ -2826,7 +2826,11 @@ export function AutonomyLive() {
         <div className="autonomy-live-screen" data-playing={playing}>
           {playing && selectedSource?.transport === "agent-core-frame" ? <canvas ref={canvasRef} aria-label={selectedSource.label} /> : null}
           {playing && selectedSource?.kind === "gps" ? (
-            <div className="autonomy-live-map" data-ready={Boolean(telemetry)}>
+            <div
+              className="autonomy-live-map"
+              data-ready={Boolean(telemetry)}
+              data-campus-map={/kumpula/iu.test(workspace.mapPack.name)}
+            >
               <div className="autonomy-live-map-grid" />
               {liveRouteGeometry ? (
                 <svg className="autonomy-live-route" viewBox="0 0 100 100" role="img" aria-label={chinese ? "规划路线与实时位置" : "Planned route and live position"}>
