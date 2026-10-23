@@ -31,6 +31,7 @@ pub(crate) struct AgentCoreState {
     info: Mutex<Option<AgentCoreInfo>>,
     startup_issue: Mutex<Option<&'static str>>,
     child: Mutex<Option<CommandChild>>,
+    job: Mutex<Option<crate::process::KillOnCloseJob>>,
     restarting: AtomicBool,
 }
 
@@ -245,7 +246,9 @@ fn wait_until_ready(port: u16) -> Result<(), String> {
     Err("AGENT Core did not become ready within 24 seconds.".to_owned())
 }
 
-fn launch(app: &AppHandle) -> Result<(AgentCoreInfo, CommandChild), String> {
+fn launch(
+    app: &AppHandle,
+) -> Result<(AgentCoreInfo, CommandChild, crate::process::KillOnCloseJob), String> {
     let port = reserve_loopback_port()?;
     let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
     let data_root = app
@@ -279,9 +282,14 @@ fn launch(app: &AppHandle) -> Result<(AgentCoreInfo, CommandChild), String> {
             "--plugin-isolator".to_owned(),
             plugin_isolator.to_string_lossy().into_owned(),
         ]);
+    let job = crate::process::KillOnCloseJob::new("AGENT Core")?;
     let (mut receiver, child) = sidecar
         .spawn()
         .map_err(|error| format!("Unable to start the AGENT Core sidecar: {error}"))?;
+    if let Err(error) = job.assign_pid(child.pid(), "AGENT Core") {
+        let _ = child.kill();
+        return Err(error);
+    }
     tauri::async_runtime::spawn(async move { while receiver.recv().await.is_some() {} });
     if let Err(error) = wait_until_ready(port) {
         let _ = child.kill();
@@ -293,6 +301,7 @@ fn launch(app: &AppHandle) -> Result<(AgentCoreInfo, CommandChild), String> {
             token,
         },
         child,
+        job,
     ))
 }
 
@@ -302,11 +311,12 @@ fn launch(app: &AppHandle) -> Result<(AgentCoreInfo, CommandChild), String> {
 /// or repair the failed component.
 pub(crate) fn start(app: &mut App) {
     match launch(app.handle()) {
-        Ok((info, child)) => {
+        Ok((info, child, job)) => {
             app.manage(AgentCoreState {
                 info: Mutex::new(Some(info)),
                 startup_issue: Mutex::new(None),
                 child: Mutex::new(Some(child)),
+                job: Mutex::new(Some(job)),
                 restarting: AtomicBool::new(false),
             });
         }
@@ -316,6 +326,7 @@ pub(crate) fn start(app: &mut App) {
                 info: Mutex::new(None),
                 startup_issue: Mutex::new(Some("agent-core-startup-failed")),
                 child: Mutex::new(None),
+                job: Mutex::new(None),
                 restarting: AtomicBool::new(false),
             });
         }
@@ -404,6 +415,9 @@ fn shutdown_state(state: &AgentCoreState) {
             wait_for_process_exit(pid);
         }
     }
+    if let Ok(mut job) = state.job.lock() {
+        job.take();
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -454,7 +468,7 @@ pub(crate) async fn agent_core_restart(
         .await
         .map_err(|error| format!("AGENT Core restart task failed: {error}"))?;
     match launch_result {
-        Ok((info, child)) => {
+        Ok((info, child, job)) => {
             *state
                 .info
                 .lock()
@@ -463,6 +477,10 @@ pub(crate) async fn agent_core_restart(
                 .child
                 .lock()
                 .map_err(|_| "agent-core-state-poisoned".to_owned())? = Some(child);
+            *state
+                .job
+                .lock()
+                .map_err(|_| "agent-core-state-poisoned".to_owned())? = Some(job);
             *state
                 .startup_issue
                 .lock()

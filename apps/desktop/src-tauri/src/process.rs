@@ -32,7 +32,7 @@ struct LimitedOutput {
 /// handle is closed. Keeping short-lived probes in a job prevents a background
 /// descendant from retaining stdout/stderr pipe handles after its direct parent
 /// exits.
-struct KillOnCloseJob {
+pub(crate) struct KillOnCloseJob {
     handle: HANDLE,
 }
 
@@ -43,7 +43,7 @@ unsafe impl Send for KillOnCloseJob {}
 
 impl KillOnCloseJob {
     /// Configure containment before launching any helper; close a failed job immediately.
-    fn new(label: &str) -> Result<Self, String> {
+    pub(crate) fn new(label: &str) -> Result<Self, String> {
         // SAFETY: null security attributes and name request an unnamed job with
         // the caller's default security descriptor.
         let handle = unsafe { CreateJobObjectW(std::ptr::null(), std::ptr::null()) };
@@ -89,6 +89,38 @@ impl KillOnCloseJob {
             return Err(format!(
                 "Unable to contain {label} in its process job: {}",
                 io::Error::last_os_error()
+            ));
+        }
+        Ok(())
+    }
+
+    /// Adopt a process created by an API that exposes only its Windows PID.
+    pub(crate) fn assign_pid(&self, pid: u32, label: &str) -> Result<(), String> {
+        use windows_sys::Win32::System::Threading::{
+            OpenProcess, PROCESS_SET_QUOTA, PROCESS_TERMINATE,
+        };
+
+        // SAFETY: the PID came from the freshly spawned sidecar. The temporary
+        // process handle is closed on every path after OpenProcess succeeds.
+        let process = unsafe { OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, 0, pid) };
+        if process.is_null() {
+            return Err(format!(
+                "Unable to open {label} for process containment: {}",
+                io::Error::last_os_error()
+            ));
+        }
+        let assigned = unsafe { AssignProcessToJobObject(self.handle, process) };
+        let error = if assigned == 0 {
+            Some(io::Error::last_os_error())
+        } else {
+            None
+        };
+        unsafe {
+            CloseHandle(process);
+        }
+        if let Some(error) = error {
+            return Err(format!(
+                "Unable to contain {label} in its process job: {error}"
             ));
         }
         Ok(())
