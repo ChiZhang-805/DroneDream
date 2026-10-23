@@ -36,21 +36,21 @@ describe("PricingPage payment channels", () => {
           id: "free",
           name: "Free",
           monthly_price_cny_fen: 0,
-          included_ai_credits: 300_000,
+          included_ai_credits: 6_000_000,
           capability_set: "core-v1",
         },
         {
           id: "plus",
           name: "Plus",
           monthly_price_cny_fen: 3_900,
-          included_ai_credits: 3_000_000,
+          included_ai_credits: 60_000_000,
           capability_set: "core-v1",
         },
         {
           id: "pro",
           name: "Pro",
           monthly_price_cny_fen: 12_900,
-          included_ai_credits: 15_000_000,
+          included_ai_credits: 300_000_000,
           capability_set: "core-v1",
         },
       ],
@@ -60,7 +60,7 @@ describe("PricingPage payment channels", () => {
         id: "free",
         name: "Free",
         monthly_price_cny_fen: 0,
-        included_ai_credits: 300_000,
+        included_ai_credits: 6_000_000,
         capability_set: "core-v1",
       },
       period: {
@@ -70,7 +70,7 @@ describe("PricingPage payment channels", () => {
       usage: {
         reserved_ai_credits: 0,
         consumed_ai_credits: 0,
-        remaining_ai_credits: 300_000,
+        remaining_ai_credits: 6_000_000,
         request_count: 0,
       },
       recent_requests: [],
@@ -89,7 +89,7 @@ describe("PricingPage payment channels", () => {
       />,
     );
 
-    expect(await screen.findByText(/3,000,000 managed AI credits/i)).toBeVisible();
+    expect(await screen.findByText(/60,000,000 managed AI credits/i)).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Choose Plus" }));
 
     const card = screen.getByRole("button", { name: "Credit or debit card" });
@@ -115,7 +115,7 @@ describe("PricingPage payment channels", () => {
       />,
     );
 
-    await screen.findByText(/15,000,000 managed AI credits/i);
+    await screen.findByText(/300,000,000 managed AI credits/i);
 
     const advancedRows = screen.getAllByText("Advanced AURORA strategy previews");
     const routingRows = screen.getAllByText("Premium managed-model routing");
@@ -149,7 +149,7 @@ describe("PricingPage payment channels", () => {
       />,
     );
 
-    await screen.findByText(/3,000,000 managed AI credits/i);
+    await screen.findByText(/60,000,000 managed AI credits/i);
     fireEvent.click(screen.getByRole("tab", { name: "Business" }));
 
     const plus = document.querySelector<HTMLElement>('.pricing-card[data-plan="plus"]');
@@ -160,7 +160,7 @@ describe("PricingPage payment channels", () => {
     expect(plus?.textContent).not.toContain("¥39");
     expect(pro?.textContent).not.toContain("¥129");
     expect(screen.getAllByText("Shared DroneDream tuning workspace")).toHaveLength(3);
-    expect(screen.getByText("3,000,000 managed AI credits per user each month"))
+    expect(screen.getByText("60,000,000 managed AI credits per user every 7 days"))
       .toBeVisible();
   });
 
@@ -175,7 +175,7 @@ describe("PricingPage payment channels", () => {
       />,
     );
 
-    await screen.findByText(/3,000,000 managed AI credits/i);
+    await screen.findByText(/60,000,000 managed AI credits/i);
     fireEvent.click(screen.getByRole("tab", { name: "Business" }));
     fireEvent.click(screen.getByRole("button", { name: "Start free" }));
 
@@ -210,7 +210,7 @@ describe("PricingPage payment channels", () => {
         id: "pro",
         name: "Pro",
         monthly_price_cny_fen: 12_900,
-        included_ai_credits: 15_000_000,
+        included_ai_credits: 300_000_000,
         capability_set: "core-v1",
       },
       account: {
@@ -226,7 +226,7 @@ describe("PricingPage payment channels", () => {
       usage: {
         reserved_ai_credits: 0,
         consumed_ai_credits: 0,
-        remaining_ai_credits: 15_000_000,
+        remaining_ai_credits: 300_000_000,
         request_count: 0,
       },
       recent_requests: [],
@@ -277,7 +277,7 @@ describe("PricingPage payment channels", () => {
         id: "plus",
         name: "Plus",
         monthly_price_cny_fen: 1_900,
-        included_ai_credits: 3_000_000,
+        included_ai_credits: 60_000_000,
         capability_set: "core-v1",
       },
       account: {
@@ -293,7 +293,7 @@ describe("PricingPage payment channels", () => {
       usage: {
         reserved_ai_credits: 0,
         consumed_ai_credits: 0,
-        remaining_ai_credits: 3_000_000,
+        remaining_ai_credits: 60_000_000,
         request_count: 0,
       },
       recent_requests: [],
