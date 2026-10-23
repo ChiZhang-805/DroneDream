@@ -1097,6 +1097,10 @@ export function getAgentCoreRuntimeStatus(): Promise<AgentCoreRuntimeStatus> {
   return requestJson("/v1/runtime/status");
 }
 
+export function provisionAgentCoreRuntime(): Promise<AgentCoreRuntimeStatus> {
+  return requestJson("/v1/runtime/provision", { method: "POST" });
+}
+
 export function executeAgentCoreMission(
   threadId: string,
   payload: {

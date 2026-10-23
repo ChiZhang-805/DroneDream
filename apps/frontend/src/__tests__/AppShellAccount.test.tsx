@@ -164,6 +164,26 @@ describe("workspace account entry", () => {
     router.dispose();
   });
 
+  it("uses the AGENT navigation inside Universal Autonomy", () => {
+    window.localStorage.setItem("drone-dream:locale", "en");
+    window.localStorage.setItem("dronedream:universal-workspace:v2", "universal");
+    const { container, router } = renderWorkspace("/autonomy");
+
+    expect(Array.from(
+      container.querySelectorAll<HTMLAnchorElement>(".app-nav a"),
+      (link) => link.textContent?.trim(),
+    )).toEqual([
+      "Chatbot",
+      "Aircraft",
+      "Maps",
+      "Plug-ins",
+      "Live",
+      "Run History",
+    ]);
+
+    router.dispose();
+  });
+
   it("collapses mobile account, navigation, and settings into one disclosure", async () => {
     useMobileViewport();
     window.localStorage.setItem("drone-dream:locale", "en");

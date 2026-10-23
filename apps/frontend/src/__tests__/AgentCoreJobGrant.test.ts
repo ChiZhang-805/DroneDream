@@ -38,6 +38,13 @@ beforeEach(() => {
   vi.spyOn(core, "createAgentCoreThread").mockResolvedValue(thread);
   vi.spyOn(core, "patchAgentCoreThread").mockResolvedValue(thread);
   vi.spyOn(core, "getAgentCoreThread").mockResolvedValue(thread);
+  vi.spyOn(core, "getAgentCoreRuntimeStatus").mockResolvedValue({
+    distribution: "DroneDreamRuntime",
+    runtime_available: true,
+    resources_ready: true,
+    provisioned: true,
+    issue: null,
+  });
   vi.spyOn(cloud, "issueManagedModelGrant").mockResolvedValue({
     grant: "ddg_test", scope: "job", max_calls: 256, gateway_base_url: "https://project.supabase.co/functions/v1/model-gateway",
   } as cloud.ManagedModelGrant);
@@ -64,5 +71,29 @@ it("confirmed execution gets a separate job grant, while a changed plan gets non
   await expect(executeBoundAgentCoreMission({ ...input, planRevisionId: `plan-${"b".repeat(32)}` })).rejects.toThrow("PLAN_CHANGED");
   expect(cloud.issueManagedModelGrant).not.toHaveBeenCalled();
   await expect(executeBoundAgentCoreMission({ ...input, planRevisionId: planId })).rejects.toThrow("STOP_AT_BACKEND_BOUNDARY");
+  expect(cloud.issueManagedModelGrant).toHaveBeenCalledExactlyOnceWith("job", threadId, "kimi", "kimi-k2.6");
+});
+
+it("provisions an installed runtime before confirmed execution", async () => {
+  localStorage.setItem("dronedream:agent-core-thread:v1:account-test:autonomy:conversation-test", threadId);
+  vi.mocked(core.getAgentCoreRuntimeStatus).mockResolvedValueOnce({
+    distribution: "DroneDreamRuntime",
+    runtime_available: true,
+    resources_ready: true,
+    provisioned: false,
+    issue: "RUNTIME_PROVISION_REQUIRED",
+  });
+  const provision = vi.spyOn(core, "provisionAgentCoreRuntime").mockResolvedValue({
+    distribution: "DroneDreamRuntime",
+    runtime_available: true,
+    resources_ready: true,
+    provisioned: true,
+    issue: null,
+  });
+  vi.spyOn(core, "executeAgentCoreMission").mockRejectedValue(new Error("STOP_AT_BACKEND_BOUNDARY"));
+
+  await expect(executeBoundAgentCoreMission({ ...input, planRevisionId: planId }))
+    .rejects.toThrow("STOP_AT_BACKEND_BOUNDARY");
+  expect(provision).toHaveBeenCalledOnce();
   expect(cloud.issueManagedModelGrant).toHaveBeenCalledExactlyOnceWith("job", threadId, "kimi", "kimi-k2.6");
 });

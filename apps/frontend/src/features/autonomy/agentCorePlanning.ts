@@ -9,9 +9,11 @@ import {
   getAgentCoreAssetQualificationEvidence,
   getAgentCoreThread,
   getAgentCoreBootstrap,
+  getAgentCoreRuntimeStatus,
   issueAgentCoreCustomModelGrant,
   patchAgentCoreThread,
   prepareAgentCoreMission,
+  provisionAgentCoreRuntime,
   requestAgentCoreAssetInterpretation,
   submitAgentCoreRuntimeMessage,
   uploadAgentCoreAttachment,
@@ -573,6 +575,8 @@ export async function executeBoundAgentCoreMission(input: AgentCoreExecutionInpu
   if (currentPlan?.metadata?.plan_revision_id !== input.planRevisionId) {
     throw new Error("AGENT_CORE_PLAN_CHANGED_REVIEW_AGAIN");
   }
+  const runtime = await getAgentCoreRuntimeStatus();
+  if (!runtime.provisioned) await provisionAgentCoreRuntime();
   const grant = input.accessMode === "platform"
     ? await issueManagedModelGrant(
         // Execution may invoke review and replanning after explicit confirmation.

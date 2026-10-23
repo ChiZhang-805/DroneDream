@@ -1350,7 +1350,7 @@ export function AutonomyPlatform() {
   ];
   const currentSectionPath = normalizedAutonomyPath(location.pathname);
   const currentSection = sections.find((section) => section.to === currentSectionPath)?.id ?? "overview";
-  const usesSidebarNavigation = edition === "autonomy";
+  const usesSidebarNavigation = edition === "autonomy" || edition === "universal";
   const healthAlert = agentCoreHealth === "unavailable" ? (
     <div className="agent-core-health-alert" role="alert">
       <ShieldCheck aria-hidden="true" />
@@ -2503,7 +2503,6 @@ async function persistLiveRecording(blob: Blob, fileName: string) {
 export function AutonomyLive() {
   const { chinese, workspace } = useAutonomyWorkspace();
   const auth = useOptionalAuth();
-  const edition = useEditionTheme().id;
   const { settings: modelAccess } = useModelAccess();
   const planningModel: AutonomyPlanningModel = modelAccess.accessMode === "platform"
     ? {
@@ -2520,10 +2519,10 @@ export function AutonomyLive() {
       };
   const conversationId = workspace.mission.conversationId;
   const binding = useMemo(() => ({
-    edition,
+    edition: "autonomy" as const,
     accountId: auth?.account?.id ?? null,
     conversationId: conversationId || "",
-  }), [auth?.account?.id, conversationId, edition]);
+  }), [auth?.account?.id, conversationId]);
   const [threadId, setThreadId] = useState("");
   const [coreSources, setCoreSources] = useState<AgentCoreLiveSource[]>([]);
   const [deviceSources, setDeviceSources] = useState<LiveSource[]>([]);
