@@ -2271,11 +2271,13 @@ function RepositoryDetailsDialog({
 }
 
 export function AgentCoreLiveMission({
+  edition,
   chinese,
   workspace,
   planningModel,
   accountId,
 }: {
+  edition: BrandEditionId;
   chinese: boolean;
   workspace: AutonomyWorkspaceState;
   planningModel: AutonomyPlanningModel;
@@ -2290,10 +2292,10 @@ export function AgentCoreLiveMission({
   const [error, setError] = useState<string | null>(null);
   const conversationId = workspace.mission.conversationId;
   const binding = useMemo(() => ({
-    edition: "autonomy" as const,
+    edition,
     accountId,
     conversationId: conversationId || "",
-  }), [accountId, conversationId]);
+  }), [accountId, conversationId, edition]);
 
   useEffect(() => {
     if (!conversationId) return undefined;
@@ -2418,7 +2420,7 @@ export function AgentCoreLiveMission({
       {thread?.state === "awaiting_confirmation" ? (
         <div className="agent-core-live-confirmation">
           <p>{chinese ? "确认后才会启动真实的 Gazebo 与 PX4 SITL；规划合同、地图和无人机哈希在启动前会再次校验。" : "Gazebo and PX4 SITL start only after confirmation. The mission contract and exact asset hashes are revalidated before launch."}</p>
-          <button className="btn btn-primary" type="button" disabled={working || runtimeReady !== true} onClick={() => void start()}><Airplay aria-hidden="true" />{working ? (chinese ? "正在启动" : "Starting") : (chinese ? "确认并开始仿真" : "Confirm and start simulation")}</button>
+          <button className="btn btn-primary" type="button" disabled={working} onClick={() => void start()}><Airplay aria-hidden="true" />{working ? (chinese ? "正在启动" : "Starting") : (chinese ? "确认并开始仿真" : "Confirm and start simulation")}</button>
         </div>
       ) : null}
       {thread?.state === "executing" ? (
@@ -2501,7 +2503,7 @@ async function persistLiveRecording(blob: Blob, fileName: string) {
 }
 
 export function AutonomyLive() {
-  const { chinese, workspace } = useAutonomyWorkspace();
+  const { edition, chinese, workspace } = useAutonomyWorkspace();
   const auth = useOptionalAuth();
   const { settings: modelAccess } = useModelAccess();
   const planningModel: AutonomyPlanningModel = modelAccess.accessMode === "platform"
@@ -2519,10 +2521,10 @@ export function AutonomyLive() {
       };
   const conversationId = workspace.mission.conversationId;
   const binding = useMemo(() => ({
-    edition: "autonomy" as const,
+    edition,
     accountId: auth?.account?.id ?? null,
     conversationId: conversationId || "",
-  }), [auth?.account?.id, conversationId]);
+  }), [auth?.account?.id, conversationId, edition]);
   const [threadId, setThreadId] = useState("");
   const [coreSources, setCoreSources] = useState<AgentCoreLiveSource[]>([]);
   const [deviceSources, setDeviceSources] = useState<LiveSource[]>([]);
@@ -2783,6 +2785,7 @@ export function AutonomyLive() {
   return (
     <>
       <AgentCoreLiveMission
+        edition={edition}
         chinese={chinese}
         workspace={workspace}
         planningModel={planningModel}
