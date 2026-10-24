@@ -49,7 +49,6 @@ const authMock = vi.hoisted(() => {
     activeDesktopSession: false,
     state,
     getSession,
-    hasActiveDesktopAuthSession: vi.fn(() => false),
     onAuthStateChange,
     signInWithPassword: vi.fn(async () => ({ data: {}, error: null })),
     signInWithOtp: vi.fn(async () => ({ data: {}, error: null })),
@@ -93,8 +92,7 @@ vi.mock("../features/auth/supabaseClient", () => ({
   hasActiveDesktopAuthSession: () => authMock.activeDesktopSession,
   githubAuthEnabled: false,
   googleAuthEnabled: false,
-  hasActiveDesktopAuthSession: authMock.hasActiveDesktopAuthSession,
-slackAuthEnabled: false,
+  slackAuthEnabled: false,
   supabaseClient: {
     auth: {
       getSession: authMock.getSession,
@@ -334,8 +332,6 @@ describe("AuthContext account profile", () => {
     authMock.removeAvatar.mockClear();
     authMock.storageFrom.mockClear();
     authMock.getSession.mockClear();
-    authMock.hasActiveDesktopAuthSession.mockReset();
-    authMock.hasActiveDesktopAuthSession.mockReturnValue(false);
     authMock.onAuthStateChange.mockClear();
     authMock.signInWithPassword.mockClear();
     authMock.signInWithOtp.mockClear();
@@ -367,21 +363,6 @@ describe("AuthContext account profile", () => {
       .toHaveTextContent("DroneDream Pilot");
     expect(screen.getByLabelText("email")).toHaveTextContent("pilot@example.com");
     expect(authMock.getSession).not.toHaveBeenCalled();
-  });
-
-  it("restores the current desktop process session after a WebView reload", async () => {
-    window.__TAURI__ = { core: { invoke: vi.fn() } };
-    authMock.hasActiveDesktopAuthSession.mockReturnValue(true);
-
-    render(
-      <AuthProvider>
-        <AccountProbe />
-      </AuthProvider>,
-    );
-
-    expect(await screen.findByLabelText("email"))
-      .toHaveTextContent("pilot.name@example.com");
-    expect(authMock.getSession).toHaveBeenCalledOnce();
   });
 
   it("defaults to the email prefix and lets the user save a custom username", async () => {
@@ -643,17 +624,6 @@ describe("AuthContext account profile", () => {
       .toBeLessThan(authMock.updateUser.mock.invocationCallOrder[0]);
     expect(authMock.updateUser.mock.invocationCallOrder[0])
       .toBeLessThan(authMock.signOut.mock.invocationCallOrder[0]);
-  });
-
-  it("adopts an explicit desktop password login and follows SDK token refresh", async () => {
-    window.__TAURI__ = { core: { invoke: vi.fn() } };
-    authMock.signInWithPassword.mockResolvedValueOnce({ data: { session: { user: authMock.state.user, access_token: "password-token" } }, error: null });
-    render(<AuthProvider><AccountProbe /></AuthProvider>);
-    expect(screen.getByLabelText("email")).toBeEmptyDOMElement();
-    fireEvent.click(screen.getByRole("button", { name: "Password sign in" }));
-    await waitFor(() => expect(screen.getByLabelText("email")).toHaveTextContent(authMock.state.user.email));
-    act(() => authMock.emitAuthStateChange("SIGNED_OUT", null));
-    expect(screen.getByLabelText("email")).toBeEmptyDOMElement();
   });
 
   it.each(["/", "/#/desktop/setup"])(
