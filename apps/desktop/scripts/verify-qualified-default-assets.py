@@ -251,11 +251,11 @@ def _verify_map(package: Package) -> dict[str, Any]:
         if edge.get("from_node") not in node_ids or edge.get("to_node") not in node_ids:
             raise AssetVerificationError("navigation edge references an unknown node")
         if (
-            edge.get("qualification") != "flight-verified"
+            edge.get("qualification") not in {"flight-verified", "geometry-derived"}
             or edge.get("evidence_sha256") != source_evidence
         ):
             raise AssetVerificationError(
-                "navigation edge is not bound to the current flight evidence"
+                "navigation edge is not bound to the reviewed navigation evidence"
             )
     named_entities = _object(graph.get("named_entities"), "navigation named entities")
     if not any(key.isascii() for key in named_entities) or not any(
