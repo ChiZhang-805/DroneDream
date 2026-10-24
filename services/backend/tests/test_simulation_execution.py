@@ -273,7 +273,7 @@ def test_simulation_execution_is_model_bound_owner_scoped_and_idempotent(
     assert len(processes) == 1
     assert processes[0].argv[1].endswith("school_map_px4_mission.py")
     assert "--run-dir" in processes[0].argv
-    assert processes[0].argv[processes[0].argv.index("--velocity-m-s") + 1] == "1.2"
+    assert processes[0].argv[processes[0].argv.index("--velocity-m-s") + 1] == "6"
     assert processes[0].argv[processes[0].argv.index("--acceleration-m-s2") + 1] == "0.8"
     assert _mission().natural_language not in processes[0].argv
     with pytest.raises(AutonomyRuntimeError) as hidden:
