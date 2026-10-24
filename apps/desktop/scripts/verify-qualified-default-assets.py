@@ -233,11 +233,18 @@ def _verify_map(package: Package) -> dict[str, Any]:
     if len(node_ids) != len(nodes) or not edges:
         raise AssetVerificationError("navigation graph must contain unique nodes and edges")
     evidence = package.qualification
+    runtime_artifacts = _object(
+        _object(evidence.get("runtime_evidence"), "runtime evidence").get("artifacts"),
+        "runtime evidence artifacts",
+    )
+    # Current map packages bind road/open-area graph edges to the reviewed map
+    # survey. Older packages used the qualification mission digest for the same
+    # check, so retain that read-only fallback without treating a mission route
+    # as a reusable navigation route.
     source_evidence = _text(
-        _object(evidence.get("runtime_evidence"), "runtime evidence")
-        .get("artifacts", {})
-        .get("source_mission_evidence_sha256"),
-        "source mission evidence SHA-256",
+        runtime_artifacts.get("navigation_evidence_sha256")
+        or runtime_artifacts.get("source_mission_evidence_sha256"),
+        "navigation evidence SHA-256",
     )
     for raw_edge in edges:
         edge = _object(raw_edge, "navigation edge")
