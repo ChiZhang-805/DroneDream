@@ -164,7 +164,7 @@ describe("workspace account entry", () => {
     router.dispose();
   });
 
-  it("uses the AGENT navigation inside Universal Autonomy", () => {
+  it("keeps the Universal navigation fixed inside Autonomy", () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     window.localStorage.setItem("dronedream:universal-workspace:v2", "universal");
     const { container, router } = renderWorkspace("/autonomy");
@@ -174,11 +174,10 @@ describe("workspace account entry", () => {
       (link) => link.textContent?.trim(),
     )).toEqual([
       "Chatbot",
-      "Aircraft",
-      "Maps",
-      "Plug-ins",
-      "Live",
+      "Autonomy",
+      "Dashboard",
       "Run History",
+      "Scenarios",
     ]);
 
     router.dispose();

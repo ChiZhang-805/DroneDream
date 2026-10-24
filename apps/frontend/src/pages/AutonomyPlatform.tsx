@@ -175,7 +175,7 @@ const SECTION_ICONS = {
 
 const SECTION_COPY = {
   en: {
-    overview: "Overview",
+    overview: "Chatbot",
     aircraft: "Aircraft",
     maps: "Maps",
     plugins: "Plugins",
@@ -183,7 +183,7 @@ const SECTION_COPY = {
     title: "Autonomy",
   },
   zh: {
-    overview: "总览",
+    overview: "聊天",
     aircraft: "无人机",
     maps: "地图",
     plugins: "插件",
@@ -1364,7 +1364,10 @@ export function AutonomyPlatform() {
   ];
   const currentSectionPath = normalizedAutonomyPath(location.pathname);
   const currentSection = sections.find((section) => section.to === currentSectionPath)?.id ?? "overview";
-  const usesSidebarNavigation = edition === "autonomy" || edition === "universal";
+  // The dedicated AGENT edition owns these destinations in its sidebar. In
+  // Universal, the product sidebar stays fixed while Autonomy exposes its own
+  // sections inside the workspace.
+  const usesSidebarNavigation = edition === "autonomy";
   const healthAlert = agentCoreHealth === "unavailable" ? (
     <div className="agent-core-health-alert" role="alert">
       <ShieldCheck aria-hidden="true" />

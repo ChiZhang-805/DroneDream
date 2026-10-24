@@ -3966,9 +3966,6 @@ function AppShellContent() {
     setMobileMenuOpen(false);
     navigate(MODE_LANDING_PATH[mode]);
   }, [navigate]);
-  const universalAutonomyRoute = !EDITION_IS_FIXED
-    && universalMode === "universal"
-    && (location.pathname === "/autonomy" || location.pathname.startsWith("/autonomy/"));
   const navigationItems = EDITION_IS_FIXED
     ? BUILD_EDITION === "sim"
       ? SIM_NAV_ITEMS
@@ -3977,9 +3974,7 @@ function AppShellContent() {
         : BUILD_EDITION === "field"
           ? FIELD_NAV_ITEMS
           : AUTONOMY_NAV_ITEMS
-    : universalAutonomyRoute
-      ? AUTONOMY_NAV_ITEMS
-      : MODE_NAV_ITEMS[universalMode];
+    : MODE_NAV_ITEMS[universalMode];
   const sidebarUpdateLabel = sidebarUpdateBusy
     ? `${t("updater.sidebarProgress")} ${sidebarUpdateProgress}%`
     : updater.error
