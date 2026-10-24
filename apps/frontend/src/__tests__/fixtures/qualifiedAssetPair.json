@@ -96,7 +96,7 @@
           "y": 0,
           "z": 0.228
         },
-        "max_speed_mps": 1.2,
+        "max_speed_mps": 6.0,
         "max_acceleration_mps2": 0.8,
         "qualified_range_m": 413.2125080792488,
         "reserve_battery_percent": 30,
