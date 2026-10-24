@@ -1236,8 +1236,22 @@ def test_noncanonical_assets_or_model_targets_never_start_the_fixed_runner(
     wrong_target["asset_context"]["planner_binding"]["task_graph"]["nodes"][1]["target"] = (
         "cafeteria-counter"
     )
-    with pytest.raises(ValueError, match="canonical route targets"):
-        AutonomyCompileRequest.model_validate(wrong_target)
+    # Generic planning accepts any model-resolved semantic target. The legacy
+    # fixed qualification runner remains scoped to its historical route and
+    # must reject that target only when someone tries to launch this adapter.
+    target_session = _create_session(
+        sessions,
+        "owner-a",
+        RuntimeSessionCreateRequest(
+            mission=AutonomyCompileRequest.model_validate(wrong_target),
+            client_request_id="runtime-request-generic-target",
+        ),
+    )
+    with pytest.raises(AutonomyRuntimeError, match="canonical office-to-takeout roundtrip"):
+        registry.start(
+            "owner-a",
+            _start_request(target_session.session_id, target_session.contract_id),
+        )
     assert processes == []
 
 

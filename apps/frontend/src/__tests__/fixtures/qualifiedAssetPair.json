@@ -2,25 +2,25 @@
   "evidence": {
     "schema_version": "dronedream.asset-qualification-evidence.v1",
     "job_id": "asset-qualification-job-008785030e3b69b88338deda",
-    "qualification_id": "asset-qualification-9968cd42eaf394ff55ce5792",
+    "qualification_id": "asset-qualification-582554632b54abc53723f55b",
     "map_asset_id": "dronedream.school-map.v1",
-    "map_content_sha256": "bc88b79228ec7ae4c974957b6b692d7941607885c5489fc1d9f5f925dba10f2d",
+    "map_content_sha256": "f929a4bd7e5151065f417cf659e7c1f59e7bf92c0af7856c0e0628b52b3d676c",
     "vehicle_asset_id": "dronedream.my-drone.v1",
-    "vehicle_content_sha256": "7be3c22e426acf7f0f794a6d8a8de6fb839544fd2362e2ede96b68e98f6419fd",
+    "vehicle_content_sha256": "3394638815e07cc49c9203ddd787694cb9aab968416c4c4e9a284150a9dc4eb5",
     "evidence_sha256": "1b63265a27d66d4d3dae0d918349d2b08816383e241f1f9a35df4992029713fa",
     "receipt": {
       "schema_version": "dronedream.asset-pair-qualification-receipt.v1",
-      "qualification_id": "asset-qualification-9968cd42eaf394ff55ce5792",
+      "qualification_id": "asset-qualification-582554632b54abc53723f55b",
       "status": "verified",
       "map_asset_id": "dronedream.school-map.v1",
-      "map_content_sha256": "f5e6e1e2d7997c2bac1fd12274774ccccf412903eb0e4a4d58a85792341cacde",
+      "map_content_sha256": "8aab33879ca7a4209b5a9efc3941f8478ea5d3015ec736f0c5477e3a0b27823c",
       "vehicle_asset_id": "dronedream.my-drone.v1",
-      "vehicle_content_sha256": "cc576b3000346dfeb7b8cf91a6e8353db57c3b9c9460d19a790d07513ad8c4e9",
+      "vehicle_content_sha256": "304ec691f4c9a24752dfcfb3ae74681f5bb7692e4e12383d006fea493a1df5fc",
       "environment_versions": {
         "gazebo_sim": "8.14.0",
         "px4_commit": "6ea3539157ca358c70a515878b77077af7d4611d",
         "ros_distribution": "jazzy",
-        "runtime_manifest_sha256": "7A5EDA6F65A26E8616D379C5F7E695F3BF10F3E060FB9C180C0E8FEA115E977F"
+        "runtime_manifest_sha256": "2954ab196ccdf92edc5721a79c5ad624056b2e9039c0d534c048a298a7237238"
       },
       "runtime_evidence_sha256": "41e5b9ef097ec4b6dcbf0a42b4e4f63d56c541a3b28423e98c87f7ac63ba7e67",
       "qualified_at": "2026-09-06T13:06:17.942112Z",
@@ -45,26 +45,26 @@
       "schema_version": "dronedream.asset-pair-runtime-contracts.v1",
       "map": {
         "asset_id": "dronedream.school-map.v1",
-        "content_sha256": "bc88b79228ec7ae4c974957b6b692d7941607885c5489fc1d9f5f925dba10f2d",
+        "content_sha256": "f929a4bd7e5151065f417cf659e7c1f59e7bf92c0af7856c0e0628b52b3d676c",
         "coordinate_frame": "ENU",
-        "node_count": 59,
-        "edge_count": 65,
-        "named_entity_count": 8,
+        "node_count": 5,
+        "edge_count": 4,
+        "named_entity_count": 6,
         "navigation_bounds_m": {
           "minimum": {
-            "x": -55.6,
-            "y": -43,
-            "z": 1.0499999999999998
+            "x": -41,
+            "y": -83,
+            "z": 1.5
           },
           "maximum": {
-            "x": 52,
-            "y": 35.4,
-            "z": 8.27
+            "x": 43,
+            "y": 55,
+            "z": 35
           },
           "span": {
-            "x": 107.6,
-            "y": 78.4,
-            "z": 7.22
+            "x": 84,
+            "y": 138,
+            "z": 33.5
           }
         },
         "semantic_layers": [
@@ -109,7 +109,7 @@
           "odometry",
           "oakd-lite-depth"
         ],
-        "content_sha256": "7be3c22e426acf7f0f794a6d8a8de6fb839544fd2362e2ede96b68e98f6419fd",
+        "content_sha256": "3394638815e07cc49c9203ddd787694cb9aab968416c4c4e9a284150a9dc4eb5",
         "vehicle_class": "multirotor",
         "simulation_targets": [
           {
@@ -129,15 +129,15 @@
     "job_id": "asset-qualification-job-008785030e3b69b88338deda",
     "owner_id": "bundled-release",
     "map_asset_id": "dronedream.school-map.v1",
-    "map_content_sha256": "f5e6e1e2d7997c2bac1fd12274774ccccf412903eb0e4a4d58a85792341cacde",
+    "map_content_sha256": "8aab33879ca7a4209b5a9efc3941f8478ea5d3015ec736f0c5477e3a0b27823c",
     "vehicle_asset_id": "dronedream.my-drone.v1",
-    "vehicle_content_sha256": "cc576b3000346dfeb7b8cf91a6e8353db57c3b9c9460d19a790d07513ad8c4e9",
+    "vehicle_content_sha256": "304ec691f4c9a24752dfcfb3ae74681f5bb7692e4e12383d006fea493a1df5fc",
     "state": "qualified",
     "progress_percent": 100,
     "revision": 1,
-    "qualification_id": "asset-qualification-9968cd42eaf394ff55ce5792",
-    "result_map_content_sha256": "bc88b79228ec7ae4c974957b6b692d7941607885c5489fc1d9f5f925dba10f2d",
-    "result_vehicle_content_sha256": "7be3c22e426acf7f0f794a6d8a8de6fb839544fd2362e2ede96b68e98f6419fd",
+    "qualification_id": "asset-qualification-582554632b54abc53723f55b",
+    "result_map_content_sha256": "f929a4bd7e5151065f417cf659e7c1f59e7bf92c0af7856c0e0628b52b3d676c",
+    "result_vehicle_content_sha256": "3394638815e07cc49c9203ddd787694cb9aab968416c4c4e9a284150a9dc4eb5",
     "issue_codes": [],
     "cancel_requested": false,
     "created_at": "2026-09-06T13:06:17.942112Z",
@@ -146,7 +146,7 @@
   "versions": [
     {
       "asset_id": "dronedream.my-drone.v1",
-      "content_sha256": "7be3c22e426acf7f0f794a6d8a8de6fb839544fd2362e2ede96b68e98f6419fd",
+      "content_sha256": "3394638815e07cc49c9203ddd787694cb9aab968416c4c4e9a284150a9dc4eb5",
       "kind": "vehicle",
       "maturity": "qualified",
       "imported_at": "2026-09-16T16:26:38.637343+08:00",
@@ -160,12 +160,12 @@
     },
     {
       "asset_id": "dronedream.school-map.v1",
-      "content_sha256": "bc88b79228ec7ae4c974957b6b692d7941607885c5489fc1d9f5f925dba10f2d",
+      "content_sha256": "f929a4bd7e5151065f417cf659e7c1f59e7bf92c0af7856c0e0628b52b3d676c",
       "kind": "map",
       "maturity": "qualified",
       "imported_at": "2026-09-16T16:26:38.634809+08:00",
       "asset_ir": {
-        "name": "School Map",
+        "name": "Kumpula Campus",
         "source": {
           "application": "DroneDream",
           "source_format": "ddpkg"

@@ -1,0 +1,504 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <model name="kumpula_campus">
+    <static>true</static>
+    <link name="ground">
+      <collision name="ground-collision">
+        <geometry>
+          <box>
+            <size>500 500 0.2</size>
+          </box>
+        </geometry>
+        <pose>0 0 -0.1 0 0 0</pose>
+      </collision>
+      <visual name="orthophoto-ground">
+        <geometry>
+          <mesh>
+            <uri>meshes/kumpula-ground.obj</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <pbr>
+            <metal>
+              <albedo_map>materials/textures/kumpula-orthophoto.jpg</albedo_map>
+              <roughness>1.0</roughness>
+            </metal>
+          </pbr>
+        </material>
+      </visual>
+    </link>
+    <link name="building-visuals">
+      <visual name="registered-buildings">
+        <geometry>
+          <mesh>
+            <uri>meshes/kumpula-buildings.obj</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+    <link name="building-collision-000">
+      <collision name="Rakennukset_alue_rekisteritiedot-28059-0-collision">
+        <pose>-85.3472 238.4072 3.4000 0 0 -1.59604289</pose>
+        <geometry>
+          <box>
+            <size>5.4435 4.1712 6.8000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-001">
+      <collision name="Rakennukset_alue_rekisteritiedot-29466-0-collision">
+        <pose>-34.7886 -190.7966 3.4000 0 0 0.45817560</pose>
+        <geometry>
+          <box>
+            <size>6.5821 3.7790 6.8000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-002">
+      <collision name="Rakennukset_alue_rekisteritiedot-33188-0-collision">
+        <pose>-98.3652 -100.2685 8.5000 0 0 -0.80073989</pose>
+        <geometry>
+          <box>
+            <size>93.7887 77.5894 17.0000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-003">
+      <collision name="Rakennukset_alue_rekisteritiedot-33270-0-collision">
+        <pose>80.3346 88.4520 6.8000 0 0 1.97312029</pose>
+        <geometry>
+          <box>
+            <size>152.6402 86.9053 13.6000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-004">
+      <collision name="Rakennukset_alue_rekisteritiedot-33857-0-collision">
+        <pose>-50.5151 101.2985 3.4000 0 0 0.76935822</pose>
+        <geometry>
+          <box>
+            <size>52.5781 35.3534 6.8000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-005">
+      <collision name="Rakennukset_alue_rekisteritiedot-33940-0-collision">
+        <pose>-104.2268 59.3582 6.8000 0 0 0.77005671</pose>
+        <geometry>
+          <box>
+            <size>53.4845 41.7347 13.6000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-006">
+      <collision name="Rakennukset_alue_rekisteritiedot-34277-0-collision">
+        <pose>213.4080 -243.9551 10.2000 0 0 3.14159265</pose>
+        <geometry>
+          <box>
+            <size>26.3651 12.0897 20.4000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-007">
+      <collision name="Rakennukset_alue_rekisteritiedot-35321-0-collision">
+        <pose>129.4699 147.2622 8.5000 0 0 2.34084690</pose>
+        <geometry>
+          <box>
+            <size>61.9001 16.9702 17.0000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-008">
+      <collision name="Rakennukset_alue_rekisteritiedot-35635-0-collision">
+        <pose>56.4040 212.8143 8.5000 0 0 -2.37157545</pose>
+        <geometry>
+          <box>
+            <size>49.0186 36.8703 17.0000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-009">
+      <collision name="Rakennukset_alue_rekisteritiedot-36104-0-collision">
+        <pose>1.9998 166.1791 10.2000 0 0 -0.79924749</pose>
+        <geometry>
+          <box>
+            <size>45.6114 39.0870 20.4000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-010">
+      <collision name="Rakennukset_alue_rekisteritiedot-36723-0-collision">
+        <pose>-153.2714 13.9420 6.8000 0 0 2.34083658</pose>
+        <geometry>
+          <box>
+            <size>44.8146 26.2495 13.6000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-011">
+      <collision name="Rakennukset_alue_rekisteritiedot-36723-1-collision">
+        <pose>-175.4591 -5.7897 6.8000 0 0 -0.75003956</pose>
+        <geometry>
+          <box>
+            <size>47.5133 24.8430 13.6000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-012">
+      <collision name="Rakennukset_alue_rekisteritiedot-38289-0-collision">
+        <pose>33.1128 183.9222 5.1000 0 0 -0.80075770</pose>
+        <geometry>
+          <box>
+            <size>34.4005 17.8000 10.2000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-013">
+      <collision name="Rakennukset_alue_rekisteritiedot-39082-0-collision">
+        <pose>74.9220 249.3343 8.5000 0 0 0.76837939</pose>
+        <geometry>
+          <box>
+            <size>12.4726 10.2035 17.0000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-014">
+      <collision name="Rakennukset_alue_rekisteritiedot-39832-1-collision">
+        <pose>-182.9387 248.6706 3.4000 0 0 -0.79419173</pose>
+        <geometry>
+          <box>
+            <size>13.8379 10.2897 6.8000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-015">
+      <collision name="Rakennukset_alue_rekisteritiedot-42870-0-collision">
+        <pose>210.1619 209.4061 6.8000 0 0 2.34088562</pose>
+        <geometry>
+          <box>
+            <size>31.7009 20.8447 13.6000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-016">
+      <collision name="Rakennukset_alue_rekisteritiedot-42937-1-collision">
+        <pose>165.5667 247.3010 6.8000 0 0 0.00000000</pose>
+        <geometry>
+          <box>
+            <size>13.1168 5.3979 13.6000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-017">
+      <collision name="Rakennukset_alue_rekisteritiedot-43058-0-collision">
+        <pose>209.5886 174.2189 6.8000 0 0 0.77164948</pose>
+        <geometry>
+          <box>
+            <size>31.7315 20.8729 13.6000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-018">
+      <collision name="Rakennukset_alue_rekisteritiedot-43110-0-collision">
+        <pose>185.7369 234.5672 6.8000 0 0 2.33841689</pose>
+        <geometry>
+          <box>
+            <size>34.4366 20.7997 13.6000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-019">
+      <collision name="Rakennukset_alue_rekisteritiedot-45341-0-collision">
+        <pose>124.8316 225.1153 6.8000 0 0 -2.37155614</pose>
+        <geometry>
+          <box>
+            <size>31.7085 10.1726 13.6000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-020">
+      <collision name="Rakennukset_alue_rekisteritiedot-45669-0-collision">
+        <pose>121.2849 247.6629 6.8000 0 0 0.00000000</pose>
+        <geometry>
+          <box>
+            <size>12.6777 4.6741 13.6000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-021">
+      <collision name="Rakennukset_alue_rekisteritiedot-45774-0-collision">
+        <pose>125.6243 198.6777 5.1000 0 0 -0.79974040</pose>
+        <geometry>
+          <box>
+            <size>28.9896 10.1426 10.2000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-022">
+      <collision name="Rakennukset_alue_rekisteritiedot-45881-0-collision">
+        <pose>174.4076 173.9894 5.1000 0 0 0.77004399</pose>
+        <geometry>
+          <box>
+            <size>31.7017 10.1138 10.2000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-023">
+      <collision name="Rakennukset_alue_rekisteritiedot-45907-0-collision">
+        <pose>147.9707 175.6502 5.1000 0 0 -0.80099113</pose>
+        <geometry>
+          <box>
+            <size>28.9474 10.1430 10.2000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-024">
+      <collision name="Rakennukset_alue_rekisteritiedot-48969-0-collision">
+        <pose>-247.8749 152.3084 3.4000 0 0 -2.37155648</pose>
+        <geometry>
+          <box>
+            <size>15.7461 12.1286 6.8000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-025">
+      <collision name="Rakennukset_alue_rekisteritiedot-49032-0-collision">
+        <pose>-217.5052 181.3024 3.4000 0 0 -2.38144067</pose>
+        <geometry>
+          <box>
+            <size>15.8907 12.1089 6.8000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-026">
+      <collision name="Rakennukset_alue_rekisteritiedot-49129-0-collision">
+        <pose>240.9346 232.4546 3.4000 0 0 -1.79204746</pose>
+        <geometry>
+          <box>
+            <size>22.5747 9.0218 6.8000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-027">
+      <collision name="Rakennukset_alue_rekisteritiedot-50176-0-collision">
+        <pose>-236.6472 163.1058 3.4000 0 0 0.76160615</pose>
+        <geometry>
+          <box>
+            <size>15.5106 12.1280 6.8000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-028">
+      <collision name="Rakennukset_alue_rekisteritiedot-50834-0-collision">
+        <pose>-206.2861 192.0303 3.4000 0 0 -2.37561446</pose>
+        <geometry>
+          <box>
+            <size>15.3263 12.1094 6.8000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-029">
+      <collision name="Rakennukset_alue_rekisteritiedot-51413-0-collision">
+        <pose>-168.0091 229.1784 3.4000 0 0 0.76011758</pose>
+        <geometry>
+          <box>
+            <size>16.1479 10.9214 6.8000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-030">
+      <collision name="Rakennukset_alue_rekisteritiedot-61548-0-collision">
+        <pose>-220.2472 239.5705 3.4000 0 0 2.33019233</pose>
+        <geometry>
+          <box>
+            <size>11.8281 8.8614 6.8000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-031">
+      <collision name="Rakennukset_alue_rekisteritiedot-61860-0-collision">
+        <pose>-185.2869 213.1469 3.4000 0 0 -0.80745197</pose>
+        <geometry>
+          <box>
+            <size>10.3821 10.0113 6.8000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-032">
+      <collision name="Rakennukset_alue_rekisteritiedot-68417-0-collision">
+        <pose>-247.7157 212.3480 3.4000 0 0 1.57079633</pose>
+        <geometry>
+          <box>
+            <size>8.6997 4.5686 6.8000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-033">
+      <collision name="Rakennukset_alue_rekisteritiedot-68454-0-collision">
+        <pose>-235.6941 226.4219 3.4000 0 0 0.77140742</pose>
+        <geometry>
+          <box>
+            <size>10.2083 10.0911 6.8000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-034">
+      <collision name="Rakennukset_alue_rekisteritiedot-72987-0-collision">
+        <pose>202.2595 103.0223 11.9000 0 0 0.67928222</pose>
+        <geometry>
+          <box>
+            <size>114.2575 49.3955 23.8000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-035">
+      <collision name="Rakennukset_alue_rekisteritiedot-74578-0-collision">
+        <pose>-16.8861 -196.0634 2.0000 0 0 -2.68497959</pose>
+        <geometry>
+          <box>
+            <size>53.5710 29.2961 4.0000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-036">
+      <collision name="Rakennukset_alue_rekisteritiedot-77061-0-collision">
+        <pose>-115.7564 243.5075 3.4000 0 0 3.11633951</pose>
+        <geometry>
+          <box>
+            <size>44.1643 14.1047 6.8000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-037">
+      <collision name="Rakennukset_alue_rekisteritiedot-7772-0-collision">
+        <pose>-70.9472 -203.7905 3.4000 0 0 2.07560833</pose>
+        <geometry>
+          <box>
+            <size>7.0304 3.0311 6.8000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-038">
+      <collision name="Rakennukset_alue_rekisteritiedot-78521-0-collision">
+        <pose>-8.9491 -5.5666 6.8000 0 0 -2.37152439</pose>
+        <geometry>
+          <box>
+            <size>142.4975 124.1639 13.6000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-039">
+      <collision name="Rakennukset_alue_rekisteritiedot-79951-0-collision">
+        <pose>1.8065 -96.9723 3.4000 0 0 2.33983412</pose>
+        <geometry>
+          <box>
+            <size>36.7617 29.6214 6.8000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-040">
+      <collision name="Rakennukset_alue_rekisteritiedot-79952-0-collision">
+        <pose>-29.0352 -82.1082 3.4000 0 0 -0.79571007</pose>
+        <geometry>
+          <box>
+            <size>11.4670 6.0385 6.8000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-041">
+      <collision name="Rakennukset_alue_rekisteritiedot-8038-0-collision">
+        <pose>88.4555 -18.0982 3.4000 0 0 -0.80071717</pose>
+        <geometry>
+          <box>
+            <size>14.6501 3.1000 6.8000</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="office-drone-launch-pad">
+      <collision name="office-drone-launch-pad-collision">
+        <pose>-41 -83 0.04 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>2.4 2.4 0.08</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name="office-drone-launch-pad-visual">
+        <pose>-41 -83 0.04 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>2.4 2.4 0.08</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.10 0.72 0.78 1</ambient>
+          <diffuse>0.10 0.72 0.78 1</diffuse>
+        </material>
+      </visual>
+    </link>
+    <link name="takeout-pickup-pad">
+      <collision name="takeout-pickup-pad-collision">
+        <pose>43 55 0.04 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>2.4 2.4 0.08</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name="takeout-pickup-pad-visual">
+        <pose>43 55 0.04 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>2.4 2.4 0.08</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.98 0.25 0.42 1</ambient>
+          <diffuse>0.98 0.25 0.42 1</diffuse>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

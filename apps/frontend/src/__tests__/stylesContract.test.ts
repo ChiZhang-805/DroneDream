@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 import postcss from "postcss";
@@ -39,6 +39,91 @@ describe("console stylesheet contract", () => {
     expect(
       [...referenced].filter((name) => !defined.has(name)).sort(),
     ).toEqual([]);
+  });
+
+  it("keeps the autonomy conversation and composer on one responsive width contract", () => {
+    const source = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
+    const root = postcss.parse(source);
+    const declarations = new Map<string, Map<string, string>>();
+
+    root.walkRules((rule) => {
+      const selectorDeclarations = declarations.get(rule.selector) ?? new Map<string, string>();
+      rule.walkDecls((declaration) => {
+        selectorDeclarations.set(declaration.prop, declaration.value);
+      });
+      declarations.set(rule.selector, selectorDeclarations);
+    });
+
+    expect(declarations.get(".autonomy-command-page")?.get("--autonomy-chat-column-width")).toBe("76rem");
+    expect(declarations.get(".autonomy-command-page")?.get("grid-template-columns")).toBe(
+      "minmax(0, min(100%, var(--autonomy-chat-column-width)))",
+    );
+    expect(declarations.get(".autonomy-command-stage")?.get("width")).toBe(
+      "100%",
+    );
+    expect(declarations.get(".autonomy-command-stage")?.get("justify-self")).toBe("stretch");
+    expect(declarations.get(".autonomy-conversation-thread")?.get("width")).toBe(
+      "min(100%, var(--autonomy-chat-column-width))",
+    );
+    expect(declarations.get(".autonomy-command-page .autonomy-command-composer")?.get("width")).toBe(
+      "min(100%, var(--autonomy-chat-column-width))",
+    );
+  });
+
+  it("keeps every desktop application surface on the canonical light theme", () => {
+    const applicationStylesheets = readdirSync(resolve(process.cwd(), "src"), {
+      recursive: true,
+      withFileTypes: true,
+    })
+      .filter((entry) => entry.isFile() && entry.name.endsWith(".css"))
+      .map((entry) => resolve(entry.parentPath, entry.name))
+      .filter((stylesheetPath) => !stylesheetPath.includes(`${process.platform === "win32" ? "\\" : "/"}site${process.platform === "win32" ? "\\" : "/"}`));
+    const forbiddenDarkTokens = [
+      "--dd-brand-dark-surface",
+      "#000000",
+      "#050611",
+      "#070913",
+      "#08091a",
+      "#090212",
+      "#09071b",
+      "#0d0e13",
+      "#101326",
+      "#11121d",
+      "#111522",
+      "#11162c",
+      "#171119",
+      "#211031",
+      "#282b3c",
+      "#292a31",
+      "#2a2e41",
+      "#3a3b43",
+    ];
+    const surfaceSelector = /(?:^|[\s>+~.,:#])(?:html|body|button|input|select|textarea|dialog|[^\s,{]*(?:shell|sidebar|header|footer|panel|card|menu|popover|modal|backdrop|launcher|settings|composer|controls|screen|viewer|workspace|repository|command)[^\s,{]*)/iu;
+    const visualContentSelector = /(?:canvas|scene|model|drone|mesh|preview-image|camera-feed|status-dot|logo|icon)/iu;
+    const violations: string[] = [];
+
+    for (const stylesheetPath of applicationStylesheets) {
+      const relativePath = stylesheetPath.slice(process.cwd().length + 1);
+      const root = postcss.parse(readFileSync(stylesheetPath, "utf8"), { from: stylesheetPath });
+      root.walkDecls((declaration) => {
+        if (declaration.prop === "color-scheme" && declaration.value.trim().toLowerCase() === "dark") {
+          violations.push(`${relativePath}:${declaration.source?.start?.line ?? 0} color-scheme: dark`);
+          return;
+        }
+        if (!/^background(?:-color)?$/u.test(declaration.prop)) return;
+        const selector = declaration.parent?.type === "rule" ? declaration.parent.selector : "";
+        if (!surfaceSelector.test(selector) || visualContentSelector.test(selector)) return;
+        const normalized = declaration.value.toLowerCase();
+        const forbidden = forbiddenDarkTokens.find((token) => normalized.includes(token));
+        if (forbidden) {
+          violations.push(
+            `${relativePath}:${declaration.source?.start?.line ?? 0} ${selector} uses ${forbidden}`,
+          );
+        }
+      });
+    }
+
+    expect(violations).toEqual([]);
   });
 
   it("keeps native scrollbar rails hidden across the shared desktop and console surface", () => {

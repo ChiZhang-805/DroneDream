@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { apiClient } from "../api/client";
@@ -83,10 +83,14 @@ describe("AUTONOMY external asset connectors", () => {
       ],
     });
 
+    HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
+    HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
     render(<AutonomyAssetConnectorPanel kind="map" chinese={false} />);
 
-    expect(await screen.findByText("GIS / DEM")).toBeVisible();
-    expect(screen.getByText("Companion required")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Import map" }));
+    expect(await screen.findByRole("dialog", { name: "Import map" })).toBeVisible();
+    expect(screen.getByText("Map scene")).toBeVisible();
+    expect(screen.queryByText("Companion required")).not.toBeInTheDocument();
     expect(screen.queryByText("ROS 2 URDF")).not.toBeInTheDocument();
     expect(screen.queryByText(/[\u3400-\u9fff]/u)).not.toBeInTheDocument();
   });

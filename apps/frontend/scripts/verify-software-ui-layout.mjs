@@ -33,6 +33,7 @@ const mobileMenuOnly = Boolean(args.get("--mobile-menu-only"));
 const fixedScenariosOnly = Boolean(args.get("--fixed-scenarios-only"));
 const settingsOnly = Boolean(args.get("--settings-only"));
 const fixedAgent = Boolean(args.get("--fixed-agent"));
+const requestedCase = args.get("--case");
 
 process.env.VITE_API_BASE_URL = `${origin}/api/v1`;
 process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
@@ -60,7 +61,8 @@ const fixedAgentCases = [
 ];
 const cases = (fixedAgent ? fixedAgentCases : universalCases)
   .filter((testCase) => !mobileMenuOnly || testCase.viewport.width <= 520)
-  .filter((testCase) => !settingsOnly || testCase.viewport.width >= 1000);
+  .filter((testCase) => !settingsOnly || testCase.viewport.width >= 1000)
+  .filter((testCase) => !requestedCase || testCase.id === requestedCase);
 const canonicalThemeColors = Object.freeze({
   universal: ["#FF5574", "#6A4CFF", "#E657D1"],
   sim: ["#00D9FF", "#2671FF", "#744CFF"],
@@ -292,10 +294,14 @@ async function verifySettings(page, testCase) {
   assert.deepEqual(themeBinding.colors, canonicalThemeColors[expectedActiveEdition]);
   let assistantModelImage;
   {
-    const assistantModel = page.locator(".assistant-model-button");
+    // Responsive layouts can keep an inactive picker mounted while another
+    // picker is the user-facing control. Exercise the enabled, visible trigger
+    // instead of relying on DOM order.
+    const assistantModel = page.locator(".assistant-model-button:visible:not(:disabled)").first();
     await assistantModel.waitFor();
-    await assistantModel.click({ force: true });
-    const modelMenu = page.locator(".assistant-model-menu");
+    await assistantModel.scrollIntoViewIfNeeded();
+    await assistantModel.click();
+    const modelMenu = page.locator(".assistant-model-menu:visible").first();
     await modelMenu.waitFor();
     const defaultModelOptions = modelMenu.locator('[role="option"][data-model-type="default"]');
     const assistantModelLabels = await defaultModelOptions.allTextContents();
@@ -406,8 +412,10 @@ async function verifySettings(page, testCase) {
   assert(quickMetrics.left >= 0 && quickMetrics.right <= settingsViewport.width + 1);
   assert(quickMetrics.top >= 0 && quickMetrics.bottom <= settingsViewport.height + 1);
   assert(
-    quickMetrics.aspectRatio >= 1.45 && quickMetrics.aspectRatio <= 1.75,
-    `${testCase.id}: Quick settings does not preserve the desktop window proportion`,
+    quickMetrics.aspectRatio >= 1.85 && quickMetrics.aspectRatio <= 2.05,
+    `${testCase.id}: Quick settings does not preserve the desktop window proportion `
+      + `(${quickMetrics.width}x${quickMetrics.height}, `
+      + `ratio ${quickMetrics.aspectRatio.toFixed(2)})`,
   );
   assert(
     quickMetrics.scrollHeight <= quickMetrics.clientHeight + 1,
@@ -415,33 +423,19 @@ async function verifySettings(page, testCase) {
   );
   assert.equal(quickMetrics.detailedMemoryControls, 0);
   for (const label of testCase.locale === "zh-CN"
-    ? ["语言", "外观", "账户记忆", "本软件记忆", "默认平台模型", "全部设置"]
-    : ["Language", "Appearance", "Account memory", "This edition's memory", "Default platform model", "All settings"]) {
+    ? ["语言", "账户记忆", "本软件记忆", "默认平台模型", "全部设置"]
+    : ["Language", "Account memory", "This edition's memory", "Default platform model", "All settings"]) {
     assert(
       (await quickSettings.getByText(label, { exact: true }).count()) > 0,
       `${testCase.id}: Quick settings is missing ${label}`,
     );
   }
-  const appearanceOptions = quickSettings.locator(".quick-settings-appearance-options button");
-  assert.equal(await appearanceOptions.count(), 2, `${testCase.id}: Appearance must expose exactly Dark and Light`);
-  await quickSettings.getByRole("button", {
-    name: testCase.locale === "zh-CN" ? "浅色" : "Light",
-  }).click();
-  await page.waitForFunction(() => document.documentElement.dataset.ddAppearance === "light");
-  const lightAppearance = await quickSettings.evaluate((element) => ({
-    dialogColor: getComputedStyle(element).color,
-    dialogBackground: getComputedStyle(element).backgroundColor,
-    titleColor: getComputedStyle(element.querySelector("h2")).color,
-  }));
-  assert.notEqual(lightAppearance.dialogColor, "rgb(255, 255, 255)");
-  assert.notEqual(lightAppearance.titleColor, "rgb(255, 255, 255)");
-  assert.notEqual(lightAppearance.dialogBackground, "rgba(0, 0, 0, 0)");
-  await screenshot(page, testCase.id, "settings-quick-light");
-  await quickSettings.getByRole("button", {
-    name: testCase.locale === "zh-CN" ? "深色" : "Dark",
-  }).click();
-  await page.waitForFunction(() => document.documentElement.dataset.ddAppearance === "dark");
-  const quickImage = await screenshot(page, testCase.id, "settings-quick-dark");
+  assert.equal(await quickSettings.locator("#quick-settings-appearance").count(), 0);
+  assert.equal(
+    await page.evaluate(() => document.documentElement.dataset.ddAppearance),
+    "light",
+  );
+  const quickImage = await screenshot(page, testCase.id, "settings-quick-light");
   await quickSettings.getByRole("button", {
     name: testCase.locale === "zh-CN" ? "全部设置" : "All settings",
   }).click();
@@ -559,6 +553,10 @@ async function verifySettings(page, testCase) {
       };
     };
     const usageBounds = element.getBoundingClientRect();
+    const surface = element.closest(".settings-workspace-surface");
+    const color = (target) => target instanceof Element
+      ? getComputedStyle(target).color
+      : null;
     return {
       manage: rect(".settings-model-plan-row .btn"),
       refresh: rect(".settings-model-refresh"),
@@ -575,16 +573,10 @@ async function verifySettings(page, testCase) {
       usageValuesFit: Array.from(
         element.querySelectorAll(".settings-model-usage-grid strong"),
       ).every((value) => value.scrollWidth <= value.clientWidth + 1),
-      foregroundColor: getComputedStyle(element).color,
-      mutedColor: getComputedStyle(
-        element.querySelector(".settings-model-period"),
-      ).color,
-      accessModeColor: getComputedStyle(
-        element.parentElement?.querySelector(".settings-model-access-mode > button"),
-      ).color,
-      headingColor: getComputedStyle(
-        element.parentElement?.querySelector(".settings-model-section-heading h3"),
-      ).color,
+      foregroundColor: color(element),
+      mutedColor: color(element.querySelector(".settings-model-period")),
+      accessModeColor: color(surface?.querySelector(".settings-model-access-mode > button")),
+      headingColor: color(element.querySelector(".settings-model-section-heading h3")),
     };
   });
   assert(metrics.manage && metrics.refresh && metrics.period && metrics.usage);
@@ -609,6 +601,7 @@ async function verifySettings(page, testCase) {
       );
     }
     await modelPicker.click();
+    await page.locator(".assistant-model-menu-portal").waitFor({ state: "detached" });
   }
   assert(metrics.usageValuesFit, `${testCase.id}: Usage values were visually truncated`);
   for (const foreground of [
@@ -617,30 +610,41 @@ async function verifySettings(page, testCase) {
     metrics.accessModeColor,
     metrics.headingColor,
   ]) {
+    assert(foreground, `${testCase.id}: a Settings foreground target is missing`);
     assert.notEqual(foreground, "rgba(0, 0, 0, 0)");
   }
+  const manage = usage.locator(".settings-model-plan-row .btn");
   const usageRange = usage.locator('.settings-allowance-range [role="tab"][aria-selected="true"]');
   const resetCards = usage.locator(".settings-reset-card-trigger");
   const useResetCard = usage.locator(".settings-model-reset-action");
   const refresh = usage.locator(".settings-model-refresh");
-  const keyboardOrder = await usage.evaluate((element) =>
-    Array.from(element.querySelectorAll('a[href],button:not([disabled]),[tabindex]:not([tabindex="-1"])'))
-      .map((candidate) => candidate instanceof HTMLElement
-        ? candidate.className || candidate.getAttribute("role") || candidate.tagName
-        : ""),
+  // Usage and reset-card fixtures are fetched independently. Wait for the
+  // reset-card control to become keyboard-operable before asserting tab order.
+  await resetCards.waitFor({ state: "visible" });
+  await page.waitForFunction(() => {
+    const trigger = document.querySelector(".settings-reset-card-trigger");
+    return trigger instanceof HTMLButtonElement && !trigger.disabled;
+  });
+  await manage.focus();
+  assert(
+    await manage.evaluate((element) => element === document.activeElement),
+    `${testCase.id}: manage-subscription link did not accept keyboard focus`,
   );
-  const expectedOrder = ["btn"];
-  if (!await resetCards.isDisabled()) expectedOrder.push("settings-reset-card-trigger");
-  if (!await useResetCard.isDisabled()) expectedOrder.push("settings-model-reset-action");
-  if (!await refresh.isDisabled()) expectedOrder.push("settings-model-refresh");
-  expectedOrder.push("tab");
-  let lastIndex = -1;
-  for (const expectedClass of expectedOrder) {
-    const index = keyboardOrder.findIndex((entry, candidateIndex) =>
-      candidateIndex > lastIndex && String(entry).includes(expectedClass));
-    assert(index > lastIndex, `${testCase.id}: ${expectedClass} is missing from keyboard order`);
-    lastIndex = index;
-  }
+  await page.keyboard.press("Tab");
+  const activeAfterManage = await page.evaluate(() => {
+    const active = document.activeElement;
+    return active instanceof HTMLElement
+      ? { tag: active.tagName, className: active.className, text: active.textContent?.trim() }
+      : null;
+  });
+  assert(
+    await resetCards.evaluate((element) => element === document.activeElement),
+    `${testCase.id}: expected reset-card trigger after plan link, received ${JSON.stringify(activeAfterManage)}`,
+  );
+  await page.keyboard.press("Tab");
+  assert(await useResetCard.evaluate((element) => element === document.activeElement));
+  await page.keyboard.press("Tab");
+  assert(await refresh.evaluate((element) => element === document.activeElement));
   assert.equal((await refresh.textContent())?.trim(), "");
   await usageRange.focus();
   assert(await usageRange.evaluate((element) => element === document.activeElement));

@@ -71,24 +71,21 @@ input:focus-visible {
 }
 
 .field-launcher {
-  background: var(--dd-brand-dark-surface);
+  color-scheme: light;
+  background: var(--dd-brand-light-surface);
 }
 
 .field-launcher .launcher-chrome {
   border-bottom-color: color-mix(in srgb, var(--dd-brand-start) 24%, transparent);
-  background: rgb(20 8 10 / 96%);
+  background: transparent;
 }
 
 .field-launcher .launcher-hero-visual {
-  background:
-    linear-gradient(180deg, rgb(40 20 13 / 18%), rgb(16 7 10 / 82%)),
-    var(--dd-brand-dark-surface);
+  background: transparent;
 }
 
 .field-launcher .launcher-hero-visual::before {
-  background-image:
-    linear-gradient(color-mix(in srgb, var(--dd-brand-start) 8%, transparent) 1px, transparent 1px),
-    linear-gradient(90deg, color-mix(in srgb, var(--dd-brand-end) 8%, transparent) 1px, transparent 1px);
+  content: none;
 }
 
 .field-launcher .launcher-progress-track > span,
@@ -139,7 +136,7 @@ input:focus-visible {
   top: calc(100% + 8px);
   left: 50%;
   width: min(520px, calc(100vw - 32px));
-  color: var(--dd-brand-light-surface);
+  color: #6e6472;
   text-align: center;
   transform: translateX(-50%);
 }
@@ -150,8 +147,8 @@ input:focus-visible {
   top: 8px;
   left: 8px;
   padding: 8px 12px;
-  color: #ffffff;
-  background: var(--dd-brand-dark-surface);
+  color: #4b3025;
+  background: #fff4e8;
   border-radius: 4px;
   transform: translateY(-160%);
 }
@@ -170,7 +167,7 @@ input:focus-visible {
   justify-content: space-between;
   gap: 24px;
   padding: 10px 24px;
-  background: rgb(255 255 255 / 96%);
+  background: transparent;
   border-bottom: 1px solid var(--field-line);
   backdrop-filter: blur(12px);
 }
@@ -309,7 +306,7 @@ input:focus-visible {
   display: grid;
   place-items: center;
   padding: 12px;
-  background: rgb(40 20 13 / 72%);
+  background: rgb(255 247 239 / 88%);
   backdrop-filter: blur(10px);
 }
 
@@ -321,13 +318,8 @@ input:focus-visible {
   grid-template-rows: auto auto minmax(0, 1fr);
   overflow: hidden;
   padding: 14px;
-  color: #ffffff;
-  background:
-    linear-gradient(
-      145deg,
-      color-mix(in srgb, var(--dd-brand-dark-surface) 96%, #000000),
-      color-mix(in srgb, var(--dd-brand-dark-surface) 88%, var(--dd-brand-end))
-    );
+  color: #3a2117;
+  background: linear-gradient(145deg, #fffdf9, #fff2e4);
   border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 44%, transparent);
   border-radius: 8px;
   box-shadow: 0 22px 64px rgb(20 8 4 / 42%);
@@ -369,8 +361,8 @@ input:focus-visible {
   flex: 0 0 auto;
   place-items: center;
   padding: 0;
-  color: #ffffff;
-  background: color-mix(in srgb, var(--dd-brand-dark-surface) 72%, transparent);
+  color: #75412d;
+  background: #fff4e8;
   border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 34%, transparent);
   border-radius: 6px;
   cursor: pointer;
@@ -396,19 +388,19 @@ input:focus-visible {
   justify-content: center;
   gap: 7px;
   padding: 8px 10px;
-  color: #d8cbd8;
-  background: color-mix(in srgb, var(--dd-brand-dark-surface) 72%, transparent);
+  color: #724532;
+  background: #fff6ed;
   border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 24%, transparent);
   border-radius: 7px;
   cursor: pointer;
 }
 
 .field-settings-backdrop .launcher-settings-tabs button[aria-selected="true"] {
-  color: #ffffff;
+  color: #422013;
   background: linear-gradient(
     125deg,
-    color-mix(in srgb, var(--dd-brand-start) 22%, transparent),
-    color-mix(in srgb, var(--dd-brand-end) 18%, transparent)
+    color-mix(in srgb, var(--dd-brand-start) 22%, #ffffff),
+    color-mix(in srgb, var(--dd-brand-end) 16%, #ffffff)
   );
   border-color: color-mix(in srgb, var(--dd-brand-middle) 62%, transparent);
 }
@@ -451,8 +443,8 @@ input:focus-visible {
   align-items: center;
   gap: 10px;
   padding: 12px 14px;
-  color: #e9e0eb;
-  background: color-mix(in srgb, var(--dd-brand-dark-surface) 72%, transparent);
+  color: #44271c;
+  background: #fffaf5;
   border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 28%, transparent);
   border-radius: 8px;
   cursor: pointer;
@@ -460,11 +452,11 @@ input:focus-visible {
 }
 
 .field-settings-languages button.selected {
-  color: #ffffff;
+  color: #4a2517;
   background: linear-gradient(
     125deg,
-    color-mix(in srgb, var(--dd-brand-start) 20%, transparent),
-    color-mix(in srgb, var(--dd-brand-end) 16%, transparent)
+    color-mix(in srgb, var(--dd-brand-start) 20%, #ffffff),
+    color-mix(in srgb, var(--dd-brand-end) 14%, #ffffff)
   );
   border-color: color-mix(in srgb, var(--dd-brand-middle) 62%, transparent);
 }
@@ -490,8 +482,8 @@ input:focus-visible {
   padding: 0 16px;
   border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 28%, transparent);
   border-radius: 12px;
-  color: #ffffff;
-  background: color-mix(in srgb, var(--dd-brand-dark-surface) 64%, transparent);
+  color: #3a2117;
+  background: #fffaf5;
   font-weight: 720;
 }
 
@@ -513,13 +505,13 @@ input:focus-visible {
   gap: 7px;
   min-width: 0;
   padding: 14px;
-  background: color-mix(in srgb, var(--dd-brand-dark-surface) 72%, transparent);
+  background: #fffaf5;
   border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 24%, transparent);
   border-radius: 8px;
 }
 
 .field-settings-safety dt {
-  color: #c9bdcb;
+  color: #76584b;
   font-size: 12px;
 }
 
@@ -529,7 +521,7 @@ input:focus-visible {
   gap: 7px;
   overflow-wrap: anywhere;
   margin: 0;
-  color: #ffffff;
+  color: #3a2117;
   font-size: 14px;
   font-weight: 700;
 }
@@ -2121,9 +2113,9 @@ input:focus-visible {
 }
 
 .field-primary-command {
-  color: #ffffff;
-  background: var(--dd-brand-dark-surface);
-  border: 1px solid var(--dd-brand-dark-surface);
+  color: #6f321c;
+  background: #fff0df;
+  border: 1px solid #e9a26f;
 }
 
 .field-primary-command:disabled {
@@ -2224,8 +2216,8 @@ input:focus-visible {
   align-content: start;
   gap: 13px;
   padding: 18px;
-  color: #ffffff;
-  background: var(--dd-brand-dark-surface);
+  color: #3a2117;
+  background: #fff7ee;
   border-top: 3px solid var(--dd-brand-start);
 }
 
@@ -2246,12 +2238,12 @@ input:focus-visible {
 
 .field-holdout span,
 .field-holdout p {
-  color: rgb(255 255 255 / 72%);
+  color: #76584b;
   font-size: 11px;
 }
 
 .field-holdout code {
-  color: #ffffff;
+  color: #3a2117;
   font-size: 10px;
 }
 
@@ -2379,9 +2371,9 @@ input:focus-visible {
 .field-adapter-actions button {
   min-height: 38px;
   padding: 0 14px;
-  color: #ffffff;
-  background: var(--field-ink);
-  border: 1px solid var(--field-ink);
+  color: #174940;
+  background: #e7f7f1;
+  border: 1px solid #9ad5c6;
 }
 
 .field-adapter-actions button svg {

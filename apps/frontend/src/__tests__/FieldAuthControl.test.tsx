@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   signOut: vi.fn(),
 }));
 
+vi.mock("../components/LauncherAccountForm", () => ({ LauncherAccountForm: () => <form aria-label="Software account" /> }));
+
 vi.mock("../desktop/bridge", () => ({
   isDesktopRuntime: () => true,
 }));
@@ -40,34 +42,11 @@ describe("FieldAuthControl", () => {
     mocks.signOut.mockResolvedValue(undefined);
   });
 
-  it("starts one explicit Field browser transaction without granting authority", async () => {
-    const { container } = render(<FieldAuthControl locale="en" />);
-
-    fireEvent.click(screen.getByRole("button", {
-      name: "Sign in to DroneDream · FIELD",
-    }));
-
-    await waitFor(() => expect(mocks.completeDesktopBrowserSignIn).toHaveBeenCalledWith(
-      "en",
-      expect.objectContaining({
-        signal: expect.any(AbortSignal),
-        restoreFromVault: false,
-        onAdopting: expect.any(Function),
-      }),
-    ));
-    expect(container.firstChild).toHaveAttribute("data-authority", "false");
-  });
-
-  it("shows a failure when the shared Field transaction cannot adopt", async () => {
-    mocks.completeDesktopBrowserSignIn.mockRejectedValueOnce(
-      new Error("The browser session belongs to a different DroneDream edition."),
-    );
-    render(<FieldAuthControl locale="zh-CN" />);
-
-    fireEvent.click(screen.getByRole("button", { name: "登录 DroneDream · FIELD" }));
-
-    await waitFor(() => expect(mocks.completeDesktopBrowserSignIn).toHaveBeenCalledTimes(1));
-    expect(screen.getByRole("alert")).toHaveTextContent("Field 登录未完成。");
+  it("opens the software account form without a browser transaction", () => {
+    render(<FieldAuthControl locale="en" />);
+    fireEvent.click(screen.getByRole("button", { name: "Sign in to DroneDream · FIELD" }));
+    expect(screen.getByRole("form", { name: "Software account" })).toBeInTheDocument();
+    expect(mocks.completeDesktopBrowserSignIn).not.toHaveBeenCalled();
   });
 
   it("uses the edition-local sign-out path for an active Field account", async () => {
@@ -85,40 +64,6 @@ describe("FieldAuthControl", () => {
 
     await waitFor(() => expect(mocks.signOut).toHaveBeenCalledTimes(1));
     expect(mocks.completeDesktopBrowserSignIn).not.toHaveBeenCalled();
-  });
-
-  it("keeps the launcher action disabled until the Field workspace is ready", () => {
-    render(
-      <FieldAuthControl
-        launcher
-        launcherReady={false}
-        locale="en"
-        onAuthenticated={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByRole("button", {
-      name: "Sign in and enter the tuning platform",
-    })).toBeDisabled();
-  });
-
-  it("enters the launcher only after adopting the Field browser session", async () => {
-    const onAuthenticated = vi.fn();
-    render(
-      <FieldAuthControl
-        launcher
-        launcherReady
-        locale="en"
-        onAuthenticated={onAuthenticated}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole("button", {
-      name: "Sign in and enter the tuning platform",
-    }));
-
-    await waitFor(() => expect(mocks.completeDesktopBrowserSignIn).toHaveBeenCalledOnce());
-    expect(onAuthenticated).toHaveBeenCalledTimes(1);
   });
 
   it("lets an existing Field account enter without signing out", () => {

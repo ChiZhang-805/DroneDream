@@ -11,6 +11,7 @@
 ; uninstall and never deletes shared WebView2 files or registry keys.
 
 !include "${__FILEDIR__}\runtime-mode.nsh"
+!include "${__FILEDIR__}\installed-app-process.nsh"
 !define DRONEDREAM_EDITION_IDENTITY_FILE "${__FILEDIR__}\edition-identity.nsh"
 !macro DRONEDREAM_EDITION_IDENTITY_TABLE
   !include "${DRONEDREAM_EDITION_IDENTITY_FILE}"
@@ -72,10 +73,10 @@
   ; case the orphaned sidecar keeps its installed executable open and NSIS
   ; cannot replace it.  Quiesce that current-user process here as a backward-
   ; compatible installer responsibility before any packaged files are copied.
-  ; The ordinary desktop executable is still handled by Tauri's own running-
-  ; application check immediately after this hook.
+  ; The ordinary desktop executable is handled by the same installation-scoped
+  ; check immediately after this hook. Sidecars must obey that scope too.
   IfFileExists "$INSTDIR\dronedream-autonomy-core.exe" 0 dronedream_agent_core_not_installed
-    !insertmacro CheckIfAppIsRunning "dronedream-autonomy-core.exe" "${DRONEDREAM_DISPLAYNAME}"
+    !insertmacro DRONEDREAM_CHECK_INSTALLED_APP "dronedream-autonomy-core.exe" "${DRONEDREAM_DISPLAYNAME}"
   dronedream_agent_core_not_installed:
 
   !if "${DRONEDREAM_EDITION_ID}" != "field"
@@ -165,6 +166,16 @@
       Abort "$(DD_UpdateAppStillRunning)"
     dronedream_main_binary_ready:
   ${EndIf}
+
+  ; Bundled AGENT Core resources are a versioned, installer-owned snapshot.
+  ; NSIS overwrites files that still exist but does not remove files dropped by
+  ; a newer build. Clear the old managed tree after every process and Runtime
+  ; handoff gate has succeeded, then let the install section recreate only the
+  ; files present in the current signed package. User data and the separately
+  ; managed DroneDreamRuntime installation are outside this directory.
+  !if "${DRONEDREAM_EDITION_ID}" == "autonomy"
+    RMDir /r "$INSTDIR\agent-core"
+  !endif
 
   Pop $1
   Pop $0

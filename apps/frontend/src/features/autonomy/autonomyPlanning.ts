@@ -18,6 +18,7 @@ import {
   autonomyPlannerBindingIssues,
   localAutonomyHarnessInspection,
   parseAutonomyPlannerArtifact,
+  verifyCorePlannerDigest,
   type AutonomyPlannerArtifact,
 } from "./missionHarness";
 import {
@@ -32,10 +33,12 @@ import type {
 } from "../../types/api";
 import {
   inspectAgentCoreAssetBindings,
-  isAgentCoreUnavailable,
   planWithAgentCore,
 } from "./agentCorePlanning";
 import { AgentCoreRequestError, type AgentCoreMissionPrepareSummary } from "./agentCore";
+import { taskUsesChinese } from "./missionPresentation";
+import type { AutonomyClarification } from "./workspaceStore";
+import { clarificationBrief, presentAutonomyClarification } from "./clarificationPresentation";
 
 export type AutonomyPlanningModel =
   | {
@@ -67,6 +70,8 @@ export interface AutonomyPlanningInput {
   attachments?: File[];
   inputChannel?: "text" | "voice" | "camera" | "api" | "webhook" | "scheduled";
   transcriptSource?: "web-speech" | "audio-attachment" | null;
+  onConversationTitle?: (title: string) => void;
+  onProgress?: (event: import("./conversationActivity").PreparationProgressEvent) => void;
 }
 
 export interface AutonomyPlanningResult {
@@ -78,6 +83,15 @@ export interface AutonomyPlanningResult {
   compileRequest: AutonomyCompileRequest | null;
   compileResult: AutonomyCompileResponse | null;
   compiledPlan: AutonomyMissionPlanSnapshot | null;
+  clarification?: AutonomyClarification | null;
+}
+
+function conversationLanguageText(value: string | null | undefined, chinese: boolean): string {
+  const text = value?.trim() ?? "";
+  if (text && taskUsesChinese(text, chinese) === chinese) return text;
+  return chinese
+    ? "任务计划已生成，可以确认后开始仿真。"
+    : "The mission plan is ready. Confirm it to start the simulation.";
 }
 
 export function requiresAgentCoreRuntime(
@@ -169,8 +183,7 @@ export function compileRequestForWorkspace(
 }
 
 function missionIdForScene(sceneId: string, intent = ""): AutonomyMissionId {
-  if (sceneId === "forest-gate-inspection") return "gates";
-  if (sceneId === "service-corridor-dock") return "narrow";
+  void sceneId;
   const normalized = intent.toLocaleLowerCase();
   if (/gate|圆门|圆环|穿门/u.test(normalized)) return "gates";
   if (/narrow|dock|走廊|corridor|停靠|狭窄|楼梯/u.test(normalized)) return "narrow";
@@ -248,6 +261,12 @@ export function missionPlanSnapshot(
   };
 }
 
+// 功能：
+//   将 Core 的已绑定计划转换为界面快照，拒绝任务图串单和无效路线坐标。
+// 输入：
+//   summary：Core 响应；plannerBinding：已核对摘要与资产的计划绑定。
+// 输出：
+//   snapshot：界面计划；不执行解锁或起飞。
 function agentCoreMissionPlanSnapshot(
   summary: AgentCoreMissionPrepareSummary,
   plannerBinding: NonNullable<AutonomyCompileAssetContext["planner_binding"]>,
@@ -266,15 +285,30 @@ function agentCoreMissionPlanSnapshot(
     throw new Error("AGENT Core mission plan projection is invalid.");
   }
   const taskIds = new Set(plan.task_graph.nodes.map((node) => node.task_id));
+  const boundNodes = new Map(plannerBinding.task_graph.nodes.map((node) => [node.node_id, node]));
   if (
     taskIds.size !== plan.task_graph.nodes.length
+    || taskIds.size !== boundNodes.size
     || plan.task_graph.nodes.some((node) => node.depends_on.some((dependency) => !taskIds.has(dependency)))
+    || plan.task_graph.nodes.some((node) => {
+      const bound = boundNodes.get(node.task_id);
+      // 界面任务图使用 completion_evidence，不包含 Core 内部的 action/target_node 字段。
+      return !bound || JSON.stringify(bound.depends_on) !== JSON.stringify(node.depends_on)
+        || JSON.stringify(bound.success_evidence) !== JSON.stringify(node.completion_evidence);
+    })
   ) {
     throw new Error("AGENT Core mission task graph binding is invalid.");
+  }
+  if (!Array.isArray(plan.route_positions_m) || plan.route_positions_m.length < 2
+    || plan.route_positions_m.some((point) => !point || ![point.x, point.y, point.z].every((coordinate) => typeof coordinate === "number" && Number.isFinite(coordinate)))) {
+    throw new Error("AGENT Core mission route projection is invalid.");
   }
   return {
     schemaVersion: 1,
     source: "agent-core",
+    routePositionsM: plan.route_positions_m,
+    routeMapSha256: plan.asset_bindings.map_content_sha256,
+    routeVehicleSha256: plan.asset_bindings.vehicle_content_sha256,
     contractId: plan.contract_id,
     sceneId: plan.scene_id,
     sceneName: plan.scene_name,
@@ -309,6 +343,8 @@ function agentCoreMissionPlanSnapshot(
 export async function planAutonomyMission(
   input: AutonomyPlanningInput,
 ): Promise<AutonomyPlanningResult> {
+  // 消息语言优先于界面设置，同时用于模型提示、命名、通知和追问。
+  input = { ...input, chinese: taskUsesChinese(input.instruction, input.chinese) };
   const harnessRequest = autonomyHarnessRequest(input.edition, input.workspace, input.intent);
   let harnessInspection = input.publicDemo
     ? await localAutonomyHarnessInspection(harnessRequest)
@@ -347,27 +383,29 @@ export async function planAutonomyMission(
         attachments: input.attachments,
         inputChannel: input.inputChannel,
         transcriptSource: input.transcriptSource,
+        onConversationTitle: input.onConversationTitle,
+        onProgress: input.onProgress,
       });
-      plannerArtifact = parseAutonomyPlannerArtifact(coreSummary.integration_artifact);
+      plannerArtifact = parseAutonomyPlannerArtifact(coreSummary.integration_artifact, "agent-core");
       if (!plannerArtifact) throw new Error("AGENT Core returned an invalid planner artifact.");
-      const localArtifactSha256 = await autonomyCanonicalSha256(plannerArtifact);
-      if (localArtifactSha256 !== coreSummary.integration_artifact_sha256) {
+      if (!await verifyCorePlannerDigest(plannerArtifact, coreSummary.integration_artifact_canonical_json, coreSummary.integration_artifact_sha256)) {
         throw new Error("AGENT Core planner artifact digest mismatch.");
       }
       const bindingIssues = autonomyPlannerBindingIssues(
         plannerArtifact,
         harnessRequest,
         harnessInspection,
+        "agent-core",
       );
       if (bindingIssues.length) {
         throw new Error(`AGENT Core planner binding failed: ${bindingIssues.join(", ")}`);
       }
       planningRunId = coreSummary.plan_revision_id;
       planningArtifactSha256 = coreSummary.integration_artifact_sha256;
-      planningBrief = coreSummary.notifications?.find((item) => item.kind === "plan")?.content.trim()
-        || (input.chinese
-          ? `计划已生成：${coreSummary.goal}（${coreSummary.model_calls} 次模型调用，${coreSummary.planning_attempts} 轮规划验证）`
-          : `Plan ready: ${coreSummary.goal} (${coreSummary.model_calls} model calls, ${coreSummary.planning_attempts} planning rounds)`);
+      planningBrief = conversationLanguageText(
+        coreSummary.notifications?.find((item) => item.kind === "plan")?.content,
+        input.chinese,
+      );
       const plannerBinding: NonNullable<AutonomyCompileAssetContext["planner_binding"]> = {
         schema_version: "dronedream.autonomy.planner-binding.v1",
         status: "draft",
@@ -395,16 +433,17 @@ export async function planAutonomyMission(
       };
     } catch (reason) {
       if (reason instanceof AgentCoreRequestError && reason.clarificationFields.length) {
+        const clarification = presentAutonomyClarification(reason.clarification, input.chinese);
         return {
-          planningBrief: `${input.chinese ? "请确认：" : "Please clarify:"}\n${reason.clarificationFields.map((field) => `• ${field}`).join("\n")}`,
+          planningBrief: clarificationBrief(reason.clarificationFields, clarification, input.chinese),
           planningRunId: null, planningArtifactSha256: null, plannerArtifact: null,
           harnessInspection, compileRequest: null, compileResult: null, compiledPlan: null,
+          clarification,
         };
       }
       // The installed AGENT edition has exactly one planning and execution
       // authority. A Core failure must never be hidden by charging a second
       // planner or silently switching to the public compiler/runtime.
-      if (!isAgentCoreUnavailable(reason)) throw reason;
       throw reason;
     }
   }
@@ -510,7 +549,10 @@ export async function planAutonomyMission(
     if (bindingIssues.length) {
       throw new Error(`The model planner artifact failed binding: ${bindingIssues.join(", ")}`);
     }
-    planningBrief = response.assistant_message?.trim() || response.experiment_summary.trim();
+    planningBrief = conversationLanguageText(
+      response.assistant_message?.trim() || response.experiment_summary.trim(),
+      input.chinese,
+    );
     planningRunId = response.orchestration?.run_id ?? planningRunId;
     if (plannerArtifact.status !== "draft") {
       harnessInspection = {

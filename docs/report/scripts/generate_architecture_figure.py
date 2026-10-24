@@ -5,7 +5,6 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
-
 WIDTH = 2640
 HEIGHT = 1034
 TOP_Y = 157

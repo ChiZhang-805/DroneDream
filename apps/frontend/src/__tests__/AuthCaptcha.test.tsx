@@ -41,6 +41,7 @@ describe("AuthCaptcha", () => {
 
     const remove = vi.fn();
     let options: {
+      theme: "light";
       callback: (token: string) => void;
       "error-callback": () => void;
       "expired-callback": () => void;
@@ -63,6 +64,7 @@ describe("AuthCaptcha", () => {
     await waitFor(() => expect(renderWidget).toHaveBeenCalledOnce());
 
     expect(options).not.toBeNull();
+    expect(options!.theme).toBe("light");
     options!.callback("verified-token");
     expect(tokenChange).toHaveBeenLastCalledWith("verified-token");
     options!["error-callback"]();

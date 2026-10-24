@@ -39,13 +39,12 @@ describe("Lab SIM / FIELD evidence bridge panel", () => {
 
     expect(await screen.findByText("Candidate lineage matched · normalization required"))
       .toBeInTheDocument();
-    expect(screen.getByText(/field-recorded\.fake\.json · Integrity verified/))
+    expect(screen.getByText("field-recorded.fake.json"))
       .toBeInTheDocument();
     expect(screen.getByText("Recorded evidence passed")).toBeInTheDocument();
     expect(screen.getByText("Remaining gates · 5")).toBeInTheDocument();
     expect(root).toHaveAttribute("data-bridge-state", "normalization-required");
-    expect(screen.getByText("Evidence import never grants hardware authority."))
-      .toBeInTheDocument();
+    expect(screen.queryByText("Evidence import never grants hardware authority.")).not.toBeInTheDocument();
   });
 
   it("fails closed when the Field product source drifts", async () => {
@@ -61,7 +60,7 @@ describe("Lab SIM / FIELD evidence bridge panel", () => {
     const alert = await screen.findByRole("alert");
     expect(within(alert).getByText("Evidence rejected")).toBeInTheDocument();
     expect(within(alert).getByText(/accepted product source/)).toBeInTheDocument();
-    expect(screen.getByText("Waiting for both receipts")).toBeInTheDocument();
+    expect(screen.queryByText("Waiting for both receipts")).not.toBeInTheDocument();
   });
 
   it("provides independently authored Chinese bridge copy", () => {
@@ -69,7 +68,7 @@ describe("Lab SIM / FIELD evidence bridge panel", () => {
 
     expect(screen.getByRole("heading", { name: "SIM / FIELD 证据桥" }))
       .toBeInTheDocument();
-    expect(screen.getByText("等待两侧回执")).toBeInTheDocument();
-    expect(screen.getByText("导入证据绝不授予真机权限。")).toBeInTheDocument();
+    expect(screen.queryByText("等待两侧回执")).not.toBeInTheDocument();
+    expect(screen.queryByText("导入证据绝不授予真机权限。")).not.toBeInTheDocument();
   });
 });

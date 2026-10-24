@@ -52,12 +52,11 @@ describe("Lab calibration workspace", () => {
     expect(root).toHaveAttribute("data-brand-edition", "lab");
     expect(root).toHaveAttribute("data-presentation-only", "true");
     expect(root).toHaveAttribute("data-grants-hardware-authority", "false");
-    expect(screen.getByText("Proposal only")).toBeInTheDocument();
-    expect(screen.getByText("Constraints enforced")).toBeInTheDocument();
+    expect(screen.queryByText("Proposal only")).not.toBeInTheDocument();
+    expect(screen.queryByText("Constraints enforced")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "SIM / FIELD evidence bridge" }))
       .toBeInTheDocument();
-    expect(screen.getByText("Evidence import never grants hardware authority."))
-      .toBeInTheDocument();
+    expect(screen.queryByText("Evidence import never grants hardware authority.")).not.toBeInTheDocument();
 
     const file = new File([JSON.stringify(fixture)], "lab-cycle.fake.json", {
       type: "application/json",
@@ -67,8 +66,8 @@ describe("Lab calibration workspace", () => {
 
     expect(await screen.findByText("lab_job_fixture_001")).toBeInTheDocument();
     expect(screen.getByText("Sim-real gap")).toBeInTheDocument();
-    expect(screen.getByText(/Denied: sim-real gap exceeds tolerance/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "DENY" })).toBeDisabled();
+    expect(screen.queryByText(/Denied: sim-real gap exceeds tolerance/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "DENY" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Open simulation optimization/ }))
       .toHaveAttribute("href", "/jobs/new");
     const progression = container.querySelector<HTMLOListElement>(".lab-stage-list");
@@ -96,9 +95,9 @@ describe("Lab calibration workspace", () => {
   it("provides independently authored Chinese workflow copy", () => {
     renderWorkspace("zh-CN");
     expect(screen.getByRole("heading", { name: "双向校准闭环" })).toBeInTheDocument();
-    expect(screen.getByText("仅提出建议")).toBeInTheDocument();
-    expect(screen.getByText("强制约束")).toBeInTheDocument();
-    expect(screen.getByText("真机权限")).toBeInTheDocument();
+    expect(screen.queryByText("仅提出建议")).not.toBeInTheDocument();
+    expect(screen.queryByText("强制约束")).not.toBeInTheDocument();
+    expect(screen.queryByText("真机权限")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "SIM / FIELD 证据桥" }))
       .toBeInTheDocument();
   });

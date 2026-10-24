@@ -16,7 +16,6 @@ import numpy as np
 from matplotlib.colors import LinearSegmentedColormap
 from PIL import Image, ImageChops
 
-
 VIOLET = "#6847FF"
 MAGENTA = "#C33DE2"
 ROSE = "#F04B9A"

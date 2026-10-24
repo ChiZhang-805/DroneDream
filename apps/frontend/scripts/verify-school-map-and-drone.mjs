@@ -15,7 +15,7 @@ const outputRoot = path.resolve(
 );
 const host = "127.0.0.1";
 const port = 5198;
-const externalOrigin = process.env.SCHOOL_MAP_VERIFY_ORIGIN?.replace(/\/$/, "");
+const externalOrigin = process.env.SCHOOL_MAP_VERIFY_ORIGIN?.replace(/\/$/u, "");
 const origin = externalOrigin ?? `http://${host}:${port}`;
 const screenshotPrefix = externalOrigin ? "online-" : "";
 
@@ -42,211 +42,102 @@ async function clearBlockingDialog(page) {
   });
 }
 
-async function changeSchoolMapView(page, schoolCanvas, buttonName, cameraPreset) {
-  const button = page.getByRole("button", { name: buttonName, exact: true });
-  const isFloorButton = /^(ALL|L[123])$/.test(buttonName);
-  const isAlreadySelectedFloor = isFloorButton && await button.getAttribute("aria-pressed") === "true";
-  if (!isAlreadySelectedFloor) {
-    const marker = `before-${buttonName}-${Date.now()}`;
-    await schoolCanvas.evaluate((canvas, value) => {
-      canvas.dataset.schoolMapVerificationMarker = value;
-    }, marker);
-    await button.click();
-    await page.waitForFunction((value) => {
-      const canvas = document.querySelector('.autonomy-world-3d[data-scene="school-campus-v1"] canvas');
-      return canvas instanceof HTMLCanvasElement
-        && canvas.dataset.schoolMapVerificationMarker !== value;
-    }, marker);
-  }
-  await schoolCanvas.waitFor({ state: "visible" });
-  await page.evaluate((preset) => {
-    window.dispatchEvent(new CustomEvent("dronedream:school-map-camera", { detail: { preset } }));
-  }, cameraPreset);
-  await page.waitForTimeout(700);
+async function openProductPage(page, pathname, selector) {
+  await page.goto(`${origin}${pathname}`, { waitUntil: "networkidle" });
+  await clearBlockingDialog(page);
+  await page.locator(selector).waitFor({ state: "visible" });
 }
 
 try {
   await server?.listen();
   browser = await chromium.launch({ channel: "msedge", headless: true });
-  const context = await browser.newContext({ viewport: { width: 1600, height: 1000 }, colorScheme: "light", deviceScaleFactor: 1 });
+  const context = await browser.newContext({
+    viewport: { width: 1600, height: 1000 },
+    colorScheme: "light",
+    deviceScaleFactor: 1,
+  });
   await context.addInitScript(() => {
     window.localStorage.setItem("dronedream:universal-workspace:v2", "universal");
     window.localStorage.setItem("drone-dream:locale", "en");
   });
   const page = await context.newPage();
 
-  await page.goto(`${origin}/console/autonomy/live`, { waitUntil: "networkidle" });
-  await clearBlockingDialog(page);
-  const schoolCanvas = page.locator('.autonomy-world-3d[data-scene="school-campus-v1"] canvas');
-  await schoolCanvas.waitFor({ state: "visible" });
-  await page.waitForTimeout(1800);
-  const world = page.locator(".autonomy-world-3d");
-  if (await world.getAttribute("data-xray") !== "false") throw new Error("School Map must open in solid mode.");
-  if (Number(await world.getAttribute("data-road-segments")) < 8) throw new Error("School Map road graph is incomplete.");
-  if (Number(await world.getAttribute("data-road-junctions")) < 6) throw new Error("School Map intersections are incomplete.");
-  const vehicleDiameter = Number(await world.getAttribute("data-vehicle-collision-diameter-m"));
-  const minimumRoadWidth = Number(await world.getAttribute("data-min-road-width-m"));
-  const openDoorClearance = Number(await world.getAttribute("data-open-door-clearance-m"));
-  if (!(minimumRoadWidth > vehicleDiameter * 4)) throw new Error("School Map roads do not preserve the reviewed My Drone operating envelope.");
-  if (!(openDoorClearance > vehicleDiameter * 2)) throw new Error("School Map teaching entrance does not preserve the reviewed My Drone door clearance.");
-  if (await page.getByRole("button", { name: "X-ray" }).count() !== 1) throw new Error("School Map is missing the X-ray control.");
-  for (const label of ["ALL", "L1", "L2", "L3"]) {
-    if (await page.getByRole("button", { name: label, exact: true }).count() !== 1) throw new Error(`School Map is missing ${label}.`);
+  // The production Live route is now the real camera surface. Validate the
+  // current, reachable map repository here; geometric scene contracts remain
+  // covered by the school-map unit and mission-validation suites.
+  await openProductPage(page, "/console/autonomy/maps", ".autonomy-repository-page");
+  const schoolMap = page.locator(".autonomy-repository-grid article").filter({ hasText: "Kumpula Campus" });
+  if (await schoolMap.count() !== 1) throw new Error("Map repository must expose exactly one Kumpula Campus card.");
+  if (await schoolMap.getAttribute("data-selected") !== "false") throw new Error("Map repository must begin without a selected map.");
+  if (await page.locator(".autonomy-asset-toolbar button").count() !== 0) throw new Error("Map repository must not expose an in-product map creator.");
+  if (await page.getByRole("button", { name: "Import map", exact: true }).count() !== 1) throw new Error("The map repository must expose the upload checklist.");
+  if (await page.getByRole("region", { name: "3D UAV Corridor" }).count() !== 0) throw new Error("The 3D corridor must remain inside the map detail dialog.");
+  const mapScreenshot = path.join(outputRoot, `${screenshotPrefix}school-map-repository-1600x1000.png`);
+  await page.screenshot({ path: mapScreenshot, fullPage: false });
+  await schoolMap.locator(".autonomy-repository-card-surface").dblclick();
+  const mapDialog = page.getByRole("dialog", { name: "Kumpula Campus" });
+  await mapDialog.waitFor({ state: "visible" });
+  const mapCanvas = mapDialog.locator(".autonomy-repository-3d-view canvas");
+  await mapCanvas.waitFor({ state: "visible" });
+  await page.waitForTimeout(500);
+  if (await mapDialog.getByText("No verified 3D geometry is available", { exact: false }).count()) {
+    throw new Error("Kumpula Campus failed to load its verified 3D geometry.");
   }
-  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-solid-1600x1000.png`), fullPage: false });
-  await page.evaluate(() => window.dispatchEvent(new CustomEvent("dronedream:school-map-camera", { detail: { preset: "teaching-entrance" } })));
-  await page.waitForTimeout(700);
-  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-entrances-1600x1000.png`), fullPage: false });
-  await page.evaluate(() => window.dispatchEvent(new CustomEvent("dronedream:school-map-camera", { detail: { preset: "cafeteria-entrance" } })));
-  await page.waitForTimeout(700);
-  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-cafeteria-entrance-1600x1000.png`), fullPage: false });
-  await page.reload({ waitUntil: "networkidle" });
-  await clearBlockingDialog(page);
-  await schoolCanvas.waitFor({ state: "visible" });
-  await page.waitForTimeout(1000);
-  const canvasBounds = await schoolCanvas.boundingBox();
-  if (!canvasBounds) throw new Error("School Map canvas bounds are unavailable for orbit verification.");
-  await page.mouse.move(canvasBounds.x + canvasBounds.width * 0.56, canvasBounds.y + canvasBounds.height * 0.52);
-  await page.mouse.down();
-  await page.mouse.move(canvasBounds.x + canvasBounds.width * 0.76, canvasBounds.y + canvasBounds.height * 0.47, { steps: 14 });
-  await page.mouse.up();
-  await page.waitForTimeout(700);
-  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-solid-west-angle-1600x1000.png`), fullPage: false });
-  await changeSchoolMapView(page, schoolCanvas, "X-ray", "teaching-stair");
-  if (await world.getAttribute("data-xray") !== "true") throw new Error("X-ray state did not reach the rendered world.");
-  for (const floor of ["L1", "L2", "L3"]) {
-    await changeSchoolMapView(page, schoolCanvas, floor, "teaching-stair");
-    await page.screenshot({
-      path: path.join(outputRoot, `${screenshotPrefix}school-map-xray-level-${floor.slice(1)}-1600x1000.png`),
-      fullPage: false,
-    });
+  const mapDetailScreenshot = path.join(outputRoot, `${screenshotPrefix}kumpula-campus-3d-detail-1600x1000.png`);
+  await page.screenshot({ path: mapDetailScreenshot, fullPage: false });
+  await mapDialog.getByRole("button", { name: "Close" }).click();
+
+  await openProductPage(page, "/console/autonomy/aircraft", ".autonomy-repository-page");
+  if (await page.locator(".autonomy-repository-grid article").count() !== 1) {
+    throw new Error("Aircraft repository must expose only the admitted X500 Depth model.");
   }
-  await changeSchoolMapView(page, schoolCanvas, "L1", "cafeteria-stair");
-  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}school-map-xray-cafeteria-stair-1600x1000.png`), fullPage: false });
-  await changeSchoolMapView(page, schoolCanvas, "Solid", "teaching-stair");
-  for (const floor of ["L1", "L2", "L3"]) {
-    await changeSchoolMapView(page, schoolCanvas, floor, "teaching-stair");
-    await page.screenshot({
-      path: path.join(outputRoot, `${screenshotPrefix}school-map-solid-level-${floor.slice(1)}-1600x1000.png`),
-      fullPage: false,
-    });
-  }
+  const myDrone = page.locator(".autonomy-repository-grid article").filter({ hasText: "X500 Depth" });
+  if (await myDrone.count() !== 1) throw new Error("Aircraft repository must expose exactly one X500 Depth card.");
+  if (await myDrone.getAttribute("data-selected") !== "false") throw new Error("Aircraft repository must begin without a selected aircraft.");
+  if (await page.locator(".autonomy-asset-toolbar button").count() !== 0) throw new Error("Aircraft repository must not expose an in-product model creator.");
+  if (await page.getByRole("button", { name: "Import aircraft", exact: true }).count() !== 1) throw new Error("Aircraft repository is missing its external import action.");
+  const aircraftScreenshot = path.join(outputRoot, `${screenshotPrefix}my-drone-repository-1600x1000.png`);
+  await page.screenshot({ path: aircraftScreenshot, fullPage: false });
 
-  await page.goto(`${origin}/console/autonomy/aircraft`, { waitUntil: "networkidle" });
-  await clearBlockingDialog(page);
-  await page.locator(".autonomy-config-page").waitFor({ state: "visible" });
-  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}my-drone-qualified-repository-1600x1000.png`), fullPage: false });
-  const vehicleText = await page.locator("body").innerText();
-  const inputValues = await page.locator("input").evaluateAll((elements) => elements.map((element) => element.value));
-  if (!vehicleText.includes("My Drone") && !inputValues.includes("My Drone")) throw new Error(`Aircraft repository did not open My Drone. Inputs: ${inputValues.join(" | ")}`);
-  if (await page.locator('.autonomy-asset-toolbar button').count() !== 0) throw new Error("Aircraft repository must not expose an in-product model creator.");
-  if (await page.locator('.autonomy-connector-import-actions button').count() < 3) throw new Error("Aircraft repository is missing external import actions.");
-  if (await page.locator('.autonomy-form-grid input:not([readonly])').count() !== 0) throw new Error("Qualified aircraft identity must remain read-only.");
-  if (!vehicleText.includes("External asset import")) throw new Error("Aircraft repository no longer exposes its external-modeling import boundary.");
-
-  await page.goto(`${origin}/console/assistant`, { waitUntil: "networkidle" });
-  await clearBlockingDialog(page);
-  await page.locator(".assistant-add-button").click();
-  if (await page.getByText("My Drone", { exact: true }).count() !== 1) throw new Error("Tuning Chat + must expose exactly one My Drone entry.");
-  if (await page.getByText("School Map", { exact: true }).count() !== 1) throw new Error("Tuning Chat + must expose exactly one School Map entry.");
-  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}tuning-chat-public-assets-1600x1000.png`), fullPage: false });
-
-  await page.evaluate(() => {
-    const updatedAt = new Date().toISOString();
-    const legacyMap = {
-      schemaVersion: 2,
-      id: "map-legacy-5-environment",
-      version: 3,
-      status: "draft",
-      qualificationReceiptId: null,
-      contentHash: null,
-      name: "5 environment",
-      representation: "hybrid-3d",
-      coordinateFrame: "ENU",
-      resolutionM: 0.1,
-      floorCount: 1,
-      liveUpdates: "depth-fusion",
-      calibrated: false,
-      compilerSceneId: null,
-      semanticLayers: ["free-space", "people"],
-      planningLayers: ["collision-geometry", "occupancy"],
-      origin: { latitude: null, longitude: null, altitudeM: null },
-      boundsM: { x: 40, y: 30, z: 12 },
-      confidencePercent: 0,
-      sourceFiles: [],
-      updatedAt,
-    };
-    window.localStorage.setItem("dronedream:autonomy-workspace:v2:local:universal", JSON.stringify({
-      schemaVersion: 2,
-      mapPack: legacyMap,
-      mission: { schemaVersion: 2, mapPackId: legacyMap.id, updatedAt },
-    }));
-    window.localStorage.setItem("dronedream:autonomy-assets:v1:local:universal", JSON.stringify({
-      schemaVersion: 1,
-      aircraft: [],
-      maps: [legacyMap],
-    }));
-  });
-  await page.goto(`${origin}/console/autonomy`, { waitUntil: "networkidle" });
-  await clearBlockingDialog(page);
+  await openProductPage(page, "/console/autonomy", ".autonomy-command-page");
   await page.locator(".assistant-add-button").click();
   const contextPopover = page.locator(".autonomy-context-popover");
   await contextPopover.waitFor({ state: "visible" });
-  const contextGeometry = await contextPopover.evaluate((element) => {
-    const headers = Array.from(element.querySelectorAll(".autonomy-context-group > header span"));
-    const headerRows = Array.from(element.querySelectorAll(".autonomy-context-group > header"));
+  if (await contextPopover.getByText("Select aircraft", { exact: true }).count() !== 1) throw new Error("Mission Context must begin without a selected aircraft.");
+  if (await contextPopover.getByText("Select map", { exact: true }).count() !== 1) throw new Error("Mission Context must begin without a selected map.");
+  const selectMap = contextPopover.getByRole("menuitem", { name: "Select map", exact: true });
+  await selectMap.hover();
+  const mapSubmenu = contextPopover.locator(".autonomy-context-submenu");
+  await mapSubmenu.waitFor({ state: "visible" });
+  if (await mapSubmenu.getByRole("menuitemradio", { name: "Kumpula Campus", exact: true }).count() !== 1) {
+    throw new Error("Map submenu must expose the sole Kumpula Campus selection.");
+  }
+  const [mapRowBox, submenuBox] = await Promise.all([selectMap.boundingBox(), mapSubmenu.boundingBox()]);
+  if (!mapRowBox || !submenuBox) throw new Error("Map submenu geometry could not be measured.");
+  if (submenuBox.y >= mapRowBox.y) throw new Error("Map submenu must expand upward when the composer is near the viewport bottom.");
+  if (submenuBox.y < 0 || submenuBox.y + submenuBox.height > 1000) throw new Error("Map submenu must stay inside the viewport.");
+  const submenuMetrics = await mapSubmenu.evaluate((element) => {
+    const style = getComputedStyle(element);
     return {
-      width: element.getBoundingClientRect().width,
-      headersFit: headers.map((header) => getComputedStyle(header).whiteSpace === "nowrap"),
-      rowsFit: headerRows.map((header) => getComputedStyle(header).flexWrap === "nowrap"),
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      scrollbarWidth: style.scrollbarWidth,
     };
   });
-  if (contextGeometry.width < 440) throw new Error(`Mission Context is still too narrow: ${contextGeometry.width}px.`);
-  if (contextGeometry.headersFit.some((fits) => !fits) || contextGeometry.rowsFit.some((fits) => !fits)) throw new Error(`Mission Context headings wrapped: ${JSON.stringify(contextGeometry)}.`);
-  if (await contextPopover.getByText("5 environment", { exact: true }).count() !== 0) throw new Error("The retired 5 environment map is still visible.");
-  if (await contextPopover.getByText("School Map", { exact: true }).count() !== 1) throw new Error("Mission Context must expose exactly one School Map entry.");
-  if (await contextPopover.locator('input[name="autonomy-map"]:checked').count() !== 0) throw new Error("Opening Mission Context must not silently replace a custom map binding.");
-  if (!await contextPopover.locator('input[name="autonomy-map"][value="map-school"]').isDisabled()) throw new Error("An unqualified School Map must not be selectable.");
-  const reboundMapId = await page.evaluate(() => {
-    const stored = window.localStorage.getItem("dronedream:autonomy-workspace:v2:local:universal");
-    return stored ? JSON.parse(stored).mapPack?.id : null;
-  });
-  if (reboundMapId !== "map-legacy-5-environment") throw new Error(`Mission Context silently replaced the user's unqualified map binding: ${reboundMapId}.`);
-  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}autonomy-mission-context-1600x1000.png`), fullPage: false });
-
-  await page.goto(`${origin}/console/autonomy/maps`, { waitUntil: "networkidle" });
-  await clearBlockingDialog(page);
-  const savedMapLabels = await page.locator('select[aria-label="Saved maps"] option').allTextContents();
-  if (savedMapLabels.some((label) => /\s·\sv\d+$/iu.test(label))) throw new Error(`Map revision suffix returned: ${savedMapLabels.join(" | ")}`);
-  if (savedMapLabels.length !== 1 || savedMapLabels[0] !== "No qualified map bound") {
-    throw new Error(`The offline repository must not present an unqualified map as selectable: ${savedMapLabels.join(" | ")}`);
+  if (submenuMetrics.scrollHeight > submenuMetrics.clientHeight) throw new Error("A one-map submenu must not create unnecessary scrolling.");
+  if (submenuMetrics.scrollbarWidth !== "none") throw new Error("Map submenu scrollbar must remain visually hidden.");
+  const contextScreenshot = path.join(outputRoot, `${screenshotPrefix}autonomy-mission-context-1600x1000.png`);
+  await page.screenshot({ path: contextScreenshot, fullPage: false });
+  await contextPopover.getByRole("menuitem", { name: "Select aircraft", exact: true }).hover();
+  const aircraftOptions = contextPopover.locator(".autonomy-context-submenu .autonomy-context-choice:not(.is-clear)");
+  await aircraftOptions.filter({ hasText: "X500 Depth" }).waitFor({ state: "visible" });
+  if (await aircraftOptions.count() !== 1 || await aircraftOptions.first().innerText() !== "X500 Depth") {
+    throw new Error("Aircraft picker must only expose the admitted X500 Depth default.");
   }
-  if (await page.locator('.autonomy-asset-toolbar button').count() !== 0) throw new Error("Map repository must not expose an in-product map creator.");
-  if (await page.locator('.autonomy-connector-import-actions button').count() < 3) throw new Error("Map repository is missing external import actions.");
-  if (await page.locator('.autonomy-form-grid input').count() !== 0) throw new Error("An unqualified map must not expose an editable in-product model form.");
-  if (await page.getByText("Import a map or world asset from an external modeling tool, then complete paired real-simulation qualification.", { exact: true }).count() !== 1) {
-    throw new Error("The map repository must explain the external-import and real-simulation qualification boundary.");
-  }
-  await page.screenshot({ path: path.join(outputRoot, `${screenshotPrefix}map-repository-unqualified-boundary-1600x1000.png`), fullPage: false });
 
   process.stdout.write(`${JSON.stringify({
-    screenshots: [
-      path.join(outputRoot, `${screenshotPrefix}school-map-solid-1600x1000.png`),
-      path.join(outputRoot, `${screenshotPrefix}school-map-entrances-1600x1000.png`),
-      path.join(outputRoot, `${screenshotPrefix}school-map-cafeteria-entrance-1600x1000.png`),
-      path.join(outputRoot, `${screenshotPrefix}school-map-solid-west-angle-1600x1000.png`),
-      path.join(outputRoot, `${screenshotPrefix}school-map-xray-level-1-1600x1000.png`),
-      path.join(outputRoot, `${screenshotPrefix}school-map-xray-level-2-1600x1000.png`),
-      path.join(outputRoot, `${screenshotPrefix}school-map-xray-level-3-1600x1000.png`),
-      path.join(outputRoot, `${screenshotPrefix}school-map-xray-cafeteria-stair-1600x1000.png`),
-      path.join(outputRoot, `${screenshotPrefix}school-map-solid-level-1-1600x1000.png`),
-      path.join(outputRoot, `${screenshotPrefix}school-map-solid-level-2-1600x1000.png`),
-      path.join(outputRoot, `${screenshotPrefix}school-map-solid-level-3-1600x1000.png`),
-      path.join(outputRoot, `${screenshotPrefix}my-drone-qualified-repository-1600x1000.png`),
-      path.join(outputRoot, `${screenshotPrefix}tuning-chat-public-assets-1600x1000.png`),
-      path.join(outputRoot, `${screenshotPrefix}autonomy-mission-context-1600x1000.png`),
-      path.join(outputRoot, `${screenshotPrefix}map-repository-unqualified-boundary-1600x1000.png`),
-    ],
+    status: "pass",
+    screenshots: [mapScreenshot, mapDetailScreenshot, aircraftScreenshot, contextScreenshot],
   }, null, 2)}\n`);
   await context.close();
 } finally {

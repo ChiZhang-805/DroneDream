@@ -28,9 +28,58 @@ sys.modules[SPEC.name] = runner
 SPEC.loader.exec_module(runner)
 
 
+def _spawn_model_root() -> tuple[float, float, float]:
+    """Return the generated Kumpula PX4 model-root spawn."""
+
+    return (-41.0, -83.0, 0.067)
+
+
 def test_payload_spawn_and_pickup_share_the_same_precise_acceptance_radius() -> None:
-    assert pytest.approx(0.20) == runner.PICKUP_ACCEPTANCE_RADIUS_M
+    assert pytest.approx(0.75) == runner.PICKUP_ACCEPTANCE_RADIUS_M
     assert runner.PICKUP_PAYLOAD_SPAWN_RADIUS_M == runner.PICKUP_ACCEPTANCE_RADIUS_M
+
+
+def test_vehicle_spawn_is_bound_to_the_actual_launch_pad_surface() -> None:
+    semantic = {
+        "runtime_bindings": {
+            "vehicle_spawn": {"x": -41.0, "y": -83.0, "z": 0.067},
+        },
+        "collision_primitives": [
+            {
+                "semantic": "launch-pad",
+                "center_x": -41.0,
+                "center_y": -83.0,
+                "center_z": 0.04,
+                "size_x": 2.4,
+                "size_y": 2.4,
+                "size_z": 0.08,
+            }
+        ],
+    }
+
+    assert runner._validate_vehicle_spawn_contact(semantic, 0.013) == _spawn_model_root()
+
+
+def test_vehicle_spawn_rejects_a_model_that_would_float_above_the_launch_pad() -> None:
+    semantic = {
+        "runtime_bindings": {
+            "vehicle_spawn": {"x": -41.0, "y": -83.0, "z": 0.067},
+        },
+        "collision_primitives": [
+            {
+                "semantic": "launch-pad",
+                "center_x": -41.0,
+                "center_y": -83.0,
+                "center_z": 0.04,
+                "size_x": 2.4,
+                "size_y": 2.4,
+                "size_z": 0.08,
+            }
+        ],
+    }
+
+    with pytest.raises(RuntimeError, match="landing contact disagrees"):
+        runner._validate_vehicle_spawn_contact(semantic, 0.02)
 
 
 def test_live_progress_cannot_jump_across_the_symmetric_return_route() -> None:
@@ -58,7 +107,7 @@ def test_live_progress_does_not_skip_to_a_nearby_return_leg() -> None:
 
 
 def test_designated_landing_pad_contact_is_not_hidden_as_free_flight() -> None:
-    exact = model_root_to_world_envelope_center((-42.25, 15.3, 7.487))
+    exact = model_root_to_world_envelope_center(_spawn_model_root())
     solver_contact = (exact[0], exact[1], exact[2] - 0.000565)
 
     result = runner._dynamic_safety_clearance(
@@ -74,7 +123,7 @@ def test_designated_landing_pad_contact_is_not_hidden_as_free_flight() -> None:
 
 
 def test_landing_contact_over_three_millimeters_fails_the_contact_gate() -> None:
-    endpoint = model_root_to_world_envelope_center((-42.25, 15.3, 7.487))
+    endpoint = model_root_to_world_envelope_center(_spawn_model_root())
     point = (endpoint[0], endpoint[1], endpoint[2] - 0.0031)
 
     result = runner._dynamic_safety_clearance(
@@ -88,7 +137,7 @@ def test_landing_contact_over_three_millimeters_fails_the_contact_gate() -> None
 
 def test_live_clearance_uses_the_same_designated_pad_contact_contract() -> None:
     primitives = runner.school_map_runtime_collision_primitives()
-    spawn_model_root = (-42.25, 15.3, 7.487)
+    spawn_model_root = _spawn_model_root()
     exact = model_root_to_world_envelope_center(spawn_model_root)
     solver_contact = (exact[0], exact[1], exact[2] - 0.0018)
 
@@ -106,7 +155,10 @@ def test_live_clearance_uses_the_same_designated_pad_contact_contract() -> None:
 
 
 def test_runtime_safety_uses_the_same_conservative_geometry_exported_to_gazebo() -> None:
-    point = (16.61, 11.86, 1.465)
+    primitive = next(
+        item for item in school_map_collision_primitives() if item.semantic == "building"
+    )
+    point = (primitive.center_x, primitive.center_y, primitive.center_z)
     detailed_clearance = min(
         vehicle_clearance_to_primitive_m(point, primitive)
         for primitive in school_map_collision_primitives()
@@ -115,15 +167,13 @@ def test_runtime_safety_uses_the_same_conservative_geometry_exported_to_gazebo()
     result = runner._dynamic_safety_clearance(
         [point],
         school_map_runtime_collision_primitives(),
-        model_root_to_world_envelope_center((-42.25, 15.3, 7.487)),
+        model_root_to_world_envelope_center(_spawn_model_root()),
     )
 
-    assert detailed_clearance > 0.56
+    assert detailed_clearance < 0.0
     assert result["unsafe_collision_count"] == 1
-    assert result["minimum_clearance_primitive"] == (
-        "cafeteria-1-table-1-1-conservative-furniture-envelope"
-    )
-    assert result["minimum_clearance_m"] == pytest.approx(-0.01)
+    assert result["minimum_clearance_primitive"] == primitive.name
+    assert result["minimum_clearance_m"] == pytest.approx(detailed_clearance)
 
 
 def test_live_swept_clearance_cannot_skip_a_thin_wall_between_clear_endpoints() -> None:

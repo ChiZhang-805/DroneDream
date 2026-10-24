@@ -3,12 +3,7 @@ from __future__ import annotations
 import pytest
 
 from app.autonomy.catalog import get_scene
-from app.autonomy.school_map_artifact import (
-    PICKUP_ROUTE_CENTER,
-    PICKUP_ROUTE_ENVELOPE_CENTER_Z_M,
-    school_map_collision_primitives,
-    school_map_stair_route_points,
-)
+from app.autonomy.school_map_artifact import school_map_collision_primitives
 from app.autonomy.school_map_mission_validation import (
     VehicleCollisionEnvelope,
     model_root_to_world_envelope_center,
@@ -26,8 +21,14 @@ def _reference_points() -> list[tuple[float, float, float]]:
     return [(point.x, point.y, point.z) for point in scene.reference_path]
 
 
+def _spawn_model_root() -> tuple[float, float, float]:
+    """Return the generated Kumpula PX4 model-root spawn, not a legacy fixture."""
+
+    return (-41.0, -83.0, 0.067)
+
+
 def test_school_map_route_frame_round_trips_every_reference_waypoint() -> None:
-    model_root_world = (-42.25, 15.3, 7.487)
+    model_root_world = _spawn_model_root()
     for world_point in _reference_points():
         local = world_envelope_center_to_px4_local_track(
             world_point,
@@ -40,8 +41,8 @@ def test_school_map_route_frame_round_trips_every_reference_waypoint() -> None:
 
 
 def test_school_map_route_frame_swaps_enu_axes_for_px4_bridge_fields() -> None:
-    origin = (-42.25, 15.3, 7.487)
-    point = (-40.25, 18.3, 8.15)
+    origin = _spawn_model_root()
+    point = (-39.0, -80.0, 8.15)
     executor_x, executor_y, up = world_envelope_center_to_px4_local_track(
         point,
         model_root_world=origin,
@@ -49,12 +50,12 @@ def test_school_map_route_frame_swaps_enu_axes_for_px4_bridge_fields() -> None:
 
     assert executor_x == pytest.approx(3.0)
     assert executor_y == pytest.approx(2.0)
-    assert up == pytest.approx(8.15 - 0.228 - 7.487)
+    assert up == pytest.approx(8.15 - 0.228 - _spawn_model_root()[2])
 
 
 def test_office_launch_model_root_touches_pad_without_penetration() -> None:
     primitives = {item.name: item for item in school_map_collision_primitives()}
-    envelope_center = model_root_to_world_envelope_center((-42.25, 15.3, 7.487))
+    envelope_center = model_root_to_world_envelope_center(_spawn_model_root())
     clearance = vehicle_clearance_to_primitive_m(
         envelope_center,
         primitives["office-drone-launch-pad"],
@@ -72,41 +73,28 @@ def test_reference_route_has_no_static_penetration_at_40_mm_sampling() -> None:
     assert result.minimum_clearance_m >= -0.001
 
 
-def test_pickup_hover_preserves_operational_clearance_from_shelf() -> None:
+def test_pickup_hover_preserves_operational_clearance_from_handoff_pad() -> None:
     primitives = {item.name: item for item in school_map_collision_primitives()}
     clearance = vehicle_clearance_to_primitive_m(
-        (*PICKUP_ROUTE_CENTER, PICKUP_ROUTE_ENVELOPE_CENTER_Z_M),
-        primitives["pickup-shelf"],
+        (43.0, 55.0, 2.0),
+        primitives["takeout-pickup-pad"],
     )
 
-    # 0.35 m is the runtime operating reserve; retain another 0.20 m at the
-    # semantic endpoint so localization and tracking error do not erase it.
-    assert clearance >= 0.55
+    assert clearance >= 1.7
 
 
-def test_stair_route_turns_square_on_landings_with_tracking_margin() -> None:
-    ascending = school_map_stair_route_points("ascending")
-    expected_landing_pairs = (
-        ((-1.12, 12.98, 2.87), (0.92, 12.98, 2.87)),
-        ((0.92, 8.02, 4.67), (-1.12, 8.02, 4.67)),
-        ((-1.12, 12.98, 6.47), (0.92, 12.98, 6.47)),
-        ((0.92, 8.02, 8.27), (-1.12, 8.02, 8.27)),
-    )
-    for start, end in expected_landing_pairs:
-        index = ascending.index(pytest.approx(start))
-        assert ascending[index + 1] == pytest.approx(end)
-
-    stair_primitives = [
+def test_route_preserves_tracking_margin_from_real_kumpula_buildings() -> None:
+    building_primitives = [
         primitive
         for primitive in school_map_collision_primitives()
-        if primitive.name.startswith("teaching-stair")
+        if primitive.semantic == "building"
     ]
     result = validate_route_clearance(
         sample_polyline(_reference_points(), interval_m=0.04),
-        stair_primitives,
+        building_primitives,
     )
     assert result.collision_count == 0, result.collisions
-    assert result.minimum_clearance_m >= 0.25
+    assert result.minimum_clearance_m >= 3.6
 
 
 def test_actual_model_root_samples_use_explicit_vertical_center_offset() -> None:

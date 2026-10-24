@@ -168,7 +168,8 @@ def test_authenticated_ui_observer_switches_real_universal_workspaces() -> None:
     assert "assert.equal(await workspaceModeSelector.inputValue(), edition)" in observer
     assert "async function assertAuthenticatedAccountSurface(page)" in observer
     assert 'menuPanel.locator(".app-account-button:visible")' in observer
-    assert "data-theme-grants-hardware-authority" in observer
+    assert ".launcher-flight-illustration" in observer
+    assert 'launcherSurface = { renderer: "lightweight-svg", canvasCount: 0 }' in observer
     assert (
         "validationSurface: authenticatedWorkspace "
         '? "authenticated-workspace" : "pre-auth-launcher"' in observer

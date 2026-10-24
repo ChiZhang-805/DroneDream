@@ -1,5 +1,7 @@
 # DroneDream Docs
 
+- [Project Memory and User Requirements](./PROJECT_MEMORY.md)
+- [AGENT Manual Acceptance](./AGENT_MANUAL_ACCEPTANCE.md)
 - [01 Overview](./01-overview.md)
 - [02 Architecture](./02-architecture.md)
 - [03 Runpod Setup](./03-runpod-setup.md)

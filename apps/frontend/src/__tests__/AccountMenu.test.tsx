@@ -276,13 +276,7 @@ describe("sidebar account menu", () => {
 
     const quickSettings = screen.getByRole("dialog", { name: "Settings" });
     expect(within(quickSettings).getByText("Language")).toBeVisible();
-    expect(within(quickSettings).getByText("Appearance")).toBeVisible();
-    const appearance = within(quickSettings).getByRole("group", { name: "Appearance" });
-    expect(within(appearance).getAllByRole("button")).toHaveLength(2);
-    expect(within(appearance).getByRole("button", { name: "Dark" })).toBeVisible();
-    expect(within(appearance).getByRole("button", { name: "Light" })).toBeVisible();
-    expect(within(appearance).queryByRole("button", { name: "System" })).not.toBeInTheDocument();
-    expect(within(appearance).queryByRole("button", { name: "Custom" })).not.toBeInTheDocument();
+    expect(within(quickSettings).queryByText("Appearance")).not.toBeInTheDocument();
     expect(within(quickSettings).getByText("Account memory")).toBeVisible();
     expect(within(quickSettings).getByText("This edition's memory")).toBeVisible();
     expect(within(quickSettings).getByRole("combobox", {

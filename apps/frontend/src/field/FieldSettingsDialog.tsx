@@ -6,14 +6,12 @@ import {
   ChevronRight,
   MapPinned,
   MonitorCog,
-  Moon,
   Plane,
   Save,
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
   Settings,
-  Sun,
   Workflow,
   X,
 } from "lucide-react";
@@ -36,7 +34,6 @@ import {
 import { isDesktopRuntime, startRuntimeUpgrade } from "../desktop/bridge";
 import { useModelAccess } from "../features/settings/ModelAccessContext";
 import { localeSafeError, type InterfaceLocale } from "../i18n/I18nProvider";
-import { useEditionTheme } from "../theme/EditionThemeProvider";
 import type { FieldLocale } from "./catalog";
 
 const ECE498BH_COURSE_URL =
@@ -114,9 +111,7 @@ const COPY = {
     allSettings: "All settings",
     tabs: ["General", "Memory", "Models", "Runtime"] as const,
     language: "Language",
-    interface: "Interface",
     notifications: "Notifications",
-    appearance: ["Dark", "Light"] as const,
     notificationLabels: [
       "Allow notifications",
       "Experiment and task completed",
@@ -178,9 +173,7 @@ const COPY = {
     allSettings: "全部设置",
     tabs: ["常规", "记忆", "模型", "Runtime"] as const,
     language: "语言",
-    interface: "界面",
     notifications: "通知",
-    appearance: ["深色", "浅色"] as const,
     notificationLabels: [
       "允许通知",
       "实验与任务完成",
@@ -347,7 +340,6 @@ export function FieldSettingsDialog({
     text: string;
   } | null>(null);
   const modelAccess = useModelAccess();
-  const editionTheme = useEditionTheme();
   const copy = COPY[interfaceLocale === "zh-CN" ? "zh-CN" : "en"];
   const modelSummary = modelAccess.settings.accessMode === "platform"
     ? modelAccess.settings.managedModel
@@ -508,30 +500,6 @@ export function FieldSettingsDialog({
               ))}
             </div>
           </div>
-          <div className="quick-settings-item quick-settings-appearance">
-            <span>{copy.interface}</span>
-            <div
-              className="quick-settings-appearance-options"
-              role="group"
-              aria-label={copy.interface}
-            >
-              {([
-                ["dark", Moon],
-                ["light", Sun],
-              ] as const).map(([appearance, Icon], index) => (
-                <button
-                  key={appearance}
-                  type="button"
-                  className={editionTheme.appearancePreference === appearance ? "selected" : undefined}
-                  aria-pressed={editionTheme.appearancePreference === appearance}
-                  onClick={() => editionTheme.setAppearance(appearance)}
-                >
-                  <Icon aria-hidden="true" />
-                  <span>{copy.appearance[index]}</span>
-                </button>
-              ))}
-            </div>
-          </div>
           <div className="quick-settings-item quick-settings-memory">
             <SettingsToggle
               checked={accountMemoryEnabled}
@@ -626,29 +594,6 @@ export function FieldSettingsDialog({
                 </button>
               ))}
             </fieldset>
-          </div>
-          <div className="settings-general-card settings-interface-card">
-            <div className="settings-card-heading">
-              <span><SlidersHorizontal aria-hidden="true" />{copy.interface}</span>
-            </div>
-            <div className="settings-appearance-options" role="group" aria-label={copy.interface}>
-              {([
-                ["dark", Moon],
-                ["light", Sun],
-              ] as const).map(([appearance, Icon], index) => (
-                <button
-                  key={appearance}
-                  type="button"
-                  className={editionTheme.appearancePreference === appearance ? "selected" : undefined}
-                  aria-pressed={editionTheme.appearancePreference === appearance}
-                  onClick={() => editionTheme.setAppearance(appearance)}
-                >
-                  <Icon aria-hidden="true" />
-                  <strong>{copy.appearance[index]}</strong>
-                  <i aria-hidden="true">✓</i>
-                </button>
-              ))}
-            </div>
           </div>
           <div className="settings-general-card settings-notification-card">
             <div className="settings-card-heading">

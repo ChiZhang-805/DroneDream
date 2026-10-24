@@ -39,9 +39,8 @@ if (!files.includes("index.html")) {
   throw new Error(`${edition} build is missing the shared AppShell entrypoint`);
 }
 
-// These routes are the common website-console contract. SimOverview used to
-// be a separately named chunk, but its content now lives in the shared console
-// shell; checking that historical filename would reject a valid current build.
+// These routes are the common website-console contract and must be present in
+// every edition build produced from the shared shell.
 const sharedConsoleChunks = [
   "AutonomyPlatform",
   "Dashboard",

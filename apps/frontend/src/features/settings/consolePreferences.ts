@@ -1,6 +1,5 @@
 import type { BrandEditionId } from "../../brand/edition-brand.generated";
 import type { InterfaceLocale } from "../../i18n/I18nProvider";
-import type { AppearancePreference } from "../../theme/EditionThemeProvider";
 import { supabaseClient } from "../auth/supabaseClient";
 
 const PERSONAL_ORGANIZATION_ID = "00000000-0000-0000-0000-000000000000";
@@ -66,7 +65,8 @@ export interface ConsolePreferenceBoundary {
 
 export interface ConsolePreferenceRecord {
   interface_locale: InterfaceLocale;
-  appearance_mode: AppearancePreference;
+  /** Legacy database column retained for backward compatibility; the UI palette is fixed. */
+  appearance_mode: "dark" | "light" | "system" | "custom";
   custom_accent: string;
   notifications: Record<string, boolean>;
   memory_enabled: boolean;
