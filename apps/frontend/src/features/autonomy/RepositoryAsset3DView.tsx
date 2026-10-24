@@ -39,7 +39,13 @@ type CatalogBuildingFootprint = {
   height_m: number;
   points: [number, number][];
   semantic: "building";
+  name: string;
+  name_zh: string;
+  function: string;
+  function_zh: string;
 };
+
+type SelectedBuilding = Pick<CatalogBuildingFootprint, "building_id" | "name" | "name_zh" | "function" | "function_zh">;
 
 type CatalogMapGeometry = {
   schema_version: "dronedream.catalog-map-geometry.v1";
@@ -141,6 +147,13 @@ function catalogMapModel(geometry: CatalogMapGeometry): THREE.Group {
     buildingGeometry.rotateX(-Math.PI / 2);
     const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
     building.name = footprint.building_id;
+    building.userData.catalogBuilding = {
+      building_id: footprint.building_id,
+      name: footprint.name,
+      name_zh: footprint.name_zh,
+      function: footprint.function,
+      function_zh: footprint.function_zh,
+    } satisfies SelectedBuilding;
     building.castShadow = true;
     building.receiveShadow = true;
     root.add(building);
@@ -221,6 +234,7 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese }: Props
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [selectedBuilding, setSelectedBuilding] = useState<SelectedBuilding | null>(null);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -242,6 +256,7 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese }: Props
     renderer.shadowMap.enabled = true;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
     mount.appendChild(renderer.domElement);
+    setSelectedBuilding(null);
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf7fafc);
@@ -264,6 +279,30 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese }: Props
     controls.minDistance = kind === "map" ? 5 : 2.8;
     controls.maxDistance = kind === "map" ? 125 : 30;
     controls.target.set(0, kind === "map" ? 2.6 : 0, 0);
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let pointerDown: { x: number; y: number } | null = null;
+    const onPointerDown = (event: PointerEvent) => {
+      pointerDown = { x: event.clientX, y: event.clientY };
+    };
+    const onPointerUp = (event: PointerEvent) => {
+      if (kind !== "map" || !pointerDown) return;
+      const distance = Math.hypot(event.clientX - pointerDown.x, event.clientY - pointerDown.y);
+      pointerDown = null;
+      if (distance > 5) return;
+      const rect = renderer.domElement.getBoundingClientRect();
+      pointer.set(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+      raycaster.setFromCamera(pointer, camera);
+      const hit = raycaster.intersectObjects(modelRoot.children, true)
+        .find((intersection) => Boolean(intersection.object.userData.catalogBuilding));
+      setSelectedBuilding((hit?.object.userData.catalogBuilding as SelectedBuilding | undefined) ?? null);
+    };
+    renderer.domElement.addEventListener("pointerdown", onPointerDown);
+    renderer.domElement.addEventListener("pointerup", onPointerUp);
 
     const modelRoot = new THREE.Group();
     scene.add(modelRoot);
@@ -317,6 +356,8 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese }: Props
       cancelled = true;
       window.cancelAnimationFrame(frame);
       observer.disconnect();
+      renderer.domElement.removeEventListener("pointerdown", onPointerDown);
+      renderer.domElement.removeEventListener("pointerup", onPointerUp);
       controls.dispose();
       disposeScene(scene);
       renderer.dispose();
@@ -336,6 +377,13 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese }: Props
         ? (chinese ? "没有可验证的三维几何，未生成替代模型。" : "No verified 3D geometry is available; no substitute model was generated.")
         : (chinese ? "当前设备无法创建三维视图。" : "3D view is unavailable on this device.")}</p> : null}
       {loading ? <p className="autonomy-repository-3d-loading">{chinese ? "正在加载三维场景…" : "Loading 3D scene…"}</p> : null}
+      {selectedBuilding ? <aside className="autonomy-repository-building-card" aria-live="polite">
+        <dl>
+          <div><dt>{chinese ? "建筑名称" : "Name"}</dt><dd>{chinese ? selectedBuilding.name_zh : selectedBuilding.name}</dd></div>
+          <div><dt>{chinese ? "建筑功能" : "Function"}</dt><dd>{chinese ? selectedBuilding.function_zh : selectedBuilding.function}</dd></div>
+        </dl>
+        <button type="button" onClick={() => setSelectedBuilding(null)} aria-label={chinese ? "关闭建筑介绍" : "Close building details"}>×</button>
+      </aside> : null}
     </div>
   );
 }

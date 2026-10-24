@@ -83,9 +83,30 @@ try {
   if (await mapDialog.getByText("No verified 3D geometry is available", { exact: false }).count()) {
     throw new Error("Kumpula Campus failed to load its verified 3D geometry.");
   }
+  const geometryResponse = await page.request.get(`${origin}/console/asset-geometry/maps/kumpula-campus.json`);
+  const geometry = await geometryResponse.json();
+  if (geometry.building_footprints?.length !== 42) throw new Error("Kumpula Campus must expose all 42 verified building footprints.");
+  for (const building of geometry.building_footprints) {
+    for (const field of ["name", "name_zh", "function", "function_zh"]) {
+      if (typeof building[field] !== "string" || !building[field].trim()) {
+        throw new Error(`Building ${building.building_id} is missing ${field}.`);
+      }
+    }
+  }
+  const canvasBox = await mapCanvas.boundingBox();
+  if (!canvasBox) throw new Error("Kumpula Campus canvas geometry could not be measured.");
+  for (const [xRatio, yRatio] of [[0.52, 0.5], [0.47, 0.54], [0.57, 0.46], [0.43, 0.47]]) {
+    await mapCanvas.click({ position: { x: canvasBox.width * xRatio, y: canvasBox.height * yRatio } });
+    if (await mapDialog.locator(".autonomy-repository-building-card").count()) break;
+  }
+  const buildingCard = mapDialog.locator(".autonomy-repository-building-card");
+  await buildingCard.waitFor({ state: "visible" });
+  if (await buildingCard.locator("dt").allTextContents().then((labels) => labels.join("|") !== "Name|Function")) {
+    throw new Error("A selected building must show only its name and function.");
+  }
   const mapDetailScreenshot = path.join(outputRoot, `${screenshotPrefix}kumpula-campus-3d-detail-1600x1000.png`);
   await page.screenshot({ path: mapDetailScreenshot, fullPage: false });
-  await mapDialog.getByRole("button", { name: "Close" }).click();
+  await mapDialog.getByRole("button", { name: "Close", exact: true }).click();
 
   await openProductPage(page, "/console/autonomy/aircraft", ".autonomy-repository-page");
   if (await page.locator(".autonomy-repository-grid article").count() !== 1) {
