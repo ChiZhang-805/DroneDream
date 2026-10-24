@@ -17,14 +17,19 @@ const EDITIONS: ReadonlyArray<{ id: SoftwareEditionId; label: string; mark: stri
 export function EditionLicenseStrip({
   licenses,
   locale = "en",
+  mode = "licensed",
 }: {
   licenses: readonly SoftwareEditionId[];
   locale?: "en" | "zh-CN";
+  mode?: "licensed" | "used";
 }) {
   const active = new Set(licenses);
+  const usedMode = mode === "used";
   return (
     <span className="edition-license-strip" aria-label={
-      locale === "zh-CN" ? "已授权软件" : "Licensed applications"
+      usedMode
+        ? locale === "zh-CN" ? "已使用的软件" : "Used applications"
+        : locale === "zh-CN" ? "已授权软件" : "Licensed applications"
     }>
       {EDITIONS.map((edition) => (
         <span
@@ -32,13 +37,21 @@ export function EditionLicenseStrip({
           className={active.has(edition.id) ? "is-active" : "is-inactive"}
           title={`${edition.label}: ${
             active.has(edition.id)
-              ? locale === "zh-CN" ? "已授权" : "Licensed"
-              : locale === "zh-CN" ? "未授权" : "Not licensed"
+              ? usedMode
+                ? locale === "zh-CN" ? "已使用" : "Used"
+                : locale === "zh-CN" ? "已授权" : "Licensed"
+              : usedMode
+                ? locale === "zh-CN" ? "尚未使用" : "Not used"
+                : locale === "zh-CN" ? "未授权" : "Not licensed"
           }`}
           aria-label={`${edition.label} ${
             active.has(edition.id)
-              ? locale === "zh-CN" ? "已授权" : "licensed"
-              : locale === "zh-CN" ? "未授权" : "not licensed"
+              ? usedMode
+                ? locale === "zh-CN" ? "已使用" : "used"
+                : locale === "zh-CN" ? "已授权" : "licensed"
+              : usedMode
+                ? locale === "zh-CN" ? "尚未使用" : "not used"
+                : locale === "zh-CN" ? "未授权" : "not licensed"
           }`}
         >
           <img src={edition.mark} alt="" />

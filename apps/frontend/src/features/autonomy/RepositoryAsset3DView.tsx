@@ -34,8 +34,16 @@ type CatalogGraphEdge = {
   to_node: string;
 };
 
+type CatalogBuildingFootprint = {
+  building_id: string;
+  height_m: number;
+  points: [number, number][];
+  semantic: "building";
+};
+
 type CatalogMapGeometry = {
   schema_version: "dronedream.catalog-map-geometry.v1";
+  building_footprints?: CatalogBuildingFootprint[];
   primitives: CatalogCollisionPrimitive[];
   nodes: CatalogGraphNode[];
   edges: CatalogGraphEdge[];
@@ -97,7 +105,10 @@ function catalogMapModel(geometry: CatalogMapGeometry): THREE.Group {
   });
   const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xb7bdc9, roughness: 0.78, metalness: 0.03 });
   const obstacleMaterial = new THREE.MeshStandardMaterial({ color: 0x8d96a5, roughness: 0.8, metalness: 0.04 });
+  const buildingMaterial = new THREE.MeshStandardMaterial({ color: 0xb7bdc9, roughness: 0.78, metalness: 0.03 });
+  const hasExactBuildingFootprints = Boolean(geometry.building_footprints?.length);
   for (const primitive of geometry.primitives) {
+    if (primitive.semantic === "building" && hasExactBuildingFootprints) continue;
     const material = primitive.semantic === "terrain"
       ? terrainMaterial
       : primitive.semantic === "wall"
@@ -109,6 +120,30 @@ function catalogMapModel(geometry: CatalogMapGeometry): THREE.Group {
     mesh.castShadow = primitive.semantic !== "terrain";
     mesh.receiveShadow = true;
     root.add(mesh);
+  }
+
+  for (const footprint of geometry.building_footprints ?? []) {
+    if (footprint.points.length < 3 || !Number.isFinite(footprint.height_m) || footprint.height_m <= 0) continue;
+    const shape = new THREE.Shape();
+    footprint.points.forEach(([x, y], index) => {
+      if (index === 0) shape.moveTo(x, y);
+      else shape.lineTo(x, y);
+    });
+    shape.closePath();
+    const buildingGeometry = new THREE.ExtrudeGeometry(shape, {
+      depth: footprint.height_m,
+      bevelEnabled: false,
+      curveSegments: 1,
+      steps: 1,
+    });
+    // ExtrudeGeometry grows along local +Z. Rotating -90 degrees maps that
+    // height to world +Y while preserving map ENU as world (X, -Z).
+    buildingGeometry.rotateX(-Math.PI / 2);
+    const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
+    building.name = footprint.building_id;
+    building.castShadow = true;
+    building.receiveShadow = true;
+    root.add(building);
   }
 
   const nodeById = new Map(geometry.nodes.map((node) => [node.node_id, node]));
