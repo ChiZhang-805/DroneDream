@@ -1,5 +1,5 @@
 import { StrictMode } from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const oauthMock = vi.hoisted(() => ({
@@ -115,6 +115,64 @@ describe("desktop OAuth consent page", () => {
         "http://127.0.0.1:49214/desktop-auth/autonomy/callback?code=code&state=state",
       );
     });
+  });
+
+  it("retries a failed details request before approving and returning to the desktop", async () => {
+    const onDesktopRedirect = vi.fn();
+    const callback = `${agentAuthorizationDetails.redirect_uri}?code=code&state=state`;
+    oauthMock.getAuthorizationDetails
+      .mockRejectedValueOnce(new Error("Network unavailable"))
+      .mockResolvedValueOnce({ data: agentAuthorizationDetails, error: null });
+    oauthMock.approveAuthorization.mockResolvedValue({ data: { redirect_url: callback }, error: null });
+    render(
+      <OAuthConsentPage
+        locale="en" account={account} authConfigured authLoading={false}
+        onRequireSignIn={vi.fn()} onRequireRegistration={vi.fn()}
+        onSwitchAccount={vi.fn()} onDesktopRedirect={onDesktopRedirect}
+      />,
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not be verified/i);
+    expect(oauthMock.approveAuthorization).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    await waitFor(() => expect(onDesktopRedirect).toHaveBeenCalledExactlyOnceWith(callback));
+    expect(oauthMock.getAuthorizationDetails).toHaveBeenCalledTimes(2);
+    expect(oauthMock.getAuthorizationDetails).toHaveBeenLastCalledWith("authorization-1");
+    expect(oauthMock.approveAuthorization).toHaveBeenCalledExactlyOnceWith(
+      "authorization-1", { skipBrowserRedirect: true },
+    );
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("re-fetches details after an approval failure before trying to approve again", async () => {
+    const freshDetails = deferred<unknown>();
+    const onDesktopRedirect = vi.fn();
+    const callback = `${agentAuthorizationDetails.redirect_uri}?code=new-code&state=state`;
+    oauthMock.getAuthorizationDetails
+      .mockResolvedValueOnce({ data: agentAuthorizationDetails, error: null })
+      .mockReturnValueOnce(freshDetails.promise);
+    oauthMock.approveAuthorization
+      .mockResolvedValueOnce({ data: null, error: new Error("Network unavailable") })
+      .mockResolvedValueOnce({ data: { redirect_url: callback }, error: null });
+    render(
+      <OAuthConsentPage
+        locale="en" account={account} authConfigured authLoading={false}
+        onRequireSignIn={vi.fn()} onRequireRegistration={vi.fn()}
+        onSwitchAccount={vi.fn()} onDesktopRedirect={onDesktopRedirect}
+      />,
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not be verified/i);
+    expect(oauthMock.approveAuthorization).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    await waitFor(() => expect(oauthMock.getAuthorizationDetails).toHaveBeenCalledTimes(2));
+    expect(oauthMock.approveAuthorization).toHaveBeenCalledTimes(1);
+    expect(onDesktopRedirect).not.toHaveBeenCalled();
+    await act(async () => freshDetails.resolve({ data: agentAuthorizationDetails, error: null }));
+    await waitFor(() => expect(onDesktopRedirect).toHaveBeenCalledExactlyOnceWith(callback));
+    expect(oauthMock.approveAuthorization).toHaveBeenCalledTimes(2);
   });
 
   it("does not approve a new transaction with stale details or follow its stale completion", async () => {

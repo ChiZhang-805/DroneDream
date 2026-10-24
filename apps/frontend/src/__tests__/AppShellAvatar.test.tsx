@@ -153,6 +153,7 @@ describe("workspace profile photo editor", () => {
       .not.toBeInTheDocument();
     expect(getUserMedia).not.toHaveBeenCalled();
     const dialog = openAccountDialog();
+    expect(within(dialog).queryByText("DroneDream account")).not.toBeInTheDocument();
 
     expect(within(dialog).getByText("Profile photo")).toBeVisible();
     expect(
@@ -231,6 +232,9 @@ describe("workspace profile photo editor", () => {
 
     const cropDialog = screen.getByRole("dialog", { name: "Crop profile photo" });
     expect(createObjectURL).toHaveBeenCalledTimes(1);
+    expect(within(cropDialog).queryByText(/Drag the image to position/u)).not.toBeInTheDocument();
+    expect(within(cropDialog).getByRole("button", { name: "Close photo cropper" })
+      .querySelector("svg")).not.toBeNull();
     expect(within(cropDialog).getByRole("group", {
       name: "Profile photo crop area",
     })).toBeVisible();

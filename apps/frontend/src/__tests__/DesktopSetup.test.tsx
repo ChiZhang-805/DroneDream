@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BUILD_EDITION } from "../edition";
 
 
 const optionalAuthState = vi.hoisted(() => ({
@@ -18,6 +17,7 @@ const optionalAuthState = vi.hoisted(() => ({
     } | null;
   },
 }));
+const passwordSignIn = vi.hoisted(() => vi.fn(async () => undefined));
 const updaterState = vi.hoisted(() => ({
   current: {
     status: "current" as
@@ -45,6 +45,19 @@ const updaterState = vi.hoisted(() => ({
     reconcileComponentPacks: vi.fn(async () => undefined),
   },
 }));
+const browserAuthMocks = vi.hoisted(() => ({
+  googleEnabled: false,
+  complete: vi.fn(async () => undefined),
+  configuration: {
+    supabaseUrl: "https://yggabfynndpzymlqvnim.supabase.co",
+    publishableKey: "public-test-key-for-browser-auth",
+  } as { supabaseUrl: string; publishableKey: string } | null,
+  adoptSession: vi.fn<
+    (session: BrowserAuthSession, options?: { signal?: AbortSignal }) => Promise<void>
+  >(async () => undefined),
+  shouldClearVault: vi.fn(() => false),
+}));
+
 const runtimeSessionContractMocks = vi.hoisted(() => ({
   verify: vi.fn(async <T,>(report: T) => report),
 }));
@@ -55,12 +68,13 @@ vi.mock("../features/auth/AuthContext", async (importOriginal) => {
   return {
     ...original,
     useOptionalAuth: () => optionalAuthState.current,
-    useAuthOrLocal: () => ({ configured: optionalAuthState.current?.configured ?? true,
-      signInWithPassword: async () => { optionalAuthState.current = { configured: true, loading: false,
-        account: { id: "accepted", email: "pilot@example.com", displayName: "Pilot", avatarUrl: null } }; },
-      sendRegistrationCode: async () => undefined,
-      verifyRegistrationCode: async () => { optionalAuthState.current = { configured: true, loading: false,
-        account: { id: "registered", email: "pilot@example.com", displayName: "Pilot", avatarUrl: null } }; },
+    useAuthOrLocal: () => ({
+      configured: optionalAuthState.current?.configured ?? true,
+      signInWithPassword: passwordSignIn,
+      sendRegistrationCode: vi.fn(async () => undefined),
+      verifyRegistrationCode: vi.fn(async () => undefined),
+      sendRecoveryCode: vi.fn(async () => undefined),
+      verifyRecoveryCode: vi.fn(async () => undefined),
     }),
   };
 });
@@ -73,6 +87,26 @@ vi.mock("../desktop/updaterContext", async (importOriginal) => {
     useAppUpdaterState: () => updaterState.current,
   };
 });
+
+vi.mock("../features/auth/supabaseClient", async (importOriginal) => {
+  const original =
+    await importOriginal<typeof import("../features/auth/supabaseClient")>();
+  return {
+    ...original,
+    browserAuthConfiguration: () => browserAuthMocks.configuration,
+    get googleAuthEnabled() { return browserAuthMocks.googleEnabled; },
+  };
+});
+
+vi.mock("../features/auth/desktopBrowserSignIn", () => ({
+  completeDesktopBrowserSignIn: browserAuthMocks.complete,
+  cancelDesktopBrowserSignIn: vi.fn(async (controller: AbortController) => { controller.abort(); return true; }),
+}));
+
+vi.mock("../features/auth/browserAuth", () => ({
+  adoptBrowserAuthSession: browserAuthMocks.adoptSession,
+  shouldClearBrowserAuthVaultAfterAdoptionError: browserAuthMocks.shouldClearVault,
+}));
 
 vi.mock("../desktop/runtimeSessionContract", async (importOriginal) => {
   const original = await importOriginal<
@@ -98,6 +132,7 @@ import { I18nProvider } from "../i18n/I18nProvider";
 import { DesktopSetup } from "../pages/DesktopSetup";
 import { resetDesktopReadinessSession } from "../desktop/readiness";
 import { DesktopRuntimeAccessProvider } from "../desktop/access";
+import { editionLandingPath } from "../edition";
 
 const prerequisites: SystemPrerequisiteReport = {
   platform: "windows",
@@ -485,9 +520,21 @@ afterEach(() => {
 
 describe("DesktopSetup", () => {
   beforeEach(() => {
-    // Runtime recovery cases begin after explicit account authentication.
-    optionalAuthState.current = { configured: true, loading: false,
-      account: { id: "runtime-test", email: "pilot@example.com", displayName: "Pilot", avatarUrl: null } };
+    optionalAuthState.current = {
+      configured: true,
+      loading: false,
+      account: { id: "runtime-test", email: "pilot@example.com", displayName: "Pilot", avatarUrl: null },
+    };
+    passwordSignIn.mockReset();
+    browserAuthMocks.googleEnabled = false;
+    browserAuthMocks.complete.mockReset();
+    passwordSignIn.mockImplementation(async () => {
+      optionalAuthState.current = {
+        configured: true,
+        loading: false,
+        account: { id: "accepted", email: "pilot@example.com", displayName: "Pilot", avatarUrl: null },
+      };
+    });
   });
   it("explains the capability boundary in a normal browser", () => {
     renderPage();
@@ -498,10 +545,61 @@ describe("DesktopSetup", () => {
     expect(screen.queryByRole("button", { name: "Check again" })).not.toBeInTheDocument();
   });
 
-  it("shows email login immediately and keeps native/browser sessions closed", async () => {
-    optionalAuthState.current = null;
+  it("uses the approved raster startup and evidence-based readiness stages", async () => {
+    let resolvePrerequisites!: (report: SystemPrerequisiteReport) => void;
+    const pendingPrerequisites = new Promise<SystemPrerequisiteReport>((resolve) => {
+      resolvePrerequisites = resolve;
+    });
     const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return pendingPrerequisites;
+      if (command === "probe_runtime_status") return runtime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    const { container } = renderPage();
+    expect(container.querySelector("img.launcher-flight-image"))
+      .toHaveAttribute("src", expect.stringMatching(/launcher-campus(?:-(?:universal|sim|lab|field))?\.png/u));
+    expect(container.querySelector("canvas, .drone-launch-scene")).toBeNull();
+    expect([...container.querySelectorAll(".launcher-stage-list strong")].map((node) => node.textContent))
+      .toEqual(["Check system", "Start runtime", "Connect services", "Open workspace"]);
+    expect(container.querySelector('.launcher-stage-list [aria-current="step"]'))
+      .toHaveTextContent("Check system");
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "0");
+    expect(screen.queryByText("Ready to install")).not.toBeInTheDocument();
+    expect(screen.getByTestId("current-route")).toHaveTextContent("/");
+    expect(invoke).not.toHaveBeenCalledWith("probe_runtime_status", undefined);
+
+    await act(async () => { resolvePrerequisites(prerequisites); });
+    await waitFor(() => {
+      expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
+      expect(screen.getByTestId("current-route")).toHaveTextContent(editionLandingPath());
+    });
+    expect(container.querySelectorAll(".launcher-stage-list .is-complete")).toHaveLength(4);
+    expect(container.querySelector('.launcher-stage-list [aria-current="step"]')).toBeNull();
+    expect(invoke).toHaveBeenCalledTimes(2);
+    expect(invoke).not.toHaveBeenCalledWith("get_runtime_install_plan", expect.anything());
+  });
+
+  it("offers direct sign-in without treating a loading account as authenticated", async () => {
+    optionalAuthState.current = { configured: true, loading: true, account: null };
+    window.__TAURI__ = { core: { invoke: vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return runtime;
+      throw new Error(`Unexpected command: ${command}`);
+    }) } };
+    renderPage();
+    expect(await screen.findByText("DroneDreamRuntime · Installed · Running")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("current-route")).toHaveTextContent("/");
+  });
+
+  it("offers the direct account form immediately while runtime checks are pending", async () => {
+    optionalAuthState.current = { configured: true, loading: false, account: null };
+    let resolvePrerequisites!: (report: SystemPrerequisiteReport) => void;
+    const pendingPrerequisites = new Promise<SystemPrerequisiteReport>((resolve) => { resolvePrerequisites = resolve; });
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return pendingPrerequisites;
       if (command === "probe_runtime_status") return runtime;
       throw new Error(`Unexpected command: ${command}`);
     });
@@ -509,15 +607,196 @@ describe("DesktopSetup", () => {
     renderPage();
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
-    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /browser/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Forgot password?" })).toBeInTheDocument();
-    expect(await screen.findByText("The installed runtime is ready.")).toBeInTheDocument();
+    expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Sign in and enter DroneDream" })).not.toBeInTheDocument();
     expect(invoke).not.toHaveBeenCalledWith("begin_browser_auth", expect.anything());
-    expect(invoke).not.toHaveBeenCalledWith("restore_browser_auth_vault", undefined);
+    await act(async () => { resolvePrerequisites(prerequisites); });
+    await screen.findByText("The installed runtime is ready.");
   });
 
-  it.each(["login", "register"])("enters the installed edition Chatbot after %s and local checks", async (mode) => {
+  it("keeps an outdated Runtime below the sign-in gate and explains the required update", async () => {
+    runtimeSessionContractMocks.verify.mockImplementationOnce(async (report) => ({
+      ...(report as RuntimeStatusReport),
+      ready: false,
+      components: [
+        ...(report as RuntimeStatusReport).components,
+        {
+          id: "account-session-api",
+          label: "Desktop account-session API",
+          status: "unhealthy",
+          required: true,
+          version: null,
+          detail: "runtime_session_api_missing",
+        },
+      ],
+      diagnostics: ["runtime_session_api_missing"],
+    }));
+    window.__TAURI__ = {
+      core: {
+        invoke: vi.fn(async (command: string) => {
+          if (command === "probe_system_prerequisites") return prerequisites;
+          if (command === "probe_runtime_status") return runtime;
+          throw new Error(`Unexpected command: ${command}`);
+        }),
+      },
+    };
+
+    renderPage();
+
+    expect(await screen.findByText("DroneDreamRuntime must be updated"))
+      .toBeVisible();
+    expect(screen.getAllByText(/older than the desktop sign-in protocol/i))
+      .toHaveLength(2);
+    expect(screen.queryByRole("button", {
+      name: "Sign in and enter DroneDream",
+    })).not.toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
+      .not.toHaveAttribute("aria-valuenow", "100");
+  });
+
+  it("keeps direct sign-in pending without opening a browser or entering the workspace", async () => {
+    optionalAuthState.current = { configured: true, loading: false, account: null };
+    passwordSignIn.mockImplementationOnce(async () => new Promise(() => undefined));
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return runtime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    renderPage();
+    await userEvent.type(screen.getByLabelText("Email"), "pilot@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "test-password");
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(screen.getByRole("button", { name: "Please wait…" })).toBeDisabled();
+    expect(screen.getByTestId("current-route")).toHaveTextContent("/");
+    expect(invoke).not.toHaveBeenCalledWith("begin_browser_auth", expect.anything());
+  });
+
+  it("does not automatically recheck a ready environment when the window regains focus", async () => {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return runtime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    renderPage();
+    await waitFor(() => expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100"));
+    expect(invoke).toHaveBeenCalledTimes(2);
+    await act(async () => { window.dispatchEvent(new Event("focus")); });
+    expect(invoke).toHaveBeenCalledTimes(2);
+  });
+
+  it("disables direct sign-in when account configuration is missing", async () => {
+    optionalAuthState.current = { configured: false, loading: false, account: null };
+    browserAuthMocks.configuration = null;
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return runtime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    renderPage();
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeDisabled();
+    expect(screen.getByText("Account access is unavailable.")).toBeInTheDocument();
+    expect(passwordSignIn).not.toHaveBeenCalled();
+    expect(invoke).not.toHaveBeenCalledWith("begin_browser_auth", expect.anything());
+    expect(screen.getByTestId("current-route")).toHaveTextContent("/");
+  });
+
+  it("does not enter when the password provider rejects the account", async () => {
+    optionalAuthState.current = { configured: true, loading: false, account: null };
+    passwordSignIn.mockRejectedValueOnce(new Error("Invalid account"));
+    window.__TAURI__ = { core: { invoke: vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return runtime;
+      throw new Error(`Unexpected command: ${command}`);
+    }) } };
+    renderPage();
+    await userEvent.type(screen.getByLabelText("Email"), "pilot@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "test-password");
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Sign-in failed. Try again.");
+    expect(screen.getByTestId("current-route")).toHaveTextContent("/");
+    expect(browserAuthMocks.adoptSession).not.toHaveBeenCalled();
+  });
+
+  it("never restores a saved desktop session before offering a fresh sign-in", async () => {
+    optionalAuthState.current = {
+      configured: true,
+      loading: false,
+      account: null,
+    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return runtime;
+      if (command === "restore_browser_auth_vault") throw new Error("Saved sessions must not be read.");
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    renderPage();
+    expect(await screen.findByRole("button", {
+      name: "Sign in",
+    })).toBeEnabled();
+    expect(invoke).not.toHaveBeenCalledWith("restore_browser_auth_vault", undefined);
+    expect(invoke).not.toHaveBeenCalledWith("begin_browser_auth", expect.anything());
+    expect(browserAuthMocks.adoptSession).not.toHaveBeenCalled();
+  });
+
+  it("still requires explicit fresh sign-in when React StrictMode replays effects", async () => {
+    optionalAuthState.current = {
+      configured: true,
+      loading: false,
+      account: null,
+    };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return runtime;
+      if (command === "restore_browser_auth_vault") throw new Error("Saved sessions must not be read.");
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    renderPage(
+      "en",
+      noInstallerRuntimeIntent,
+      noInstallerAutoStart,
+      true,
+    );
+
+    expect(await screen.findByRole("button", {
+      name: "Sign in",
+    })).toBeEnabled();
+    expect(invoke).not.toHaveBeenCalledWith("restore_browser_auth_vault", undefined);
+    expect(invoke).not.toHaveBeenCalledWith("begin_browser_auth", expect.anything());
+    expect(browserAuthMocks.adoptSession).not.toHaveBeenCalled();
+  });
+
+  it("does not enter after direct authentication until the current runtime check finishes", async () => {
+    optionalAuthState.current = { configured: true, loading: false, account: null };
+    let resolveRuntime!: (report: RuntimeStatusReport) => void;
+    const pendingRuntime = new Promise<RuntimeStatusReport>((resolve) => { resolveRuntime = resolve; });
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return pendingRuntime;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    renderPage();
+    await userEvent.type(screen.getByLabelText("Email"), "pilot@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "test-password");
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(passwordSignIn).toHaveBeenCalledWith("pilot@example.com", "test-password", undefined);
+    expect(screen.getByTestId("current-route")).toHaveTextContent("/");
+    expect(screen.getByRole("progressbar")).not.toHaveAttribute("aria-valuenow", "100");
+    await act(async () => { resolveRuntime(runtime); });
+    await waitFor(() => expect(screen.getByTestId("current-route")).toHaveTextContent(editionLandingPath()));
+    expect(invoke).not.toHaveBeenCalledWith("begin_browser_auth", expect.anything());
+  });
+
+  it("enters the selected edition after direct authentication and local checks are ready", async () => {
     optionalAuthState.current = { configured: true, loading: false, account: null };
     window.__TAURI__ = { core: { invoke: vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
@@ -525,17 +804,39 @@ describe("DesktopSetup", () => {
       throw new Error(`Unexpected command: ${command}`);
     }) } };
     renderPage();
-    if (mode === "register") await userEvent.click(screen.getByRole("tab", { name: "Create account" }));
+    await screen.findByText("The installed runtime is ready.");
+    expect(screen.getByTestId("current-route")).toHaveTextContent("/");
     await userEvent.type(screen.getByLabelText("Email"), "pilot@example.com");
-    await userEvent.type(screen.getByLabelText("Password"), "fixture-password");
-    if (mode === "register") {
-      await userEvent.type(screen.getByLabelText("Confirm password"), "fixture-password");
-      await userEvent.click(screen.getByRole("button", { name: "Send code" }));
-      await userEvent.type(screen.getByLabelText("Email code"), "123456");
-    }
-    await userEvent.click(screen.getByRole("button", { name: mode === "login" ? "Sign in" : "Create account" }));
-    await waitFor(() => expect(screen.getByTestId("current-route")).toHaveTextContent(BUILD_EDITION === "autonomy" ? "/autonomy" : "/assistant"));
+    await userEvent.type(screen.getByLabelText("Password"), "test-password");
+    await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    await waitFor(() => expect(screen.getByTestId("current-route")).toHaveTextContent(editionLandingPath()));
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
+  });
+
+  it("keeps social sign-in subject to the same current Runtime readiness gate", async () => {
+    optionalAuthState.current = { configured: true, loading: false, account: null };
+    browserAuthMocks.googleEnabled = true;
+    browserAuthMocks.complete.mockImplementationOnce(async () => {
+      optionalAuthState.current = {
+        configured: true, loading: false,
+        account: { id: "social-pilot", email: "pilot@example.com", displayName: "Pilot", avatarUrl: null },
+      };
+    });
+    let resolveRuntime!: (report: RuntimeStatusReport) => void;
+    const pendingRuntime = new Promise<RuntimeStatusReport>((resolve) => { resolveRuntime = resolve; });
+    window.__TAURI__ = { core: { invoke: vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return pendingRuntime;
+      throw new Error(`Unexpected command: ${command}`);
+    }) } };
+    renderPage();
+    await userEvent.click(screen.getByRole("button", { name: "Continue with Google" }));
+    expect(browserAuthMocks.complete).toHaveBeenCalledWith("en", expect.objectContaining({ provider: "google" }));
+    expect(passwordSignIn).not.toHaveBeenCalled();
+    expect(screen.getByTestId("current-route")).toHaveTextContent("/");
+    expect(screen.getByRole("progressbar")).not.toHaveAttribute("aria-valuenow", "100");
+    await act(async () => resolveRuntime(runtime));
+    await waitFor(() => expect(screen.getByTestId("current-route")).toHaveTextContent(editionLandingPath()));
   });
 
   it("blocks entry and offers the signed updater when a newer application is available", async () => {
@@ -597,8 +898,8 @@ describe("DesktopSetup", () => {
     expect(await screen.findByRole("button", {
       name: "Sign in",
     })).toBeEnabled();
-    expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
+    expect(screen.getByTestId("current-route")).toHaveTextContent("/");
     expect(screen.queryByRole("button", {
       name: "Version 1.0.1 is available. Click to update.",
     })).not.toBeInTheDocument();
@@ -2192,7 +2493,7 @@ describe("DesktopSetup", () => {
     );
 
     expect(await screen.findByText("The installed runtime is ready.")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
+    await waitFor(() => expect(screen.getByTestId("current-route")).toHaveTextContent(editionLandingPath()));
     expect(screen.queryByRole("button", { name: "Start runtime" }))
       .not.toBeInTheDocument();
     expect(invoke).toHaveBeenCalledWith("start_runtime", undefined);

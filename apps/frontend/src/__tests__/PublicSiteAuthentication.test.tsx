@@ -3,6 +3,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { I18nProvider } from "../i18n/I18nProvider";
 import { SiteApp } from "../site/SiteApp";
+import {
+  consumeDesktopProviderReturn,
+  markDesktopProviderRedirect,
+  rememberDesktopProviderPreference,
+  takeDesktopProviderPreference,
+} from "../site/desktopProviderHandoff";
 
 const authMock = vi.hoisted(() => ({
   state: {
@@ -93,6 +99,7 @@ function renderHomePage() {
 describe("public website account authentication", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    window.sessionStorage.clear();
     authMock.state.account = null;
     authMock.state.googleEnabled = false;
     authMock.state.githubEnabled = false;
@@ -314,6 +321,113 @@ describe("public website account authentication", () => {
     expect(screen.getByRole("dialog", { name: "Sign in" })).toBeVisible();
     fireEvent.mouseDown(container.querySelector(".site-auth-backdrop") as HTMLElement);
     expect(screen.getByRole("dialog", { name: "Sign in" })).toBeVisible();
+  });
+
+  it.each([
+    ["google", "googleEnabled"],
+    ["github", "githubEnabled"],
+    ["slack_oidc", "slackEnabled"],
+  ] as const)("continues a desktop %s preference through the configured website provider", async (provider, enabledFlag) => {
+    authMock.state[enabledFlag] = true;
+    rememberDesktopProviderPreference(provider);
+    renderOAuthPage();
+
+    await waitFor(() => expect(authMock.signInWithProvider).toHaveBeenCalledExactlyOnceWith(provider));
+    expect(takeDesktopProviderPreference()).toBeNull();
+    expect(consumeDesktopProviderReturn("authorization-other")).toBe(false);
+    expect(consumeDesktopProviderReturn("authorization-1")).toBe(true);
+    expect(authMock.signOut).not.toHaveBeenCalled();
+    expect(await screen.findByRole("dialog", { name: "Sign in" })).toBeVisible();
+  });
+
+  it("waits for the prior browser account to sign out before launching the selected provider", async () => {
+    authMock.state.account = {
+      id: "old-account", email: "old@example.com", displayName: "Old account", avatarUrl: null,
+    };
+    authMock.state.googleEnabled = true;
+    rememberDesktopProviderPreference("google");
+    let finishSignOut!: () => void;
+    authMock.signOut.mockImplementationOnce(() => new Promise<void>((resolve) => { finishSignOut = resolve; }));
+    renderOAuthPage();
+
+    await waitFor(() => expect(authMock.signOut).toHaveBeenCalledOnce());
+    expect(authMock.signInWithProvider).not.toHaveBeenCalled();
+    expect(consumeDesktopProviderReturn("authorization-1")).toBe(false);
+    await act(async () => {
+      authMock.state.account = null;
+      finishSignOut();
+    });
+    await waitFor(() => expect(authMock.signInWithProvider).toHaveBeenCalledExactlyOnceWith("google"));
+  });
+
+  it("accepts the matching authenticated provider return without signing out the new account again", async () => {
+    authMock.state.account = {
+      id: "returned-account", email: "pilot@example.com", displayName: "Pilot", avatarUrl: null,
+    };
+    markDesktopProviderRedirect("authorization-1", "google");
+    const { container } = renderOAuthPage();
+
+    await waitFor(() => expect(container.querySelector(".site-oauth-consent")).toBeInTheDocument());
+    expect(screen.queryByRole("dialog", { name: "Sign in" })).not.toBeInTheDocument();
+    expect(authMock.signOut).not.toHaveBeenCalled();
+    expect(authMock.signInWithProvider).not.toHaveBeenCalled();
+    expect(consumeDesktopProviderReturn("authorization-1")).toBe(false);
+  });
+
+  it("waits for the authenticated account before consuming a matching provider return", async () => {
+    markDesktopProviderRedirect("authorization-1", "google");
+    const page = renderOAuthPage();
+    expect(await screen.findByRole("dialog", { name: "Sign in" })).toBeVisible();
+    authMock.state.account = {
+      id: "returned-account", email: "pilot@example.com", displayName: "Pilot", avatarUrl: null,
+    };
+    page.rerender(<I18nProvider><SiteApp /></I18nProvider>);
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Sign in" })).not.toBeInTheDocument());
+    expect(page.container.querySelector(".site-oauth-consent")).toBeInTheDocument();
+    expect(authMock.signOut).not.toHaveBeenCalled();
+    expect(consumeDesktopProviderReturn("authorization-1")).toBe(false);
+  });
+
+  it("requires fresh authentication when a provider return belongs to another request", async () => {
+    authMock.state.account = {
+      id: "old-account", email: "old@example.com", displayName: "Old account", avatarUrl: null,
+    };
+    markDesktopProviderRedirect("authorization-other", "google");
+    authMock.signOut.mockImplementationOnce(async () => { authMock.state.account = null; });
+    const { container } = renderOAuthPage();
+
+    expect(await screen.findByRole("dialog", { name: "Sign in" })).toBeVisible();
+    expect(authMock.signOut).toHaveBeenCalledOnce();
+    expect(container.querySelector(".site-oauth-consent")).not.toBeInTheDocument();
+    expect(consumeDesktopProviderReturn("authorization-other")).toBe(true);
+  });
+
+  it("does not authorize or launch a disabled preferred provider", async () => {
+    rememberDesktopProviderPreference("google");
+    renderOAuthPage();
+
+    const dialog = await screen.findByRole("dialog", { name: "Sign in" });
+    expect(await within(dialog).findByRole("alert"))
+      .toHaveTextContent("The account request could not be completed. Please try again.");
+    expect(authMock.signInWithProvider).not.toHaveBeenCalled();
+    expect(consumeDesktopProviderReturn("authorization-1")).toBe(false);
+  });
+
+  it("clears a failed social continuation and binds a manual retry to the same desktop request", async () => {
+    authMock.state.googleEnabled = true;
+    rememberDesktopProviderPreference("google");
+    authMock.signInWithProvider.mockRejectedValueOnce(new Error("private provider diagnostics"));
+    renderOAuthPage();
+
+    const dialog = await screen.findByRole("dialog", { name: "Sign in" });
+    expect(await within(dialog).findByRole("alert"))
+      .toHaveTextContent("The account request could not be completed. Please try again.");
+    expect(dialog).not.toHaveTextContent("private provider diagnostics");
+    expect(consumeDesktopProviderReturn("authorization-1")).toBe(false);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Continue with Google" }));
+    await waitFor(() => expect(authMock.signInWithProvider).toHaveBeenCalledTimes(2));
+    expect(consumeDesktopProviderReturn("authorization-1")).toBe(true);
   });
 
   it.each([

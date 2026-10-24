@@ -9,6 +9,7 @@ import { FieldRoot } from "./FieldRoot";
 import "../brand/edition-brand.generated.css";
 import "../styles.css";
 import "./field.css";
+import "../desktop/launcher.css";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("Field root element is missing");

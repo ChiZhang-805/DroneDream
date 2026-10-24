@@ -2,10 +2,10 @@ import { Settings } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 
 import { LauncherFlightIllustration } from "../components/LauncherFlightIllustration";
+import { LauncherAccountForm } from "../components/LauncherAccountForm";
 import type { SettingsSurfaceTabId } from "../components/EditionSettingsSurface";
 import { useAuthOrLocal } from "../features/auth/AuthContext";
 import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
-import { LauncherAccountForm } from "../components/LauncherAccountForm";
 import { FieldBrandLockup } from "./FieldBrandLockup";
 import { useFieldLocale } from "./FieldLocaleProvider";
 import { FieldSettingsDialog } from "./FieldSettingsDialog";
@@ -23,11 +23,9 @@ const COPY = {
     ready: "Field workspace ready",
     settings: "Open settings",
     illustrationTitle: "Ready for takeoff",
-    illustrationDescription:
-      "",
+    illustrationDescription: "",
     cardKicker: "FIELD STARTUP",
     cardTitle: "Starting workspace",
-    cardHint: "",
     stages: ["Check system", "Start device services", "Connect services", "Open workspace"],
   },
   "zh-CN": {
@@ -35,11 +33,10 @@ const COPY = {
     loading: "正在启动工作区",
     ready: "Field 工作区已就绪",
     settings: "打开设置",
-    illustrationTitle: "让想法起飞",
+    illustrationTitle: "无人机校园插画",
     illustrationDescription: "",
     cardKicker: "FIELD 启动",
     cardTitle: "正在启动工作区",
-    cardHint: "",
     stages: ["检查系统", "启动设备服务", "连接服务", "进入工作区"],
   },
 } as const;
@@ -172,7 +169,6 @@ function FieldLaunchScreen({
               <div className="launcher-status-card-heading">
                 <span>{copy.cardKicker}</span>
                 <h2>{copy.cardTitle}</h2>
-                <p>{copy.cardHint}</p>
               </div>
               <ol className="launcher-stage-list" aria-label={copy.loading}>
                 {copy.stages.map((stage, index) => (
@@ -300,8 +296,8 @@ export function FieldRoot() {
     };
     void run().catch((reason: unknown) => {
       if (active && !(reason instanceof DOMException && reason.name === "AbortError")) {
-        // Readiness fails closed at 0%. The launcher never reveals a sign-in
-        // action until every product, localization, theme and 3D gate passes.
+        // Readiness fails closed at 0%. Inline sign-in cannot open the workspace
+        // until every product, localization, theme and 3D gate passes.
         setProgress(0);
       }
     });
@@ -313,7 +309,15 @@ export function FieldRoot() {
   if (entered || (authCompleted && account && progress === 100)) {
     return (
       <Suspense fallback={null}>
-        <FieldApp initialLocale={locale} focusOnMount />
+        <FieldApp
+          initialLocale={locale}
+          focusOnMount
+          onSignedOut={() => {
+            setEntered(false);
+            setAuthCompleted(false);
+            setSettingsPresentation("closed");
+          }}
+        />
       </Suspense>
     );
   }

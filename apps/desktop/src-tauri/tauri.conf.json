@@ -26,6 +26,7 @@
         "decorations": true,
         "fullscreen": false,
         "transparent": false,
+        "theme": "Light",
         "backgroundColor": "#ffffff"
       }
     ],

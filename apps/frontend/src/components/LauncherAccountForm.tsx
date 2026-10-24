@@ -1,7 +1,10 @@
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useAuthOrLocal } from "../features/auth/AuthContext";
 import { AuthCaptcha } from "../features/auth/AuthCaptcha";
-import { captchaProtectionConfigured, turnstileSiteKey } from "../features/auth/supabaseClient";
+import { captchaProtectionConfigured, githubAuthEnabled, googleAuthEnabled, slackAuthEnabled, turnstileSiteKey } from "../features/auth/supabaseClient";
+import { cancelDesktopBrowserSignIn, completeDesktopBrowserSignIn } from "../features/auth/desktopBrowserSignIn";
+import type { BrowserAuthRequest } from "../desktop/bridge";
+import { SocialProviderIcon } from "./SocialProviderIcon";
 
 const COPY = {
   en: { title: "Welcome to DroneDream", login: "Sign in", register: "Create account", email: "Email", password: "Password", code: "Email code", send: "Send code", verify: "Verify & continue", busy: "Please wait…", sent: "Check your email for a code.", failed: "Sign-in failed. Try again.", codeFailed: "Code not sent. Try again.", verifyFailed: "Check the code and try again.", unavailable: "Account access is unavailable.", forgot: "Forgot password?", recovery: "Reset your password", newPassword: "New password", back: "Back to sign in", reset: "Reset & sign in", passwordHint: "At least 8 characters" },
@@ -25,11 +28,80 @@ export function LauncherAccountForm({ locale, onAuthenticated }: {
   const [error, setError] = useState("");
   const [captcha, setCaptcha] = useState<string | null>(null);
   const [captchaAttempt, setCaptchaAttempt] = useState(0);
+  const [socialMessage, setSocialMessage] = useState("");
+  const [socialError, setSocialError] = useState(false);
+  const [socialPending, setSocialPending] = useState(false);
+  const socialController = useRef<AbortController | null>(null);
   const submitting = useRef(false);
   const emailInput = useRef<HTMLInputElement>(null);
   const registrationCopy = locale === "zh-CN"
     ? { confirm: "确认密码", complete: "完成注册", mismatch: "两次输入的密码不一致。", resend: "重新发送", sendFirst: "请先发送邮箱验证码。" }
     : { confirm: "Confirm password", complete: "Create account", mismatch: "Passwords do not match.", resend: "Resend code", sendFirst: "Send an email code first." };
+  const socialCopy = locale === "zh-CN"
+    ? { group: "快捷登录", continue: (name: string) => `使用 ${name} 登录`, waiting: (name: string) => `请在浏览器完成：${name}`, adopting: "正在验证账户…", failed: "快捷登录未完成，请重试。", cancel: "取消", cancelled: "已取消登录，可以重试。" }
+    : { group: "Social sign-in", continue: (name: string) => `Continue with ${name}`, waiting: (name: string) => `Finish in browser: ${name}`, adopting: "Verifying your account…", failed: "Social sign-in could not be completed. Try again.", cancel: "Cancel", cancelled: "Sign-in cancelled. You can try again." };
+  const providers = [
+    { id: "google" as const, name: "Google", enabled: googleAuthEnabled },
+    { id: "github" as const, name: "GitHub", enabled: githubAuthEnabled },
+    { id: "slack_oidc" as const, name: "Slack", enabled: slackAuthEnabled },
+  ].filter((provider) => provider.enabled);
+
+  useEffect(() => () => {
+    const controller = socialController.current;
+    socialController.current = null;
+    if (controller) void cancelDesktopBrowserSignIn(controller);
+  }, []);
+
+  const signInWithSocialProvider = async (provider: NonNullable<BrowserAuthRequest["provider"]>, name: string) => {
+    if (submitting.current || !auth.configured) return;
+    const controller = new AbortController();
+    socialController.current = controller;
+    submitting.current = true;
+    setBusy(true);
+    setError("");
+    setSocialError(false);
+    setSocialPending(true);
+    setSocialMessage(socialCopy.waiting(name));
+    try {
+      await completeDesktopBrowserSignIn(locale, {
+        provider,
+        signal: controller.signal,
+        onAdopting: () => {
+          if (!controller.signal.aborted && socialController.current === controller) {
+            setSocialMessage(socialCopy.adopting);
+          }
+        },
+      });
+      if (controller.signal.aborted || socialController.current !== controller) return;
+      socialController.current = null;
+      submitting.current = false;
+      setBusy(false);
+      setSocialPending(false);
+      setSocialMessage("");
+      onAuthenticated?.();
+    } catch {
+      if (controller.signal.aborted || socialController.current !== controller) return;
+      socialController.current = null;
+      submitting.current = false;
+      setBusy(false);
+      setSocialPending(false);
+      setSocialError(true);
+      setSocialMessage(socialCopy.failed);
+    }
+  };
+
+  const cancelSocialSignIn = async () => {
+    const controller = socialController.current;
+    if (!controller) return;
+    await cancelDesktopBrowserSignIn(controller);
+    if (socialController.current !== controller) return;
+    socialController.current = null;
+    submitting.current = false;
+    setBusy(false);
+    setSocialPending(false);
+    setSocialError(false);
+    setSocialMessage(socialCopy.cancelled);
+  };
   const sendRegistrationCode = async () => {
     if (submitting.current || !emailInput.current?.reportValidity()) return;
     submitting.current = true;
@@ -125,6 +197,23 @@ export function LauncherAccountForm({ locale, onAuthenticated }: {
       <button className="launcher-auth-secondary" type="button" disabled={busy} onClick={() => {
         setMode(mode === "login" ? "recovery" : "login"); setSent(false); setCode(""); setPassword(""); setConfirmPassword(""); setError("");
       }}>{mode === "login" ? copy.forgot : copy.back}</button>
+      {mode === "login" && providers.length > 0 ? (
+        <section className="launcher-auth-social" aria-label={socialCopy.group}>
+          <div className="launcher-social-actions" role="group" aria-label={socialCopy.group}>
+            {providers.map((provider) => <button key={provider.id} type="button"
+              className={`launcher-social-button is-${provider.id}`}
+              aria-label={socialCopy.continue(provider.name)} title={socialCopy.continue(provider.name)}
+              disabled={busy || !auth.configured}
+              onClick={() => void signInWithSocialProvider(provider.id, provider.name)}>
+              <SocialProviderIcon provider={provider.id} />
+            </button>)}
+          </div>
+          {socialMessage ? <div className="launcher-social-status">
+            <span role={socialError ? "alert" : "status"} aria-live="polite">{socialMessage}</span>
+            {socialPending ? <button type="button" onClick={() => void cancelSocialSignIn()}>{socialCopy.cancel}</button> : null}
+          </div> : null}
+        </section>
+      ) : null}
     </form>
   );
 }

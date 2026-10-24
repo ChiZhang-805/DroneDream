@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, renderHook, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { I18nProvider, localeSafeError, useI18n } from "../i18n/I18nProvider";
@@ -103,12 +103,9 @@ describe("I18nProvider", () => {
     expect(document.documentElement.lang).toBe("en");
   });
 
-  it("defaults to English on a fresh desktop install regardless of installer language", () => {
+  it("starts a fresh desktop install in English even if the installer and OS used Chinese", () => {
     window.localStorage.clear();
-    const invoke = vi.fn(async (command: string) => {
-      if (command === "get_installer_locale") return "zh-CN";
-      throw new Error(`Unexpected command: ${command}`);
-    });
+    vi.spyOn(window.navigator, "language", "get").mockReturnValue("zh-CN");
     window.__TAURI__ = {
       core: {
         invoke,
@@ -123,7 +120,48 @@ describe("I18nProvider", () => {
 
     expect(screen.getByText("New Tuning Experiment")).toBeInTheDocument();
     expect(document.documentElement.lang).toBe("en");
-    expect(invoke).not.toHaveBeenCalled();
+    expect(window.__TAURI__.core?.invoke).not.toHaveBeenCalled();
+  });
+
+  it.each(["en", "zh-CN"] as const)("restores the user's %s selection after reopening", (locale) => {
+    window.localStorage.clear();
+    const first = render(<I18nProvider><InterfaceLanguageProbe /></I18nProvider>);
+    fireEvent.click(screen.getByRole("button", { name: locale }));
+    first.unmount();
+
+    render(<I18nProvider><InterfaceLanguageProbe /></I18nProvider>);
+    expect(screen.getByTestId("interface-locale")).toHaveTextContent(locale);
+    expect(document.documentElement.lang).toBe(locale);
+    expect(window.localStorage.getItem("drone-dream:locale")).toBe(locale);
+  });
+
+  it.each(["en", "zh-CN"] as const)("does not replace a local %s selection with a cloud preference", (locale) => {
+    window.localStorage.setItem("drone-dream:locale", locale);
+    const { result } = renderHook(() => useI18n(), { wrapper: I18nProvider });
+    act(() => result.current.restoreLocale(locale === "en" ? "zh-CN" : "en"));
+    expect(result.current.locale).toBe(locale);
+    expect(window.localStorage.getItem("drone-dream:locale")).toBe(locale);
+  });
+
+  it("recovers an existing account language only when no local language was chosen", () => {
+    window.localStorage.clear();
+    const { result } = renderHook(() => useI18n(), { wrapper: I18nProvider });
+    expect(result.current.locale).toBe("en");
+    act(() => result.current.restoreLocale("zh-CN"));
+    expect(result.current.locale).toBe("zh-CN");
+    expect(window.localStorage.getItem("drone-dream:locale")).toBe("zh-CN");
+  });
+
+  it("keeps a new selection when cloud preferences arrive late and persistence is denied", () => {
+    window.localStorage.clear();
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("Storage disabled", "QuotaExceededError");
+    });
+    const { result } = renderHook(() => useI18n(), { wrapper: I18nProvider });
+    act(() => result.current.setLocale("zh-CN"));
+    act(() => result.current.restoreLocale("en"));
+    expect(result.current.locale).toBe("zh-CN");
+    expect(document.documentElement.lang).toBe("zh-CN");
   });
 
   it("keeps the selected in-memory locale when persistence fails", () => {

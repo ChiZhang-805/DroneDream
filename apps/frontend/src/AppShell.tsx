@@ -994,9 +994,11 @@ function SettingsDialog({
   presentation?: "quick" | "workspace";
   preferenceSaveQueueRef: MutableRefObject<Promise<boolean>>;
 }) {
-  const { locale, interfaceLocale, setLocale, t } = useI18n();
+  const { locale, interfaceLocale, setLocale, restoreLocale, t } = useI18n();
   const navigate = useNavigate();
   const settingsCopy = SETTINGS_COPY[interfaceLocale];
+  const editionTheme = useEditionTheme();
+  const setCustomAccentPreference = editionTheme.setCustomAccent;
   const auth = useAuth();
   const adminAccess = useAdminAccess();
   const {
@@ -1251,7 +1253,10 @@ function SettingsDialog({
               ...DEFAULT_NOTIFICATION_PREFERENCES,
               ...preferences.notifications,
             });
-            setLocale(preferences.interface_locale);
+            restoreLocale(preferences.interface_locale);
+            // Appearance is session-only: opening settings must not restore a
+            // previous cloud theme or override the user's current session.
+            setCustomAccentPreference(preferences.custom_accent);
           }
         } else {
           persistedExperiencePreferenceRef.current = EMPTY_EXPERIENCE_PREFERENCE_DRAFT;
@@ -1272,7 +1277,8 @@ function SettingsDialog({
     initialPreferenceDraft,
     localDesktopPreferences,
     preferenceBoundary,
-    setLocale,
+    setCustomAccentPreference,
+    restoreLocale,
   ]);
   useEffect(() => {
     if (
@@ -2809,6 +2815,10 @@ const ACCOUNT_COPY = {
     createAccount: "Create account",
     registerNow: "New to DroneDream? Register now",
     backToSignIn: "Already registered? Sign in",
+    forgotPassword: "Forgot password",
+    recoveryTitle: "Reset password",
+    recoveryBody: "Enter your email, request a verification code, and choose a new password.",
+    resetPassword: "Reset password and sign in",
     code: "Verification code",
     codePlaceholder: "Six-digit code",
     passwordTooShort: "Password must contain at least 8 characters.",
@@ -2819,6 +2829,7 @@ const ACCOUNT_COPY = {
     github: "Continue with GitHub",
     slack: "Continue with Slack",
     apple: "Continue with Apple",
+    socialSignIn: "Social sign-in options",
     username: "Username",
     usernamePlaceholder: "Choose a username",
     saveUsername: "Save username",
@@ -2889,6 +2900,10 @@ const ACCOUNT_COPY = {
     createAccount: "创建账号",
     registerNow: "还没有账号？立即注册",
     backToSignIn: "已经注册？返回登录",
+    forgotPassword: "忘记密码",
+    recoveryTitle: "重置密码",
+    recoveryBody: "填写邮箱、获取验证码，并设置新的登录密码。",
+    resetPassword: "重置密码并登录",
     code: "邮箱验证码",
     codePlaceholder: "六位验证码",
     passwordTooShort: "密码至少需要 8 个字符。",
@@ -2899,6 +2914,7 @@ const ACCOUNT_COPY = {
     github: "使用 GitHub 登录",
     slack: "使用 Slack 登录",
     apple: "使用 Apple 登录",
+    socialSignIn: "快捷登录选项",
     username: "用户名",
     usernamePlaceholder: "输入用户名",
     saveUsername: "保存用户名",
@@ -3042,12 +3058,14 @@ function AccountMenuPopover({
   onEditProfile,
   onOpenAllowance,
   onOpenSettings,
+  onSignedOut,
 }: {
   menuRef: RefObject<HTMLDivElement>;
   onClose: () => void;
   onEditProfile: () => void;
   onOpenAllowance: () => void;
   onOpenSettings: () => void;
+  onSignedOut: () => void;
 }) {
   const auth = useAuth();
   const navigate = useNavigate();
@@ -3091,7 +3109,7 @@ function AccountMenuPopover({
     try {
       await auth.signOut();
       onClose();
-      if (isDesktopRuntime()) navigate("/desktop/setup", { replace: true });
+      onSignedOut();
     } catch {
       setSignOutError(true);
       setSignOutPending(false);
@@ -3138,6 +3156,7 @@ export function AccountDialog({
   required,
   edition,
   onClose,
+  onSignedOut,
 }: {
   closeRef: RefObject<HTMLButtonElement>;
   required: boolean;
@@ -3145,6 +3164,7 @@ export function AccountDialog({
   desktopBrowserAuthReady?: boolean;
   onOpenDesktopSetup?: () => void;
   onClose: () => void;
+  onSignedOut: () => void;
 }) {
   const { locale } = useI18n();
   const copy = ACCOUNT_COPY[locale];
@@ -3157,7 +3177,7 @@ export function AccountDialog({
   const [captchaCycle, setCaptchaCycle] = useState(0);
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
-  const [authMode, setAuthMode] = useState<"sign-in" | "register">("sign-in");
+  const [authMode, setAuthMode] = useState<"sign-in" | "register" | "recovery">("sign-in");
   const [displayName, setDisplayName] = useState(
     auth.account?.displayName ?? "",
   );
@@ -3367,38 +3387,62 @@ export function AccountDialog({
     return true;
   };
 
+  const changeAuthMode = (mode: "sign-in" | "register" | "recovery") => {
+    setAuthMode(mode);
+    setCode("");
+    setCodeSent(false);
+    setCaptchaToken(null);
+    setCaptchaCycle((current) => current + 1);
+    setPassword("");
+    setPasswordConfirmation("");
+    setError(null);
+  };
+
   return (
     <section
-      className="account-dialog"
+      className={`account-dialog${auth.configured && !auth.account ? " is-auth-entry" : ""}`}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="account-dialog-title"
+      aria-labelledby={auth.account ? undefined : "account-dialog-title"}
+      aria-label={auth.account ? copy.title : undefined}
     >
       <header>
-        <div className="account-dialog-title">
-          <CircleUserRound aria-hidden="true" strokeWidth={1.75} />
-          <h2 id="account-dialog-title">
-            {!auth.configured
-              ? copy.localTitle
-              : auth.account
-                ? copy.title
-                : authMode === "register"
-                  ? copy.registerTitle
-                  : copy.signInTitle}
-          </h2>
+        <BrandLockup edition="universal" className="account-dialog-brand" />
+        <div className="account-dialog-header-actions">
+          {auth.configured && !auth.account && !desktopRuntime ? (
+            <button
+              type="button"
+              className="account-auth-mode"
+              disabled={pending}
+              onClick={() => changeAuthMode(authMode === "sign-in" ? "register" : "sign-in")}
+            >
+              <CircleUserRound aria-hidden="true" strokeWidth={1.8} />
+              {authMode === "sign-in" ? copy.register : copy.backToSignIn}
+            </button>
+          ) : null}
+          {!required ? (
+            <button
+              ref={closeRef}
+              type="button"
+              className="account-dialog-close"
+              aria-label={copy.close}
+              onClick={onClose}
+            >
+              <X aria-hidden="true" strokeWidth={1.9} />
+            </button>
+          ) : null}
         </div>
-        {!required ? (
-          <button
-            ref={closeRef}
-            type="button"
-            className="account-dialog-close"
-            aria-label={copy.close}
-            onClick={onClose}
-          >
-            <X aria-hidden="true" strokeWidth={1.9} />
-          </button>
-        ) : null}
       </header>
+
+      {!auth.account ? <h2 id="account-dialog-title">
+        {!auth.configured
+          ? copy.localTitle
+          : authMode === "register"
+              ? copy.registerTitle
+              : authMode === "recovery"
+                ? copy.recoveryTitle
+                : copy.signInTitle}
+      </h2> : null}
 
       {!auth.configured ? (
         <p className="account-dialog-copy">{copy.localBody}</p>
@@ -3426,7 +3470,10 @@ export function AccountDialog({
               type="button"
               className="btn account-sign-out"
               disabled={pending}
-              onClick={() => void run(auth.signOut)}
+              onClick={() => void run(async () => {
+                await auth.signOut();
+                onSignedOut();
+              })}
             >
               {copy.signOut}
             </button>
@@ -3548,6 +3595,9 @@ export function AccountDialog({
         </div>
       ) : (
         <>
+          {authMode === "recovery" ? (
+            <p className="account-dialog-copy account-recovery-copy">{copy.recoveryBody}</p>
+          ) : null}
           <form
             className="account-email-form"
             onSubmit={(event) => {
@@ -3575,6 +3625,15 @@ export function AccountDialog({
                     }
                   }
                 });
+                return;
+              }
+              if (authMode === "recovery") {
+                if (!registrationPasswordIsValid()) return;
+                if (!codeSent || !code.trim()) {
+                  setError(copy.codeRequired);
+                  return;
+                }
+                void run(() => auth.verifyRecoveryCode(email, code, password));
                 return;
               }
               if (!registrationPasswordIsValid()) return;
@@ -3606,7 +3665,7 @@ export function AccountDialog({
                 required
                 minLength={8}
                 autoComplete={
-                  authMode === "register" ? "new-password" : "current-password"
+                  authMode === "sign-in" ? "current-password" : "new-password"
                 }
                 value={password}
                 placeholder={copy.passwordPlaceholder}
@@ -3614,7 +3673,7 @@ export function AccountDialog({
                 onChange={(event) => setPassword(event.target.value)}
               />
             </label>
-            {authMode === "register" ? (
+            {authMode !== "sign-in" ? (
               <>
                 <label>
                   <span>{copy.confirmPassword}</span>
@@ -3664,12 +3723,17 @@ export function AccountDialog({
                       void run(async () => {
                           try {
                             if (captchaToken) {
-                              await auth.sendRegistrationCode(
-                                email,
-                                captchaToken,
-                              );
+                              if (authMode === "register") {
+                                await auth.sendRegistrationCode(email, captchaToken);
+                              } else {
+                                await auth.sendRecoveryCode(email, captchaToken);
+                              }
                             } else {
-                              await auth.sendRegistrationCode(email);
+                              if (authMode === "register") {
+                                await auth.sendRegistrationCode(email);
+                              } else {
+                                await auth.sendRecoveryCode(email);
+                              }
                             }
                             setCodeSent(true);
                           } finally {
@@ -3696,89 +3760,79 @@ export function AccountDialog({
             ) : null}
             <button type="submit" className="btn btn-primary" disabled={pending}>
               <MailCheck aria-hidden="true" strokeWidth={1.8} />
-              {authMode === "register" ? copy.createAccount : copy.signIn}
+              {authMode === "register"
+                ? copy.createAccount
+                : authMode === "recovery"
+                  ? copy.resetPassword
+                  : copy.signIn}
             </button>
           </form>
-          <button
-            type="button"
-            className="account-auth-mode"
-            disabled={pending}
-            onClick={() => {
-              setAuthMode((current) =>
-                current === "sign-in" ? "register" : "sign-in",
-              );
-              setCode("");
-              setCodeSent(false);
-              setCaptchaToken(null);
-              setCaptchaCycle((current) => current + 1);
-              setPassword("");
-              setPasswordConfirmation("");
-              setError(null);
-            }}
-          >
-            {authMode === "sign-in"
-              ? copy.registerNow
-              : copy.backToSignIn}
-          </button>
-          {auth.googleEnabled || auth.githubEnabled || auth.slackEnabled || auth.appleEnabled ? (
-            <div className="account-social-actions">
-              {auth.githubEnabled ? (
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={pending}
-                  onClick={() =>
-                    void run(() => auth.signInWithProvider("github"))
-                  }
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path fill="currentColor" d="M12 .7a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2.23c-3.22.7-3.9-1.37-3.9-1.37-.52-1.34-1.29-1.69-1.29-1.69-1.05-.72.08-.71.08-.71 1.17.08 1.78 1.2 1.78 1.2 1.04 1.78 2.72 1.27 3.39.97.1-.75.4-1.27.74-1.56-2.57-.29-5.27-1.28-5.27-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.47.11-3.05 0 0 .97-.31 3.16 1.18a10.98 10.98 0 0 1 5.76 0c2.19-1.49 3.15-1.18 3.15-1.18.63 1.58.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.71 5.38-5.29 5.67.42.36.79 1.06.79 2.15v3.2c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .7Z" />
-                  </svg>
-                  {copy.github}
-                </button>
-              ) : null}
-              {auth.googleEnabled ? (
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={pending}
-                  onClick={() =>
-                    void run(() => auth.signInWithProvider("google"))
-                  }
-                >
-                  <LogIn aria-hidden="true" strokeWidth={1.8} />
-                  {copy.google}
-                </button>
-              ) : null}
-              {auth.slackEnabled ? (
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={pending}
-                  onClick={() =>
-                    void run(() => auth.signInWithProvider("slack_oidc"))
-                  }
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path fill="#e01e5a" d="M5.04 15.16a2.52 2.52 0 1 1-2.52-2.52h2.52v2.52Zm1.27 0a2.53 2.53 0 0 1 5.05 0v6.32a2.53 2.53 0 0 1-5.05 0v-6.32Z" />
-                    <path fill="#36c5f0" d="M8.84 5.04a2.52 2.52 0 1 1 2.52-2.52v2.52H8.84Zm0 1.27a2.53 2.53 0 0 1 0 5.05H2.52a2.53 2.53 0 0 1 0-5.05h6.32Z" />
-                    <path fill="#2eb67d" d="M18.96 8.84a2.52 2.52 0 1 1 2.52 2.52h-2.52V8.84Zm-1.27 0a2.53 2.53 0 0 1-5.05 0V2.52a2.53 2.53 0 0 1 5.05 0v6.32Z" />
-                    <path fill="#ecb22e" d="M15.16 18.96a2.52 2.52 0 1 1-2.52 2.52v-2.52h2.52Zm0-1.27a2.53 2.53 0 0 1 0-5.05h6.32a2.53 2.53 0 0 1 0 5.05h-6.32Z" />
-                  </svg>
-                  {copy.slack}
-                </button>
-              ) : null}
+          {authMode === "sign-in" ? (
+            <button
+              type="button"
+              className="account-forgot-password"
+              disabled={pending}
+              onClick={() => changeAuthMode("recovery")}
+            >
+              {copy.forgotPassword}
+            </button>
+          ) : null}
+          {(authMode === "sign-in" || authMode === "register") ? (
+            <div className="account-social-actions" role="group" aria-label={copy.socialSignIn}>
+              <button
+                type="button"
+                className="account-provider-icon is-github"
+                aria-label={copy.github}
+                title={copy.github}
+                disabled={pending || !auth.githubEnabled}
+                onClick={() => void run(() => auth.signInWithProvider("github"))}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="currentColor" d="M12 .7a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2.23c-3.22.7-3.9-1.37-3.9-1.37-.52-1.34-1.29-1.69-1.29-1.69-1.05-.72.08-.71.08-.71 1.17.08 1.78 1.2 1.78 1.2 1.04 1.78 2.72 1.27 3.39.97.1-.75.4-1.27.74-1.56-2.57-.29-5.27-1.28-5.27-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.47.11-3.05 0 0 .97-.31 3.16 1.18a10.98 10.98 0 0 1 5.76 0c2.19-1.49 3.15-1.18 3.15-1.18.63 1.58.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.71 5.38-5.29 5.67.42.36.79 1.06.79 2.15v3.2c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .7Z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="account-provider-icon is-google"
+                aria-label={copy.google}
+                title={copy.google}
+                disabled={pending || !auth.googleEnabled}
+                onClick={() => void run(() => auth.signInWithProvider("google"))}
+              >
+                <svg viewBox="0 0 18 18" aria-hidden="true">
+                  <path fill="#4285f4" d="M17.64 9.205c0-.638-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.797 2.716v2.258h2.909c1.703-1.568 2.684-3.879 2.684-6.614Z" />
+                  <path fill="#34a853" d="M9 18c2.43 0 4.468-.806 5.956-2.182l-2.909-2.258c-.806.54-1.836.86-3.047.86-2.344 0-4.328-1.585-5.037-3.714H.956v2.332A9 9 0 0 0 9 18Z" />
+                  <path fill="#fbbc05" d="M3.963 10.706A5.42 5.42 0 0 1 3.682 9c0-.592.102-1.168.281-1.706V4.962H.956A9 9 0 0 0 0 9c0 1.452.347 2.827.956 4.038l3.007-2.332Z" />
+                  <path fill="#ea4335" d="M9 3.58c1.321 0 2.507.454 3.441 1.346l2.581-2.581C13.464.892 11.43 0 9 0A9 9 0 0 0 .956 4.962l3.007 2.332C4.672 5.165 6.656 3.58 9 3.58Z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="account-provider-icon is-slack"
+                aria-label={copy.slack}
+                title={copy.slack}
+                disabled={pending || !auth.slackEnabled}
+                onClick={() => void run(() => auth.signInWithProvider("slack_oidc"))}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="#e01e5a" d="M5.04 15.16a2.52 2.52 0 1 1-2.52-2.52h2.52v2.52Zm1.27 0a2.53 2.53 0 0 1 5.05 0v6.32a2.53 2.53 0 0 1-5.05 0v-6.32Z" />
+                  <path fill="#36c5f0" d="M8.84 5.04a2.52 2.52 0 1 1 2.52-2.52v2.52H8.84Zm0 1.27a2.53 2.53 0 0 1 0 5.05H2.52a2.53 2.53 0 0 1 0-5.05h6.32Z" />
+                  <path fill="#2eb67d" d="M18.96 8.84a2.52 2.52 0 1 1 2.52 2.52h-2.52V8.84Zm-1.27 0a2.53 2.53 0 0 1-5.05 0V2.52a2.53 2.53 0 0 1 5.05 0v6.32Z" />
+                  <path fill="#ecb22e" d="M15.16 18.96a2.52 2.52 0 1 1-2.52 2.52v-2.52h2.52Zm0-1.27a2.53 2.53 0 0 1 0-5.05h6.32a2.53 2.53 0 0 1 0 5.05h-6.32Z" />
+                </svg>
+              </button>
               {auth.appleEnabled ? (
                 <button
                   type="button"
-                  className="btn"
+                  className="account-provider-icon is-apple"
+                  aria-label={copy.apple}
+                  title={copy.apple}
                   disabled={pending}
                   onClick={() =>
                     void run(() => auth.signInWithProvider("apple"))
                   }
                 >
                   <Apple aria-hidden="true" strokeWidth={1.8} />
-                  {copy.apple}
                 </button>
               ) : null}
             </div>
@@ -4177,6 +4231,15 @@ function AppShellContent() {
     });
   }, [accountRequired, mobileNavigationEnabled]);
 
+  const returnToLauncherAfterSignOut = useCallback(() => {
+    setAccountMenuOpen(false);
+    setAccountOpen(false);
+    setLauncherSettingsOpen(false);
+    setSettingsWorkspaceOpen(false);
+    setMobileMenuOpen(false);
+    navigate(desktopRuntime ? "/desktop/setup" : "/", { replace: true });
+  }, [desktopRuntime, navigate]);
+
   useEffect(() => {
     if (!mobileMenuExpanded) return;
     const closeMobileMenu = (restoreFocus: boolean) => {
@@ -4466,6 +4529,7 @@ function AppShellContent() {
         desktopBrowserAuthReady={runtimeAccess.canUseRuntime}
         onOpenDesktopSetup={() => navigate("/desktop/setup")}
         onClose={closeAccount}
+        onSignedOut={returnToLauncherAfterSignOut}
       />
     </div>
   ) : null;
@@ -4700,6 +4764,7 @@ function AppShellContent() {
                 onOpenSettings={() => {
                   openSettingsWorkspace("general", "account");
                 }}
+                onSignedOut={returnToLauncherAfterSignOut}
               />
             ) : null}
             <button

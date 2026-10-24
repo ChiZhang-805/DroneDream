@@ -43,6 +43,10 @@ process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
 process.env.VITE_DRONEDREAM_EDITION = edition;
 process.env.VITE_SUPABASE_URL = "https://visual-fixture.supabase.co";
 process.env.VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_visual_fixture";
+// Exercise the same three enabled providers as the production account service.
+process.env.VITE_AUTH_GOOGLE_ENABLED = "true";
+process.env.VITE_AUTH_GITHUB_ENABLED = "true";
+process.env.VITE_AUTH_SLACK_ENABLED = "true";
 const productionEnvironment = await readFile(
   path.join(frontendRoot, ".env.production"),
   "utf8",
@@ -288,7 +292,7 @@ async function verifyCase(browser, testCase) {
     // same URL shape here instead of accidentally testing the hosted router.
     await page.goto(`${origin}/${edition === "field" ? "field.html" : ""}#/desktop/setup`, { waitUntil: "networkidle" });
     if (progressOnly) {
-      await page.goto(origin + '/?docsPreview=1#/desktop/setup', { waitUntil: 'networkidle' });
+      await page.goto(origin + (edition === 'field' ? '/field.html' : '/') + '?docsPreview=1#/desktop/setup', { waitUntil: 'networkidle' });
       await page.locator('.launcher-stage-list').waitFor();
       assert.equal(await page.locator('.launcher-stage-list li').count(), 4);
       const marker = page.locator('.launcher-stage-list li[aria-current="step"] > span');
@@ -301,11 +305,18 @@ async function verifyCase(browser, testCase) {
       assert(heading.height <= heading.lineHeight + 1 && heading.scrollWidth <= heading.width + 1, 'Startup title must fit one line');
       const panel = await page.locator('.launcher-progress-panel').evaluate(el=>({height:el.clientHeight,scrollHeight:el.scrollHeight}));
       assert(panel.scrollHeight <= panel.height + 1, 'All four checkpoints must fit the card');
+      assert.equal(pageErrors.length, 0);
       await page.screenshot({path:path.join(outputRoot, testCase.id + '-progress.png')});
       return { case: testCase, status:'pass', heading, panel, animated:true };
     }
     const form = page.locator(".launcher-account-form");
     await form.waitFor();
+    const socialButtons = form.locator(".launcher-social-button");
+    assert.equal(await socialButtons.count(), 3, "All configured social providers must be visible on the first screen");
+    for (const provider of ["Google", "GitHub", "Slack"]) {
+      const button = form.getByRole("button", { name: testCase.locale === "en" ? `Continue with ${provider}` : `使用 ${provider} 登录` });
+      assert.equal(await button.isEnabled(), true);
+    }
     const before = await page.locator(".launcher-progress-panel").boundingBox();
     assert.equal(await page.getByRole("progressbar").count(), 0);
     const email = form.locator('input[type="email"]');
@@ -334,7 +345,11 @@ async function verifyCase(browser, testCase) {
     assert.equal(await form.getByRole("button", { name: /browser|浏览器/i }).count(), 0);
     await form.getByRole("button", { name: testCase.locale === "en" ? "Forgot password?" : "忘记密码？" }).click();
     await form.getByRole("heading", { name: testCase.locale === "en" ? "Reset your password" : "找回密码" }).waitFor();
-    assert.deepEqual(await page.locator(".launcher-progress-panel").boundingBox(), before);
+    const recoveryBounds = await page.locator(".launcher-progress-panel").boundingBox();
+    assert.equal(recoveryBounds.width, before.width);
+    assert(recoveryBounds.height <= before.height, "Recovery must not reserve empty tab space");
+    const recoverySubmit = await form.locator('button[type="submit"]').boundingBox();
+    assert(recoverySubmit.y + recoverySubmit.height < recoveryBounds.y + recoveryBounds.height);
     await form.getByRole("button", { name: testCase.locale === "en" ? "Back to sign in" : "返回登录" }).click();
     const expectedPercent = null;
     const dimensions = await page.evaluate(() => ({
@@ -357,9 +372,11 @@ async function verifyCase(browser, testCase) {
         return {
           illustrationCount: document.querySelectorAll(".launcher-flight-illustration").length,
           imageLoaded: Boolean(illustration?.querySelector("img.launcher-flight-image")?.naturalWidth),
+          imageSource: illustration?.querySelector("img.launcher-flight-image")?.getAttribute("src"),
           svgCount: illustration?.querySelectorAll("svg").length ?? 0,
           chromeBackground: getComputedStyle(document.querySelector(".launcher-chrome")).backgroundColor,
-          scrollbar: getComputedStyle(document.documentElement).scrollbarWidth,
+          colorScheme: getComputedStyle(document.querySelector(".app-shell-launcher")).colorScheme,
+          panelBackground: getComputedStyle(document.querySelector(".launcher-progress-panel")).backgroundColor,
           canvasCount: document.querySelectorAll(".desktop-launcher canvas").length,
           width: bounds?.width ?? 0,
           height: bounds?.height ?? 0,
@@ -370,14 +387,17 @@ async function verifyCase(browser, testCase) {
     }));
     assert.equal(dimensions.scrollWidth, dimensions.documentWidth);
     assert(dimensions.scrollHeight <= dimensions.documentHeight + 1);
-    assert.equal(dimensions.appearance, "light");
+    // Workspace appearance is a separate persisted preference. The launcher
+    // remains light without overwriting the user's workspace theme.
+    assert.equal(dimensions.launcher.colorScheme, "light");
+    assert.equal(dimensions.launcher.panelBackground, "rgba(255, 255, 255, 0.97)");
     assert.equal(dimensions.brandEdition, edition);
     assert.equal(dimensions.grantsHardwareAuthority, "false");
     assert.equal(dimensions.launcher.illustrationCount, 1);
     assert.equal(dimensions.launcher.svgCount, 0);
     assert.equal(dimensions.launcher.imageLoaded, true);
+    assert(dimensions.launcher.imageSource.includes(edition === "autonomy" ? "launcher-campus.png" : `launcher-campus-${edition}.png`), "The background artwork must match the edition, independently of the logo");
     assert.equal(dimensions.launcher.chromeBackground, "rgba(0, 0, 0, 0)");
-    assert.equal(dimensions.launcher.scrollbar, "none");
     assert.equal(dimensions.launcher.canvasCount, 0,
       `${testCase.id}: desktop startup must not create a WebGL canvas`);
     if (testCase.viewport.width > 850) assert(dimensions.launcher.width > 100 && dimensions.launcher.height > 100,
@@ -401,6 +421,9 @@ async function verifyCase(browser, testCase) {
         sha256: await sha256File(imagePath),
       },
     };
+  } catch (error) {
+    await page.screenshot({ path: path.join(outputRoot, `${testCase.id}-failure.png`) });
+    throw error;
   } finally {
     await context.close();
   }

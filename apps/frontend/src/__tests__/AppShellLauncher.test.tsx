@@ -159,7 +159,7 @@ afterEach(() => {
 });
 
 describe("desktop launcher chrome", () => {
-  it("always presents the Universal mother-brand theme before workspace entry", () => {
+  it("keeps the Universal launcher theme independent of the remembered workspace", () => {
     window.localStorage.setItem("dronedream:universal-workspace:v2", "field");
     installDesktopBridge();
     const { router } = renderLauncher();
@@ -217,7 +217,7 @@ describe("desktop launcher chrome", () => {
     });
     const { router } = renderLauncher();
 
-    await screen.findByRole("button", { name: "Settings" });
+    expect(screen.queryByText("Checked")).not.toBeInTheDocument();
     const workspace = await openSettingsWorkspace();
     fireEvent.click(within(workspace).getByRole("tab", { name: "Memory" }));
     const memory = await within(workspace).findByLabelText(/Cross-session memory/);
@@ -278,7 +278,7 @@ describe("desktop launcher chrome", () => {
     installDesktopBridge();
     const { router } = renderLauncher();
 
-    await screen.findByRole("button", { name: "Settings" });
+    expect(screen.queryByText("Checked")).not.toBeInTheDocument();
     expect(document.querySelector(".launcher-runtime-indicator")).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Language" })).not.toBeInTheDocument();
     const settings = screen.getByRole("button", { name: "Settings" });

@@ -135,11 +135,7 @@ const clientHost = globalThis as typeof globalThis & DroneDreamGlobal;
 const selectedAuthStorage = authStorage();
 migrateLegacyBrowserAuthStorage(selectedAuthStorage);
 
-/**
- * Detect only an active session already owned by this WebView process.
- * Desktop storage is session-scoped, so this restores a page reload without
- * turning a later application launch into an implicit sign-in.
- */
+/** Resume only a session already held by this edition's current WebView process. */
 export function hasActiveDesktopAuthSession(): boolean {
   if (!desktopRuntime || !desktopStorageKey || !selectedAuthStorage) return false;
   try {

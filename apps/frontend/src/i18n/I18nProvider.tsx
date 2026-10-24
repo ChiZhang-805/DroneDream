@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import type { ReactNode } from "react";
@@ -268,6 +269,15 @@ const enTranslations = {
     "launcher.retryChecks": "Retry startup checks",
     "launcher.startupBlocked": "Startup checks need attention",
     "launcher.progressLabel": "Startup readiness progress",
+    "launcher.illustrationTitle": "Ready for takeoff",
+    "launcher.illustrationDescription": "",
+    "launcher.cardKicker": "DRONEDREAM STARTUP",
+    "launcher.cardTitle": "Starting workspace",
+    "launcher.cardHint": "",
+    "launcher.stage.system": "Check system",
+    "launcher.stage.runtime": "Start runtime",
+    "launcher.stage.services": "Connect services",
+    "launcher.stage.workspace": "Open workspace",
     "launcher.tagline": "Let Every Flight Flow Like a Dream",
     "launcher.illustrationTitle": "Ready for takeoff",
     "launcher.illustrationDescription":
@@ -1911,6 +1921,15 @@ const zhTranslations = {
     "launcher.retryChecks": "重新检查启动条件",
     "launcher.startupBlocked": "启动检查需要处理",
     "launcher.progressLabel": "启动就绪进度",
+    "launcher.illustrationTitle": "无人机校园插画",
+    "launcher.illustrationDescription": "",
+    "launcher.cardKicker": "DRONEDREAM 启动",
+    "launcher.cardTitle": "正在启动工作区",
+    "launcher.cardHint": "",
+    "launcher.stage.system": "检查这台电脑",
+    "launcher.stage.runtime": "启动运行环境",
+    "launcher.stage.services": "连接服务",
+    "launcher.stage.workspace": "进入工作区",
     "launcher.tagline": "蝶 梦 水 云 乡",
     "launcher.illustrationTitle": "让想法起飞",
     "launcher.illustrationDescription":
@@ -3296,6 +3315,7 @@ interface I18nValue {
   locale: Locale;
   interfaceLocale: InterfaceLocale;
   setLocale: (locale: InterfaceLocale) => void;
+  restoreLocale: (locale: InterfaceLocale) => void;
   t: (key: TranslationKey, params?: TranslationParams) => string;
 }
 
@@ -3312,27 +3332,31 @@ const I18nContext = createContext<I18nValue>({
   locale: "en",
   interfaceLocale: "en",
   setLocale: () => undefined,
+  restoreLocale: () => undefined,
   t: (key, params) => translate("en", key, params),
 });
 
-function initialLocale(): InterfaceLocale {
-  if (typeof window === "undefined") return "en";
+function initialLocale(): { locale: InterfaceLocale; hasSelection: boolean } {
+  if (typeof window === "undefined") return { locale: "en", hasSelection: false };
   try {
     const saved = window.localStorage.getItem("drone-dream:locale");
-    if (saved === "en" || saved === "zh-CN") return saved;
+    if (saved === "en" || saved === "zh-CN") return { locale: saved, hasSelection: true };
     if (saved !== null) window.localStorage.setItem("drone-dream:locale", "en");
   } catch {
     // Language preference storage is optional; the app must still start when
     // browser or WebView policy denies access to localStorage.
   }
-  return "en";
+  return { locale: "en", hasSelection: false };
 }
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [interfaceLocale, setLocaleState] = useState<InterfaceLocale>(initialLocale);
+  const [initialPreference] = useState(initialLocale);
+  const [interfaceLocale, setLocaleState] = useState<InterfaceLocale>(initialPreference.locale);
+  const localeSelectedRef = useRef(initialPreference.hasSelection);
   const locale: Locale = interfaceLocale === "zh-CN" ? "zh-CN" : "en";
 
   const setLocale = useCallback((next: InterfaceLocale) => {
+    localeSelectedRef.current = true;
     setLocaleState(next);
     try {
       window.localStorage.setItem("drone-dream:locale", next);
@@ -3340,6 +3364,14 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       // Keep the in-memory preference even when persistence is unavailable.
     }
   }, []);
+
+  const restoreLocale = useCallback((next: InterfaceLocale) => {
+    // Late account hydration must not replace a local or in-session selection,
+    // including when storage is unavailable and the choice exists only in memory.
+    if (!localeSelectedRef.current && (next === "en" || next === "zh-CN")) {
+      setLocale(next);
+    }
+  }, [setLocale]);
 
   useEffect(() => {
     document.documentElement.lang = interfaceLocale;
@@ -3350,9 +3382,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       locale,
       interfaceLocale,
       setLocale,
+      restoreLocale,
       t: (key, params) => translate(interfaceLocale, key, params),
     }),
-    [interfaceLocale, locale, setLocale],
+    [interfaceLocale, locale, restoreLocale, setLocale],
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

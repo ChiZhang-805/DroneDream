@@ -14,6 +14,9 @@ export type EditionTheme3D = Readonly<{
   gridMinor: number;
 }>;
 
+export type AppearanceMode = "dark" | "light";
+export const DEFAULT_APPEARANCE: AppearanceMode = "light";
+
 export type EditionTheme = Readonly<{
   id: BrandEditionId;
   productName: string;
@@ -35,7 +38,7 @@ function hexColorNumber(value: string): number {
 }
 
 /** Derive one immutable display palette, keeping runtime objects separate from generated source tokens. */
-function createTheme(id: BrandEditionId): EditionTheme {
+function createTheme(id: BrandEditionId, appearance: AppearanceMode = DEFAULT_APPEARANCE): EditionTheme {
   const token = EDITION_BRAND_TOKENS[id];
   const [primary, secondary, tertiary] = token.gradientStops;
   const sceneSurface = hexColorNumber(token.darkSurface);
@@ -67,7 +70,7 @@ export const EDITION_THEMES = Object.freeze({
   autonomy: createTheme("autonomy"),
 }) satisfies Readonly<Record<BrandEditionId, EditionTheme>>;
 
-/** Return the cached light palette; it contains no model, subscription, or hardware permissions. */
+/** Return the light launch palette; it contains no model, subscription, or hardware permissions. */
 export function editionTheme(id: BrandEditionId): EditionTheme {
   return EDITION_THEMES[id];
 }

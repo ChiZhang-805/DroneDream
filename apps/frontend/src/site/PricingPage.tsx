@@ -73,9 +73,9 @@ interface DisplayPlan extends Plan {
 }
 
 const PLANS: readonly Plan[] = [
-  { id: "free", name: "Free", price: 0, includedCredits: 300_000 },
-  { id: "plus", name: "Plus", price: 39, includedCredits: 3_000_000, featured: true },
-  { id: "pro", name: "Pro", price: 129, includedCredits: 15_000_000 },
+  { id: "free", name: "Free", price: 0, includedCredits: 6_000_000 },
+  { id: "plus", name: "Plus", price: 39, includedCredits: 60_000_000, featured: true },
+  { id: "pro", name: "Pro", price: 129, includedCredits: 300_000_000 },
 ];
 const BUSINESS_SEAT_PRICES: Record<PaidPlanId, number> = {
   plus: 19,
@@ -150,8 +150,8 @@ const pricingContent = {
       premiumRouting: "Business managed-model routing",
       advancedHarness: "Shared AURORA strategy previews",
     },
-    allowanceFeature: (credits: string) => `${credits} managed AI credits each month`,
-    businessAllowanceFeature: (credits: string) => `${credits} managed AI credits per user each month`,
+    allowanceFeature: (credits: string) => `${credits} managed AI credits every 7 days`,
+    businessAllowanceFeature: (credits: string) => `${credits} managed AI credits per user every 7 days`,
     close: "Close payment dialog",
     paymentTitle: "Payment",
     wechat: "WeChat Pay",
@@ -201,8 +201,8 @@ const pricingContent = {
       premiumRouting: "商业托管模型路由",
       advancedHarness: "共享 AURORA 高级策略预览",
     },
-    allowanceFeature: (credits: string) => `每月 ${credits} 托管模型 AI 额度`,
-    businessAllowanceFeature: (credits: string) => `每人每月 ${credits} 托管模型 AI 额度`,
+    allowanceFeature: (credits: string) => `每 7 天 ${credits} 托管模型 AI 额度`,
+    businessAllowanceFeature: (credits: string) => `每人每 7 天 ${credits} 托管模型 AI 额度`,
     close: "关闭支付弹窗",
     paymentTitle: "支付",
     wechat: "微信支付",

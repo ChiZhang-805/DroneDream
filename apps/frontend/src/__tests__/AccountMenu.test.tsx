@@ -160,6 +160,60 @@ describe("sidebar account menu", () => {
     window.localStorage.clear();
   });
 
+  it("does not restore a cloud theme at launch or overwrite the current session on settings reopen", async () => {
+    window.localStorage.setItem("dronedream:appearance", "dark");
+    preferenceMock.preferences = {
+      interface_locale: "zh-CN",
+      appearance_mode: "dark",
+      custom_accent: "#e52a57",
+      notifications: {},
+      memory_enabled: false,
+      memory_scopes: {
+        chat_preferences: false,
+        experiment_defaults: false,
+        device_vehicle: false,
+        metrics_constraints: false,
+        safety_approvals: false,
+        workflow_tools: false,
+        reports_delivery: false,
+        collaboration_organization: false,
+        files_artifacts: false,
+      },
+      defaults: {},
+    };
+    const { router } = renderApp();
+    try {
+      expect(document.documentElement.dataset.ddAppearance).toBe("light");
+      fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+      const firstSettings = screen.getByRole("dialog", { name: "Settings" });
+      await waitFor(() => expect(within(firstSettings).getByRole("checkbox", {
+        name: "Account memory",
+      })).toBeEnabled());
+      expect(preferenceMock.loadPreferences).toHaveBeenCalledTimes(1);
+      expect(document.documentElement.lang).toBe("en");
+      expect(document.documentElement.dataset.ddAppearance).toBe("light");
+      expect(within(firstSettings).getByRole("button", { name: "Light" }))
+        .toHaveAttribute("aria-pressed", "true");
+
+      fireEvent.click(within(firstSettings).getByRole("button", { name: "Dark" }));
+      expect(document.documentElement.dataset.ddAppearance).toBe("dark");
+      fireEvent.click(within(firstSettings).getByRole("button", { name: "Close settings" }));
+      preferenceMock.preferences.appearance_mode = "light";
+      fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+      const reopened = screen.getByRole("dialog", { name: "Settings" });
+      await waitFor(() => expect(within(reopened).getByRole("checkbox", {
+        name: "Account memory",
+      })).toBeEnabled());
+      expect(preferenceMock.loadPreferences).toHaveBeenCalledTimes(2);
+      expect(document.documentElement.lang).toBe("en");
+      expect(document.documentElement.dataset.ddAppearance).toBe("dark");
+      expect(within(reopened).getByRole("button", { name: "Dark" }))
+        .toHaveAttribute("aria-pressed", "true");
+    } finally {
+      router.dispose();
+    }
+  });
+
   it("does not mislabel an authenticated account as Free when usage is unavailable", async () => {
     usageMock.get.mockRejectedValueOnce(new Error("usage unavailable"));
     const { router } = renderApp();

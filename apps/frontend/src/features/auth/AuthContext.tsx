@@ -29,7 +29,7 @@ import {
   githubAuthEnabled,
   googleAuthEnabled,
   hasActiveDesktopAuthSession,
-slackAuthEnabled,
+  slackAuthEnabled,
   supabaseClient,
 } from "./supabaseClient";
 
@@ -119,10 +119,8 @@ function shouldDeferDesktopAuth(): boolean {
   // Tauri uses a hash router and initially mounts the provider at `/` before
   // the index redirect selects `#/desktop/setup`.  Looking only at pathname
   // therefore lets account hydration race the environment-only launcher.
-  // Desktop auth is explicit on each process launch, through the inline account
-  // form or the optional browser flow. A reload within that same WebView keeps
-  // sessionStorage, so hydrate that already-active process session instead of
-  // incorrectly falling back to Local user.
+  // Fresh desktop processes require explicit sign-in. A page reload may resume
+  // a session already established in this edition's current WebView process.
   return isDesktopRuntime() && !hasActiveDesktopAuthSession();
 }
 
@@ -319,6 +317,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [passwordSessionActive, setPasswordSessionActive] = useState(false);
   const previousAccountId = useRef<string | null>(account?.id ?? null);
   const accountGeneration = useRef(0);
+  const desktopPasswordSession = useRef(isDesktopRuntime() && !deferDesktopAuth);
+  const [passwordSessionActive, setPasswordSessionActive] = useState(false);
 
   useEffect(() => () => { accountGeneration.current += 1; }, []);
 
@@ -341,16 +341,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!deferDesktopAuth) return undefined;
+    if (!isDesktopRuntime()) return undefined;
     const adopt = (event: Event) => {
       const detail = (event as CustomEvent<{ user: User; accessToken: string }>).detail;
       if (!detail?.user || !detail.accessToken) return;
+      desktopPasswordSession.current = false;
       adoptUser(detail.user, detail.accessToken);
       setLoading(false);
     };
     window.addEventListener(ADOPT_DESKTOP_AUTH_EVENT, adopt);
     return () => window.removeEventListener(ADOPT_DESKTOP_AUTH_EVENT, adopt);
-  }, [adoptUser, deferDesktopAuth]);
+  }, [adoptUser]);
 
   useEffect(() => {
     const expire = () => {
@@ -389,7 +390,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void supabaseClient.auth.getSession().then(({ data, error }) => {
       // An auth event is newer than the startup snapshot, even if its request
       // completes first. A late snapshot must not resurrect a signed-out account.
-      if (!active || authEventReceived) return;
+      if (!active || authEventReceived
+        || (isDesktopRuntime() && !desktopPasswordSession.current)) return;
       if (error) {
         adoptUser(null, null);
       } else {
@@ -397,16 +399,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       setLoading(false);
     }).catch(() => {
-      if (!active || authEventReceived) return;
+      if (!active || authEventReceived
+        || (isDesktopRuntime() && !desktopPasswordSession.current)) return;
       adoptUser(null, null);
       setLoading(false);
     });
     const { data } = supabaseClient.auth.onAuthStateChange((event, session) => {
       if (!active) return;
       authEventReceived = true;
+      // A native browser adoption may supersede this restored SDK session.
+      if (isDesktopRuntime() && !desktopPasswordSession.current) return;
       if (event === "PASSWORD_RECOVERY") {
         setPasswordRecovery(true);
       } else if (event === "SIGNED_OUT") {
+        desktopPasswordSession.current = false;
         setPasswordRecovery(false);
       }
       adoptUser(session?.user ?? null, session?.access_token ?? null);
@@ -418,13 +424,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [adoptUser, authActivated, deferDesktopAuth, docsPreview]);
 
-  // Desktop password sessions remain process-scoped and refresh through the SDK.
-  // Only an explicitly completed password/code transaction may publish identity.
+  // Inline password/code sessions refresh through the SDK. Deferred desktop
+  // hydration must not hide the result of a transaction the user just completed.
   useEffect(() => {
     if (!deferDesktopAuth || !passwordSessionActive || !supabaseClient) return;
     const { data } = supabaseClient.auth.onAuthStateChange((event, session) => {
       if (!desktopPasswordSession.current) return;
-      if (event === "TOKEN_REFRESHED") adoptUser(session?.user ?? null, session?.access_token ?? null);
+      if (event === "TOKEN_REFRESHED") {
+        adoptUser(session?.user ?? null, session?.access_token ?? null);
+      }
       if (event === "SIGNED_OUT") {
         desktopPasswordSession.current = false;
         adoptUser(null, null);
@@ -434,21 +442,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [adoptUser, deferDesktopAuth, passwordSessionActive]);
 
   const adoptPasswordSession = useCallback((session: Session | null) => {
-    if (!deferDesktopAuth) return;
-    if (!session?.user || !session.access_token) throw new Error("The account service returned no session.");
+    if (!isDesktopRuntime()) return;
+    if (!session?.user || !session.access_token) {
+      throw new Error("The account service returned no session.");
+    }
     clearBrowserAuthSessionRefresh();
     desktopPasswordSession.current = true;
     setPasswordSessionActive(true);
     adoptUser(session.user, session.access_token);
     setLoading(false);
-  }, [adoptUser, deferDesktopAuth]);
+  }, [adoptUser]);
 
   const signInWithPassword = useCallback(async (
     email: string,
     password: string,
     captchaToken?: string,
   ) => {
-    // Send credentials only through the configured SDK; auth events adopt the result.
+    // Send credentials through the configured SDK, then adopt the desktop result.
     const { data, error } = await requireClient().auth.signInWithPassword({
       email: email.trim(),
       password,
@@ -526,7 +536,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       type: "email",
     });
     if (error) throw error;
-    if (newPassword === undefined) { adoptPasswordSession(data.session); return; }
+    if (newPassword === undefined) {
+      adoptPasswordSession(data.session);
+      return;
+    }
     try {
       const { error: passwordError } = await client.auth.updateUser({
         password: newPassword,

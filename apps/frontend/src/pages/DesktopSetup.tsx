@@ -42,7 +42,6 @@ import type {
 import { formatBytes } from "../desktop/format";
 import { useDesktopRuntimeAccess } from "../desktop/access";
 import { useOptionalAuth } from "../features/auth/AuthContext";
-
 import { probeSystemPrerequisitesWithStartupGrace } from "../desktop/prerequisiteProbe";
 import {
   isOverallDesktopReady,
@@ -366,6 +365,11 @@ export function DesktopSetup() {
         : null;
   const signedInAccount =
     auth?.configured && !auth.loading ? auth.account : null;
+  useEffect(() => {
+    // AuthProvider only publishes a desktop account after explicit sign-in or
+    // restoration of that same WebView process's already-active session.
+    setAuthCompletedForLaunch(Boolean(signedInAccount));
+  }, [signedInAccount]);
   const startupGateReady =
     !desktopAvailable ||
     (authCompletedForLaunch &&
@@ -538,8 +542,7 @@ export function DesktopSetup() {
 
   useEffect(() => {
     if (!desktopAvailable) return;
-    // Account entry and environment readiness are independent. Open the
-    // workspace only after explicit authentication and fresh local checks.
+    // Inline account entry does not bypass fresh runtime or updater checks.
     if (!localChecksReady || !authCompletedForLaunch) return;
     if (
       updater.status === "checking" ||
@@ -1364,6 +1367,8 @@ export function DesktopSetup() {
           localReady={localChecksReady}
           ready={workspaceReady}
           checking={environmentChecking}
+          starting={runtimeAccess.status === "starting"}
+          installationRequired={showInstallPlanner}
           gateBlocked={
             environmentBlocked ||
             runtimeSessionFailure !== null ||
@@ -2505,6 +2510,8 @@ function RuntimeLauncherHero({
   localReady,
   ready,
   checking,
+  starting,
+  installationRequired,
   gateBlocked,
   accountRequired,
   automaticStartPending,
@@ -2517,6 +2524,8 @@ function RuntimeLauncherHero({
   localReady: boolean;
   ready: boolean;
   checking: boolean;
+  starting: boolean;
+  installationRequired: boolean;
   gateBlocked: boolean;
   accountRequired: boolean;
   automaticStartPending: boolean;
@@ -2543,13 +2552,26 @@ function RuntimeLauncherHero({
         ? t("launcher.status.signIn")
       : localReady && environmentProgress < 100
         ? t("launcher.status.checking")
+      : starting && !active
+        ? t("launcher.status.starting")
       : phase === "completed"
         ? t("launcher.status.healthChecking")
-      : (checking || automaticStartPending) && phase === "idle"
+      : (checking || automaticStartPending || !installationRequired) && phase === "idle"
         ? t("launcher.status.checking")
         : t(LAUNCHER_STATUS_KEYS[phase]);
   const activeStage = ready ? 4 : active
     ? (["starting", "healthChecking"].includes(phase) ? 2 : 1)
+    : percent < 20 ? 0 : percent < 55 ? 1 : percent < 95 ? 2 : 3;
+  const stages = [
+    t("launcher.stage.system"),
+    t("launcher.stage.runtime"),
+    t("launcher.stage.services"),
+    t("launcher.stage.workspace"),
+  ];
+
+  const activeStage = ready ? 4 : active
+    ? (["starting", "healthChecking"].includes(phase) ? 2 : 1)
+    : starting ? 1
     : percent < 20 ? 0 : percent < 55 ? 1 : percent < 95 ? 2 : 3;
   const stages = [
     t("launcher.stage.system"),
