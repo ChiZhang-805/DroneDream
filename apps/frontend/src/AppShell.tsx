@@ -1,4 +1,3 @@
-import { LauncherAccountForm } from "./components/LauncherAccountForm";
 import {
   Fragment,
   useCallback,
@@ -37,6 +36,7 @@ import {
   MailCheck,
   MapPinned,
   Menu,
+  Moon,
   MonitorCog,
   Navigation2,
   RadioTower,
@@ -48,6 +48,7 @@ import {
   Sparkles,
   TicketCheck,
   Trophy,
+  Sun,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -110,6 +111,10 @@ import {
 } from "./appSettings";
 import { AuthCaptcha } from "./features/auth/AuthCaptcha";
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
+import {
+  cancelDesktopBrowserSignIn,
+  completeDesktopBrowserSignIn,
+} from "./features/auth/desktopBrowserSignIn";
 import { OPEN_ACCOUNT_DIALOG_EVENT } from "./features/auth/events";
 import {
   useAdminAccess,
@@ -172,7 +177,7 @@ import {
   type ModelHarnessMemoryNamespace,
 } from "./features/settings/consolePreferences";
 import { ECE498BH_COURSE_URL } from "./externalLinks";
-import { EditionThemeProvider } from "./theme/EditionThemeProvider";
+import { EditionThemeProvider, useEditionTheme } from "./theme/EditionThemeProvider";
 import {
   BUILD_EDITION,
   EDITION_IS_FIXED,
@@ -518,7 +523,9 @@ type SettingsCopy = Readonly<{
   title: string;
   tabs: readonly [string, string, string, string];
   language: string;
+  interface: string;
   notifications: string;
+  appearance: readonly [string, string];
   notificationLabels: readonly [string, string, string, string, string, string, string, string];
   memoryTitle: string;
   memoryEnabled: readonly [string, string];
@@ -545,7 +552,9 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     title: "Settings",
     tabs: ["General", "Memory", "Model", "Runtime"],
     language: "Language",
+    interface: "Interface",
     notifications: "Notifications",
+    appearance: ["Dark", "Light"],
     notificationLabels: ["Allow notifications", "Experiment and task completed", "AI response completed", "Product updates", "Approval required", "Allowance or card expiring", "Security and sign-in", "Device or runtime status"],
     memoryTitle: "Memory",
     memoryEnabled: ["Memory off", "Memory on"],
@@ -560,7 +569,9 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     title: "设置",
     tabs: ["常规", "记忆", "模型", "运行环境"],
     language: "语言",
+    interface: "界面",
     notifications: "通知",
+    appearance: ["深色", "浅色"],
     notificationLabels: ["允许通知", "实验与任务完成", "AI 回复完成", "产品更新", "需要审批", "额度或重置卡即将到期", "安全与登录提醒", "设备或运行环境状态"],
     memoryTitle: "记忆",
     memoryEnabled: ["记忆已关闭", "记忆已开启"],
@@ -1078,8 +1089,8 @@ function SettingsDialog({
     draft: ExperiencePreferenceDraft = experiencePreferenceDraft,
   ): ConsolePreferenceRecord => ({
     interface_locale: interfaceLocale,
-    appearance_mode: "light",
-    custom_accent: "#8d72ee",
+    appearance_mode: editionTheme.appearancePreference,
+    custom_accent: editionTheme.customAccent,
     notifications: notificationPreferences,
     memory_enabled: draft.memory_enabled,
     memory_scopes: draft.memory_scopes,
@@ -1094,6 +1105,8 @@ function SettingsDialog({
       report_format: draft.default_report_format,
     },
   }), [
+    editionTheme.appearancePreference,
+    editionTheme.customAccent,
     experiencePreferenceDraft,
     interfaceLocale,
     notificationPreferences,
@@ -1628,10 +1641,6 @@ function SettingsDialog({
   };
   const prerequisiteSnapshot = snapshot?.prerequisites ?? null;
   const runtimeSnapshot = snapshot?.runtime ?? null;
-  const runtimeComponents = runtimeSnapshot?.components ?? [];
-  const readyRuntimeComponentCount = runtimeComponents.filter(
-    (component) => component.status === "ready",
-  ).length;
   const runtimeCheckSteps = [
     {
       id: "operating-system",
@@ -1663,33 +1672,23 @@ function SettingsDialog({
         : null,
     },
     {
-      id: "graphics",
-      label: interfaceLocale === "zh-CN" ? "显卡驱动" : "Graphics driver",
-      detail: prerequisiteSnapshot?.gpus.map((gpu) => `${gpu.name}${gpu.driverVersion ? ` · ${gpu.driverVersion}` : ""}`).join(" / ") || null,
-      result: prerequisiteSnapshot ? prerequisiteSnapshot.gpus.length > 0 && prerequisiteSnapshot.gpus.every((gpu) => Boolean(gpu.driverVersion)) : null,
-    },
-    {
-      id: "storage",
-      label: interfaceLocale === "zh-CN" ? "可用存储" : "Available storage",
-      detail: prerequisiteSnapshot?.disks.map((disk) => `${disk.drive} ${(disk.freeBytes / 1_073_741_824).toFixed(1)} GB`).join(" · ") || null,
-      result: prerequisiteSnapshot ? prerequisiteSnapshot.disks.length > 0 && prerequisiteSnapshot.disks.every((disk) => disk.freeBytes > 0) : null,
-    },
-    {
       id: "runtime-installed",
       label: runtimeCheckCopy.installed,
       detail: runtimeSnapshot?.version ?? null,
       result: runtimeSnapshot ? runtimeSnapshot.installed : null,
     },
     {
-      id: "runtime-stack",
+      id: "runtime-running",
       label: runtimeCheckCopy.running,
-      detail: runtimeSnapshot
-        ? `${runtimeSnapshot.runtimeName ?? "DroneDreamRuntime"} · ${readyRuntimeComponentCount}/${runtimeComponents.length} ${interfaceLocale === "zh-CN" ? "个组件就绪" : "components ready"}`
-        : null,
-      result: runtimeSnapshot
-        ? runtimeSnapshot.running && runtimeComponents.every((component) => component.status === "ready")
-        : null,
+      detail: runtimeSnapshot?.runtimeName ?? null,
+      result: runtimeSnapshot ? runtimeSnapshot.running : null,
     },
+    ...(runtimeSnapshot?.components ?? []).map((component) => ({
+      id: `component-${component.id}`,
+      label: component.label,
+      detail: component.detail ?? component.version ?? null,
+      result: component.status === "ready",
+    })),
   ].map((step) => ({
     ...step,
     state: checkedState(step.result),
@@ -1740,20 +1739,26 @@ function SettingsDialog({
       ? {
           title: "设置",
           language: "语言",
+          appearance: "外观",
           accountMemory: "账户记忆",
           editionMemory: "本软件记忆",
           model: "默认平台模型",
           runtime: "Runtime",
           allSettings: "全部设置",
+          dark: "深色",
+          light: "浅色",
         }
       : {
           title: "Settings",
           language: "Language",
+          appearance: "Appearance",
           accountMemory: "Account memory",
           editionMemory: "This edition's memory",
           model: "Default platform model",
           runtime: "Runtime",
           allSettings: "All settings",
+          dark: "Dark",
+          light: "Light",
         };
     const availableModels = managedModels.filter(managedModelAvailableForAssistant);
     const selectedModel = `${modelAccess.managedProvider}:${modelAccess.managedModel}`;
@@ -1795,6 +1800,33 @@ function SettingsDialog({
                   <span>{option.label}</span>
                 </button>
               ))}
+            </div>
+          </div>
+          <div className="quick-settings-item quick-settings-appearance">
+            <span>{quickCopy.appearance}</span>
+            <div
+              className="quick-settings-appearance-options"
+              role="group"
+              aria-label={quickCopy.appearance}
+            >
+              <button
+                type="button"
+                className={editionTheme.appearancePreference === "dark" ? "selected" : undefined}
+                aria-pressed={editionTheme.appearancePreference === "dark"}
+                onClick={() => editionTheme.setAppearance("dark")}
+              >
+                <Moon aria-hidden="true" />
+                <span>{quickCopy.dark}</span>
+              </button>
+              <button
+                type="button"
+                className={editionTheme.appearancePreference === "light" ? "selected" : undefined}
+                aria-pressed={editionTheme.appearancePreference === "light"}
+                onClick={() => editionTheme.setAppearance("light")}
+              >
+                <Sun aria-hidden="true" />
+                <span>{quickCopy.light}</span>
+              </button>
             </div>
           </div>
           {auth.account || docsPreview ? (
@@ -1896,40 +1928,7 @@ function SettingsDialog({
       consumerProfile={edition}
       presentation="workspace"
       backLabel={interfaceLocale === "zh-CN" ? "返回应用" : "Back to app"}
-      headerAction={activeSettingsTab === "model" ? (
-        <div className="settings-model-access-mode settings-heading-model-access" role="group" aria-label={t("settings.model.accessMode")}>
-          <button
-            type="button"
-            className={modelAccess.accessMode === "platform" ? "selected" : undefined}
-            aria-pressed={modelAccess.accessMode === "platform"}
-            onClick={() => selectAccessMode("platform")}
-          >
-            <strong>{t("settings.model.includedAllowance")}</strong>
-          </button>
-          <button
-            type="button"
-            className={modelAccess.accessMode === "byok" ? "selected" : undefined}
-            aria-pressed={modelAccess.accessMode === "byok"}
-            onClick={() => selectAccessMode("byok")}
-          >
-            <strong>{t("settings.model.byok")}</strong>
-          </button>
-        </div>
-      ) : activeSettingsTab === "memory" ? (
-        <SettingsToggle
-          className="settings-heading-memory-toggle"
-          checked={experiencePreferenceDraft.account_memory_enabled && experiencePreferenceDraft.memory_enabled}
-          disabled={experiencePreferenceControlsDisabled}
-          label={settingsCopy.memoryEnabled[
-            experiencePreferenceDraft.account_memory_enabled && experiencePreferenceDraft.memory_enabled ? 1 : 0
-          ]}
-          onChange={(checked) => setExperiencePreferenceDraft((current) => ({
-            ...current,
-            account_memory_enabled: checked,
-            memory_enabled: checked,
-          }))}
-        />
-      ) : activeSettingsTab === "course" ? (
+      headerAction={activeSettingsTab === "course" ? (
         <a
           className="settings-course-header-action"
           href={ECE498BH_COURSE_URL}
@@ -1964,6 +1963,37 @@ function SettingsDialog({
                 </button>
               ))}
             </fieldset>
+          </div>
+          <div className="settings-general-card settings-interface-card">
+            <div className="settings-card-heading">
+              <span><SlidersHorizontal aria-hidden="true" />{settingsCopy.interface}</span>
+            </div>
+            <div
+              className="settings-appearance-options"
+              role="group"
+              aria-label={t("settings.general.appearance")}
+            >
+              <button
+                type="button"
+                className={editionTheme.appearancePreference === "dark" ? "selected" : undefined}
+                aria-pressed={editionTheme.appearancePreference === "dark"}
+                onClick={() => editionTheme.setAppearance("dark")}
+              >
+                <Moon aria-hidden="true" />
+                <strong>{settingsCopy.appearance[0]}</strong>
+                <i aria-hidden="true">✓</i>
+              </button>
+              <button
+                type="button"
+                className={editionTheme.appearancePreference === "light" ? "selected" : undefined}
+                aria-pressed={editionTheme.appearancePreference === "light"}
+                onClick={() => editionTheme.setAppearance("light")}
+              >
+                <Sun aria-hidden="true" />
+                <strong>{settingsCopy.appearance[1]}</strong>
+                <i aria-hidden="true">✓</i>
+              </button>
+            </div>
           </div>
           <div className="settings-general-card settings-notification-card">
             <div className="settings-card-heading">
@@ -2336,20 +2366,19 @@ function SettingsDialog({
             </div>
           </section>
         </div>
-        <div className="settings-memory-message-slot" aria-live="polite">
-          {experiencePreferenceState === "blocked" ? (
-            <p className="settings-memory-message" role="status">
-              {t("settings.memory.runtimeRequired")}
-            </p>
-          ) : experiencePreferenceMessage && experiencePreferenceMessage !== EXPERIENCE_PREFERENCE_LOAD_FAILED ? (
-            <p
-              className="settings-memory-message"
-              role={experiencePreferenceState === "error" ? "alert" : "status"}
-            >
-              {experiencePreferenceMessage}
-            </p>
-          ) : null}
-        </div>
+        {experiencePreferenceState === "blocked" ? (
+          <p className="settings-memory-message" role="status">
+            {t("settings.memory.runtimeRequired")}
+          </p>
+        ) : null}
+        {experiencePreferenceMessage && experiencePreferenceMessage !== EXPERIENCE_PREFERENCE_LOAD_FAILED ? (
+          <p
+            className="settings-memory-message"
+            role={experiencePreferenceState === "error" ? "alert" : "status"}
+          >
+            {experiencePreferenceMessage}
+          </p>
+        ) : null}
         </section>
       </EditionSettingsPanel>
       <EditionSettingsPanel active={activeSettingsTab === "model"} id="model">
@@ -2357,6 +2386,29 @@ function SettingsDialog({
           className={`settings-model-panel${modelAccess.accessMode === "byok" ? " settings-model-panel-byok" : ""}`}
           aria-label={t("settings.model.title")}
         >
+        <section className="settings-model-section settings-model-mode-row" aria-labelledby="settings-model-access-title">
+          <header className="settings-model-section-heading">
+            <h3 id="settings-model-access-title">{t("settings.model.accessMode")}</h3>
+          </header>
+          <div className="settings-model-access-mode" role="group" aria-label={t("settings.model.accessMode")}>
+            <button
+              type="button"
+              className={modelAccess.accessMode === "platform" ? "selected" : undefined}
+              aria-pressed={modelAccess.accessMode === "platform"}
+              onClick={() => selectAccessMode("platform")}
+            >
+              <strong>{t("settings.model.includedAllowance")}</strong>
+            </button>
+            <button
+              type="button"
+              className={modelAccess.accessMode === "byok" ? "selected" : undefined}
+              aria-pressed={modelAccess.accessMode === "byok"}
+              onClick={() => selectAccessMode("byok")}
+            >
+              <strong>{t("settings.model.byok")}</strong>
+            </button>
+          </div>
+        </section>
         {modelAccess.accessMode === "platform" ? (
           <div className="settings-model-usage">
             <section className="settings-model-section settings-model-current-plan-section" aria-labelledby="settings-current-plan-title">
@@ -2590,7 +2642,6 @@ function SettingsDialog({
               className={`settings-runtime-status settings-runtime-status-${runtimeCheckVisualPhase ?? level}`}
               role="status"
               aria-live="polite"
-              title={uniqueDetails.join(" · ") || undefined}
             >
               <span className="settings-runtime-status-icon" aria-hidden="true">
                 {runtimeCheckVisualPhase === "checking" ? (
@@ -2637,9 +2688,13 @@ function SettingsDialog({
                 );
               })}
             </ol>
+            {!runtimeCheckActive && level !== "healthy" && uniqueDetails.length > 0 ? (
+              <ul className="settings-runtime-diagnostics" aria-label={t("settings.runtime.viewDetails")}>
+                {uniqueDetails.map((detail) => <li key={detail}>{detail}</li>)}
+              </ul>
+            ) : null}
           </section>
           <SettingsUpdateCenter
-            runtime={runtimeSnapshot}
             onOpenRuntimeBase={() => {
               onClose();
               navigate("/desktop/setup");
@@ -3068,7 +3123,6 @@ function AccountMenuPopover({
   onSignedOut: () => void;
 }) {
   const auth = useAuth();
-  const navigate = useNavigate();
   const { interfaceLocale } = useI18n();
   const accountLocale = interfaceLocale === "en" ? "en" : "zh-CN";
   const copy = ACCOUNT_COPY[accountLocale];
@@ -3118,12 +3172,7 @@ function AccountMenuPopover({
 
   return (
     <div ref={menuRef} className="account-menu-popover" role="menu" aria-label={copy.account}>
-      <button
-        type="button"
-        className="account-menu-row account-menu-profile"
-        role="menuitem"
-        onClick={onEditProfile}
-      >
+      <button type="button" className="account-menu-row" role="menuitem" onClick={onEditProfile}>
         <CircleUserRound aria-hidden="true" strokeWidth={1.8} />
         <span>{copy.editProfile}</span>
       </button>
@@ -3155,6 +3204,8 @@ export function AccountDialog({
   closeRef,
   required,
   edition,
+  desktopBrowserAuthReady = false,
+  onOpenDesktopSetup,
   onClose,
   onSignedOut,
 }: {
@@ -3183,6 +3234,7 @@ export function AccountDialog({
   );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [browserAuthWaiting, setBrowserAuthWaiting] = useState(false);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
   const [avatarCropSource, setAvatarCropSource] = useState<{
@@ -3194,11 +3246,39 @@ export function AccountDialog({
   const cameraButtonRef = useRef<HTMLButtonElement>(null);
   const cameraVideoRef = useRef<HTMLVideoElement>(null);
   const cameraStreamRef = useRef<MediaStream | null>(null);
+  const browserAuthControllerRef = useRef<AbortController | null>(null);
   const mountedRef = useRef(true);
 
   useEffect(() => {
     setDisplayName(auth.account?.displayName ?? "");
   }, [auth.account?.displayName]);
+
+  const startDesktopBrowserSignIn = useCallback(async () => {
+    if (!desktopRuntime || browserAuthControllerRef.current) return;
+    const controller = new AbortController();
+    browserAuthControllerRef.current = controller;
+    setError(null);
+    setBrowserAuthWaiting(true);
+    try {
+      await completeDesktopBrowserSignIn(locale, { signal: controller.signal });
+    } catch (reason) {
+      const message = reason instanceof Error ? reason.message : String(reason);
+      if (mountedRef.current && !/cancelled/iu.test(message)) {
+        setError(copy.browserSignInFailed);
+      }
+    } finally {
+      if (browserAuthControllerRef.current === controller) {
+        browserAuthControllerRef.current = null;
+        if (mountedRef.current) setBrowserAuthWaiting(false);
+      }
+    }
+  }, [copy.browserSignInFailed, desktopRuntime, locale]);
+
+  const cancelDesktopSignIn = useCallback(async () => {
+    const controller = browserAuthControllerRef.current;
+    if (!desktopRuntime || !controller) return;
+    await cancelDesktopBrowserSignIn(controller);
+  }, [desktopRuntime]);
 
   const stopCamera = useCallback(() => {
     cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
@@ -3217,6 +3297,8 @@ export function AccountDialog({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      const controller = browserAuthControllerRef.current;
+      if (controller) void cancelDesktopBrowserSignIn(controller);
       cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
       cameraStreamRef.current = null;
     };
@@ -3590,8 +3672,35 @@ export function AccountDialog({
           ) : null}
         </div>
       ) : desktopRuntime ? (
-        <div className="launcher-progress-panel account-software-auth">
-          <LauncherAccountForm locale={locale} />
+        <div className="account-desktop-browser-auth">
+          <p>{desktopBrowserAuthReady
+            ? copy.browserSignInBody
+            : copy.browserRuntimeRequired}</p>
+          {desktopBrowserAuthReady ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={browserAuthWaiting}
+              onClick={() => void startDesktopBrowserSignIn()}
+            >
+              <LogIn aria-hidden="true" strokeWidth={1.85} />
+              {browserAuthWaiting ? copy.browserSignInWaiting : copy.browserSignIn}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={onOpenDesktopSetup}
+            >
+              <MonitorCog aria-hidden="true" strokeWidth={1.85} />
+              {copy.openEnvironment}
+            </button>
+          )}
+          {desktopBrowserAuthReady && browserAuthWaiting ? (
+            <button type="button" className="btn" onClick={() => void cancelDesktopSignIn()}>
+              {copy.cancelBrowserSignIn}
+            </button>
+          ) : null}
         </div>
       ) : (
         <>
@@ -4041,8 +4150,10 @@ function AppShellContent() {
   }, [desktopRuntime, t]);
 
   useEffect(() => {
-    // The launcher owns explicit software authentication and local readiness.
-    // The workspace gate runs after navigation away from the launcher.
+    // The launcher owns a strict two-stage flow: environment first, browser
+    // authentication only after the user selects the sole sign-in action at
+    // 100%. The workspace gate below therefore runs only after navigation away
+    // from the launcher.
     if (!desktopRuntime || launcherMode) return;
     if (
       updater.status === "checking" ||

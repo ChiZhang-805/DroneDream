@@ -13,8 +13,8 @@
   padding: 22px;
   border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
   border-radius: 18px;
-  color: #261d29;
-  background: #ffffff;
+  color: var(--app-text, #211827);
+  background: var(--app-surface, #fff);
   box-shadow: 0 24px 70px rgba(18, 10, 25, 0.24);
 }
 

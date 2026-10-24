@@ -31,7 +31,6 @@ vi.mock("../features/auth/desktopBrowserSignIn", () => ({
 
 vi.mock("../features/auth/AuthContext", () => ({
   AuthProvider: ({ children }: { children: ReactNode }) => children,
-  useAuthOrLocal: () => ({ configured: true, ...authMock }),
   useAuth: () => ({
     configured: true,
     loading: false,
@@ -266,6 +265,5 @@ describe("workspace email and password authentication", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Open Environment" }));
     expect(onOpenDesktopSetup).toHaveBeenCalledOnce();
     expect(desktopSignInMock.complete).not.toHaveBeenCalled();
-    expect(within(dialog).queryByRole("button", { name: /browser/i })).not.toBeInTheDocument();
   });
 });

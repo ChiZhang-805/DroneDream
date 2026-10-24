@@ -313,8 +313,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       : null,
   );
-  const desktopPasswordSession = useRef(false);
-  const [passwordSessionActive, setPasswordSessionActive] = useState(false);
   const previousAccountId = useRef<string | null>(account?.id ?? null);
   const accountGeneration = useRef(0);
   const desktopPasswordSession = useRef(isDesktopRuntime() && !deferDesktopAuth);

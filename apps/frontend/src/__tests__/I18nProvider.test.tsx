@@ -108,7 +108,10 @@ describe("I18nProvider", () => {
     vi.spyOn(window.navigator, "language", "get").mockReturnValue("zh-CN");
     window.__TAURI__ = {
       core: {
-        invoke,
+        invoke: vi.fn(async (command: string) => {
+          if (command === "get_installer_locale") return "zh-CN";
+          throw new Error(`Unexpected command: ${command}`);
+        }),
       },
     };
 

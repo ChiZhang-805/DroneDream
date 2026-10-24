@@ -1,8 +1,11 @@
 import {
+  useCallback,
   createContext,
   useContext,
   useEffect,
   useLayoutEffect,
+  useMemo,
+  useState,
   useSyncExternalStore,
   type ReactNode,
 } from "react";
@@ -17,13 +20,21 @@ import {
 import {
   DEFAULT_APPEARANCE,
   editionTheme,
+  editionThemeForAppearance,
+  type AppearanceMode,
   type EditionTheme,
 } from "./editionTheme";
 
 const CUSTOM_ACCENT_STORAGE_KEY = "dronedream:custom-accent";
-export type EditionThemeContextValue = EditionTheme;
+export type AppearancePreference = AppearanceMode;
 
-const EditionThemeContext = createContext<EditionThemeContextValue>(editionTheme("universal"));
+export type EditionThemeContextValue = EditionTheme & Readonly<{
+  appearancePreference: AppearancePreference;
+  customAccent: string;
+  setAppearance: (appearance: AppearancePreference) => void;
+  setCustomAccent: (accent: string) => void;
+  resetAppearance: () => void;
+}>;
 
 const fallbackTheme: EditionThemeContextValue = {
   ...editionTheme("universal"),
@@ -84,9 +95,9 @@ export function EditionThemeProvider({
   }), [appearance, appearancePreference, customAccent, edition, resetAppearance, setAppearance, setCustomAccent]);
   useLayoutEffect(() => {
     applyUniversalMode(edition);
-    document.documentElement.dataset.ddAppearance = "light";
+    document.documentElement.dataset.ddAppearance = appearance;
     document.documentElement.dataset.ddReducedMotion = String(reducedMotion);
-    document.documentElement.style.colorScheme = "light";
+    document.documentElement.style.colorScheme = appearance;
     document.documentElement.style.removeProperty("--dd-brand-start");
     document.documentElement.style.removeProperty("--dd-brand-middle");
     document.documentElement.style.removeProperty("--dd-brand-end");

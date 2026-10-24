@@ -1,4 +1,4 @@
-/** Fixed edition styling and motion preferences must tolerate denied browser persistence. */
+/** Device appearance must remain usable even when browser persistence is denied. */
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { appReducedMotionEnabled, setAppReducedMotionEnabled } from "../desktop/uiMotionPreferences";
@@ -20,7 +20,7 @@ describe("motion preferences", () => {
     expect(() => persistUniversalMode("sim")).not.toThrow();
   });
 
-  it("keeps the edition palette fixed with no persistent storage", () => {
+  it("keeps theme controls usable with no persistent storage", () => {
     vi.spyOn(window, "localStorage", "get").mockImplementation(() => { throw new DOMException("blocked", "SecurityError"); });
     const { result } = renderHook(() => useEditionTheme(), {
       wrapper: ({ children }) => <EditionThemeProvider edition="sim">{children}</EditionThemeProvider>,

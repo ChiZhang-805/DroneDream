@@ -4,6 +4,7 @@ import { StrictMode } from "react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { BrowserAuthSession } from "../desktop/bridge";
 
 const optionalAuthState = vi.hoisted(() => ({
   current: null as null | {
@@ -512,6 +513,14 @@ afterEach(() => {
     reconcileEnginePack: vi.fn(async () => undefined),
     reconcileComponentPacks: vi.fn(async () => undefined),
   };
+  browserAuthMocks.configuration = {
+    supabaseUrl: "https://yggabfynndpzymlqvnim.supabase.co",
+    publishableKey: "public-test-key-for-browser-auth",
+  };
+  browserAuthMocks.adoptSession.mockReset();
+  browserAuthMocks.adoptSession.mockResolvedValue(undefined);
+  browserAuthMocks.shouldClearVault.mockReset();
+  browserAuthMocks.shouldClearVault.mockReturnValue(false);
   runtimeSessionContractMocks.verify.mockReset();
   runtimeSessionContractMocks.verify.mockImplementation(async (report) => report);
   vi.restoreAllMocks();
@@ -2460,7 +2469,7 @@ describe("DesktopSetup", () => {
       .toHaveAttribute("aria-valuenow", "0");
     expect(screen.queryByRole("button", { name: "Repair and restart runtime" }))
       .not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Use browser sign-in" }))
+    expect(screen.queryByRole("button", { name: "Sign in and enter DroneDream" }))
       .not.toBeInTheDocument();
     expect(invoke).not.toHaveBeenCalledWith("repair_runtime", undefined);
   });
@@ -2552,7 +2561,7 @@ describe("DesktopSetup", () => {
       .toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Start runtime" }))
       .not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Use browser sign-in" }))
+    expect(screen.queryByRole("button", { name: "Sign in and enter DroneDream" }))
       .not.toBeInTheDocument();
     expect(invoke).toHaveBeenCalledWith("start_runtime", undefined);
   });
