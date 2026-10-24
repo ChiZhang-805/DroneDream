@@ -2,7 +2,11 @@
   "building_footprints": [
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-28059-0",
+      "function": "Campus building",
+      "function_zh": "校园建筑",
       "height_m": 6.8,
+      "name": "Campus building 28059",
+      "name_zh": "校园建筑 28059",
       "points": [
         [
           -83.1935,
@@ -25,7 +29,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-29466-0",
+      "function": "Campus building",
+      "function_zh": "校园建筑",
       "height_m": 6.8,
+      "name": "Campus building 29466",
+      "name_zh": "校园建筑 29466",
       "points": [
         [
           -32.6752,
@@ -48,7 +56,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-33188-0",
+      "function": "Meteorological research and the Finnish Meteorological Institute",
+      "function_zh": "气象研究与芬兰气象研究所",
       "height_m": 17.0,
+      "name": "Dynamicum",
+      "name_zh": "动力气象楼",
       "points": [
         [
           -57.3511,
@@ -119,7 +131,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-33270-0",
+      "function": "Chemistry research and teaching",
+      "function_zh": "化学研究与教学",
       "height_m": 13.6,
+      "name": "Chemicum",
+      "name_zh": "化学楼",
       "points": [
         [
           117.3823,
@@ -546,7 +562,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-33857-0",
+      "function": "University sports and recreation centre",
+      "function_zh": "大学体育与运动中心",
       "height_m": 6.8,
+      "name": "Kumpula Sports Centre",
+      "name_zh": "昆普拉体育中心",
       "points": [
         [
           -47.2366,
@@ -593,7 +613,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-33940-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 13.6,
+      "name": "Väinö Auerin katu 13",
+      "name_zh": "Väinö Auerin katu 13",
       "points": [
         [
           -72.6253,
@@ -648,7 +672,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-34277-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 20.4,
+      "name": "Hämeentie 109",
+      "name_zh": "Hämeentie 109",
       "points": [
         [
           200.2254,
@@ -675,7 +703,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-35321-0",
+      "function": "Campus building",
+      "function_zh": "校园建筑",
       "height_m": 17.0,
+      "name": "Campus building 35321",
+      "name_zh": "校园建筑 35321",
       "points": [
         [
           130.7921,
@@ -730,7 +762,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-35635-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 17.0,
+      "name": "Väinö Auerin katu 7",
+      "name_zh": "Väinö Auerin katu 7",
       "points": [
         [
           65.1482,
@@ -773,7 +809,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-36104-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 20.4,
+      "name": "Väinö Auerin katu 7",
+      "name_zh": "Väinö Auerin katu 7",
       "points": [
         [
           -16.8702,
@@ -816,7 +856,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-36723-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 13.6,
+      "name": "Väinö Auerin katu 15",
+      "name_zh": "Väinö Auerin katu 15",
       "points": [
         [
           -159.4489,
@@ -887,7 +931,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-36723-1",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 13.6,
+      "name": "Väinö Auerin katu 15",
+      "name_zh": "Väinö Auerin katu 15",
       "points": [
         [
           -191.1534,
@@ -958,7 +1006,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-38289-0",
+      "function": "Commercial and service building",
+      "function_zh": "商业与服务建筑",
       "height_m": 10.2,
+      "name": "Väinö Auerin katu 7",
+      "name_zh": "Väinö Auerin katu 7",
       "points": [
         [
           25.5176,
@@ -997,7 +1049,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-39082-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 17.0,
+      "name": "Väinö Auerin katu 7",
+      "name_zh": "Väinö Auerin katu 7",
       "points": [
         [
           73.9955,
@@ -1020,7 +1076,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-39832-1",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 6.8,
+      "name": "Limingantie 40",
+      "name_zh": "Limingantie 40",
       "points": [
         [
           -174.437,
@@ -1043,7 +1103,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-42870-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 13.6,
+      "name": "Gadolininkatu 4",
+      "name_zh": "Gadolininkatu 4",
       "points": [
         [
           198.7507,
@@ -1114,7 +1178,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-42937-1",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 13.6,
+      "name": "Väinö Auerin katu 10",
+      "name_zh": "Väinö Auerin katu 10",
       "points": [
         [
           172.1251,
@@ -1145,7 +1213,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-43058-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 13.6,
+      "name": "Gadolininkatu 4",
+      "name_zh": "Gadolininkatu 4",
       "points": [
         [
           200.5595,
@@ -1216,7 +1288,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-43110-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 13.6,
+      "name": "Väinö Auerin katu 10",
+      "name_zh": "Väinö Auerin katu 10",
       "points": [
         [
           183.0315,
@@ -1295,7 +1371,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-45341-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 13.6,
+      "name": "Väinö Auerin katu 10",
+      "name_zh": "Väinö Auerin katu 10",
       "points": [
         [
           132.6671,
@@ -1342,7 +1422,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-45669-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 13.6,
+      "name": "Väinö Auerin katu 10",
+      "name_zh": "Väinö Auerin katu 10",
       "points": [
         [
           122.8108,
@@ -1373,7 +1457,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-45774-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 10.2,
+      "name": "Gadolininkatu 4",
+      "name_zh": "Gadolininkatu 4",
       "points": [
         [
           119.1707,
@@ -1412,7 +1500,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-45881-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 10.2,
+      "name": "Gadolininkatu 4",
+      "name_zh": "Gadolininkatu 4",
       "points": [
         [
           167.1064,
@@ -1459,7 +1551,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-45907-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 10.2,
+      "name": "Gadolininkatu 4",
+      "name_zh": "Gadolininkatu 4",
       "points": [
         [
           141.566,
@@ -1498,7 +1594,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-48969-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 6.8,
+      "name": "Limingantie 27",
+      "name_zh": "Limingantie 27",
       "points": [
         [
           -246.4446,
@@ -1525,7 +1625,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-49032-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 6.8,
+      "name": "Limingantie 31",
+      "name_zh": "Limingantie 31",
       "points": [
         [
           -219.0401,
@@ -1548,7 +1652,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-49129-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 6.8,
+      "name": "Kustaa Vaasan tie 8",
+      "name_zh": "Kustaa Vaasan tie 8",
       "points": [
         [
           242.8048,
@@ -1571,7 +1679,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-50176-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 6.8,
+      "name": "Limingantie 29",
+      "name_zh": "Limingantie 29",
       "points": [
         [
           -226.8498,
@@ -1594,7 +1706,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-50834-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 6.8,
+      "name": "Limingantie 33",
+      "name_zh": "Limingantie 33",
       "points": [
         [
           -204.9642,
@@ -1617,7 +1733,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-51413-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 6.8,
+      "name": "Limingantie 37",
+      "name_zh": "Limingantie 37",
       "points": [
         [
           -159.0168,
@@ -1656,7 +1776,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-61548-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 6.8,
+      "name": "Limingantie 38",
+      "name_zh": "Limingantie 38",
       "points": [
         [
           -221.0966,
@@ -1695,7 +1819,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-61860-0",
+      "function": "Campus building",
+      "function_zh": "校园建筑",
       "height_m": 6.8,
+      "name": "Campus building 61860",
+      "name_zh": "校园建筑 61860",
       "points": [
         [
           -179.2501,
@@ -1734,7 +1862,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-68417-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 6.8,
+      "name": "Limingantie 34",
+      "name_zh": "Limingantie 34",
       "points": [
         [
           -245.6453,
@@ -1769,7 +1901,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-68454-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 6.8,
+      "name": "Limingantie 36",
+      "name_zh": "Limingantie 36",
       "points": [
         [
           -236.245,
@@ -1824,7 +1960,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-72987-0",
+      "function": "Residential building",
+      "function_zh": "住宅楼",
       "height_m": 23.8,
+      "name": "Campus building 72987",
+      "name_zh": "校园建筑 72987",
       "points": [
         [
           151.1938,
@@ -1975,7 +2115,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-74578-0",
+      "function": "Particle accelerator research laboratory",
+      "function_zh": "粒子加速器研究实验室",
       "height_m": 4.0,
+      "name": "Accelerator Laboratory",
+      "name_zh": "加速器实验室",
       "points": [
         [
           -32.2097,
@@ -2038,7 +2182,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-77061-0",
+      "function": "Early childhood education and daycare",
+      "function_zh": "幼儿教育与日托",
       "height_m": 6.8,
+      "name": "Daycare Kumpupilvi",
+      "name_zh": "昆普拉云朵幼儿园",
       "points": [
         [
           -93.8593,
@@ -2081,7 +2229,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-7772-0",
+      "function": "Campus building",
+      "function_zh": "校园建筑",
       "height_m": 6.8,
+      "name": "Campus building 7772",
+      "name_zh": "校园建筑 7772",
       "points": [
         [
           -73.9739,
@@ -2104,7 +2256,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-78521-0",
+      "function": "Computer science, mathematics, statistics, physics, geosciences and the campus science library",
+      "function_zh": "计算机科学、数学、统计、物理、地球科学与校园科学图书馆",
       "height_m": 13.6,
+      "name": "Exactum and Physicum",
+      "name_zh": "信息科学楼与物理楼",
       "points": [
         [
           -81.9562,
@@ -2431,7 +2587,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-79951-0",
+      "function": "Upper secondary science education",
+      "function_zh": "高中阶段自然科学教育",
       "height_m": 6.8,
+      "name": "Helsinki Upper Secondary School of Natural Sciences",
+      "name_zh": "赫尔辛基自然科学高中",
       "points": [
         [
           25.232,
@@ -2454,7 +2614,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-79952-0",
+      "function": "Campus building",
+      "function_zh": "校园建筑",
       "height_m": 6.8,
+      "name": "Campus building 79952",
+      "name_zh": "校园建筑 79952",
       "points": [
         [
           -35.1641,
@@ -2477,7 +2641,11 @@
     },
     {
       "building_id": "Rakennukset_alue_rekisteritiedot-8038-0",
+      "function": "Campus building",
+      "function_zh": "校园建筑",
       "height_m": 6.8,
+      "name": "Campus building 8038",
+      "name_zh": "校园建筑 8038",
       "points": [
         [
           84.4687,

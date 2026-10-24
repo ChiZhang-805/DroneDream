@@ -700,6 +700,8 @@ def _frontend_geometry(buildings: list[Building]) -> dict[str, Any]:
     appear to bridge roads or overlap their neighbours in the catalog preview.
     """
 
+    metadata_path = Path(__file__).with_name("data") / "kumpula-building-metadata.json"
+    building_metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     return {
         "schema_version": "dronedream.catalog-map-geometry.v1",
         "building_footprints": [
@@ -711,6 +713,15 @@ def _frontend_geometry(buildings: list[Building]) -> dict[str, Any]:
                     for x, y in list(item.polygon.exterior.coords)[:-1]
                 ],
                 "semantic": "building",
+                **building_metadata.get(
+                    item.building_id,
+                    {
+                        "name": item.names[0] if item.names else "Campus building",
+                        "name_zh": BUILDING_NAMES[item.names[0]][0] if item.names else "校园建筑",
+                        "function": "University, residential, or campus support building",
+                        "function_zh": "大学教学、居住或校园配套建筑",
+                    },
+                ),
             }
             for item in buildings
         ],
