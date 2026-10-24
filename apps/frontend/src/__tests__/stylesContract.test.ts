@@ -54,7 +54,7 @@ describe("console stylesheet contract", () => {
       declarations.set(rule.selector, selectorDeclarations);
     });
 
-    expect(declarations.get(".autonomy-command-page")?.get("--autonomy-chat-column-width")).toBe("52rem");
+    expect(declarations.get(".autonomy-command-page")?.get("--autonomy-chat-column-width")).toBe("76rem");
     expect(declarations.get(".autonomy-command-page")?.get("grid-template-columns")).toBe(
       "minmax(0, min(100%, var(--autonomy-chat-column-width)))",
     );
