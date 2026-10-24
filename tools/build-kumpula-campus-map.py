@@ -692,18 +692,28 @@ def _navigation_graph() -> dict[str, Any]:
 
 
 def _frontend_geometry(buildings: list[Building]) -> dict[str, Any]:
-    """Project collision geometry and graph data into the interactive 3D viewer."""
+    """Project visual footprints, collision geometry and graph data into the 3D viewer.
 
-    route_nodes = [
-        {
-            "node_id": f"route-{index:02d}",
-            "position_m": [x, y, z],
-            "semantic": phase,
-        }
-        for index, (x, y, z, phase, _speed) in enumerate(ROUTE)
-    ]
+    Building collisions intentionally use conservative oriented boxes, but those
+    boxes are not the building facade.  Keep the exact source-footprint extrusion
+    alongside the collision primitives so concave and multi-wing buildings do not
+    appear to bridge roads or overlap their neighbours in the catalog preview.
+    """
+
     return {
         "schema_version": "dronedream.catalog-map-geometry.v1",
+        "building_footprints": [
+            {
+                "building_id": item.building_id,
+                "height_m": item.height_m,
+                "points": [
+                    [round(float(x), 4), round(float(y), 4)]
+                    for x, y in list(item.polygon.exterior.coords)[:-1]
+                ],
+                "semantic": "building",
+            }
+            for item in buildings
+        ],
         "primitives": [
             {
                 "center_x": 0.0,
@@ -740,14 +750,10 @@ def _frontend_geometry(buildings: list[Building]) -> dict[str, Any]:
                 "semantic": "pickup-pad",
             },
         ],
-        "nodes": route_nodes,
-        "edges": [
-            {
-                "from_node": route_nodes[index]["node_id"],
-                "to_node": route_nodes[index + 1]["node_id"],
-            }
-            for index in range(len(route_nodes) - 1)
-        ],
+        # A catalog asset has no active mission. Live mission routes are added
+        # only after the selected model calls the planner for the current goal.
+        "nodes": [],
+        "edges": [],
         "texture_url": "asset-previews/maps/kumpula-campus-source.jpg",
     }
 

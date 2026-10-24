@@ -513,7 +513,7 @@ function actualDependencies(): OrganizationConsoleDependencies {
       }
       const userIds = rawMembers.map((row) => String(row.user_id));
       const joinUserIds = (joinRequestResult.data ?? []).map((row) => String(row.user_id));
-      const [entitlements, licenses, users] = await Promise.all([
+      const [entitlements, licenses, applicationActivity, users] = await Promise.all([
         userIds.length
           ? client.from("account_entitlements")
             .select("user_id,plan_id,status")
@@ -524,6 +524,11 @@ function actualDependencies(): OrganizationConsoleDependencies {
             .select("user_id,edition,status")
             .in("user_id", userIds)
             .eq("status", "active")
+          : Promise.resolve({ data: [], error: null }),
+        userIds.length
+          ? client.from("user_application_activity")
+            .select("user_id,edition")
+            .in("user_id", userIds)
           : Promise.resolve({ data: [], error: null }),
         Promise.all(userIds.map(async (memberUserId) => {
           const result = await client.auth.admin.getUserById(memberUserId);
@@ -537,7 +542,7 @@ function actualDependencies(): OrganizationConsoleDependencies {
           return result.data.user;
         })),
       ]);
-      if (entitlements.error || licenses.error) {
+      if (entitlements.error || licenses.error || applicationActivity.error) {
         throw new OrganizationConsoleError(
           "ORGANIZATION_PORTFOLIO_FAILED",
           "Organization subscription data is unavailable.",
@@ -558,6 +563,15 @@ function actualDependencies(): OrganizationConsoleDependencies {
           ...(licensesByUser.get(id) ?? []),
           edition as EditionId,
         ]);
+      }
+      for (const row of applicationActivity.data ?? []) {
+        const edition = String(row.edition);
+        if (!["universal", "sim", "lab", "field", "autonomy"].includes(edition)) continue;
+        const id = String(row.user_id);
+        const current = licensesByUser.get(id) ?? [];
+        if (!current.includes(edition as EditionId)) {
+          licensesByUser.set(id, [...current, edition as EditionId]);
+        }
       }
       const userById = new Map(users.map((user) => [user.id, user]));
       const joinUsers = await Promise.all(joinUserIds.map(async (joinUserId) => {

@@ -53,7 +53,6 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { apiClient } from "./api/client";
 import {
   ArchivedExperimentManager,
   ExperimentWorkspaceSidebar,
@@ -111,6 +110,7 @@ import {
 } from "./appSettings";
 import { AuthCaptcha } from "./features/auth/AuthCaptcha";
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
+import { recordDesktopApplicationActivity } from "./features/licensing/applicationActivity";
 import {
   cancelDesktopBrowserSignIn,
   completeDesktopBrowserSignIn,
@@ -139,10 +139,7 @@ import {
   type ManagedModelUsageDay,
   type ManagedModelUsageSnapshot,
 } from "./features/settings/cloudModelAccess";
-import {
-  hasExperimentDraft,
-  persistExperimentDraftsForExit,
-} from "./features/experiment/draftStorage";
+import { persistExperimentDraftsForExit } from "./features/experiment/draftStorage";
 import {
   loadUniversalMode,
   parseUniversalMode,
@@ -161,8 +158,6 @@ import { getAssistantWorkspaceIndex } from "./features/experiment/assistantOrche
 import { localeSafeError, useI18n } from "./i18n/I18nProvider";
 import type { InterfaceLocale, TranslationKey } from "./i18n/I18nProvider";
 import type {
-  Job,
-  JobStatus,
   StarterExperienceTemplateKey,
   UserDefaultTrackType,
 } from "./types/api";
@@ -354,14 +349,6 @@ const EDITION_PLATFORM_LABEL: Record<BrandEditionId, TranslationKey> = {
   autonomy: "app.platformAutonomy",
 };
 
-const EXIT_GUARD_JOB_STATUSES: JobStatus[] = [
-  "CREATED",
-  "QUEUED",
-  "RUNNING",
-  "AGGREGATING",
-  "FINALIZING",
-];
-
 const DOCS_PREVIEW_MANAGED_USAGE: ManagedModelUsageSnapshot = {
   plan: {
     id: "plus",
@@ -433,11 +420,22 @@ const DOCS_PREVIEW_MANAGED_USAGE: ManagedModelUsageSnapshot = {
 
 const DOCS_PREVIEW_MANAGED_MODELS: ManagedModelCatalogEntry[] =
   DEFAULT_MANAGED_MODEL_CATALOG;
-const ACTIVE_JOB_CHECK_TIMEOUT_MS = 2_500;
-const ACTIVE_JOB_CANCEL_TIMEOUT_MS = 2_000;
 const RUNTIME_EXIT_TIMEOUT_MS = 6_000;
-const ACTIVE_JOB_PAGE_SIZE = 100;
 const MOBILE_NAVIGATION_QUERY = "(max-width: 520px)";
+const SETTINGS_WORKSPACE_STORAGE_KEY = "dronedream.settings-workspace:v1";
+
+function restoredSettingsWorkspace(): SettingsSurfaceTabId | null {
+  if (!isDesktopRuntime() || typeof window === "undefined") return null;
+  try {
+    const tab = window.sessionStorage.getItem(SETTINGS_WORKSPACE_STORAGE_KEY);
+    return tab && ["general", "memory", "model", "course", "administration", "runtime"]
+      .includes(tab)
+      ? tab as SettingsSurfaceTabId
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 function subscribeToMobileNavigation(onChange: () => void): () => void {
   if (typeof window === "undefined" || !window.matchMedia) return () => undefined;
@@ -450,7 +448,6 @@ function mobileNavigationSnapshot(): boolean {
   return typeof window !== "undefined"
     && Boolean(window.matchMedia?.(MOBILE_NAVIGATION_QUERY).matches);
 }
-const MAX_ACTIVE_JOB_PAGES_PER_STATUS = 10;
 
 interface ExperiencePreferenceDraft {
   account_memory_enabled: boolean;
@@ -812,104 +809,6 @@ function AllowanceUsageHistory({
       )}
     </section>
   );
-}
-
-interface ExitPromptState {
-  hasDraft: boolean;
-  draftPreserved: boolean;
-  activeJobCount: number;
-  activeJobs: Pick<Job, "id" | "control_version">[];
-  activeJobsUnknown: boolean;
-}
-
-async function listActiveJobsForStatus(status: JobStatus): Promise<{
-  count: number;
-  jobs: Pick<Job, "id" | "control_version">[];
-}> {
-  const first = await apiClient.listJobs({
-    page: 1,
-    page_size: ACTIVE_JOB_PAGE_SIZE,
-    status,
-  });
-  const pageCount = Math.ceil(first.total / ACTIVE_JOB_PAGE_SIZE);
-  if (pageCount > MAX_ACTIVE_JOB_PAGES_PER_STATUS) {
-    throw new Error("Too many active experiments to enumerate safely before exit.");
-  }
-  const remaining = pageCount > 1
-    ? await Promise.all(
-        Array.from({ length: pageCount - 1 }, (_, index) =>
-          apiClient.listJobs({
-            page: index + 2,
-            page_size: ACTIVE_JOB_PAGE_SIZE,
-            status,
-          })
-        ),
-      )
-    : [];
-  return {
-    count: first.total,
-    jobs: Array.from(
-      new Map(
-        [first, ...remaining]
-          .flatMap((page) => page.items)
-          .map((job) => [job.id, {
-            id: job.id,
-            control_version: job.control_version,
-          }] as const),
-      ).values(),
-    ),
-  };
-}
-
-async function findActiveJobsBeforeExit(): Promise<{
-  count: number;
-  jobs: Pick<Job, "id" | "control_version">[];
-}> {
-  let timeoutId: number | undefined;
-  const timeout = new Promise<never>((_resolve, reject) => {
-    timeoutId = window.setTimeout(
-      () => reject(new Error("Timed out while checking active experiments.")),
-      ACTIVE_JOB_CHECK_TIMEOUT_MS,
-    );
-  });
-  try {
-    const statuses = await Promise.race([
-      Promise.all(EXIT_GUARD_JOB_STATUSES.map(listActiveJobsForStatus)),
-      timeout,
-    ]);
-    return {
-      count: statuses.reduce((total, result) => total + result.count, 0),
-      jobs: Array.from(
-        new Map(
-          statuses
-            .flatMap((result) => result.jobs)
-            .map((job) => [job.id, job] as const),
-        ).values(),
-      ),
-    };
-  } finally {
-    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
-  }
-}
-
-async function stopKnownActiveJobsBeforeExit(
-  jobs: Pick<Job, "id" | "control_version">[],
-): Promise<void> {
-  if (jobs.length === 0) return;
-  let timeoutId: number | undefined;
-  const timeout = new Promise<void>((resolve) => {
-    timeoutId = window.setTimeout(resolve, ACTIVE_JOB_CANCEL_TIMEOUT_MS);
-  });
-  try {
-    await Promise.race([
-      Promise.allSettled(
-        jobs.map((job) => apiClient.cancelJob(job.id, job.control_version)),
-      ).then(() => undefined),
-      timeout,
-    ]);
-  } finally {
-    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
-  }
 }
 
 async function stopDesktopRuntimeBeforeExit(): Promise<void> {
@@ -2707,140 +2606,6 @@ function SettingsDialog({
   );
 }
 
-function ExitGuardDialog({
-  state,
-  onReturn,
-  onConfirmExit,
-}: {
-  state: ExitPromptState;
-  onReturn: () => void;
-  onConfirmExit: () => void;
-}) {
-  const { t } = useI18n();
-  const backdropRef = useRef<HTMLDivElement>(null);
-  const dialogRef = useRef<HTMLElement>(null);
-  const returnButtonRef = useRef<HTMLButtonElement>(null);
-  const paragraphKey: TranslationKey = state.hasDraft
-    ? state.activeJobsUnknown
-      ? "exitGuard.draftActiveUnknown"
-      : state.activeJobCount > 0
-        ? "exitGuard.draftActive"
-        : "exitGuard.draft"
-    : state.activeJobsUnknown
-      ? "exitGuard.activeUnknown"
-      : "exitGuard.active";
-
-  useEffect(() => {
-    const previousFocus = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
-    const backdrop = backdropRef.current;
-    const parent = backdrop?.parentElement;
-    const siblings = parent && backdrop
-      ? Array.from(parent.children)
-        .filter((element): element is HTMLElement => (
-          element instanceof HTMLElement && element !== backdrop
-        ))
-        .map((element) => ({
-          element,
-          inert: element.hasAttribute("inert"),
-          ariaHidden: element.getAttribute("aria-hidden"),
-        }))
-      : [];
-    for (const { element } of siblings) {
-      element.setAttribute("inert", "");
-      element.setAttribute("aria-hidden", "true");
-    }
-
-    const focusFrame = window.requestAnimationFrame(() => returnButtonRef.current?.focus());
-    const keepFocusInside = (event: globalThis.KeyboardEvent) => {
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onReturn();
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const controls = Array.from(dialog.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      )).filter((element) => !element.closest("[inert]"));
-      if (controls.length === 0) {
-        event.preventDefault();
-        return;
-      }
-      const first = controls[0];
-      const last = controls[controls.length - 1];
-      const active = document.activeElement;
-      if (event.shiftKey && (active === first || !dialog.contains(active))) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", keepFocusInside, true);
-    return () => {
-      window.cancelAnimationFrame(focusFrame);
-      document.removeEventListener("keydown", keepFocusInside, true);
-      for (const { element, inert, ariaHidden } of siblings) {
-        if (!inert) element.removeAttribute("inert");
-        if (ariaHidden === null) element.removeAttribute("aria-hidden");
-        else element.setAttribute("aria-hidden", ariaHidden);
-      }
-      window.requestAnimationFrame(() => {
-        const fallback = document.querySelector<HTMLElement>(
-          '.settings-workspace-sidebar [role="tab"][aria-selected="true"], .launcher-settings-button, .account-button',
-        );
-        const target = previousFocus && previousFocus.isConnected && previousFocus !== document.body
-          ? previousFocus
-          : fallback;
-        if (target && !target.closest("[inert]")) target.focus();
-      });
-    };
-  }, [onReturn]);
-
-  return (
-    <div ref={backdropRef} className="app-exit-backdrop" role="presentation">
-      <section
-        ref={dialogRef}
-        className="app-exit-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="app-exit-title"
-        aria-describedby="app-exit-description"
-      >
-        <h2 id="app-exit-title">{t("exitGuard.title")}</h2>
-        <p id="app-exit-description">
-          {t(paragraphKey, { count: state.activeJobCount })}
-        </p>
-        {state.hasDraft ? (
-          <p role={state.draftPreserved ? "status" : "alert"}>
-            {t(
-              state.draftPreserved
-                ? "exitGuard.draftSaved"
-                : "exitGuard.draftSaveFailed",
-            )}
-          </p>
-        ) : null}
-        <div className="app-exit-actions">
-          <button ref={returnButtonRef} type="button" className="btn" onClick={onReturn}>
-            {t("exitGuard.return")}
-          </button>
-          <button
-            type="button"
-            className="btn app-exit-confirm"
-            onClick={onConfirmExit}
-          >
-            {t(state.hasDraft ? "exitGuard.exitKeep" : "exitGuard.exitAnyway")}
-          </button>
-        </div>
-      </section>
-    </div>
-  );
-}
-
 const ACCOUNT_COPY = {
   en: {
     title: "DroneDream account",
@@ -3971,6 +3736,14 @@ function AppShellContent() {
   const updater = useAppUpdaterState();
 
   useEffect(() => {
+    const accountId = auth.account?.id;
+    if (!desktopRuntime || !accountId) return;
+    void recordDesktopApplicationActivity(accountId).catch(() => {
+      // Sign-in remains usable while activity telemetry is temporarily offline.
+    });
+  }, [auth.account?.id, desktopRuntime]);
+
+  useEffect(() => {
     const ownerId = auth.account?.id;
     if (!ownerId) return;
     let active = true;
@@ -4026,9 +3799,12 @@ function AppShellContent() {
     () => false,
   );
   const [launcherSettingsOpen, setLauncherSettingsOpen] = useState(false);
-  const [settingsWorkspaceOpen, setSettingsWorkspaceOpen] = useState(false);
+  const restoredSettingsTab = useMemo(restoredSettingsWorkspace, []);
+  const [settingsWorkspaceOpen, setSettingsWorkspaceOpen] = useState(
+    restoredSettingsTab !== null,
+  );
   const [settingsInitialTab, setSettingsInitialTab] =
-    useState<SettingsSurfaceTabId>("general");
+    useState<SettingsSurfaceTabId>(restoredSettingsTab ?? "general");
   const [settingsPreferenceHandoff, setSettingsPreferenceHandoff] =
     useState<ExperiencePreferenceDraft | null>(null);
   const [universalMode, setUniversalMode] = useState(() => {
@@ -4045,7 +3821,6 @@ function AppShellContent() {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [externalNavigationError, setExternalNavigationError] = useState<string | null>(null);
-  const [exitPrompt, setExitPrompt] = useState<ExitPromptState | null>(null);
   const launcherSettingsButtonRef = useRef<HTMLButtonElement>(null);
   const launcherSettingsCloseRef = useRef<HTMLButtonElement>(null);
   const accountButtonRef = useRef<HTMLButtonElement>(null);
@@ -4056,10 +3831,6 @@ function AppShellContent() {
   const settingsWorkspaceOpenerRef = useRef<"account" | "settings">("settings");
   const settingsPreferenceSaveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const desktopWindowRef = useRef<DesktopWindowHandle | null>(null);
-  const currentPathRef = useRef(location.pathname);
-  const exitPromptRef = useRef<ExitPromptState | null>(null);
-  const exitCheckInFlightRef = useRef(false);
-  const exitApprovedRef = useRef(false);
   const launcherMode = desktopRuntime && location.pathname === "/desktop/setup";
   const experimentWizardMode = location.pathname === "/jobs/new";
   const activeThemeEdition: BrandEditionId = EDITION_IS_FIXED
@@ -4268,6 +4039,11 @@ function AppShellContent() {
     setAccountMenuOpen(false);
     setMobileMenuOpen(false);
     setSettingsWorkspaceOpen(true);
+    try {
+      window.sessionStorage.setItem(SETTINGS_WORKSPACE_STORAGE_KEY, tab);
+    } catch {
+      // Settings still opens when sessionStorage is unavailable.
+    }
   }, []);
   const openAllSettings = useCallback((
     tab: SettingsSurfaceTabId = "general",
@@ -4280,6 +4056,11 @@ function AppShellContent() {
     setSettingsWorkspaceOpen(false);
     setSettingsPreferenceHandoff(null);
     setSettingsInitialTab("general");
+    try {
+      window.sessionStorage.removeItem(SETTINGS_WORKSPACE_STORAGE_KEY);
+    } catch {
+      // The in-memory close remains authoritative for this render.
+    }
     requestAnimationFrame(() => {
       const opener = settingsWorkspaceOpenerRef.current === "account"
         ? accountButtonRef.current
@@ -4393,34 +4174,6 @@ function AppShellContent() {
       window.removeEventListener(OPEN_ACCOUNT_DIALOG_EVENT, openAccountDialog);
   }, [launcherMode]);
 
-  const returnFromExitPrompt = useCallback(() => {
-    exitPromptRef.current = null;
-    setExitPrompt(null);
-  }, []);
-
-  const confirmExit = useCallback(async () => {
-    const desktopWindow = desktopWindowRef.current;
-    if (!desktopWindow || exitApprovedRef.current) return;
-    persistExperimentDraftsForExit();
-    exitApprovedRef.current = true;
-    const activeJobs = exitPromptRef.current?.activeJobs ?? [];
-    await stopKnownActiveJobsBeforeExit(activeJobs);
-    await stopDesktopRuntimeBeforeExit();
-    try {
-      await desktopWindow.destroy();
-    } catch {
-      exitApprovedRef.current = false;
-    }
-  }, []);
-
-  useEffect(() => {
-    currentPathRef.current = location.pathname;
-  }, [location.pathname]);
-
-  useEffect(() => {
-    exitPromptRef.current = exitPrompt;
-  }, [exitPrompt]);
-
   useEffect(() => {
     if (!desktopRuntime) return;
     const desktopWindow = getDesktopWindowHandle();
@@ -4430,52 +4183,10 @@ function AppShellContent() {
     let unlisten: (() => void) | undefined;
 
     void desktopWindow.onCloseRequested(async (event) => {
-      if (exitApprovedRef.current) return;
       event.preventDefault();
-      if (exitCheckInFlightRef.current || exitPromptRef.current) return;
-      exitCheckInFlightRef.current = true;
-
-      const path = currentPathRef.current;
-      const hasDraft = path === "/jobs/new" || hasExperimentDraft();
-      const draftPreserved = hasDraft
-        ? persistExperimentDraftsForExit()
-        : true;
-      let activeJobCount = 0;
-      let activeJobs: Pick<Job, "id" | "control_version">[] = [];
-      let activeJobsUnknown = false;
-      if (path !== "/desktop/setup") {
-        try {
-          const activeJobResult = await findActiveJobsBeforeExit();
-          activeJobCount = activeJobResult.count;
-          activeJobs = activeJobResult.jobs;
-        } catch {
-          activeJobsUnknown = true;
-        }
-      }
-
-      const state = {
-        hasDraft,
-        draftPreserved,
-        activeJobCount,
-        activeJobs,
-        activeJobsUnknown,
-      };
-      const mustConfirm = hasDraft || activeJobCount > 0 || activeJobsUnknown;
-      if (mustConfirm) {
-        if (!cancelled) {
-          exitPromptRef.current = state;
-          setExitPrompt(state);
-        }
-      } else {
-        exitApprovedRef.current = true;
-        await stopDesktopRuntimeBeforeExit();
-        try {
-          await desktopWindow.destroy();
-        } catch {
-          exitApprovedRef.current = false;
-        }
-      }
-      exitCheckInFlightRef.current = false;
+      persistExperimentDraftsForExit();
+      await stopDesktopRuntimeBeforeExit();
+      if (!cancelled) await desktopWindow.destroy();
     }).then((dispose) => {
       if (cancelled) dispose();
       else unlisten = dispose;
@@ -4617,13 +4328,6 @@ function AppShellContent() {
     };
   }, [accountDialogOpen, accountDialogRequired, closeAccount]);
 
-  const exitGuard = exitPrompt ? (
-    <ExitGuardDialog
-      state={exitPrompt}
-      onReturn={returnFromExitPrompt}
-      onConfirmExit={confirmExit}
-    />
-  ) : null;
   const accountDialog = accountDialogOpen ? (
     <div
       className="account-dialog-backdrop"
@@ -4689,9 +4393,9 @@ function AppShellContent() {
               type="button"
               className="launcher-settings-button"
               aria-label={t("app.settings")}
-              aria-haspopup={auth.account ? "menu" : "dialog"}
-              aria-expanded={launcherSettingsOpen}
-              onClick={() => setLauncherSettingsOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={settingsWorkspaceOpen}
+              onClick={() => openSettingsWorkspace("general")}
             >
               <Settings aria-hidden="true" strokeWidth={1.85} />
             </button>
@@ -4723,7 +4427,6 @@ function AppShellContent() {
            <Outlet key={activeThemeEdition} />
          </main>
          {settingsWorkspace}
-         {exitGuard}
          </div>
       </EditionThemeProvider>
     );
@@ -4940,10 +4643,10 @@ function AppShellContent() {
               className="app-mobile-settings-entry"
               aria-label={t("app.settings")}
               aria-haspopup="dialog"
-              aria-expanded={launcherSettingsOpen}
+              aria-expanded={settingsWorkspaceOpen}
               onClick={() => {
                 setMobileMenuOpen(false);
-                setLauncherSettingsOpen(true);
+                openSettingsWorkspace("general");
               }}
             >
               <Settings aria-hidden="true" strokeWidth={1.75} />
@@ -4965,8 +4668,8 @@ function AppShellContent() {
                 className="launcher-settings-button"
                 aria-label={t("app.settings")}
                 aria-haspopup="dialog"
-                aria-expanded={launcherSettingsOpen}
-                onClick={() => setLauncherSettingsOpen(true)}
+                aria-expanded={settingsWorkspaceOpen}
+                onClick={() => openSettingsWorkspace("general")}
               >
                 <Settings aria-hidden="true" strokeWidth={1.85} />
               </button>
@@ -5013,7 +4716,6 @@ function AppShellContent() {
         </main>
       </div>
       {settingsWorkspace}
-      {exitGuard}
       <UpdateBlockedDialog
         block={updater.blockedActivity}
         locale={locale}

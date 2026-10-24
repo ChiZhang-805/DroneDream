@@ -25189,6 +25189,81 @@ body {
   padding: 0;
   border: 0;
 }
+
+/* Shared settings finish for every desktop edition. */
+.settings-workspace-content .settings-appearance-options {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.settings-workspace-content .settings-appearance-options > button {
+  min-width: 0;
+  min-height: 3.1rem;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.72rem 1rem;
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--border) 92%, transparent);
+  border-radius: 0.78rem;
+  background: color-mix(in srgb, var(--panel) 96%, transparent);
+  box-shadow: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-workspace-content .settings-appearance-options > button:hover,
+.settings-workspace-content .settings-appearance-options > button:focus-visible {
+  border-color: color-mix(in srgb, var(--dd-brand-start) 58%, var(--border));
+}
+
+.settings-workspace-content .settings-appearance-options > button.selected {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--dd-brand-start) 72%, var(--border));
+  background: color-mix(in srgb, var(--dd-brand-start) 10%, var(--panel));
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--dd-brand-start) 10%, transparent);
+}
+
+.settings-workspace-content .settings-appearance-options svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.settings-workspace-content .settings-appearance-options strong {
+  font-size: 0.94rem;
+}
+
+.settings-workspace-content .settings-appearance-options i {
+  color: transparent;
+  font-style: normal;
+}
+
+.settings-workspace-content .settings-appearance-options > button.selected i {
+  color: var(--dd-brand-start);
+}
+
+.app-shell .settings-workspace-content .settings-model-panel:not(.settings-model-panel-byok) {
+  height: auto;
+  min-height: 0;
+  grid-template-rows: auto auto;
+  align-content: start;
+  gap: 0.85rem;
+}
+
+.app-shell .settings-workspace-content .settings-model-section.settings-model-mode-row {
+  height: auto;
+  min-height: 4.75rem;
+}
+
+@media (max-width: 700px) {
+  .settings-workspace-content .settings-appearance-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .settings-workspace-content .settings-allowance-heatmap i { aspect-ratio: 1; width: 100%; height: auto; }
 .settings-workspace-content .settings-allowance-year-heading,
 .settings-workspace-content .settings-allowance-range button,

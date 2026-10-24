@@ -56,6 +56,7 @@ function installDesktopBridge(runtime: unknown = readyRuntime) {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  window.sessionStorage.clear();
   window.history.replaceState(null, "", "/");
 });
 

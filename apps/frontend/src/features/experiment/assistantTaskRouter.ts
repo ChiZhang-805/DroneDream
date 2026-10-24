@@ -20,36 +20,16 @@ export interface AssistantTaskOption {
 }
 
 const TASKS_BY_EDITION: Readonly<Record<BrandEditionId, readonly AssistantTaskType[]>> = {
-  universal: [
-    "control_tuning",
-    "mission_autonomy",
-    "asset_import_qualification",
-    "simulation_experiment",
-    "cross_edition_workflow",
-    "hardware_validation",
-    "calibration",
-    "sim_to_real",
-    "real_to_sim",
-    "field_task",
-  ],
-  sim: ["control_tuning", "mission_autonomy", "asset_import_qualification", "simulation_experiment"],
-  lab: [
-    "control_tuning",
-    "mission_autonomy",
-    "asset_import_qualification",
-    "simulation_experiment",
-    "hardware_validation",
-    "calibration",
-    "sim_to_real",
-    "real_to_sim",
-  ],
-  field: ["control_tuning", "mission_autonomy", "asset_import_qualification", "field_task"],
-  autonomy: ["mission_autonomy", "asset_import_qualification", "simulation_experiment"],
+  universal: ["control_tuning", "mission_autonomy"],
+  sim: ["control_tuning", "mission_autonomy"],
+  lab: ["control_tuning", "mission_autonomy"],
+  field: ["control_tuning", "mission_autonomy"],
+  autonomy: ["control_tuning", "mission_autonomy"],
 };
 
 const EN: Record<AssistantTaskType, Omit<AssistantTaskOption, "id">> = {
-  control_tuning: { label: "Control tuning", description: "Tune PX4 parameters against bounded evidence." },
-  mission_autonomy: { label: "Autonomous mission", description: "Plan, simulate, monitor, and safely replan a route." },
+  control_tuning: { label: "Parameter Optimization", description: "Tune PX4 parameters against bounded evidence." },
+  mission_autonomy: { label: "Agent Mission", description: "Plan, simulate, monitor, and safely replan a route." },
   asset_import_qualification: { label: "Asset import & qualification", description: "Normalize an external map, world, or aircraft package and plan its ROS 2, Gazebo, and PX4 qualification." },
   simulation_experiment: { label: "Simulation study", description: "Build a repeatable PX4 and Gazebo experiment." },
   cross_edition_workflow: { label: "Cross-edition workflow", description: "Connect SIM, LAB, and FIELD with qualification gates." },
@@ -61,8 +41,8 @@ const EN: Record<AssistantTaskType, Omit<AssistantTaskOption, "id">> = {
 };
 
 const ZH: Record<AssistantTaskType, Omit<AssistantTaskOption, "id">> = {
-  control_tuning: { label: "控制参数调优", description: "依据受约束证据调优 PX4 参数。" },
-  mission_autonomy: { label: "自主飞行任务", description: "规划、仿真、监控并安全地实时重规划航线。" },
+  control_tuning: { label: "参数优化", description: "依据受约束证据调优 PX4 参数。" },
+  mission_autonomy: { label: "智能体任务", description: "规划、仿真、监控并安全地实时重规划航线。" },
   asset_import_qualification: { label: "资产导入与资格认证", description: "规范化外部地图、世界或无人机资产，并规划 ROS 2、Gazebo 与 PX4 资格认证。" },
   simulation_experiment: { label: "仿真实验", description: "创建可复现的 PX4 与 Gazebo 实验。" },
   cross_edition_workflow: { label: "跨版本工作流", description: "通过资格门连接 SIM、LAB 与 FIELD。" },

@@ -11,7 +11,6 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowUp,
   Boxes,
-  BrainCircuit,
   Crosshair,
   Download,
   FileText,
@@ -1392,22 +1391,6 @@ export function ExperimentAssistant() {
             {actionMenuOpen ? (
               <div className="assistant-add-popover assistant-task-popover" role="menu">
                 <strong className="assistant-task-popover-title">{copy.taskType}</strong>
-                <button
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={selectedTaskType === null}
-                  data-task-icon="auto_detect"
-                  className={selectedTaskType === null ? "is-selected" : ""}
-                  onClick={() => {
-                    setSelectedTaskType(null);
-                    setActionMenuOpen(false);
-                  }}
-                >
-                  <span className="assistant-task-icon" aria-hidden="true">
-                    <BrainCircuit strokeWidth={1.8} />
-                  </span>
-                  <span className="assistant-task-popover-copy"><b>{copy.autoTask}</b><small>{copy.autoTaskDescription}</small></span>
-                </button>
                 {taskOptions.map((task) => {
                   const TaskIcon = TASK_ICON_BY_TYPE[task.id];
                   return (
@@ -1426,7 +1409,7 @@ export function ExperimentAssistant() {
                       <span className="assistant-task-icon" aria-hidden="true">
                         <TaskIcon strokeWidth={1.8} />
                       </span>
-                      <span className="assistant-task-popover-copy"><b>{task.label}</b><small>{task.description}</small></span>
+                      <span className="assistant-task-popover-copy"><b>{task.label}</b></span>
                     </button>
                   );
                 })}
@@ -1440,7 +1423,7 @@ export function ExperimentAssistant() {
                   onClick={() => bindPublicAutonomyAsset("aircraft")}
                 >
                   <span className="assistant-task-icon" aria-hidden="true"><Navigation2 strokeWidth={1.8} /></span>
-                  <span className="assistant-task-popover-copy"><b>My Drone</b><small>{chinese ? "已校核 PX4/Gazebo X500 机型" : "Qualified PX4/Gazebo X500 aircraft"}</small></span>
+                  <span className="assistant-task-popover-copy"><b>My Drone</b></span>
                 </button>
                 <button
                   type="button"
@@ -1450,7 +1433,7 @@ export function ExperimentAssistant() {
                   onClick={() => bindPublicAutonomyAsset("map")}
                 >
                   <span className="assistant-task-icon" aria-hidden="true"><Layers3 strokeWidth={1.8} /></span>
-                  <span className="assistant-task-popover-copy"><b>School Map</b><small>{chinese ? "公共三层校园地图" : "Public three-floor campus map"}</small></span>
+                  <span className="assistant-task-popover-copy"><b>Kumpula Campus</b></span>
                 </button>
                 <hr />
                 <Link data-task-icon="manual" to="/jobs/new" role="menuitem" onClick={() => setActionMenuOpen(false)}>
@@ -1481,7 +1464,9 @@ export function ExperimentAssistant() {
             className={`assistant-task-chip ${selectedTask ? "is-explicit" : ""}`}
             onClick={() => setActionMenuOpen(true)}
           >
-            {selectedTask ? selectedTask.label : copy.autoTask}
+            {selectedTask
+              ? selectedTask.label
+              : taskOptions.find(({ id }) => id === "mission_autonomy")?.label ?? copy.autoTask}
           </button>
           <span className="assistant-composer-spacer" />
           <AssistantModelPicker

@@ -117,10 +117,11 @@ describe("OrganizationPage", () => {
     const ownerRow = screen.getByText("owner@example.test").closest("tr");
     expect(ownerRow).not.toBeNull();
     expect(within(ownerRow!).getAllByLabelText(
-      /^(Universal|SIM|LAB|FIELD|AGENT) (not )?licensed$/i,
+      /^(Universal|SIM|LAB|FIELD|AGENT) (not )?used$/i,
     )).toHaveLength(5);
     expect(ownerRow?.querySelectorAll(".edition-license-strip .is-active")).toHaveLength(2);
-    expect(within(ownerRow!).getByRole("img")).toHaveAttribute("src", "/owner-avatar.png");
+    expect(ownerRow!.querySelector(".organization-avatar img"))
+      .toHaveAttribute("src", "/owner-avatar.png");
     expect(container.querySelector(".organization-member-table")).toBeVisible();
   });
 
