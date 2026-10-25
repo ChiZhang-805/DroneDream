@@ -225,11 +225,6 @@ const AUTONOMY_NAV_ITEM: NavigationItem = {
 const SIM_NAV_ITEMS: NavigationItem[] = [
   { ...ASSISTANT_NAV_ITEM, sectionKey: "app.navSectionAutonomy" },
   AUTONOMY_NAV_ITEM,
-  {
-    to: "/jobs/new",
-    labelKey: "app.experimentBuilder",
-    icon: SlidersHorizontal,
-  },
   DASHBOARD_NAV_ITEM,
   SCENARIOS_NAV_ITEM,
   HISTORY_NAV_ITEM,
@@ -252,11 +247,6 @@ const LAB_WORKSPACE_NAV_ITEMS: NavigationItem[] = [
 const LAB_NAV_ITEMS: NavigationItem[] = [
   { ...ASSISTANT_NAV_ITEM, sectionKey: "app.navSectionAutonomy" },
   AUTONOMY_NAV_ITEM,
-  {
-    to: "/jobs/new",
-    labelKey: "app.experimentBuilder",
-    icon: SlidersHorizontal,
-  },
   LAB_WORKSPACE_NAV_ITEMS[0],
   LAB_WORKSPACE_NAV_ITEMS[1],
   { to: "/lab/validation", labelKey: "app.labValidation", icon: ShieldCheck },

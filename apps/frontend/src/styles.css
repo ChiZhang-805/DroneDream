@@ -10496,6 +10496,103 @@ a {
   gap: 1rem;
 }
 
+.optimization-decision-summary {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--dd-brand-middle) 28%, var(--border));
+  border-radius: 12px;
+  background:
+    linear-gradient(120deg, color-mix(in srgb, var(--dd-brand-start) 8%, white), transparent 55%),
+    color-mix(in srgb, var(--surface) 95%, white);
+}
+
+.optimization-decision-summary > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.optimization-decision-summary > header > div {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.optimization-decision-summary > header span,
+.optimization-decision-grid span {
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 760;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.optimization-decision-summary > header strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 1rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.optimization-decision-summary > header em {
+  flex: 0 0 auto;
+  padding: 0.32rem 0.55rem;
+  border-radius: 999px;
+  color: var(--dd-brand-end);
+  background: color-mix(in srgb, var(--dd-brand-end) 9%, white);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 720;
+}
+
+.optimization-decision-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.optimization-decision-grid > div {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+  padding: 0.62rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--surface) 90%, white);
+}
+
+.optimization-decision-grid strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.86rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.optimization-decision-parameters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.38rem;
+}
+
+.optimization-decision-parameters code {
+  padding: 0.28rem 0.42rem;
+  border-radius: 6px;
+  color: color-mix(in srgb, var(--dd-brand-end) 78%, #24162a);
+  background: color-mix(in srgb, var(--dd-brand-middle) 8%, white);
+  font-size: 0.72rem;
+}
+
+.optimization-decision-summary > p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
 .insight-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -10656,6 +10753,10 @@ a {
 
   .insight-grid {
     grid-template-columns: 1fr;
+  }
+
+  .optimization-decision-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .wizard-stepper {

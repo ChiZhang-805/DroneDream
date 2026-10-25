@@ -276,20 +276,20 @@ type EditionAssistantCopy = Readonly<{
 
 const EDITION_ASSISTANT_COPY: Record<BrandEditionId, EditionAssistantCopy> = {
   universal: {
-    title: "What should DroneDream design with you?",
-    openDraft: "Open asset repositories",
+    title: "What should DroneDream optimize with you?",
+    openDraft: "Open optimization draft",
     examples: [
       {
-        title: "Qualify an External Asset",
-        body: "Prepare an import and qualification plan for an aircraft or world authored in a mainstream 3D tool, including source identity, coordinate frames, physics, ROS 2, Gazebo, and PX4 evidence.",
+        title: "Tune Hover Stability",
+        body: "Tune the x500 hover controller with bounded parameter ranges, repeatable wind trials, and a validated final candidate.",
       },
       {
-        title: "Plan the Full Workflow",
-        body: "Turn one flight objective into a connected SIM, LAB, and FIELD workflow with explicit qualification gates between every stage.",
+        title: "Reduce Tracking Error",
+        body: "Optimize horizontal tracking parameters and let the Harness select algorithms from each round of simulation evidence.",
       },
       {
-        title: "Compare Editions",
-        body: "Help me decide which work belongs in SIM, LAB, and FIELD, then prepare the corresponding reviewable drafts without running anything.",
+        title: "Plan an Agent Mission",
+        body: "Switch to an Agent mission for a short campus delivery with route planning, live monitoring, and safe replanning.",
       },
     ],
   },
@@ -358,7 +358,7 @@ const EDITION_ASSISTANT_TITLES: Readonly<
   Record<InterfaceLocale, Readonly<Record<BrandEditionId, string>>>
 > = {
   en: {
-    universal: "What should DroneDream design with you?",
+    universal: "What should DroneDream optimize with you?",
     sim: "What flight experiment should we build?",
     lab: "What validation experiment should we build?",
     field: "What real-device task should we prepare?",
@@ -652,7 +652,7 @@ export function ExperimentAssistant() {
   const [voiceConsentIntent, setVoiceConsentIntent] = useState<"toggle" | "hold" | null>(null);
   const [voiceConsentGranted, setVoiceConsentGranted] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
-  const [selectedTaskType, setSelectedTaskType] = useState<AssistantTaskType | null>(null);
+  const [selectedTaskType, setSelectedTaskType] = useState<AssistantTaskType | null>("control_tuning");
   const [referenceFiles, setReferenceFiles] = useState<AssistantReferenceFile[]>(
     [],
   );
@@ -1466,7 +1466,7 @@ export function ExperimentAssistant() {
           >
             {selectedTask
               ? selectedTask.label
-              : taskOptions.find(({ id }) => id === "mission_autonomy")?.label ?? copy.autoTask}
+              : taskOptions.find(({ id }) => id === "control_tuning")?.label ?? copy.autoTask}
           </button>
           <span className="assistant-composer-spacer" />
           <AssistantModelPicker
