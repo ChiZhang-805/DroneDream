@@ -160,13 +160,14 @@ try {
             }
             if (shellState === "quick-settings" || shellState?.startsWith("settings-")) {
               await page.locator(".app-header .launcher-settings-button").click();
-              await page.locator(".quick-settings-dialog").waitFor({ state: "visible" });
               if (shellState?.startsWith("settings-")) {
-                await page.getByRole("button", { name: "All settings" }).click();
+                await page.getByRole("button", { name: "All settings", exact: true }).click();
                 await page.locator(".settings-workspace-host").waitFor({ state: "visible" });
                 const tab = shellState.replace(/^settings-/u, "");
                 await page.locator(`#settings-tab-${tab}`).click();
                 await page.locator(`#settings-panel-${tab}`).waitFor({ state: "visible" });
+              } else {
+                await page.locator(".quick-settings-dialog").waitFor({ state: "visible" });
               }
             } else if (shellState === "account-menu") {
               await page.locator(".app-account-button").click();
@@ -187,7 +188,7 @@ try {
               const main = document.querySelector(".app-main, .launcher-main");
               const lockup = document.querySelector(".app-title img, .universal-mode-switch-trigger img, .launcher-brand img");
               const title = document.querySelector(
-                "#main-content h1, #main-content h2, main h1, main h2, .assistant-hero-question, .state-title",
+                "#main-content h1, #main-content h2, main h1, main h2, .assistant-hero-question, .state-title, .app-header-title",
               );
               const adapterScroller = document.querySelector(".field-adapter-center .field-table-scroll");
               const adapterTable = document.querySelector(".field-adapter-table");
@@ -239,6 +240,49 @@ try {
                 ".quick-settings-dialog, .settings-workspace-host, .account-menu-popover",
               );
               const overlayRect = overlay?.getBoundingClientRect();
+              const relativeLuminance = (red, green, blue) => {
+                const linear = [red, green, blue].map((channel) => {
+                  const normalized = channel / 255;
+                  return normalized <= 0.04045
+                    ? normalized / 12.92
+                    : ((normalized + 0.055) / 1.055) ** 2.4;
+                });
+                return (0.2126 * linear[0]) + (0.7152 * linear[1]) + (0.0722 * linear[2]);
+              };
+              const darkSurfaceIssues = [...document.querySelectorAll("html, body, body *")]
+                .filter((element) => element instanceof HTMLElement && isVisible(element))
+                .filter((element) => !element.matches("canvas, img, picture, video, svg, path"))
+                .map((element) => {
+                  const rect = element.getBoundingClientRect();
+                  const background = window.getComputedStyle(element).backgroundColor;
+                  const channels = background.match(/[\d.]+/g)?.map(Number) ?? [];
+                  const [rawRed = 255, rawGreen = 255, rawBlue = 255, alpha = 1] = channels;
+                  const colorScale = background.startsWith("color(srgb") ? 255 : 1;
+                  const red = rawRed * colorScale;
+                  const green = rawGreen * colorScale;
+                  const blue = rawBlue * colorScale;
+                  return {
+                    element,
+                    rect,
+                    background,
+                    luminance: relativeLuminance(red, green, blue),
+                    alpha,
+                  };
+                })
+                .filter(({ element, rect, alpha, luminance }) => {
+                  const meaningfulSurface = rect.width >= 32 && rect.height >= 24;
+                  const interactiveControl = element.matches("button, input, select, textarea, [role='button']");
+                  return alpha >= 0.8
+                    && luminance < 0.18
+                    && (meaningfulSurface || interactiveControl);
+                })
+                .map(({ element, background, rect }) => ({
+                  label: normalizedText(element),
+                  className: element.className,
+                  background,
+                  width: Math.round(rect.width),
+                  height: Math.round(rect.height),
+                }));
               return {
                 edition: root.dataset.brandEdition,
                 viewportWidth: window.innerWidth,
@@ -279,6 +323,7 @@ try {
                 adapterActionVisible: !adapterScrollerRect || !adapterActionRect
                   ? true
                   : adapterActionRect.right <= adapterScrollerRect.right + 1,
+                darkSurfaceIssues,
               };
             });
 
@@ -304,6 +349,11 @@ try {
             assert(metrics.overlayFits, `${caseLabel}: shell overlay is clipped by the window`);
             assert(metrics.adapterTableFits, `${caseLabel}: adapter table is wider than its visible panel`);
             assert(metrics.adapterActionVisible, `${caseLabel}: adapter action column is clipped`);
+            assert.deepEqual(
+              metrics.darkSurfaceIssues,
+              [],
+              `${caseLabel}: dark application surfaces remain ${JSON.stringify(metrics.darkSurfaceIssues)}`,
+            );
 
             const pairKey = `${edition.id}/${surface}`;
             const previous = pairs.get(pairKey);

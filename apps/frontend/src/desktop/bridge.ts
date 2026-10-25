@@ -680,6 +680,7 @@ export interface DesktopArtifactDownloadResponse {
 
 export interface BrowserAuthRequest {
   locale: InstallerLocale;
+  provider?: "google" | "github" | "slack_oidc";
 }
 
 export interface BrowserAuthSession {
@@ -1443,9 +1444,14 @@ export function beginBrowserAuth(
 ): Promise<BrowserAuthSession> {
   const normalizedRequest = {
     locale: request.locale,
+    ...(request.provider !== undefined ? { provider: request.provider } : {}),
   };
   if (normalizedRequest.locale !== "en" && normalizedRequest.locale !== "zh-CN") {
     return Promise.reject(new Error("Browser sign-in locale must be en or zh-CN."));
+  }
+  if (request.provider !== undefined
+    && !["google", "github", "slack_oidc"].includes(request.provider)) {
+    return Promise.reject(new Error("Browser sign-in provider is not supported."));
   }
   return invokeDesktop(
     "begin_browser_auth",

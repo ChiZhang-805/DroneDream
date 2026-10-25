@@ -3,6 +3,7 @@ import {
   cancelBrowserAuth,
   clearBrowserAuthVault,
   restoreBrowserAuthVault,
+  type BrowserAuthRequest,
 } from "../../desktop/bridge";
 import {
   adoptBrowserAuthSession,
@@ -12,6 +13,7 @@ import { activateDesktopAuthSession } from "./desktopAuthActivation";
 
 export interface DesktopBrowserSignInOptions {
   signal?: AbortSignal;
+  provider?: BrowserAuthRequest["provider"];
   restoreFromVault?: boolean;
   onAdopting?: () => void;
 }
@@ -80,8 +82,14 @@ export async function completeDesktopBrowserSignIn(
   options: DesktopBrowserSignInOptions = {},
 ): Promise<void> {
   // Explicit sign-in owns launcher activation, browser consent, then remote adoption.
-  const { signal, restoreFromVault = false, onAdopting } = options;
+  const { signal, provider, restoreFromVault = false, onAdopting } = options;
   throwIfCancelled(signal);
+  if (provider !== undefined && !["google", "github", "slack_oidc"].includes(provider)) {
+    throw new Error("Browser sign-in provider is not supported.");
+  }
+  if (provider && restoreFromVault) {
+    throw new Error("A provider shortcut requires a fresh browser sign-in.");
+  }
   activateDesktopAuthSession();
   if (!restoreFromVault) {
     // A desktop launch is intentionally a fresh authentication ceremony.
@@ -92,7 +100,10 @@ export async function completeDesktopBrowserSignIn(
     ? await abortable(restoreBrowserAuthVault(), signal)
     : null;
   throwIfCancelled(signal);
-  const session = restored ?? await abortable(beginBrowserAuth({ locale }), signal);
+  const session = restored ?? await abortable(beginBrowserAuth({
+    locale,
+    ...(provider ? { provider } : {}),
+  }), signal);
   throwIfCancelled(signal);
   onAdopting?.();
   throwIfCancelled(signal);

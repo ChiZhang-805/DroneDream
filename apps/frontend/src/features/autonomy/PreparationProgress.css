@@ -1,0 +1,5 @@
+.autonomy-preparation-progress { display: flex; align-items: center; gap: .65rem; min-width: 0; padding: .3rem 0 .7rem; }
+.autonomy-preparation-progress h3 { margin: 0; color: var(--text); font-size: 1rem; font-weight: 650; }
+.autonomy-progress-spinner { flex: 0 0 1rem; height: 1rem; border: 2px solid color-mix(in srgb, var(--primary) 20%, transparent); border-top-color: var(--primary); border-radius: 50%; animation: preparation-spin .8s linear infinite; }
+@keyframes preparation-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .autonomy-progress-spinner { animation: none; } }

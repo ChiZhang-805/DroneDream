@@ -2,6 +2,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import type { BrandEditionId } from "../../brand/edition-brand.generated";
 import { getAuthAccessToken } from "../auth/authTokenStore";
 import type { AutonomyPlannerArtifact } from "./missionHarness";
+import type { AutonomyClarification } from "./workspaceStore";
 
 export type AgentCoreActivationMode = "single" | "multiple" | "pipeline";
 
@@ -365,6 +366,144 @@ export interface AgentCoreAssetSourceAdapter {
   provider_plugin_ids: string[];
 }
 
+export interface AgentCoreMapResource {
+  schema_version: "dronedream.map-resource.v1";
+  resource_id: string;
+  display_name: Record<"zh-CN" | "en-US", string>;
+  aliases?: Record<"zh-CN" | "en-US", string[]>;
+  description: Record<"zh-CN" | "en-US", string>;
+  category: "indoor_and_site_map" | "real_outdoor_3d_campus";
+  default_resource: true;
+  install_mode: "on_demand" | "bundled";
+  review: {
+    status: "approved";
+    reviewed_at: string;
+    source_commit_pinned: boolean;
+    source_data_hashes_pinned?: boolean;
+    license_reviewed: boolean;
+    executable_content_required: boolean;
+  };
+  license: {
+    spdx_id: string;
+    name: string;
+    url?: string;
+    commercial_use: boolean;
+    redistribution: boolean;
+    automated_analysis: boolean;
+    attribution_required?: boolean;
+  };
+  source: {
+    source_type: "direct_url" | "git" | "bundled_ddpkg";
+    location: string;
+    expected_sha256: string;
+    git_ref?: string;
+    subpath?: string;
+    source_path_at_commit?: string;
+    source_format: string;
+    expected_kind: "map";
+    real_world_crs?: string;
+  };
+  analysis: {
+    status: "preparsed" | "qualified";
+    parser: string;
+    source_commit?: string;
+    level_names?: string[];
+    level_count?: number;
+    door_count?: number;
+    lift_count?: number;
+    model_count?: number;
+    navigation_lane_count?: number;
+    vertex_count?: number;
+    wall_count?: number;
+    floor_polygon_count?: number;
+    building_count?: number;
+    collision_primitive_count?: number;
+    visual_primitive_count?: number;
+    named_buildings?: string[];
+    named_buildings_zh?: string[];
+    coordinate_frame?: string;
+    notes: string[];
+  };
+  readiness: {
+    catalog: "ready";
+    planning: "preparsed" | "ready";
+    simulation: "conversion_required" | "ready";
+    flight: "unqualified" | "qualified";
+    qualification_id?: string;
+    required_inputs: string[];
+  };
+}
+
+export interface AgentCoreMapResourceCatalog {
+  schema_version: "dronedream.map-resource-catalog.v1";
+  catalog_revision: string;
+  resources: AgentCoreMapResource[];
+}
+
+export interface AgentCoreVehicleResource {
+  schema_version: "dronedream.vehicle-resource.v1";
+  resource_id: string;
+  display_name: Record<"zh-CN" | "en-US", string>;
+  description: Record<"zh-CN" | "en-US", string>;
+  category: "simulation_aircraft";
+  vehicle_class: "multicopter" | "vtol" | string;
+  default_resource: true;
+  install_mode: "on_demand";
+  review: {
+    status: "approved";
+    reviewed_at: string;
+    source_commit_pinned: boolean;
+    license_reviewed: boolean;
+    executable_content_required: boolean;
+  };
+  license: {
+    spdx_id: string;
+    name: string;
+    url: string;
+    commercial_use: boolean;
+    redistribution: boolean;
+    automated_analysis: boolean;
+  };
+  source: {
+    source_type: "git";
+    location: string;
+    expected_sha256: string;
+    git_ref: string;
+    subpath: string;
+    source_path_at_commit: string;
+    source_format: "gazebo-model-bundle";
+    expected_kind: "vehicle";
+    px4_sitl_model: string;
+  };
+  analysis: {
+    status: "preparsed";
+    parser: string;
+    source_commit: string;
+    sdf_version: string;
+    source_file_count: number;
+    source_size_bytes: number;
+    dependency_models: string[];
+    resolved_sensor_types: string[];
+    runtime_plugin_count: number;
+    joint_count: number;
+    recommended_for: string[];
+    excluded_from: string[];
+    notes: string[];
+  };
+  readiness: {
+    catalog: "ready";
+    planning: "preparsed";
+    simulation: "dependency_resolution_required" | "ready";
+    flight: "unqualified" | "qualified";
+    required_inputs: string[];
+  };
+}
+
+export interface AgentCoreVehicleResourceCatalog {
+  schema_version: "dronedream.vehicle-resource-catalog.v1";
+  catalog_revision: string;
+  resources: AgentCoreVehicleResource[];
+}
 export interface AgentCoreAssetQualificationJob {
   schema_version: "dronedream.asset-pair-qualification-job.v1";
   job_id: string;
@@ -566,6 +705,18 @@ export interface AgentCoreRuntimeStatus {
   issue: string | null;
 }
 
+export interface AgentCoreRuntimeSetupProgress {
+  schema_version: "dronedream.autonomy.runtime-setup.v1";
+  operation_id: string;
+  phase: string;
+  progress: number;
+  active: boolean;
+  error: string | null;
+  failed_phase: string | null;
+  started_at: string;
+  updated_at: string;
+}
+
 export type AgentCoreLiveSourceKind = "simulation" | "camera" | "gps";
 
 export interface AgentCoreLiveSource {
@@ -662,6 +813,45 @@ export interface AgentCoreAssetEntry {
   updated_at: string;
 }
 
+export type AgentCoreAssetPairStatus =
+  | "qualified_builtin"
+  | "compatible_requires_qualification"
+  | "incompatible";
+
+export interface AgentCoreAssetPairCatalogEntry {
+  schema_version: "dronedream.asset-pair-compatibility.v1";
+  pair_id: string;
+  map_resource_id: string;
+  map_display_name: { "zh-CN": string; "en-US": string };
+  environment_class: string;
+  vehicle_resource_id: string;
+  vehicle_display_name: { "zh-CN": string; "en-US": string };
+  vehicle_class: "multicopter" | "vtol" | string;
+  status: AgentCoreAssetPairStatus;
+  compatible: boolean;
+  qualification_id: string | null;
+  qualified_map_asset_id: string | null;
+  qualified_vehicle_asset_id: string | null;
+  qualification_scope: string | null;
+  reasons: string[];
+  required_gates: string[];
+  sensor_constraints: string[];
+}
+
+export interface AgentCoreAssetPairCatalog {
+  schema_version: "dronedream.asset-pair-catalog.v1";
+  catalog_revision: string;
+  map_count: number;
+  vehicle_count: number;
+  pair_count: number;
+  counts: {
+    qualified_builtin: number;
+    compatible_requires_qualification: number;
+    incompatible: number;
+  };
+  pairs: AgentCoreAssetPairCatalogEntry[];
+}
+
 export interface AgentCoreAssetVersion {
   asset_id: string;
   content_sha256: string;
@@ -679,6 +869,11 @@ export interface AgentCoreBootstrap {
   vehicles: AgentCoreAssetEntry[];
   asset_import_jobs: AgentCoreAssetImportJob[];
   asset_versions: AgentCoreAssetVersion[];
+  bundled_asset_replacements?: Array<{
+    asset_id: string;
+    source_content_sha256: string;
+    replacement_content_sha256: string;
+  }>;
   asset_qualification_jobs: AgentCoreAssetQualificationJob[];
   asset_source_adapters: AgentCoreAssetSourceAdapter[];
   plugins: AgentCorePluginEntry[];
@@ -705,6 +900,7 @@ export interface AgentCoreMissionPrepareSummary {
   route_nodes: string[];
   minimum_clearance_m: number;
   mission_plan: {
+    route_positions_m?: Array<{ x: number; y: number; z: number }>;
     schema_version: "dronedream.agent-core-mission-plan.v1";
     source: "agent-core";
     contract_id: string;
@@ -769,6 +965,7 @@ export interface AgentCoreMissionPrepareSummary {
   capability_broker_receipts_sha256: string;
   integration_artifact: AutonomyPlannerArtifact;
   integration_artifact_sha256: string;
+  integration_artifact_canonical_json?: string;
   notifications?: Array<{ kind: "plan" | "status"; content: string; metadata?: Record<string, unknown> }>;
 }
 
@@ -792,12 +989,19 @@ export class AgentCoreUnavailableError extends Error {
 export class AgentCoreRequestError extends Error {
   readonly status: number;
   readonly clarificationFields: string[];
+  readonly clarification: AutonomyClarification | null;
 
-  constructor(status: number, detail: string, clarificationFields: string[] = []) {
+  constructor(
+    status: number,
+    detail: string,
+    clarificationFields: string[] = [],
+    clarification: AutonomyClarification | null = null,
+  ) {
     super(detail);
     this.name = "AgentCoreRequestError";
     this.status = status;
     this.clarificationFields = clarificationFields;
+    this.clarification = clarification;
   }
 }
 
@@ -831,11 +1035,25 @@ function isDesktopResponse(value: unknown): value is AgentCoreDesktopResponse {
     && (candidate.contentType === null || typeof candidate.contentType === "string");
 }
 
+// 功能：
+//   提取后端有界错误码和诊断编号，不把结构化错误直接显示成整段 JSON。
+// 输入：
+//   body：本地后端响应字节。
+// 输出：
+//   detail：错误码及可选诊断编号，或原有简短文本。
 function detailFromBody(body: Uint8Array): string {
   const text = new TextDecoder().decode(body);
   try {
     const parsed = JSON.parse(text) as { detail?: unknown };
     if (typeof parsed.detail === "string") return parsed.detail;
+    if (parsed.detail && typeof parsed.detail === "object") {
+      const detail = parsed.detail as { code?: unknown; error_id?: unknown };
+      if (typeof detail.code === "string" && /^[A-Z][A-Z0-9_]{0,119}$/u.test(detail.code)) {
+        const id = typeof detail.error_id === "string" && /^[a-f0-9]{32}$/u.test(detail.error_id)
+          ? `:${detail.error_id}` : "";
+        return `${detail.code}${id}`;
+      }
+    }
   } catch {
     // The Core may return a short plain-text diagnostic before JSON is available.
   }
@@ -865,15 +1083,51 @@ async function requestBytes(
   if (value.status < 200 || value.status >= 300) {
     // 只有受限的追问合同可以转为对话回复；普通接口失败仍然抛出原错误。
     let fields: string[] = [];
+    let clarification: AutonomyClarification | null = null;
     try {
       const detail = JSON.parse(new TextDecoder().decode(body)).detail;
       if (value.status === 409 && detail?.code === "MISSION_CLARIFICATION_REQUIRED"
         && Array.isArray(detail.fields) && detail.fields.length > 0 && detail.fields.length <= 16
         && detail.fields.every((item: unknown) => typeof item === "string" && item.trim().length > 0 && item.length <= 240)) {
         fields = detail.fields;
+        if (Array.isArray(detail.questions) && detail.questions.length <= 4) {
+          const questions = detail.questions.flatMap((question: unknown) => {
+            if (!question || typeof question !== "object") return [];
+            const candidate = question as Record<string, unknown>;
+            if (typeof candidate.question_id !== "string"
+              || !/^[a-z][a-z0-9._-]{1,63}$/u.test(candidate.question_id)
+              || typeof candidate.prompt !== "string" || candidate.prompt.length < 3
+              || candidate.prompt.length > 240 || !Array.isArray(candidate.options)
+              || candidate.options.length > 3) return [];
+            const options = candidate.options.flatMap((option: unknown, index: number) => {
+              if (!option || typeof option !== "object") return [];
+              const item = option as Record<string, unknown>;
+              const expected = (["A", "B", "C"] as const)[index];
+              if (item.option_id !== expected || typeof item.label !== "string"
+                || typeof item.response !== "string" || item.label.length > 120
+                || item.response.length > 240) return [];
+              return [{ optionId: expected, label: item.label, response: item.response }];
+            });
+            if (candidate.options.length && options.length !== candidate.options.length) return [];
+            return [{
+              questionId: candidate.question_id,
+              prompt: candidate.prompt,
+              options,
+              allowOther: candidate.allow_other !== false,
+              otherLabel: typeof candidate.other_label === "string"
+                && candidate.other_label.length <= 40 ? candidate.other_label : "其他",
+            }];
+          });
+          if (questions.length) clarification = { questions };
+        }
       }
     } catch { /* 非 JSON 响应交给通用诊断，不解释为模型追问。 */ }
-    if (fields.length) throw new AgentCoreRequestError(value.status, "MISSION_CLARIFICATION_REQUIRED", fields);
+    if (fields.length) throw new AgentCoreRequestError(
+      value.status,
+      "MISSION_CLARIFICATION_REQUIRED",
+      fields,
+      clarification,
+    );
     throw new AgentCoreRequestError(value.status, detailFromBody(body));
   }
   return body;
@@ -958,6 +1212,10 @@ export function getAgentCoreBootstrap(): Promise<AgentCoreBootstrap> {
   return requestJson("/v1/bootstrap");
 }
 
+export function getAgentCoreAssetPairCatalog(): Promise<AgentCoreAssetPairCatalog> {
+  return requestJson("/v1/asset-pair-catalog");
+}
+
 export function createAgentCoreThread(payload: {
   title: string;
   selected_model: string;
@@ -973,11 +1231,18 @@ export function getAgentCoreLiveSources(threadId: string): Promise<AgentCoreLive
   return requestJson(`/v1/threads/${encodeURIComponent(threadId)}/live-sources`);
 }
 
-export async function getAgentCoreLiveFrame(threadId: string): Promise<Blob> {
-  const bytes = await requestBytes(`/v1/threads/${encodeURIComponent(threadId)}/live-frame`);
+// 功能：
+//   获取选定仿真相机的真实帧，不将机载画面替换为俯视画面。
+// 输入：
+//   threadId：当前任务；sourceId：相机来源标识。
+// 输出：
+//   frame：服务器返回的 PNG 图像。
+export async function getAgentCoreLiveFrame(threadId: string, sourceId = "gazebo-render"): Promise<Blob> {
+  const bytes = await requestBytes(`/v1/threads/${encodeURIComponent(threadId)}/live-frame?source_id=${encodeURIComponent(sourceId)}`);
   const copy = new Uint8Array(bytes.byteLength);
   copy.set(bytes);
-  return new Blob([copy.buffer], { type: "image/png" });
+  const frame = new Blob([copy.buffer], { type: "image/png" });
+  return frame;
 }
 
 export function getAgentCoreLiveTelemetry(threadId: string): Promise<AgentCoreLiveTelemetry> {
@@ -1021,6 +1286,7 @@ export function prepareAgentCoreMission(
   threadId: string,
   payload: {
     expected_owner_account_id: string;
+    progress_request_id?: string;
     source_edition: BrandEditionId;
     message: string;
     map_id: string;
@@ -1042,6 +1308,16 @@ export function prepareAgentCoreMission(
     method: "POST",
     body: payload,
   });
+}
+
+// 功能：
+//   读取当前已认证请求的新增公开处理摘要，不读取模型内部思维。
+// 输入：
+//   threadId：会话；requestId：本次请求；after：游标。
+// 输出：
+//   snapshot：有序摘要及处理状态。
+export function getAgentCorePreparationProgress(threadId: string, requestId: string, after: number): Promise<{ state: string; events: import("./conversationActivity").PreparationProgressEvent[] }> {
+  return requestJson(`/v1/threads/${encodeURIComponent(threadId)}/preparation-progress?request_id=${encodeURIComponent(requestId)}&after=${after}`);
 }
 
 export function createAgentCoreCustomModel(payload: {
@@ -1096,6 +1372,12 @@ export function getAgentCoreRuntimeStatus(): Promise<AgentCoreRuntimeStatus> {
   return requestJson("/v1/runtime/status");
 }
 
+// Provision the signed runtime bundle through Agent Core's managed installer.
+// The endpoint is idempotent while setup is active, so callers may safely recover after navigation.
+export function startAgentCoreRuntimeSetup(): Promise<AgentCoreRuntimeSetupProgress> {
+  return requestJson("/v1/runtime/setup", { method: "POST" });
+}
+
 export function executeAgentCoreMission(
   threadId: string,
   payload: {
@@ -1123,6 +1405,13 @@ export function listAgentCoreAssetSourceAdapters(): Promise<AgentCoreAssetSource
   return requestJson("/v1/asset-source-adapters");
 }
 
+export function listAgentCoreMapResources(): Promise<AgentCoreMapResourceCatalog> {
+  return requestJson("/v1/map-resource-catalog");
+}
+
+export function listAgentCoreVehicleResources(): Promise<AgentCoreVehicleResourceCatalog> {
+  return requestJson("/v1/vehicle-resource-catalog");
+}
 export function listAgentCoreAssetImportJobs(): Promise<AgentCoreAssetImportJob[]> {
   return requestJson("/v1/asset-import-jobs");
 }
@@ -1156,7 +1445,7 @@ export async function pickAndCreateAgentCoreAssetImportJob(
   const chinese = locale === "zh-CN";
   const extensions = Array.from(new Set(
     adapters
-      .filter((adapter) => adapter.asset_kinds.includes(expectedKind))
+      .filter((adapter) => adapter.enabled && adapter.availability === "builtin" && adapter.asset_kinds.includes(expectedKind))
       .flatMap((adapter) => adapter.file_extensions)
       .map((extension) => extension.replace(/^\./u, "").toLowerCase())
       .filter((extension) => /^[a-z0-9]+$/u.test(extension)),
@@ -1172,15 +1461,19 @@ export async function pickAndCreateAgentCoreAssetImportJob(
         ? chinese ? "导入地图或世界文件夹" : "Import map or world directory"
         : chinese ? "导入地图或世界资产" : "Import map or world asset",
     filters: sourceKind === "file" && extensions.length
-      ? [{ name: chinese ? "可用的三维资产" : "Supported 3D assets", extensions }]
+      ? [{ name: expectedKind === "vehicle" ? (chinese ? "无人机资产包与模型" : "Aircraft packages & models") : (chinese ? "地图资产" : "Map assets"), extensions }]
       : undefined,
   });
   if (!selection || Array.isArray(selection)) return null;
+  return createAgentCoreAssetImportFromPath(selection, expectedKind);
+}
+
+export async function createAgentCoreAssetImportFromPath(filePath: string, expectedKind: AgentCoreAssetKind): Promise<AgentCoreAssetImportJob> {
   const core = tauriCore();
   if (!core) throw new AgentCoreUnavailableError();
   const response = await core.invoke("agent_core_import_asset_path", {
     request: {
-      filePath: selection,
+      filePath,
       sourceFormat: "auto",
       expectedKind,
     },
@@ -1195,6 +1488,37 @@ export async function pickAndCreateAgentCoreAssetImportJob(
 
 export function processAgentCoreAssetImportJob(jobId: string): Promise<AgentCoreAssetImportJob> {
   return requestJson(`/v1/asset-import-jobs/${encodeURIComponent(jobId)}/process`, { method: "POST" });
+}
+
+export type MapUploadRole = "scene" | "resources" | "places" | "routes";
+export interface MapUploadReceipt {
+  role: MapUploadRole;
+  filePath: string;
+  name: string;
+  fileCount: number;
+}
+
+export async function pickMapUpload(role: MapUploadRole, chinese: boolean): Promise<MapUploadReceipt | null> {
+  const core = tauriCore();
+  if (!core) throw new AgentCoreUnavailableError();
+  const selection = await open({
+    multiple: false,
+    directory: role === "resources",
+    title: chinese ? "上传地图文件" : "Upload map file",
+    filters: role === "resources" ? undefined : [{
+      name: role === "scene" ? (chinese ? "地图" : "Map") : "JSON",
+      extensions: role === "scene" ? ["ddpkg", "zip", "sdf", "world", "yaml"] : ["json"],
+    }],
+  });
+  if (!selection || Array.isArray(selection)) return null;
+  return await core.invoke("stage_map_import_file", { filePath: selection, role }) as MapUploadReceipt;
+}
+
+export async function createMapUploadImport(uploads: MapUploadReceipt[]): Promise<AgentCoreAssetImportJob> {
+  const core = tauriCore();
+  if (!core) throw new AgentCoreUnavailableError();
+  const path = await core.invoke("prepare_map_import", { uploads }) as string;
+  return createAgentCoreAssetImportFromPath(path, "map");
 }
 
 export async function pickAndSubmitAgentCoreCompanionResult(
@@ -1261,6 +1585,24 @@ export interface AgentCoreAssetInterpretation {
   model_calls: Array<Record<string, unknown>>;
 }
 
+export interface AirspaceRequest {
+  map_asset_id: string;
+  map_content_sha256: string;
+  vehicle_asset_id: string;
+  vehicle_content_sha256: string;
+}
+
+// 功能：
+//   通过既有身份验证通道读取选定地图／机型的真实空间，不请求模型或触发飞行。
+// 输入：
+//   payload：精确的资产版本绑定。
+// 输出：
+//   snapshot：待独立校验的空间数据。
+export async function getPreferredAirspace(payload: AirspaceRequest): Promise<unknown> {
+  const snapshot = await requestJson<unknown>("/v1/assets/preferred-airspace", { method: "POST", body: payload });
+  return snapshot;
+}
+
 // 功能：
 //   通过现有身份桥提交资产解析，不触发规划或执行接口。
 // 输入：
@@ -1275,6 +1617,16 @@ export function requestAgentCoreAssetInterpretation(threadId: string, payload: {
   locale: "zh-CN" | "en-US"; force: boolean;
 }): Promise<AgentCoreAssetInterpretation> {
   return requestJson(`/v1/threads/${encodeURIComponent(threadId)}/interpret`, { method: "POST", body: payload });
+}
+
+// 功能：
+//   通过已认证的本机接口请求模型短标题，不启动规划或飞行。
+// 输入：
+//   threadId：后端会话；payload：首条需求、模型授权与账户。
+// 输出：
+//   result：模型生成的名称。
+export function requestAgentCoreConversationTitle(threadId: string, payload: { expected_owner_account_id: string; source_edition: BrandEditionId; message: string; model_id: string; model_grant: string; gateway_base_url: string | null; locale: "zh-CN" | "en-US" }): Promise<{ title: string }> {
+  return requestJson(`/v1/threads/${encodeURIComponent(threadId)}/title`, { method: "POST", body: payload });
 }
 
 export function createAgentCoreAssetQualificationJob(payload: {

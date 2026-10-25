@@ -29,7 +29,45 @@ const INITIAL_SESSION: DesktopStartupGateSession = {
   failureCode: null,
 };
 
-let session = INITIAL_SESSION;
+const STARTUP_GATE_STORAGE_KEY = "dronedream.desktop-startup-gate:v1";
+
+function storedReadySession(): DesktopStartupGateSession {
+  if (typeof window === "undefined") return INITIAL_SESSION;
+  try {
+    const value = JSON.parse(
+      window.sessionStorage.getItem(STARTUP_GATE_STORAGE_KEY) ?? "null",
+    ) as Partial<DesktopStartupGateSession> | null;
+    if (
+      value?.status !== "ready"
+      || (value.accountId !== null && typeof value.accountId !== "string")
+      || typeof value.checkedAt !== "number"
+    ) return INITIAL_SESSION;
+    return {
+      status: "ready",
+      accountId: value.accountId,
+      checkedAt: value.checkedAt,
+      error: null,
+      failureCode: null,
+    };
+  } catch {
+    return INITIAL_SESSION;
+  }
+}
+
+function persist(next: DesktopStartupGateSession): void {
+  if (typeof window === "undefined") return;
+  try {
+    if (next.status === "ready") {
+      window.sessionStorage.setItem(STARTUP_GATE_STORAGE_KEY, JSON.stringify(next));
+    } else {
+      window.sessionStorage.removeItem(STARTUP_GATE_STORAGE_KEY);
+    }
+  } catch {
+    // A storage policy may block sessionStorage. The in-memory gate still works.
+  }
+}
+
+let session = storedReadySession();
 let verificationInFlight: {
   accountId: string;
   revision: number;
@@ -40,6 +78,7 @@ const listeners = new Set<DesktopStartupGateListener>();
 
 function publish(next: DesktopStartupGateSession): DesktopStartupGateSession {
   session = next;
+  persist(next);
   for (const listener of listeners) listener();
   return next;
 }

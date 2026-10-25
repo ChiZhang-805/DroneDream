@@ -188,7 +188,7 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
       window.location.replace(launcherUrl.href);
     }, locale);
     await page.waitForURL((url) => url.hash === "#/desktop/setup");
-    await page.locator(".drone-launch-scene").waitFor({ state: "visible", timeout: 30_000 });
+    await page.locator(".launcher-flight-illustration").waitFor({ state: "visible", timeout: 30_000 });
   }
 
   const initialViewport = await page.evaluate(() => ({
@@ -224,24 +224,18 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
   assert.equal(startupTheme.presentationOnly, "true");
   assert.equal(startupTheme.grantsHardwareAuthority, "false");
   assert.deepEqual(startupTheme.colors, canonicalColors[expectedThemeEdition]);
-  let scene = null;
+  let launcherSurface = null;
   // Capture only after Settings applies the requested locale. This ordering
   // prevents each case from inheriting the previous case's language even when
   // its later Settings assertions pass.
   let surfaceScreenshot;
   if (!authenticatedWorkspace) {
-    scene = await page.locator(".drone-launch-scene").evaluate((element) => ({
-      edition: element.getAttribute("data-theme-edition"),
-      colors: [
-        element.getAttribute("data-theme-primary")?.toUpperCase(),
-        element.getAttribute("data-theme-secondary")?.toUpperCase(),
-        element.getAttribute("data-theme-tertiary")?.toUpperCase(),
-      ],
-      grantsHardwareAuthority: element.getAttribute("data-theme-grants-hardware-authority"),
-    }));
-    assert.equal(scene.edition, "universal");
-    assert.equal(scene.grantsHardwareAuthority, "false");
-    assert.deepEqual(scene.colors, canonicalColors.universal);
+    const launcherIllustration = page.locator(".launcher-flight-illustration");
+    assert.equal(await launcherIllustration.count(), 1);
+    assert.equal(await launcherIllustration.locator("svg.launcher-flight-map").count(), 1);
+    assert.equal(await page.locator(".desktop-launcher canvas").count(), 0,
+      "The desktop launcher must not create a WebGL canvas");
+    launcherSurface = { renderer: "lightweight-svg", canvasCount: 0 };
     // The pre-auth prerequisite intentionally stays on the Universal launcher.
     assert.equal(edition, "universal");
   }
@@ -335,7 +329,7 @@ const browser = await chromium.connectOverCDP(cdpEndpoint);
     viewportControl: emulateViewport ? "cdp-emulated-installed-webview" : "native-window-client-size",
     startupTheme,
     theme,
-    scene,
+    launcherSurface,
     languageSelectionCount: 1,
     settingsOpenCount: 1,
     settingsTabActivationCount: 4,

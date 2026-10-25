@@ -1,8 +1,9 @@
-import { Pin, PinOff, Trash2 } from "lucide-react";
+import { Archive, Pin, PinOff, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import type { BrandEditionId } from "../brand/edition-brand.generated";
-import { AUTONOMY_CONVERSATIONS_CHANGED, autonomyConversationPath, deleteAutonomyConversation, listAutonomyConversations, preserveLegacyAutonomyConversation, setAutonomyConversationPinned } from "../features/autonomy/conversationStore";
+import { AUTONOMY_CONVERSATIONS_CHANGED, autonomyConversationPath, listAutonomyConversations, preserveLegacyAutonomyConversation, updateAutonomyConversation } from "../features/autonomy/conversationStore";
+import { EXPERIMENT_WORKSPACES_CHANGED_EVENT, experimentWorkspacePath, listExperimentWorkspaces, updateExperimentWorkspace } from "../features/experiment/workspaceRegistry";
 
 // 功能：
 //   展示独立自主任务会话入口，首条消息保存后立即更新，切换账户时隔离列表。
@@ -19,13 +20,18 @@ export function AutonomyConversationSidebar({ ownerId, edition, locale, onNaviga
     const refresh = () => setRevision((value) => value + 1);
     const onChange = (event: Event) => {
       const detail = (event as CustomEvent).detail;
-      if (detail?.ownerId === ownerId && detail?.edition === edition) refresh();
+      if (
+        detail?.ownerId === ownerId
+        && (detail?.edition === undefined || detail.edition === edition)
+      ) refresh();
     };
     window.addEventListener(AUTONOMY_CONVERSATIONS_CHANGED, onChange);
+    window.addEventListener(EXPERIMENT_WORKSPACES_CHANGED_EVENT, onChange);
     window.addEventListener("storage", refresh);
     try { preserveLegacyAutonomyConversation(ownerId, edition); setError(false); refresh(); } catch { setError(true); }
     return () => {
       window.removeEventListener(AUTONOMY_CONVERSATIONS_CHANGED, onChange);
+      window.removeEventListener(EXPERIMENT_WORKSPACES_CHANGED_EVENT, onChange);
       window.removeEventListener("storage", refresh);
     };
   }, [ownerId, edition]);
@@ -33,10 +39,8 @@ export function AutonomyConversationSidebar({ ownerId, edition, locale, onNaviga
   let conversations: ReturnType<typeof listAutonomyConversations> = [];
   let unavailable = error;
   try { conversations = listAutonomyConversations(ownerId, edition); } catch { unavailable = true; }
+  const experimentConversations = listExperimentWorkspaces(ownerId, edition).filter((workspace) => !workspace.archived);
   const heading = locale === "zh-CN" ? "对话" : "Conversations";
-  const pin = locale === "zh-CN" ? "置顶" : "Pin";
-  const unpin = locale === "zh-CN" ? "取消置顶" : "Unpin";
-  const remove = locale === "zh-CN" ? "删除" : "Delete";
   return (
     <section className="app-workspaces app-conversations" aria-label={heading}>
       <header className="app-workspaces-header"><span>{heading}</span></header>
@@ -46,20 +50,41 @@ export function AutonomyConversationSidebar({ ownerId, edition, locale, onNaviga
           return (
             <div key={conversation.id} className={`app-workspace-row${location.pathname === path ? " active" : ""}`}>
               <NavLink to={path} title={conversation.title} onClick={onNavigate}>
-                <span className="app-workspace-label"><strong>{conversation.title}</strong></span>
-                {conversation.pinned ? <span className="app-workspace-pinned-indicator" title={unpin} aria-label={unpin}><Pin aria-hidden="true" /></span> : null}
+                <span className="app-workspace-label">{conversation.pinned ? <Pin size={12} aria-hidden="true" /> : null}<strong>{conversation.title}</strong></span>
               </NavLink>
-              <span className="app-workspace-actions">
-                <button type="button" className={conversation.pinned ? "is-active" : undefined} aria-label={`${conversation.pinned ? unpin : pin}: ${conversation.title}`} title={conversation.pinned ? unpin : pin} onClick={() => setAutonomyConversationPinned(ownerId, edition, conversation.id, !conversation.pinned)}>
-                  {conversation.pinned ? <PinOff aria-hidden="true" /> : <Pin aria-hidden="true" />}
-                </button>
-                <button type="button" aria-label={`${remove}: ${conversation.title}`} title={remove} onClick={() => {
-                  deleteAutonomyConversation(ownerId, edition, conversation.id);
-                  if (location.pathname === path) void navigate("/autonomy");
-                }}><Trash2 aria-hidden="true" /></button>
-              </span>
+              <div className="app-workspace-actions">
+                <button type="button" aria-label={locale === "zh-CN" ? (conversation.pinned ? "取消置顶" : "置顶对话") : (conversation.pinned ? "Unpin conversation" : "Pin conversation")} onClick={() => {
+                  try { updateAutonomyConversation(ownerId, edition, conversation.id, { pinned: !conversation.pinned }); setError(false); } catch { setError(true); }
+                }}>{conversation.pinned ? <PinOff /> : <Pin />}</button>
+                <button type="button" aria-label={locale === "zh-CN" ? "删除对话" : "Delete conversation"} onClick={() => {
+                  if (!window.confirm(locale === "zh-CN" ? "删除此对话？这不会终止正在执行的飞行，运行记录仍会保留。" : "Delete this conversation? This will not stop an active flight; run history is preserved.")) return;
+                  try {
+                    updateAutonomyConversation(ownerId, edition, conversation.id, { deleted: true });
+                    if (location.pathname === path) navigate("/autonomy");
+                    setError(false);
+                  } catch { setError(true); }
+                }}><Trash2 /></button>
+              </div>
             </div>
           );
+        })}
+        {experimentConversations.map((workspace) => {
+          const path = experimentWorkspacePath(workspace);
+          return <div key={`experiment:${workspace.id}`} className={`app-workspace-row${location.pathname + location.search === path ? " active" : ""}`}>
+            <NavLink to={path} title={workspace.name} onClick={onNavigate}>
+              <span className="app-workspace-label">{workspace.pinned ? <Pin size={12} aria-hidden="true" /> : null}<strong>{workspace.name}</strong></span>
+            </NavLink>
+            <div className="app-workspace-actions">
+              <button type="button" aria-label={locale === "zh-CN" ? (workspace.pinned ? "取消置顶" : "置顶对话") : (workspace.pinned ? "Unpin conversation" : "Pin conversation")} onClick={() => {
+                updateExperimentWorkspace(ownerId, workspace.id, { pinned: !workspace.pinned }, edition);
+                setRevision((value) => value + 1);
+              }}>{workspace.pinned ? <PinOff /> : <Pin />}</button>
+              <button type="button" aria-label={locale === "zh-CN" ? "归档对话" : "Archive conversation"} onClick={() => {
+                updateExperimentWorkspace(ownerId, workspace.id, { archived: true }, edition);
+                setRevision((value) => value + 1);
+              }}><Archive /></button>
+            </div>
+          </div>;
         })}
       </div>
       {unavailable ? <p role="alert">{locale === "zh-CN" ? "无法读取或保存本机会话。" : "Local conversations could not be read or saved."}</p> : null}

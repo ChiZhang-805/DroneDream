@@ -24,6 +24,8 @@ const host = "127.0.0.1";
 const port = Number(args.get("--port") || 5198);
 const origin = `http://${host}:${port}`;
 const cases = [
+  { id: "2560-en", locale: "en", viewport: { width: 2560, height: 1440 } },
+  { id: "1366-zh", locale: "zh-CN", viewport: { width: 1366, height: 768 } },
   { id: "1440-en", locale: "en", viewport: { width: 1440, height: 1000 } },
   { id: "1440-zh", locale: "zh-CN", viewport: { width: 1440, height: 1000 } },
   { id: "760-en", locale: "en", viewport: { width: 760, height: 900 } },
@@ -223,8 +225,8 @@ try {
     await page.goto(`${origin}/lab?docsPreview=1`, { waitUntil: "networkidle" });
 
     const title = testCase.locale === "en"
-      ? "Sim-to-Real calibration laboratory"
-      : "Sim-to-Real 校准实验室";
+      ? "LAB workspace"
+      : "LAB 工作区";
     await page.getByRole("heading", { name: title }).waitFor();
     const brandImage = page.locator('.workspace-switch-brand[data-brand-edition="lab"] img').first();
     await brandImage.waitFor({ state: "attached" });
@@ -245,13 +247,21 @@ try {
       .evaluate((element) => getComputedStyle(element).color);
     assert.equal(activeNavigationColor, "rgb(8, 126, 105)");
     assert.equal(await page.locator("html").getAttribute("lang"), testCase.locale);
-    assert.equal(await page.getByText(testCase.locale === "en" ? "0 of 8" : "0 / 8").count(), 1);
-    assert.equal(await page.getByText(testCase.locale === "en" ? "DENY" : "拒绝").first().count(), 1);
+    assert.equal(await page.getByText(testCase.locale === "en" ? "0 of 8" : "0 / 8").count(), 0);
+    assert.equal(await page.getByText(testCase.locale === "en" ? "DENY" : "拒绝").first().count(), 0);
     const calibration = page.locator('.lab-calibration[data-brand-edition="lab"]');
     assert.equal(await calibration.getAttribute("data-presentation-only"), "true");
     assert.equal(await calibration.getAttribute("data-grants-hardware-authority"), "false");
     const bridge = page.locator('.lab-evidence-bridge[data-grants-hardware-authority="false"]');
     assert.equal(await bridge.getAttribute("data-presentation-only"), "true");
+    assert.equal(await page.locator(".lab-role-strip, .lab-status-summary").count(), 0);
+    if (testCase.viewport.width > 900) {
+      await assertSingleScreen(page, testCase, "calibration-empty", ".lab-page");
+      const bottom = await page.locator(".lab-empty-evidence").evaluate(el => el.getBoundingClientRect().bottom);
+      assert(Math.abs(bottom - testCase.viewport.height) < 40, "Results must fill the available window height");
+    }
+    await assertViewportFits(page, testCase, "calibration-empty");
+    evidence.push(await screenshot(page, testCase, "calibration-empty"));
     const bridgeInputs = bridge.locator('input[type="file"]');
     assert.equal(await bridgeInputs.count(), 2);
     await bridgeInputs.nth(0).setInputFiles({
@@ -278,13 +288,12 @@ try {
       ).count(),
       1,
     );
-    await page.locator('.lab-calibration-controls input[type="file"]').setInputFiles({
+    await page.locator('.lab-calibration-import input[type="file"]').setInputFiles({
       name: "calibration-input.fake.json",
       mimeType: "application/json",
       buffer: calibrationFixture,
     });
     await page.getByText("lab_job_fixture_001", { exact: true }).waitFor();
-    assert(await page.getByRole("button", { name: testCase.locale === "en" ? "DENY" : "拒绝" }).isDisabled());
     await bridge.scrollIntoViewIfNeeded();
     await assertViewportFits(page, testCase, "calibration");
     evidence.push(await screenshot(page, testCase, "calibration"));
@@ -321,7 +330,7 @@ try {
     const confirmLabel = testCase.locale === "en" ? "Confirm hardware action" : "确认真机动作";
     assert(await page.getByRole("button", { name: confirmLabel }).isDisabled());
     assert(await page.locator(".lab-operator-confirmation input").isDisabled());
-    assert.equal(await page.locator(".lab-quorum > div > strong").count(), 4);
+    assert.equal(await page.locator(".lab-quorum > div > strong").count(), 0);
     await assertViewportFits(page, testCase, "safety");
     evidence.push(await screenshot(page, testCase, "safety"));
 
@@ -342,7 +351,7 @@ try {
         testCase.locale === "en" ? "0 validated packs" : "0 个已验证机型包",
         { exact: true },
       ).count(),
-      1,
+      0,
     );
     await assertViewportFits(page, testCase, "hardware-domain");
     await assertSingleScreen(page, testCase, "hardware-domain", ".lab-hardware-workspace");

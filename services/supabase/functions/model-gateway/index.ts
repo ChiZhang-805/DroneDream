@@ -164,20 +164,29 @@ function jsonResponse(
   });
 }
 
-function errorResponse(request: Request, error: unknown): Response {
+// 功能：
+//   把网关及数据库已知错误映射为稳定状态码，不向客户端泄漏原始诊断。
+// 输入：
+//   request：当前 HTTP 请求。
+//   error：异常或 Supabase 返回的普通错误对象。
+// 输出：
+//   response：仅含已知错误码与固定安全说明的 HTTP 响应。
+export function errorResponse(request: Request, error: unknown): Response {
   if (error instanceof GatewayError) {
     return jsonResponse(request, error.status, {
       error: { code: error.code, message: error.message },
     });
   }
-  const rawMessage = error instanceof Error ? error.message : "";
+  // PostgREST 错误通常是普通对象而非 Error；否则授权耗尽会被误报为 500。
+  const rawMessage = error instanceof Error ? error.message
+    : isRecord(error) && typeof error.message === "string" ? error.message : "";
   const knownCode = [
     "MODEL_QUOTA_EXHAUSTED",
     "MODEL_GRANT_INVALID",
     "MODEL_PLAN_UNAVAILABLE",
     "CREDIT_POLICY_MISMATCH",
     "IDEMPOTENCY_CONFLICT",
-  ].find((code) => rawMessage.includes(code));
+  ].find((code) => rawMessage === code);
   if (knownCode) {
     const status = knownCode === "MODEL_QUOTA_EXHAUSTED" ? 402 : 409;
     return jsonResponse(request, status, {
@@ -601,7 +610,17 @@ function idempotencyKey(request: Request): string {
   return raw;
 }
 
-function providerConfiguration(provider: ManagedProvider, model: string) {
+export function managedOutputBudget(purpose: ModelPurpose): number {
+  // Whole-map interpretation and mission contracts must fit in one complete JSON response.
+  return positiveIntegerEnv(
+    purpose === "job" ? "PLATFORM_LLM_JOB_MAX_OUTPUT_TOKENS" : "PLATFORM_LLM_MAX_OUTPUT_TOKENS",
+    purpose === "job" ? 16_384 : 2_048,
+    64,
+    16_384,
+  );
+}
+
+function providerConfiguration(provider: ManagedProvider, model: string, purpose: ModelPurpose) {
   const prefix = `PLATFORM_${provider.toUpperCase()}`;
   const globalProvider =
     Deno.env.get("PLATFORM_LLM_PROVIDER")?.trim().toLowerCase() ||
@@ -645,12 +664,7 @@ function providerConfiguration(provider: ManagedProvider, model: string) {
     baseUrl,
     model: selectedModel,
     provider,
-    maxOutputTokens: positiveIntegerEnv(
-      "PLATFORM_LLM_MAX_OUTPUT_TOKENS",
-      2_048,
-      64,
-      16_384,
-    ),
+    maxOutputTokens: managedOutputBudget(purpose),
     outputCreditWeight: positiveIntegerEnv(
       "PLATFORM_LLM_OUTPUT_CREDIT_WEIGHT",
       4,
@@ -754,7 +768,7 @@ async function handleChatCompletions(request: Request): Promise<Response> {
   const purpose = grantRecord.scope as ModelPurpose;
   const provider = managedProvider(grantRecord.provider);
   const selectedModel = managedModelDefinition(provider, grantRecord.model).model;
-  const config = providerConfiguration(provider, selectedModel);
+  const config = providerConfiguration(provider, selectedModel, purpose);
   const serializedPromptBytes = new TextEncoder().encode(JSON.stringify({
     messages,
     response_format: responseFormat ?? null,

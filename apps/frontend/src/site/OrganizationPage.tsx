@@ -206,10 +206,18 @@ function OrganizationAvatar({ member, large = false }: {
   member: Pick<OrganizationMember, "avatar_url" | "display_name">;
   large?: boolean;
 }) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const imageAvailable = Boolean(member.avatar_url && failedUrl !== member.avatar_url);
   return (
     <span className={`organization-avatar${large ? " is-large" : ""}`}>
-      {member.avatar_url ? (
-        <img src={member.avatar_url} alt={`${member.display_name} avatar`} loading="lazy" referrerPolicy="no-referrer" />
+      {imageAvailable ? (
+        <img
+          src={member.avatar_url ?? undefined}
+          alt=""
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={() => setFailedUrl(member.avatar_url)}
+        />
       ) : (
         <CircleUserRound aria-hidden="true" />
       )}
@@ -580,7 +588,7 @@ export function OrganizationPage({
                   <td><OrganizationAvatar member={member} /><span><strong>{member.display_name}</strong><small>{member.email}</small></span></td>
                   <td><span className={`organization-role is-${member.role}`}>{roleLabel(member.role, copy)}</span></td>
                   <td><strong>{member.plan.toUpperCase()}</strong></td>
-                  <td><EditionLicenseStrip licenses={member.licenses} locale={locale} /></td>
+                  <td><EditionLicenseStrip licenses={member.licenses} locale={locale} mode="used" /></td>
                   <td>{date.format(new Date(member.created_at))}</td>
                   <td>{member.last_sign_in_at ? date.format(new Date(member.last_sign_in_at)) : copy.noSignIn}</td>
                   <td><div className="organization-row-actions"><button type="button" className="organization-details-button" onClick={() => openDetails(member)}><Eye aria-hidden="true" /><span>{copy.details}</span></button><button type="button" className="organization-row-delete" aria-label={`${copy.deleteMember}: ${member.display_name}`} title={copy.deleteMember} disabled={busy || !canRemove(member)} onClick={() => void removeMemberFromRow(member)}><Trash2 aria-hidden="true" /></button></div></td>
@@ -621,7 +629,7 @@ export function OrganizationPage({
                 <div><dt>{copy.plan}</dt><dd>{selected.plan.toUpperCase()}</dd></div>
                 <div><dt>{copy.created}</dt><dd>{date.format(new Date(selected.created_at))}</dd></div>
                 <div><dt>{copy.lastSignIn}</dt><dd>{selected.last_sign_in_at ? date.format(new Date(selected.last_sign_in_at)) : copy.noSignIn}</dd></div>
-                <div className="organization-member-applications"><dt>{copy.apps}</dt><dd><EditionLicenseStrip licenses={selected.licenses} locale={locale} /></dd></div>
+                <div className="organization-member-applications"><dt>{copy.apps}</dt><dd><EditionLicenseStrip licenses={selected.licenses} locale={locale} mode="used" /></dd></div>
               </dl>
             </div>
             {canManageSelected ? (

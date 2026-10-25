@@ -116,16 +116,10 @@ function renderLauncher() {
   return { ...page, router };
 }
 
-function openQuickSettings() {
-  fireEvent.click(screen.getByRole("button", { name: /Settings|设置/ }));
-  return screen.getByRole("dialog", { name: /Settings|设置/ });
-}
-
 async function openSettingsWorkspace() {
-  const quickSettings = openQuickSettings();
-  fireEvent.click(within(quickSettings).getByRole("button", {
-    name: /All settings|全部设置/,
-  }));
+  fireEvent.click(screen.getByRole("button", { name: /Settings|设置/ }));
+  const quickSettings = await screen.findByRole("dialog", { name: /Settings|设置/ });
+  fireEvent.click(within(quickSettings).getByRole("button", { name: /All settings|全部设置/ }));
   return screen.findByRole("region", { name: /Settings|设置/ });
 }
 
@@ -159,7 +153,7 @@ afterEach(() => {
 });
 
 describe("desktop launcher chrome", () => {
-  it("always presents the Universal mother-brand theme before workspace entry", () => {
+  it("keeps the Universal launcher theme independent of the remembered workspace", () => {
     window.localStorage.setItem("dronedream:universal-workspace:v2", "field");
     installDesktopBridge();
     const { router } = renderLauncher();
@@ -192,7 +186,7 @@ describe("desktop launcher chrome", () => {
     expect(screen.getByRole("button", { name: "Settings" })).toBeInTheDocument();
     const launcherActions = document.querySelector(".launcher-chrome-actions");
     expect(launcherActions?.querySelector(".launcher-runtime-indicator"))
-      .toBeInTheDocument();
+      .not.toBeInTheDocument();
     expect(launcherActions?.querySelectorAll("button")).toHaveLength(1);
 
     router.dispose();
@@ -217,7 +211,7 @@ describe("desktop launcher chrome", () => {
     });
     const { router } = renderLauncher();
 
-    await screen.findByText("Checked");
+    expect(screen.queryByText("Checked")).not.toBeInTheDocument();
     const workspace = await openSettingsWorkspace();
     fireEvent.click(within(workspace).getByRole("tab", { name: "Memory" }));
     const memory = await within(workspace).findByLabelText(/Cross-session memory/);
@@ -250,7 +244,7 @@ describe("desktop launcher chrome", () => {
     router.dispose();
   });
 
-  it("keeps language in quick settings and moves detailed controls into the settings workspace", async () => {
+  it("opens quick settings from the header gear and reaches the complete workspace from All settings", async () => {
     launcherAuthState.current = {
       configured: true,
       loading: false,
@@ -278,63 +272,51 @@ describe("desktop launcher chrome", () => {
     installDesktopBridge();
     const { router } = renderLauncher();
 
-    const checked = await screen.findByText("Checked");
-    expect(checked.closest(".launcher-runtime-indicator")).toHaveClass("is-checked");
+    expect(screen.queryByText("Checked")).not.toBeInTheDocument();
+    expect(document.querySelector(".launcher-runtime-indicator")).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Language" })).not.toBeInTheDocument();
     const settings = screen.getByRole("button", { name: "Settings" });
     expect(settings).toHaveAttribute("aria-expanded", "false");
 
     fireEvent.click(settings);
     expect(settings).toHaveAttribute("aria-expanded", "true");
-    expect(document.body).toHaveStyle({ overflow: "hidden" });
-    expect(document.querySelector(".launcher-main")).toHaveProperty("inert", true);
-    const quickSettings = screen.getByRole("dialog", { name: "Settings" });
-    expect(quickSettings).toBeInTheDocument();
-    expect(within(quickSettings).queryByText("DroneDream")).not.toBeInTheDocument();
-    expect(within(quickSettings).queryByText("Interface language")).not.toBeInTheDocument();
-    expect(within(quickSettings).queryByText(
-      "Run a full Windows, WSL, backend, PX4, and Gazebo check. DroneDream reuses the result until you check again or a real run detects a problem.",
-    )).not.toBeInTheDocument();
-    expect(within(quickSettings).queryByRole("tab")).not.toBeInTheDocument();
-    expect(within(quickSettings).getByRole("button", { name: "English" })).toHaveAttribute(
+    const quickSettings = await screen.findByRole("dialog", { name: "Settings" });
+    expect(within(quickSettings).getByRole("group", { name: "Appearance" })).toBeVisible();
+    fireEvent.click(within(quickSettings).getByRole("button", { name: "All settings" }));
+    const workspace = await screen.findByRole("region", { name: "Settings" });
+    expect(screen.queryByRole("dialog", { name: "Settings" })).not.toBeInTheDocument();
+    expect(within(workspace).getByRole("button", { name: "English" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    expect(within(quickSettings).getByRole("button", { name: "English" }).querySelector("svg"))
+    expect(within(workspace).getByRole("button", { name: "English" }).querySelector("svg"))
       .toBeInTheDocument();
-    expect(within(quickSettings).getByRole("button", { name: "简体中文" }).querySelector("svg"))
+    expect(within(workspace).getByRole("button", { name: "简体中文" }).querySelector("svg"))
       .toBeInTheDocument();
-    fireEvent.click(within(quickSettings).getByRole("button", { name: "简体中文" }));
+    fireEvent.click(within(workspace).getByRole("button", { name: "简体中文" }));
     await waitFor(() => {
       expect(window.localStorage.getItem("drone-dream:locale")).toBe("zh-CN");
     });
-    const chineseQuickSettings = screen.getByRole("dialog", { name: "设置" });
-    expect(within(chineseQuickSettings).getByRole("button", { name: "English" })).toBeInTheDocument();
-    expect(within(chineseQuickSettings).getByRole("button", { name: "简体中文" })).toBeInTheDocument();
-    fireEvent.click(within(chineseQuickSettings).getByRole("button", { name: "全部设置" }));
-
-    const workspace = await screen.findByRole("region", { name: "设置" });
-    expect(within(workspace).getByRole("tablist", { name: "设置" }))
+    const chineseWorkspace = await screen.findByRole("region", { name: "设置" });
+    expect(within(chineseWorkspace).getByRole("tablist", { name: "设置" }))
       .toHaveAttribute("aria-orientation", "vertical");
-    fireEvent.click(within(workspace).getByRole("tab", { name: "模型" }));
-    expect(within(workspace).getByRole("button", { name: /默认模型/ }))
+    fireEvent.click(within(chineseWorkspace).getByRole("tab", { name: "模型" }));
+    expect(within(chineseWorkspace).getByRole("button", { name: /默认模型/ }))
       .toHaveAttribute("aria-pressed", "true");
-    expect(within(workspace).getByRole("link", { name: "管理订阅" }))
+    expect(within(chineseWorkspace).getByRole("link", { name: "管理订阅" }))
       .toHaveAttribute("href", "https://getdronedream.com/pricing/");
-    fireEvent.click(within(workspace).getByRole("tab", { name: "Runtime" }));
-    expect(within(workspace).getByRole("button", { name: "检查运行环境" }))
+    fireEvent.click(within(chineseWorkspace).getByRole("tab", { name: "Runtime" }));
+    expect(within(chineseWorkspace).getByRole("button", { name: "检查运行环境" }))
       .toBeInTheDocument();
-    expect(within(workspace).getByText("运行环境正常")).toBeInTheDocument();
-    expect(within(workspace).queryByText("界面语言")).not.toBeInTheDocument();
-    expect(within(workspace).queryByText("Simplified Chinese")).not.toBeInTheDocument();
-    expect(within(workspace).queryByText(
+    expect(within(chineseWorkspace).getByText("运行环境正常")).toBeInTheDocument();
+    expect(within(chineseWorkspace).queryByText("界面语言")).not.toBeInTheDocument();
+    expect(within(chineseWorkspace).queryByText("Simplified Chinese")).not.toBeInTheDocument();
+    expect(within(chineseWorkspace).queryByText(
       "全面检查 Windows、WSL、本地后端、PX4 与 Gazebo。检查结果会在本次软件运行期间复用，除非你手动重检或真实运行发现异常。",
     )).not.toBeInTheDocument();
-    fireEvent.click(within(workspace).getByRole("button", { name: "返回应用" }));
+    fireEvent.click(within(chineseWorkspace).getByRole("button", { name: "返回应用" }));
     expect(screen.queryByRole("region", { name: "设置" })).not.toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("button", { name: "设置" })).toHaveFocus());
-    expect(document.body).not.toHaveStyle({ overflow: "hidden" });
-    expect(document.querySelector(".launcher-main")).toHaveProperty("inert", false);
 
     router.dispose();
   });
@@ -369,21 +351,18 @@ describe("desktop launcher chrome", () => {
     router.dispose();
   });
 
-  it("keeps keyboard focus inside quick settings", async () => {
+  it("moves keyboard focus into the complete settings workspace", async () => {
     window.localStorage.setItem("drone-dream:locale", "en");
     installDesktopBridge();
     const { router } = renderLauncher();
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
-    const dialog = screen.getByRole("dialog", { name: "Settings" });
-    const close = within(dialog).getByRole("button", { name: "Close settings" });
-    await waitFor(() => expect(close).toHaveFocus());
-
-    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
-    expect(dialog).toContainElement(document.activeElement as HTMLElement);
-    expect(close).not.toHaveFocus();
-    fireEvent.keyDown(document, { key: "Tab" });
-    expect(close).toHaveFocus();
+    const quickSettings = await screen.findByRole("dialog", { name: "Settings" });
+    fireEvent.click(within(quickSettings).getByRole("button", { name: "All settings" }));
+    const workspace = await screen.findByRole("region", { name: "Settings" });
+    const selectedTab = within(workspace).getByRole("tab", { name: "General" });
+    await waitFor(() => expect(selectedTab).toHaveFocus());
+    expect(workspace).toContainElement(document.activeElement as HTMLElement);
 
     router.dispose();
   });
@@ -450,9 +429,8 @@ describe("desktop launcher chrome", () => {
     };
     const { router } = renderLauncher();
 
-    const quickSettings = openQuickSettings();
-    fireEvent.click(within(quickSettings).getByRole("button", { name: /Runtime/ }));
-    const workspace = await screen.findByRole("region", { name: "Settings" });
+    const workspace = await openSettingsWorkspace();
+    fireEvent.click(within(workspace).getByRole("tab", { name: /Runtime/ }));
     expect(await within(workspace).findByText("Ready with warnings")).toBeInTheDocument();
     expect(within(workspace).getByRole("list", { name: "View details" }))
       .toBeVisible();

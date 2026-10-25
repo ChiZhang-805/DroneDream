@@ -3746,11 +3746,29 @@ def _resolve_real_launch_command(args: argparse.Namespace) -> tuple[str, str | N
     if not autopilot_path.exists() or not autopilot_path.is_dir():
         raise ValueError(f"PX4_AUTOPILOT_DIR does not exist or is not a directory: {autopilot_dir}")
 
+    rootfs = autopilot_path / "build" / "px4_sitl_default" / "rootfs"
+    executable = autopilot_path / "build" / "px4_sitl_default" / "bin" / "px4"
+    if not rootfs.is_dir() or not executable.is_file():
+        raise ValueError(
+            "PX4_AUTOPILOT_DIR does not contain the bundled px4_sitl_default runtime"
+        )
+
     components: list[str] = []
     if setup_commands:
         components.append(setup_commands)
-    components.append(f"cd {shlex.quote(str(autopilot_path))}")
-    components.append(f"HEADLESS={values['headless']} make px4_sitl {shlex.quote(make_target)}")
+    quoted_rootfs = shlex.quote(str(rootfs))
+    components.append(f"cd {quoted_rootfs}")
+    launch_environment = [
+        f"HEADLESS={values['headless']}",
+        f"PX4_SIM_MODEL={shlex.quote(simulator_model)}",
+        f"GZ_IP={shlex.quote(os.environ.get('GZ_IP', '127.0.0.1'))}",
+    ]
+    if args.world and args.world != "default":
+        launch_environment.append(f"PX4_GZ_WORLD={shlex.quote(args.world)}")
+    components.append(
+        " ".join(launch_environment)
+        + f" {shlex.quote(str(executable))} -d -w {quoted_rootfs} {quoted_rootfs}"
+    )
     return "; ".join(components), str(autopilot_path)
 
 

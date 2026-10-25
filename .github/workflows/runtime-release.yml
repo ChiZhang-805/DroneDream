@@ -27,7 +27,6 @@ jobs:
     # runners. Register a dedicated Linux amd64 runner with this custom label.
     runs-on: [self-hosted, Linux, X64, dronedream-runtime-builder]
     timeout-minutes: 240
-    environment: runtime-release
     env:
       IMAGE: dronedream/runtime:${{ github.run_id }}-${{ github.run_attempt }}
       RELEASE_TAG: ${{ inputs.release_tag }}
@@ -40,9 +39,12 @@ jobs:
           # workflow's contents:write credential in the checkout's Git config;
           # only the explicit publish steps below receive GH_TOKEN.
           persist-credentials: false
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: "3.12"
+      - name: Verify runner Python
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python --version
+          python -m pip --version
 
       - name: Validate manual release inputs and trust anchor
         shell: bash
@@ -94,9 +96,13 @@ jobs:
             echo "could not verify that the release tag is unused: $RELEASE_TAG" >&2
             exit 2
           fi
-          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "release already exists and will never be overwritten: $RELEASE_TAG" >&2
-            exit 2
+          if is_draft=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --json isDraft --jq .isDraft 2>/dev/null); then
+            if [[ "$is_draft" != "true" ]]; then
+              echo "release tag is already reserved: $RELEASE_TAG" >&2
+              exit 2
+            fi
+            echo "resuming the existing draft release: $RELEASE_TAG"
           fi
 
       - name: Confirm signing secret is configured
@@ -150,7 +156,8 @@ jobs:
           rootfs="platform/runtime/out/DroneDreamRuntime-${version}-amd64.tar"
           output="platform/runtime/out/release/$RELEASE_TAG"
           base_url="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG"
-          build_timestamp=$(docker image inspect --format '{{.Created}}' "$IMAGE")
+          image_created=$(docker image inspect --format '{{.Created}}' "$IMAGE")
+          build_timestamp=$(date --utc --date="$image_created" '+%Y-%m-%dT%H:%M:%SZ')
           test ! -e "$output"
           python platform/runtime/tools/runtime_release.py package \
             --rootfs "$rootfs" \
@@ -201,14 +208,22 @@ jobs:
           # `package` enforces every part is strictly under GitHub's 2 GiB
           # per-asset ceiling. Assets enter an invisible draft first so a
           # network/upload failure cannot expose a partial public release.
-          gh release create "$RELEASE_TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "DroneDreamRuntime $RELEASE_TAG" \
-            --notes "Signed beta WSL2 runtime. Real PX4/Gazebo smoke evidence is attached." \
-            --draft
-          gh release upload "$RELEASE_TAG" "$output"/* \
-            --repo "$GITHUB_REPOSITORY"
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "DroneDreamRuntime $RELEASE_TAG" \
+              --notes "Signed beta WSL2 runtime. Real PX4/Gazebo smoke evidence is attached." \
+              --draft
+          fi
+          for asset in "$output"/*; do
+            for attempt in 1 2 3; do
+              gh release upload "$RELEASE_TAG" "$asset" \
+                --repo "$GITHUB_REPOSITORY" --clobber && break
+              [[ "$attempt" -lt 3 ]] || exit 1
+              sleep 15
+            done
+          done
           gh release edit "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --draft=false \

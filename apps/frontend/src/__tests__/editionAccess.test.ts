@@ -21,13 +21,12 @@ describe("desktop edition ownership", () => {
     expect(editionHasWorkspace("field", "field")).toBe(true);
   });
 
-  it("gives AGENT an external-asset workflow while retaining legacy history", () => {
+  it("keeps AGENT focused on agent missions", () => {
     expect(assistantTaskOptions("autonomy", "en").map(({ id }) => id)).toEqual([
       "mission_autonomy",
-      "asset_import_qualification",
-      "simulation_experiment",
     ]);
-    expect(assistantTaskIsAllowed("autonomy", "asset_import_qualification")).toBe(true);
+    expect(assistantTaskIsAllowed("autonomy", "control_tuning")).toBe(false);
+    expect(assistantTaskIsAllowed("autonomy", "asset_import_qualification")).toBe(false);
     expect(assistantArtifactMatchesEdition("autonomy", "external_asset_qualification_plan"))
       .toBe(true);
     expect(assistantArtifactMatchesEdition("autonomy", "universal_vehicle_model"))
@@ -39,18 +38,10 @@ describe("desktop edition ownership", () => {
     )).toBe(true);
   });
 
-  it("lets Universal orchestrate every specialist workflow without changing ownership", () => {
+  it("keeps Universal focused on parameter optimization and agent missions", () => {
     expect(assistantTaskOptions("universal", "en").map(({ id }) => id)).toEqual([
       "control_tuning",
       "mission_autonomy",
-      "asset_import_qualification",
-      "simulation_experiment",
-      "cross_edition_workflow",
-      "hardware_validation",
-      "calibration",
-      "sim_to_real",
-      "real_to_sim",
-      "field_task",
     ]);
     for (const artifactKind of [
       "lab_hardware_validation",
@@ -61,5 +52,12 @@ describe("desktop edition ownership", () => {
     ] as const) {
       expect(assistantArtifactMatchesEdition("universal", artifactKind)).toBe(true);
     }
+  });
+
+  it("keeps SIM focused on parameter optimization", () => {
+    expect(assistantTaskOptions("sim", "en").map(({ id }) => id)).toEqual([
+      "control_tuning",
+    ]);
+    expect(assistantTaskIsAllowed("sim", "mission_autonomy")).toBe(false);
   });
 });

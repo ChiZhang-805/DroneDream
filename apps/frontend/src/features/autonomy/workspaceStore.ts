@@ -147,7 +147,7 @@ export const AUTONOMY_AIRCRAFT_LIMITS = {
   batteryEnergyWh: { min: 1, max: 1_000_000 },
   reserveBatteryPercent: { min: 10, max: 90 },
   maximumPickupPayloadKg: { min: 0, max: 20 },
-  maximumSpeedMps: { min: 0.2, max: 20 },
+  maximumSpeedMps: { min: 5, max: 6 },
   maximumAccelerationMps2: { min: 0.2, max: 30 },
   maximumClimbMps: { min: 0.1, max: 15 },
   maximumDescentMps: { min: 0.1, max: 10 },
@@ -285,8 +285,19 @@ export interface AutonomyMapPack {
     | "roads"
     | "vegetation"
     | "street-furniture"
+    | "building-footprints"
+    | "orthophoto"
+    | "named-campus-buildings"
   >;
-  planningLayers: Array<"collision-geometry" | "occupancy" | "esdf" | "dynamic-overlay" | "confidence">;
+  planningLayers: Array<
+    | "collision-geometry"
+    | "occupancy"
+    | "esdf"
+    | "dynamic-overlay"
+    | "confidence"
+    | "navigation-graph"
+    | "route-corridor"
+  >;
   origin: { latitude: number | null; longitude: number | null; altitudeM: number | null };
   boundsM: AutonomyVector3;
   confidencePercent: number;
@@ -340,9 +351,11 @@ export interface AutonomyMissionDraft {
 export interface AutonomyConversationMessage {
   id: string;
   role: "user" | "assistant";
+  kind?: "text" | "error";
   content: string;
   createdAt: string;
   planContractId: string | null;
+  clarification?: AutonomyClarification;
   attachments?: Array<{
     name: string;
     contentType: string;
@@ -350,7 +363,28 @@ export interface AutonomyConversationMessage {
   }>;
 }
 
+export interface AutonomyClarificationOption {
+  optionId: "A" | "B" | "C";
+  label: string;
+  response: string;
+}
+
+export interface AutonomyClarificationQuestion {
+  questionId: string;
+  prompt: string;
+  options: AutonomyClarificationOption[];
+  allowOther: boolean;
+  otherLabel: string;
+}
+
+export interface AutonomyClarification {
+  questions: AutonomyClarificationQuestion[];
+}
+
 export interface AutonomyMissionPlanSnapshot {
+  routePositionsM?: AutonomyVector3[];
+  routeMapSha256?: string;
+  routeVehicleSha256?: string;
   schemaVersion: 1;
   source: "backend" | "local-preview" | "agent-core";
   contractId: string;
@@ -409,9 +443,13 @@ const CANONICAL_SCHOOL_SCENE_ID: AutonomyCompiledSceneId = "school-campus-v1";
 const SENSOR_SET = new Set<AutonomySensorKind>(["rgb", "depth", "stereo", "thermal", "lidar", "gps", "vio"]);
 const SEMANTIC_SET = new Set<AutonomyMapPack["semanticLayers"][number]>([
   "free-space", "stairs", "doors", "gates", "people", "pickup-zones", "launch-zones",
-  "rooms", "corridors", "roads", "vegetation", "street-furniture",
+  "rooms", "corridors", "roads", "vegetation", "street-furniture", "building-footprints",
+  "orthophoto", "named-campus-buildings",
 ]);
-const PLANNING_LAYER_SET = new Set<AutonomyMapPack["planningLayers"][number]>(["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"]);
+const PLANNING_LAYER_SET = new Set<AutonomyMapPack["planningLayers"][number]>([
+  "collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence",
+  "navigation-graph", "route-corridor",
+]);
 
 function boundedNumber(value: unknown, fallback: number, minimum: number, maximum: number): number {
   return typeof value === "number" && Number.isFinite(value)
@@ -733,6 +771,13 @@ function normalizeMissionPlan(value: unknown): AutonomyMissionPlanSnapshot | nul
       brakingDistanceM: metrics.brakingDistanceM === null ? null : boundedNumber(metrics.brakingDistanceM, 0, 0, 100_000),
     },
     immutableSafetyRules: boundedTextList(plan.immutableSafetyRules, 24, 320),
+    ...(plan.source === "agent-core" && typeof plan.routeMapSha256 === "string"
+      && /^[a-f0-9]{64}$/u.test(plan.routeMapSha256)
+      && typeof plan.routeVehicleSha256 === "string" && /^[a-f0-9]{64}$/u.test(plan.routeVehicleSha256)
+      && Array.isArray(plan.routePositionsM) && plan.routePositionsM.length <= 100_000
+      && plan.routePositionsM.every((p) => p && [p.x, p.y, p.z].every((v) => typeof v === "number" && Number.isFinite(v) && Math.abs(v) <= 1e6))
+      ? { routePositionsM: plan.routePositionsM.map((p) => ({ x: p.x, y: p.y, z: p.z })),
+        routeMapSha256: plan.routeMapSha256, routeVehicleSha256: plan.routeVehicleSha256 } : {}),
     compiledAt: boundedText(plan.compiledAt, new Date().toISOString(), 40),
   };
 }
@@ -806,21 +851,21 @@ export function defaultAutonomyWorkspace(now = new Date()): AutonomyWorkspaceSta
       agentCoreAssetId: "dronedream.school-map.v1",
       agentCoreContentSha256: null,
       agentCoreRuntimeContract: null,
-      name: "School Map",
+      name: "Kumpula Campus",
       representation: "hybrid-3d",
       coordinateFrame: "ENU",
-      resolutionM: 0.05,
-      floorCount: 3,
+      resolutionM: 0.18,
+      floorCount: 1,
       liveUpdates: "fixed",
       calibrated: true,
       compilerSceneId: "school-campus-v1",
       semanticLayers: [
-        "free-space", "stairs", "doors", "gates", "people", "pickup-zones", "launch-zones",
-        "rooms", "corridors", "roads", "vegetation", "street-furniture",
+        "free-space", "building-footprints", "orthophoto", "pickup-zones",
+        "launch-zones", "named-campus-buildings",
       ],
-      planningLayers: ["collision-geometry", "occupancy", "esdf", "dynamic-overlay", "confidence"],
-      origin: { latitude: null, longitude: null, altitudeM: null },
-      boundsM: { x: 120, y: 90, z: 12.6 },
+      planningLayers: ["collision-geometry", "navigation-graph", "route-corridor"],
+      origin: { latitude: 60.2038, longitude: 24.9629, altitudeM: 0 },
+      boundsM: { x: 500, y: 500, z: 35 },
       confidencePercent: 100,
       sourceFiles: [],
       updatedAt,
@@ -1202,11 +1247,42 @@ export function normalizeAutonomyWorkspace(value: unknown): AutonomyWorkspaceSta
         )).slice(-100).map((message) => ({
           id: boundedText(message.id, crypto.randomUUID(), 160),
           role: message.role,
+          kind: message.kind === "error" ? "error" : "text",
           content: boundedText(message.content, "Empty message", 6_000),
           createdAt: boundedText(message.createdAt, updatedAt, 40),
           planContractId: typeof message.planContractId === "string"
             ? boundedText(message.planContractId, "", 160) || null
             : null,
+          clarification: message.clarification
+            && typeof message.clarification === "object"
+            && Array.isArray(message.clarification.questions)
+            ? {
+                questions: message.clarification.questions.slice(0, 4).flatMap((question) => {
+                  if (!question || typeof question !== "object"
+                    || typeof question.questionId !== "string"
+                    || typeof question.prompt !== "string"
+                    || !Array.isArray(question.options)) return [];
+                  const options = question.options.slice(0, 3).flatMap((option, index) => {
+                    if (!option || typeof option !== "object"
+                      || option.optionId !== (["A", "B", "C"] as const)[index]
+                      || typeof option.label !== "string"
+                      || typeof option.response !== "string") return [];
+                    return [{
+                      optionId: option.optionId,
+                      label: boundedText(option.label, option.optionId, 120),
+                      response: boundedText(option.response, option.label, 240),
+                    }];
+                  });
+                  return [{
+                    questionId: boundedText(question.questionId, `question-${crypto.randomUUID()}`, 64),
+                    prompt: boundedText(question.prompt, message.content, 240),
+                    options,
+                    allowOther: question.allowOther !== false,
+                    otherLabel: boundedText(question.otherLabel, "其他", 40),
+                  }];
+                }),
+              }
+            : undefined,
           attachments: Array.isArray(message.attachments)
             ? message.attachments.filter((attachment) => Boolean(
               attachment

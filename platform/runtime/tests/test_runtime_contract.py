@@ -99,6 +99,13 @@ class RuntimeManifestContractTests(unittest.TestCase):
         self.assertIn("python -m pytest platform/runtime/tests -q", readme)
         self.assertNotIn("unittest discover -s platform/runtime/tests", readme)
 
+    def test_runtime_shell_entrypoints_resolve_the_repository_root(self) -> None:
+        expected = 'root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)'
+        for script_name in ("build-rootfs.sh", "smoke-image.sh", "export-rootfs.sh"):
+            script = (RUNTIME / script_name).read_text(encoding="utf-8")
+            with self.subTest(script=script_name):
+                self.assertIn(expected, script)
+
     def test_promotion_is_atomic_and_requires_every_real_check(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)
@@ -231,6 +238,15 @@ class RuntimeManifestContractTests(unittest.TestCase):
         ):
             self.assertIn(placeholder, template)
             self.assertIn(placeholder, dockerfile)
+        # These two values are intentionally generated on first boot, after
+        # the public service endpoints have already been injected at build time.
+        self.assertIn("APP_SECRET_KEY=__APP_SECRET_KEY__", template)
+        self.assertIn("DRONEDREAM_RUNTIME_ID=__RUNTIME_ID__", template)
+        self.assertIn(
+            "! grep -Eq '__OIDC_ISSUER__|__OIDC_JWKS_URL__|__MODEL_GATEWAY_BASE_URL__'",
+            dockerfile,
+        )
+        self.assertNotIn("! grep -q '__[A-Z0-9_]*__'", dockerfile)
         self.assertIn("VITE_SUPABASE_URL", build)
         self.assertIn("/auth/v1/.well-known/jwks.json", build)
         self.assertIn("/functions/v1/model-gateway", build)
@@ -248,6 +264,11 @@ class ThirdPartyNoticeContractTests(unittest.TestCase):
         self.assertIn("!LICENSE", dockerignore)
         self.assertIn("!platform/runtime/**", dockerignore)
         self.assertNotIn("platform/runtime/THIRD_PARTY_NOTICES.md", dockerignore)
+        self.assertIn("!shared/brand/report/**", dockerignore)
+        self.assertIn(
+            "chmod 0644 /etc/systemd/system/*.service /etc/systemd/system/*.timer",
+            dockerfile,
+        )
         self.assertIn("/usr/share/doc/valkey/COPYING", dockerfile)
         self.assertIn("/usr/share/doc/dronedream-runtime/LICENSE", dockerfile)
         self.assertIn(
@@ -285,6 +306,10 @@ class RuntimeReleaseImmutabilityContractTests(unittest.TestCase):
             workflow,
         )
         self.assertIn('if [[ "$tag_status" -ne 2 ]]', workflow)
+        self.assertIn(
+            "date --utc --date=\"$image_created\" '+%Y-%m-%dT%H:%M:%SZ'",
+            workflow,
+        )
 
     def test_rootfs_export_refuses_every_existing_release_artifact(self) -> None:
         script = (RUNTIME / "export-rootfs.sh").read_text(encoding="utf-8")
@@ -547,6 +572,21 @@ class SystemdContractTests(unittest.TestCase):
         self.assertLess(setup, unprivileged)
         self.assertLess(unprivileged, build)
         self.assertNotIn("NOPASSWD", dockerfile)
+
+    def test_runtime_image_prebuilds_the_same_px4_gazebo_target_used_by_smoke(self) -> None:
+        dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
+        smoke = (RUNTIME / "scripts" / "px4-gazebo-smoke.py").read_text(
+            encoding="utf-8"
+        )
+        runtime_check = (RUNTIME / "scripts" / "runtime-check.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("build/px4_sitl_default/bin/px4", dockerfile)
+        self.assertIn("rootfs/etc/init.d-posix/rcS", dockerfile)
+        self.assertIn("Tools/simulation/gz/models/x500/model.sdf", dockerfile)
+        self.assertIn('"PX4_SIM_MODEL": "gz_x500"', smoke)
+        self.assertIn('environment["PX4_AUTOPILOT_DIR"] = "/opt/PX4-Autopilot"', runtime_check)
+        self.assertIn('[str(executable), "-d", "-w", str(rootfs), str(rootfs)]', smoke)
 
     def test_build_checks_and_forwards_every_reported_component_version(self) -> None:
         dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")

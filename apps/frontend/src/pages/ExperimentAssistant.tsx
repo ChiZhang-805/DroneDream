@@ -11,7 +11,6 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowUp,
   Boxes,
-  BrainCircuit,
   Crosshair,
   Download,
   FileText,
@@ -277,20 +276,20 @@ type EditionAssistantCopy = Readonly<{
 
 const EDITION_ASSISTANT_COPY: Record<BrandEditionId, EditionAssistantCopy> = {
   universal: {
-    title: "What should DroneDream design with you?",
-    openDraft: "Open asset repositories",
+    title: "What should DroneDream optimize with you?",
+    openDraft: "Open optimization draft",
     examples: [
       {
-        title: "Qualify an External Asset",
-        body: "Prepare an import and qualification plan for an aircraft or world authored in a mainstream 3D tool, including source identity, coordinate frames, physics, ROS 2, Gazebo, and PX4 evidence.",
+        title: "Tune Hover Stability",
+        body: "Tune the x500 hover controller with bounded parameter ranges, repeatable wind trials, and a validated final candidate.",
       },
       {
-        title: "Plan the Full Workflow",
-        body: "Turn one flight objective into a connected SIM, LAB, and FIELD workflow with explicit qualification gates between every stage.",
+        title: "Reduce Tracking Error",
+        body: "Optimize horizontal tracking parameters and let the Harness select algorithms from each round of simulation evidence.",
       },
       {
-        title: "Compare Editions",
-        body: "Help me decide which work belongs in SIM, LAB, and FIELD, then prepare the corresponding reviewable drafts without running anything.",
+        title: "Plan an Agent Mission",
+        body: "Switch to an Agent mission for a short campus delivery with route planning, live monitoring, and safe replanning.",
       },
     ],
   },
@@ -359,7 +358,7 @@ const EDITION_ASSISTANT_TITLES: Readonly<
   Record<InterfaceLocale, Readonly<Record<BrandEditionId, string>>>
 > = {
   en: {
-    universal: "What should DroneDream design with you?",
+    universal: "What should DroneDream optimize with you?",
     sim: "What flight experiment should we build?",
     lab: "What validation experiment should we build?",
     field: "What real-device task should we prepare?",
@@ -653,7 +652,9 @@ export function ExperimentAssistant() {
   const [voiceConsentIntent, setVoiceConsentIntent] = useState<"toggle" | "hold" | null>(null);
   const [voiceConsentGranted, setVoiceConsentGranted] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
-  const [selectedTaskType, setSelectedTaskType] = useState<AssistantTaskType | null>(null);
+  const [selectedTaskType, setSelectedTaskType] = useState<AssistantTaskType | null>(() =>
+    editionTheme.id === "autonomy" ? "mission_autonomy" : "control_tuning",
+  );
   const [referenceFiles, setReferenceFiles] = useState<AssistantReferenceFile[]>(
     [],
   );
@@ -1392,22 +1393,6 @@ export function ExperimentAssistant() {
             {actionMenuOpen ? (
               <div className="assistant-add-popover assistant-task-popover" role="menu">
                 <strong className="assistant-task-popover-title">{copy.taskType}</strong>
-                <button
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={selectedTaskType === null}
-                  data-task-icon="auto_detect"
-                  className={selectedTaskType === null ? "is-selected" : ""}
-                  onClick={() => {
-                    setSelectedTaskType(null);
-                    setActionMenuOpen(false);
-                  }}
-                >
-                  <span className="assistant-task-icon" aria-hidden="true">
-                    <BrainCircuit strokeWidth={1.8} />
-                  </span>
-                  <span className="assistant-task-popover-copy"><b>{copy.autoTask}</b><small>{copy.autoTaskDescription}</small></span>
-                </button>
                 {taskOptions.map((task) => {
                   const TaskIcon = TASK_ICON_BY_TYPE[task.id];
                   return (
@@ -1426,7 +1411,7 @@ export function ExperimentAssistant() {
                       <span className="assistant-task-icon" aria-hidden="true">
                         <TaskIcon strokeWidth={1.8} />
                       </span>
-                      <span className="assistant-task-popover-copy"><b>{task.label}</b><small>{task.description}</small></span>
+                      <span className="assistant-task-popover-copy"><b>{task.label}</b></span>
                     </button>
                   );
                 })}
@@ -1440,7 +1425,7 @@ export function ExperimentAssistant() {
                   onClick={() => bindPublicAutonomyAsset("aircraft")}
                 >
                   <span className="assistant-task-icon" aria-hidden="true"><Navigation2 strokeWidth={1.8} /></span>
-                  <span className="assistant-task-popover-copy"><b>My Drone</b><small>{chinese ? "已校核 PX4/Gazebo X500 机型" : "Qualified PX4/Gazebo X500 aircraft"}</small></span>
+                  <span className="assistant-task-popover-copy"><b>My Drone</b></span>
                 </button>
                 <button
                   type="button"
@@ -1450,7 +1435,7 @@ export function ExperimentAssistant() {
                   onClick={() => bindPublicAutonomyAsset("map")}
                 >
                   <span className="assistant-task-icon" aria-hidden="true"><Layers3 strokeWidth={1.8} /></span>
-                  <span className="assistant-task-popover-copy"><b>School Map</b><small>{chinese ? "公共三层校园地图" : "Public three-floor campus map"}</small></span>
+                  <span className="assistant-task-popover-copy"><b>Kumpula Campus</b></span>
                 </button>
                 <hr />
                 <Link data-task-icon="manual" to="/jobs/new" role="menuitem" onClick={() => setActionMenuOpen(false)}>
@@ -1481,7 +1466,9 @@ export function ExperimentAssistant() {
             className={`assistant-task-chip ${selectedTask ? "is-explicit" : ""}`}
             onClick={() => setActionMenuOpen(true)}
           >
-            {selectedTask ? selectedTask.label : copy.autoTask}
+            {selectedTask
+              ? selectedTask.label
+              : taskOptions.find(({ id }) => id === "control_tuning")?.label ?? copy.autoTask}
           </button>
           <span className="assistant-composer-spacer" />
           <AssistantModelPicker

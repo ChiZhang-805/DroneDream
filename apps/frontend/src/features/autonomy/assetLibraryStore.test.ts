@@ -8,6 +8,7 @@ import {
   type AutonomyExternalAssetReference,
 } from "./assetLibraryStore";
 import { defaultAutonomyWorkspace } from "./workspaceStore";
+import retiredMapVersions from "./retiredMapVersions.json";
 
 const SHA_A = "a".repeat(64);
 const SHA_B = "b".repeat(64);
@@ -33,6 +34,25 @@ function external(
 }
 
 describe("autonomy asset library", () => {
+  it("does not resurrect deleted maps during reload or bootstrap registration", () => {
+    const workspace = defaultAutonomyWorkspace();
+    let value = "";
+    saveAutonomyAssetLibrary("local", "autonomy", {
+      schemaVersion: 2, aircraft: [], maps: [workspace.mapPack], externalAssets: [],
+      removedMapIds: [workspace.mapPack.agentCoreAssetId!, "customer.map"],
+    }, { setItem: (_key, next) => { value = next; } });
+    const loaded = loadAutonomyAssetLibrary("local", "autonomy", workspace, { getItem: () => value });
+    expect(loaded.maps).toHaveLength(0);
+    expect(withExternalAutonomyAsset(loaded, external("customer.map", "map", SHA_A)).externalAssets).toHaveLength(0);
+    expect(withExternalAutonomyAsset({ ...loaded, removedMapIds: [] }, external("customer.map", "map", SHA_A)).externalAssets).toHaveLength(1);
+  });
+
+  it("removes retired demo versions, preserving a new user map with the same name", () => {
+    const retired = retiredMapVersions[0];
+    const library: AutonomyAssetLibrary = { schemaVersion: 2, aircraft: [], maps: [], externalAssets: [] };
+    expect(withExternalAutonomyAsset(library, external(retired.assetId, "map", retired.contentSha256)).externalAssets).toHaveLength(0);
+    expect(withExternalAutonomyAsset(library, external(retired.assetId, "map", SHA_A)).externalAssets).toHaveLength(1);
+  });
   it("migrates canonical Aircraft and Maps history to one visible asset each", () => {
     const workspace = defaultAutonomyWorkspace(new Date("2026-08-27T00:00:00.000Z"));
     const stored: AutonomyAssetLibrary = {

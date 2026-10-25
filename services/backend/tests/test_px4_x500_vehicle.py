@@ -9,6 +9,7 @@ import pytest
 
 from app.autonomy.px4_x500_vehicle import (
     MY_DRONE_PAYLOAD_STATE_TOPIC,
+    PX4_X500_DEPTH_OPTICAL_CENTER_RELATIVE_TO_BASE_LINK_M,
     PX4_X500_DRY_MASS_KG,
     PX4_X500_MAXIMUM_THRUST_N,
     TAKEOUT_PAYLOAD_CENTER_ABOVE_MODEL_ROOT_M,
@@ -59,6 +60,9 @@ def test_my_drone_artifact_binds_x500_and_dynamic_payload_joint() -> None:
     assert model.findtext(".//plugin/output_topic") == MY_DRONE_PAYLOAD_STATE_TOPIC
     assert payload.findtext(".//link/inertial/mass") == "0.04"
     assert summary["control_interface"] == "mavsdk"
+    assert summary["perception"]["optical_center_relative_to_base_link_m"] == list(
+        PX4_X500_DEPTH_OPTICAL_CENTER_RELATIVE_TO_BASE_LINK_M
+    )
     assert summary["mission_payload"]["loaded_thrust_to_weight"] >= 1.6
     assert summary["mission_payload"]["maximum_attachment_error_m"] == pytest.approx(
         TAKEOUT_PAYLOAD_MAXIMUM_ATTACHMENT_ERROR_M

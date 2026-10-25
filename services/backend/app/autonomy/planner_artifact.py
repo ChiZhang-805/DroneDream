@@ -12,6 +12,7 @@ from urllib.parse import quote, urlsplit, urlunsplit
 
 from app.autonomy.models import AutonomyCompileRequest
 from app.config import Settings, get_settings
+from app.json_boundaries import json_nesting_within_limit
 
 
 class PlannerArtifactVerificationError(RuntimeError):
@@ -119,6 +120,12 @@ def _read_bounded_response(response: Any, maximum_bytes: int) -> dict[str, Any]:
         raise PlannerArtifactVerificationError(
             "AUTONOMY_PLANNER_RECEIPT_TOO_LARGE",
             "The assistant run response exceeded the verification limit.",
+            502,
+        )
+    if not json_nesting_within_limit(raw):
+        raise PlannerArtifactVerificationError(
+            "AUTONOMY_PLANNER_RECEIPT_INVALID",
+            "The assistant run did not return a valid JSON receipt.",
             502,
         )
     try:

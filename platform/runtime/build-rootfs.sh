@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 # shellcheck disable=SC1091
 source "$root/platform/runtime/pins.env"
 image=${IMAGE:-"dronedream/runtime:${DRONEDREAM_RUNTIME_VERSION}"}

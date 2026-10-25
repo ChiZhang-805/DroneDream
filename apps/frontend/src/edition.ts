@@ -32,9 +32,7 @@ export function initialWorkspaceMode(
 }
 
 export function editionLandingPath(edition = BUILD_EDITION): string {
-  if (edition === "sim") return "/sim";
-  if (edition === "lab") return "/lab";
-  if (edition === "field") return "/field";
+  // Enter the installed edition's Chatbot; specialist workspaces remain in navigation.
   if (edition === "autonomy") return "/autonomy";
   return "/assistant";
 }

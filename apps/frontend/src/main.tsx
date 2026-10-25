@@ -6,6 +6,7 @@ import { RouterProvider } from "react-router-dom";
 import { router } from "./router";
 import { I18nProvider } from "./i18n/I18nProvider";
 import "./styles.css";
+import "./desktop/launcher.css";
 
 const queryClient = new QueryClient();
 

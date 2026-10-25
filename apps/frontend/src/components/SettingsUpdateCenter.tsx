@@ -7,17 +7,19 @@ import {
 } from "lucide-react";
 
 import { useAppUpdaterState } from "../desktop/updaterContext";
+import type { RuntimeStatusReport } from "../desktop/bridge";
 import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 
 type SettingsUpdateTone = "current" | "busy" | "attention" | "error";
 
-/** Present updater progress visually and through one stable localized live-region label. */
 export function SettingsUpdateCenter({
   onOpenRuntimeBase,
   runtimeBaseActionDisabled = false,
+  runtime,
 }: {
   onOpenRuntimeBase: () => void | Promise<void>;
   runtimeBaseActionDisabled?: boolean;
+  runtime?: RuntimeStatusReport | null;
 }) {
   const { locale, t } = useI18n();
   const updater = useAppUpdaterState();
@@ -38,9 +40,9 @@ export function SettingsUpdateCenter({
         en: "The update could not be completed.",
       })
     : null;
-  const stateCopy = locale === "zh-CN"
+  const copy = locale === "zh-CN"
     ? {
-        label: "软件版本状态：",
+        stateLabel: "软件版本状态：",
         current: "已是最新版本",
         checking: "正在检查",
         oldVersion: "旧版本",
@@ -54,7 +56,7 @@ export function SettingsUpdateCenter({
         runtimeRequired: "Runtime Base 需要更新",
       }
     : {
-        label: "software version state:",
+        stateLabel: "software version state:",
         current: "up-to-date",
         checking: "checking",
         oldVersion: "old-version",
@@ -68,7 +70,7 @@ export function SettingsUpdateCenter({
         runtimeRequired: "Runtime Base update required",
       };
 
-  let stateValue = stateCopy.current;
+  let stateValue = copy.current;
   let tone: SettingsUpdateTone = "current";
   let StatusIcon: LucideIcon = CircleCheckBig;
   let actionLabel: string | null = t("settings.updates.checkNow");
@@ -77,14 +79,14 @@ export function SettingsUpdateCenter({
   let actionDisabled = false;
 
   if (updater.status === "checking") {
-    stateValue = stateCopy.checking;
+    stateValue = copy.checking;
     tone = "busy";
     StatusIcon = RefreshCcw;
     actionLabel = t("updater.checking");
     action = null;
     actionDisabled = true;
   } else if (updater.status === "available") {
-    stateValue = `${stateCopy.oldVersion}${updater.availableVersion ? ` · v${updater.availableVersion}` : ""}`;
+    stateValue = `${copy.oldVersion}${updater.availableVersion ? ` · v${updater.availableVersion}` : ""}`;
     tone = "attention";
     StatusIcon = Download;
     actionLabel = localizedError
@@ -93,63 +95,63 @@ export function SettingsUpdateCenter({
     action = () => { void updater.installAvailableUpdate(); };
     actionPrimary = updater.updateRequired;
   } else if (updater.status === "downloading") {
-    stateValue = `${stateCopy.downloading}${progress === null ? "" : ` · ${progress}%`}`;
+    stateValue = `${copy.downloading}${progress === null ? "" : ` · ${progress}%`}`;
     tone = "busy";
     StatusIcon = Download;
     actionLabel = null;
     action = null;
   } else if (updater.status === "installing") {
-    stateValue = `${stateCopy.installing}${progress === null ? "" : ` · ${progress}%`}`;
+    stateValue = `${copy.installing}${progress === null ? "" : ` · ${progress}%`}`;
     tone = "busy";
     StatusIcon = RefreshCcw;
     actionLabel = null;
     action = null;
   } else if (updater.status === "reconcilingEngine") {
-    stateValue = stateCopy.reconciling;
+    stateValue = copy.reconciling;
     tone = "busy";
     StatusIcon = RefreshCcw;
     actionLabel = null;
     action = null;
   } else if (updater.status === "engineUpdateDeferred") {
-    stateValue = stateCopy.deferred;
+    stateValue = copy.deferred;
     tone = "attention";
     StatusIcon = RefreshCcw;
     actionLabel = t("settings.updates.retry");
     action = () => { void updater.reconcileEnginePack(); };
   } else if (updater.status === "engineError") {
-    stateValue = stateCopy.engineFailed;
+    stateValue = copy.engineFailed;
     tone = "error";
     StatusIcon = CircleAlert;
     actionLabel = t("settings.updates.retry");
     action = () => { void updater.reconcileEnginePack(); };
   } else if (updater.status === "componentAvailable") {
     const versions = [...new Set(candidates.map((candidate) => `v${candidate.version}`))];
-    stateValue = `${stateCopy.oldVersion}${versions.length > 0 ? ` · ${versions.join(" / ")}` : ""}`;
+    stateValue = `${copy.oldVersion}${versions.length > 0 ? ` · ${versions.join(" / ")}` : ""}`;
     tone = "attention";
     StatusIcon = Download;
     actionLabel = t("settings.updates.installPacks");
     action = () => { void updater.installComponentUpdates(); };
     actionPrimary = candidates.some((candidate) => candidate.urgency === "required");
   } else if (updater.status === "installingComponents") {
-    stateValue = `${stateCopy.installing}${progress === null ? "" : ` · ${progress}%`}`;
+    stateValue = `${copy.installing}${progress === null ? "" : ` · ${progress}%`}`;
     tone = "busy";
     StatusIcon = RefreshCcw;
     actionLabel = null;
     action = null;
   } else if (updater.status === "componentUpdateDeferred") {
-    stateValue = stateCopy.deferred;
+    stateValue = copy.deferred;
     tone = "attention";
     StatusIcon = RefreshCcw;
     actionLabel = t("settings.updates.retry");
     action = () => { void updater.checkForUpdates(); };
   } else if (updater.status === "componentError") {
-    stateValue = stateCopy.componentFailed;
+    stateValue = copy.componentFailed;
     tone = "error";
     StatusIcon = CircleAlert;
     actionLabel = t("settings.updates.retry");
     action = () => { void updater.checkForUpdates(); };
   } else if (updater.status === "runtimeBaseRequired") {
-    stateValue = stateCopy.runtimeRequired;
+    stateValue = copy.runtimeRequired;
     tone = "error";
     StatusIcon = Download;
     actionLabel = t("settings.updates.openRuntimeBase");
@@ -157,12 +159,22 @@ export function SettingsUpdateCenter({
     actionPrimary = true;
     actionDisabled = runtimeBaseActionDisabled;
   } else if (updater.status === "error") {
-    stateValue = stateCopy.failed;
+    stateValue = copy.failed;
     tone = "error";
     StatusIcon = CircleAlert;
     actionLabel = t("settings.updates.retry");
     action = () => { void updater.checkForUpdates(); };
   }
+
+  const unknown = locale === "zh-CN" ? "未检查" : "Not checked";
+  const versionRows = [
+    { label: "Runtime Base", version: runtime?.version, state: runtime ? (runtime.installed ? (locale === "zh-CN" ? "已安装" : "Installed") : (locale === "zh-CN" ? "未安装" : "Not installed")) : unknown },
+    { label: "Engine Pack", version: updater.enginePack?.installedPackId, state: updater.enginePack ? (updater.enginePack.updateRequired ? copy.oldVersion : copy.current) : unknown },
+    ...(["capability-pack", "asset-pack"] as const).map((id) => {
+      const candidate = updater.componentUpdates?.candidates.find((item) => item.componentId === id);
+      return { label: id === "capability-pack" ? "Capability Pack" : "Asset Pack", version: candidate?.installedVersion, state: candidate ? (candidate.available ? `${copy.oldVersion} → ${candidate.version}` : copy.current) : unknown };
+    }),
+  ];
 
   return (
     <section className="settings-update-center settings-runtime-module" aria-labelledby="settings-updates-title">
@@ -182,7 +194,7 @@ export function SettingsUpdateCenter({
       <div
         className={`settings-update-state settings-update-state-${tone}`}
         role="status"
-        aria-label={`${stateCopy.label} ${stateValue}`}
+        aria-label={`${copy.stateLabel} ${stateValue}`}
         aria-live="polite"
         aria-busy={tone === "busy"}
         title={localizedError ?? undefined}
@@ -191,7 +203,7 @@ export function SettingsUpdateCenter({
           <StatusIcon />
         </span>
         <p className="settings-update-copy">
-          <span>{stateCopy.label}</span>
+          <span>{copy.stateLabel}</span>
           <strong>{stateValue}</strong>
         </p>
         {progress !== null && [
@@ -207,6 +219,9 @@ export function SettingsUpdateCenter({
           />
         ) : null}
       </div>
+      <dl className="settings-update-versions">{versionRows.map((row) => <div key={row.label}>
+        <dt>{row.label}</dt><dd title={row.version ?? undefined}>{row.version ?? "—"}</dd><dd>{row.state}</dd>
+      </div>)}</dl>
       {localizedError ? <p className="settings-update-error" role="alert">{localizedError}</p> : null}
     </section>
   );

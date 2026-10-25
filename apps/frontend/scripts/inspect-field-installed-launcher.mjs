@@ -52,50 +52,18 @@ try {
     : "登录并进入调优平台";
   await page.getByRole("button", { name: initialEntryName }).waitFor();
 
-  const scene = page.locator('.drone-launch-scene[data-theme-edition="field"]');
-  const canvas = scene.locator("canvas");
-  if (await scene.count() !== 1 || await canvas.count() !== 1) {
-    throw new Error("The installed Field launcher did not render one shared 3D scene.");
+  const illustration = page.locator(".launcher-flight-illustration");
+  if (await illustration.count() !== 1 ||
+      await illustration.locator("svg.launcher-flight-map").count() !== 1) {
+    throw new Error("The installed Field launcher did not render its lightweight flight illustration.");
   }
-  const canvasBounds = await canvas.boundingBox();
-  if (!canvasBounds || canvasBounds.width <= 0 || canvasBounds.height <= 0) {
-    throw new Error("The installed Field 3D canvas has no visible area.");
+  if (await launcher.locator("canvas").count() !== 0) {
+    throw new Error("The installed Field launcher still creates a WebGL canvas.");
   }
-  const pixels = await canvas.screenshot();
-  const pixelStats = await page.evaluate(async (base64) => {
-    const image = new Image();
-    image.src = `data:image/png;base64,${base64}`;
-    await image.decode();
-    const sample = document.createElement("canvas");
-    sample.width = 64;
-    sample.height = 64;
-    const context = sample.getContext("2d", { willReadFrequently: true });
-    if (!context) throw new Error("Canvas pixel sampler is unavailable.");
-    context.drawImage(image, 0, 0, 64, 64);
-    const values = context.getImageData(0, 0, 64, 64).data;
-    let visiblePixels = 0;
-    const buckets = new Set();
-    for (let index = 0; index < values.length; index += 4) {
-      const [red, green, blue, alpha] = values.slice(index, index + 4);
-      if (alpha > 0 && red + green + blue > 24) visiblePixels += 1;
-      buckets.add(`${red >> 4}:${green >> 4}:${blue >> 4}:${alpha >> 4}`);
-    }
-    return { visiblePixels, colorBuckets: buckets.size };
-  }, pixels.toString("base64"));
-  if (pixelStats.visiblePixels <= 512 || pixelStats.colorBuckets <= 24) {
-    throw new Error("The installed Field 3D canvas is blank or lacks visual detail.");
+  const illustrationBounds = await illustration.boundingBox();
+  if (!illustrationBounds || illustrationBounds.width <= 0 || illustrationBounds.height <= 0) {
+    throw new Error("The installed Field launch illustration has no visible area.");
   }
-
-  if (await scene.getAttribute("data-flight-state") !== "hover") {
-    throw new Error("The installed Field drone did not reach hover state.");
-  }
-  await page.mouse.click(
-    canvasBounds.x + canvasBounds.width * 0.5,
-    canvasBounds.y + canvasBounds.height * 0.42,
-  );
-  await page.waitForFunction(() =>
-    document.querySelector(".drone-launch-scene")?.getAttribute("data-flight-state") === "starflight"
-  );
 
   const theme = await page.locator("html").evaluate((element, tokens) => {
     const style = getComputedStyle(element);
@@ -153,8 +121,8 @@ try {
     finalLocale,
     progress: 100,
     theme,
-    pixelStats,
-    droneInteraction: "hover-to-starflight",
+    illustrationBounds,
+    launcherRenderer: "lightweight-svg",
     externalRequestCount: 0,
     authenticationRequestCount: 0,
     authStorageKeyCount: 0,

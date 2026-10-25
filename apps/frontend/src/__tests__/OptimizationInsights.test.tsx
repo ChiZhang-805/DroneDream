@@ -66,6 +66,10 @@ const history: OptimizationHistory = {
       label: "Robust",
       parameters: { MPC_XY_P: 0.9 },
       proposal_reason: "higher holdout pass rate",
+      optimizer_metadata: {
+        harness_orchestration: { tool_id: "optimizer_portfolio" },
+        model_rationale: "Reduce lateral gain after the previous wind evidence.",
+      },
       parent_candidate_id: "candidate-balanced",
       aggregated_score: 1.5,
       aggregated_metrics: { rmse: 0.8 },
@@ -93,6 +97,11 @@ describe("OptimizationInsights", () => {
     expect(screen.getAllByText(/balanced/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/robust/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Pareto")).toHaveLength(2);
+    const decision = screen.getByRole("region", { name: "Latest optimization decision" });
+    expect(decision).toHaveTextContent("optimizer_portfolio");
+    expect(decision).toHaveTextContent("MPC_XY_P=0.9");
+    expect(decision).toHaveTextContent("Reduce lateral gain after the previous wind evidence.");
+    expect(decision).toHaveTextContent("4/4");
   });
 
   it("shows an explicit empty state before completed evidence exists", () => {

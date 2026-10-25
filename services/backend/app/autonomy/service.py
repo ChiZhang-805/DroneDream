@@ -33,17 +33,12 @@ from app.autonomy.models import (
     TaskRisk,
     ValidationIssue,
 )
-from app.autonomy.school_map_artifact import (
-    OFFICE_DOOR_CENTER_X,
-    TEACHING_OPEN_DOOR_PAIR_CENTER_X,
-    school_map_stair_route_points,
-)
 
 GRAVITY = 9.80665
 MIN_THRUST_TO_WEIGHT = 1.35
 MASS_COMPARISON_TOLERANCE_KG = 1e-9
 VALIDATED_SIGNED_PACK_COUNT = 0
-SchoolMissionProfile = Literal["coffee", "gates", "narrow"]
+SchoolMissionProfile = Literal["delivery", "inspection"]
 
 
 class AutonomyCompileError(ValueError):
@@ -203,11 +198,6 @@ def _select_scene(request: AutonomyCompileRequest) -> str:
                 404,
             )
         return request.scene_id
-    text = request.natural_language.casefold()
-    if any(token in text for token in ("gate", "圆门", "穿门", "树林", "forest")):
-        return "forest-gate-inspection"
-    if any(token in text for token in ("dock", "走廊", "corridor", "停靠", "狭窄")):
-        return "service-corridor-dock"
     return "school-campus-v1"
 
 
@@ -232,36 +222,13 @@ def school_mission_profile(
     request: AutonomyCompileRequest,
     scene_id: str,
 ) -> SchoolMissionProfile:
-    """Select a deterministic route contract inside the shared School Map.
+    """Select a deterministic route contract inside Kumpula Campus.
 
-    Public mission presets now share one physical scene. Intent classification
-    therefore selects a route and task graph, not a different display-only map.
-    Explicit legacy scene identifiers remain stable for existing API clients.
+    Public mission presets share the one qualified physical scene. Intent
+    classification selects a task profile, never a display-only map.
     """
 
-    if scene_id == "forest-gate-inspection":
-        return "gates"
-    if scene_id == "service-corridor-dock":
-        return "narrow"
-    if scene_id == "stairwell-coffee-return":
-        return "coffee"
-
     text = request.natural_language.casefold()
-    if any(token in text for token in ("gate", "ring", "圆门", "圆环", "穿门")):
-        return "gates"
-    if any(
-        token in text
-        for token in (
-            "narrow",
-            "corridor",
-            "stair",
-            "狭窄",
-            "走廊",
-            "楼梯",
-            "通道",
-        )
-    ):
-        return "narrow"
     if any(
         token in text
         for token in (
@@ -269,16 +236,19 @@ def school_mission_profile(
             "pickup",
             "pick up",
             "takeout",
-            "return",
+            "deliver",
+            "handoff",
             "咖啡",
             "取餐",
             "外卖",
             "取回",
-            "返航",
+            "取件",
+            "送到",
+            "交接",
         )
     ):
-        return "coffee"
-    return "coffee"
+        return "delivery"
+    return "inspection"
 
 
 def _steps(
@@ -287,212 +257,104 @@ def _steps(
     pickup_payload_kg: float,
     locale: Literal["en", "zh-CN"],
 ) -> list[MissionStep]:
-    if scene_id == "forest-gate-inspection":
+    """Describe Kumpula missions without reintroducing retired synthetic scenes."""
+    if scene_id == "school-campus-v1":
+        if profile == "delivery":
+            return [
+                MissionStep(
+                    order=1,
+                    action="takeoff",
+                    label=_localized(
+                        locale,
+                        "Launch from the Kumpula south outdoor pad",
+                        "从 Kumpula 校园南侧室外起降点起飞",
+                    ),
+                ),
+                MissionStep(
+                    order=2,
+                    action="transit",
+                    label=_localized(
+                        locale,
+                        "Fly above the registered campus buildings to Chemicum",
+                        "飞越已登记的校园建筑前往 Chemicum",
+                    ),
+                ),
+                MissionStep(
+                    order=3,
+                    action="pickup",
+                    label=_localized(
+                        locale,
+                        "Collect the item at the Chemicum south handoff point",
+                        "在 Chemicum 南侧交接点取件",
+                    ),
+                    payload_delta_kg=pickup_payload_kg,
+                ),
+                MissionStep(
+                    order=4,
+                    action="return",
+                    label=_localized(
+                        locale,
+                        "Return through the verified outdoor corridor",
+                        "沿已验证的室外走廊返航",
+                    ),
+                ),
+                MissionStep(
+                    order=5,
+                    action="land",
+                    label=_localized(
+                        locale,
+                        "Land on the original campus south pad",
+                        "在校园南侧原起降点降落",
+                    ),
+                ),
+            ]
         return [
             MissionStep(
                 order=1,
                 action="takeoff",
-                label=_localized(locale, "Launch into the vegetation corridor", "起飞进入植被走廊"),
-            ),
-            MissionStep(
-                order=2,
-                action="pass_gate",
                 label=_localized(
                     locale,
-                    "Pass three gates through their geometric centers",
-                    "依次从三座训练门的几何中心穿过",
+                    "Launch from the Kumpula south pad",
+                    "从 Kumpula 校园南侧起降点起飞",
                 ),
-            ),
-            MissionStep(
-                order=3,
-                action="land",
-                label=_localized(
-                    locale, "Complete the inspection hover and land", "完成巡检悬停并降落"
-                ),
-            ),
-        ]
-    if scene_id == "service-corridor-dock":
-        return [
-            MissionStep(
-                order=1,
-                action="takeoff",
-                label=_localized(locale, "Launch in the service corridor", "在服务走廊内起飞"),
             ),
             MissionStep(
                 order=2,
                 action="transit",
                 label=_localized(
                     locale,
-                    "Follow the narrow collision-free corridor around blind corners",
-                    "沿无碰撞的狭窄走廊通过盲角",
+                    "Inspect the outdoor corridor to Chemicum",
+                    "巡检通往 Chemicum 的室外航线",
                 ),
             ),
             MissionStep(
                 order=3,
-                action="land",
-                label=_localized(locale, "Dock on the marked target", "在标记目标上精准降落"),
-            ),
-        ]
-    if profile == "coffee":
-        return [
-            MissionStep(
-                order=1,
-                action="takeoff",
-                label=_localized(locale, "Launch from the third-floor office", "从三楼办公室起飞"),
-            ),
-            MissionStep(
-                order=2,
-                action="traverse_stairs",
+                action="return",
                 label=_localized(
-                    locale,
-                    "Descend the narrow stairwell through two landings",
-                    "穿过两个楼梯平台，下行狭窄楼梯间",
-                ),
-            ),
-            MissionStep(
-                order=3,
-                action="transit",
-                label=_localized(
-                    locale,
-                    "Exit to the courtyard and avoid trees, signs, poles and buildings",
-                    "飞出教学楼进入庭院，避开树木、标牌、立柱和建筑物",
+                    locale, "Return through the verified corridor", "沿已验证航线返回"
                 ),
             ),
             MissionStep(
                 order=4,
-                action="pickup",
-                label=_localized(
-                    locale, "Acquire the coffee at the docking target", "在取货目标点拿取咖啡"
-                ),
-                payload_delta_kg=pickup_payload_kg,
-            ),
-            MissionStep(
-                order=5,
-                action="return",
+                action="land",
                 label=_localized(
                     locale,
-                    "Replan with the loaded vehicle envelope and return upstairs",
-                    "根据载荷后的飞行包络重新规划并返回楼上",
+                    "Land on the Kumpula south pad",
+                    "在 Kumpula 校园南侧起降点降落",
                 ),
-            ),
-            MissionStep(
-                order=6,
-                action="land",
-                label=_localized(locale, "Land at the original launch point", "在原起飞点降落"),
             ),
         ]
-    if profile == "gates":
-        return [
-            MissionStep(
-                order=1,
-                action="takeoff",
-                label=_localized(
-                    locale, "Launch onto the campus gate course", "起飞进入校园训练门路线"
-                ),
-            ),
-            MissionStep(
-                order=2,
-                action="pass_gate",
-                label=_localized(
-                    locale,
-                    "Pass the three training gates through their geometric centers",
-                    "依次从三座训练门的几何中心穿过",
-                ),
-            ),
-            MissionStep(
-                order=3,
-                action="land",
-                label=_localized(locale, "Land at the east course goal", "在训练路线东侧终点降落"),
-            ),
-        ]
-    return [
-        MissionStep(
-            order=1,
-            action="takeoff",
-            label=_localized(locale, "Launch from the third-floor office", "从三楼办公室起飞"),
-        ),
-        MissionStep(
-            order=2,
-            action="traverse_stairs",
-            label=_localized(
-                locale,
-                "Traverse the teaching wing and descend both switchback stair flights",
-                "穿过教学楼并下行两段折返楼梯",
-            ),
-        ),
-        MissionStep(
-            order=3,
-            action="land",
-            label=_localized(locale, "Land outside the teaching entrance", "在教学楼入口外降落"),
-        ),
-    ]
+    raise AutonomyCompileError(
+        "UNKNOWN_AUTONOMY_SCENE",
+        f"No mission-step compiler is registered for scene {scene_id!r}.",
+        status_code=404,
+    )
 
 
 def _school_reference_path(profile: SchoolMissionProfile) -> list[RoutePoint] | None:
-    """Return School Map paths in the backend ENU vector convention.
-
-    Three.js renders `(east, altitude, north)` while the API stores
-    `(east, north, altitude)`, so every reviewed visual waypoint is explicitly
-    transposed here instead of being inferred at runtime.
-    """
-
-    if profile == "coffee":
-        return None
-    if profile == "gates":
-        return [
-            RoutePoint(x=-24.8, y=-1.055, z=1.4, phase="launch", speed_limit_mps=0.7),
-            RoutePoint(x=-25.0, y=-9.0, z=1.7, phase="transit", speed_limit_mps=0.9),
-            RoutePoint(x=-25.0, y=-18.0, z=1.9, phase="transit", speed_limit_mps=1.0),
-            RoutePoint(x=-13.0, y=-18.0, z=2.2, phase="transit", speed_limit_mps=1.1),
-            RoutePoint(x=-5.0, y=-18.0, z=2.4, phase="gate", speed_limit_mps=0.8),
-            RoutePoint(x=5.0, y=-18.0, z=2.2, phase="transit", speed_limit_mps=1.0),
-            RoutePoint(x=15.0, y=-18.0, z=2.5, phase="gate", speed_limit_mps=0.8),
-            RoutePoint(x=25.0, y=-18.0, z=2.2, phase="transit", speed_limit_mps=1.0),
-            RoutePoint(x=35.0, y=-18.0, z=1.9, phase="gate", speed_limit_mps=0.8),
-            RoutePoint(x=48.0, y=-18.0, z=1.3, phase="land", speed_limit_mps=0.4),
-        ]
-    return [
-        RoutePoint(x=-42.25, y=15.3, z=8.15, phase="launch", speed_limit_mps=0.55),
-        RoutePoint(x=-42.25, y=11.5, z=8.15, phase="transit", speed_limit_mps=0.55),
-        RoutePoint(
-            x=OFFICE_DOOR_CENTER_X,
-            y=11.0,
-            z=8.15,
-            phase="transit",
-            speed_limit_mps=0.55,
-        ),
-        RoutePoint(
-            x=OFFICE_DOOR_CENTER_X,
-            y=9.75,
-            z=8.15,
-            phase="transit",
-            speed_limit_mps=0.55,
-        ),
-        RoutePoint(x=-35.0, y=8.02, z=8.12, phase="transit", speed_limit_mps=0.8),
-        RoutePoint(x=-23.0, y=8.02, z=8.1, phase="transit", speed_limit_mps=0.8),
-        RoutePoint(x=-12.0, y=8.02, z=8.08, phase="transit", speed_limit_mps=0.75),
-        RoutePoint(x=-4.0, y=8.02, z=8.05, phase="transit", speed_limit_mps=0.65),
-        *[
-            RoutePoint(x=x, y=y, z=z, phase="stairs", speed_limit_mps=0.42)
-            for x, y, z in school_map_stair_route_points("descending")
-        ],
-        RoutePoint(x=-3.0, y=8.02, z=1.05, phase="transit", speed_limit_mps=0.55),
-        RoutePoint(x=-8.0, y=5.0, z=1.2, phase="transit", speed_limit_mps=0.65),
-        RoutePoint(
-            x=TEACHING_OPEN_DOOR_PAIR_CENTER_X,
-            y=2.7,
-            z=1.3,
-            phase="transit",
-            speed_limit_mps=0.5,
-        ),
-        RoutePoint(
-            x=TEACHING_OPEN_DOOR_PAIR_CENTER_X,
-            y=-1.055,
-            z=1.4,
-            phase="land",
-            speed_limit_mps=0.35,
-        ),
-    ]
+    """Use the sole flight-verified Kumpula route for every public preset."""
+    del profile
+    return None
 
 
 def _task_graph(
@@ -1092,7 +954,7 @@ def compile_autonomy_mission(request: AutonomyCompileRequest) -> AutonomyCompile
                 ),
             )
         )
-    if scene_id in {"school-campus-v1", "stairwell-coffee-return"} and perception == "vision":
+    if scene_id == "school-campus-v1" and perception == "vision":
         issues.append(
             ValidationIssue(
                 code="perception.no-global-return-map",

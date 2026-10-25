@@ -1588,7 +1588,7 @@ html[lang="zh-CN"] .site-hero h1 {
 .organization-member-actions .organization-save-button { display: grid; width: 42px; min-height: 42px; padding: 0; place-items: center; }
 .organization-save-button svg { width: 19px; height: 19px; }
 .organization-member-danger-row { display: flex; align-items: flex-end; justify-content: flex-end; gap: 12px; margin-top: 4px; }
-.organization-member-actions .is-danger { display: inline-flex; width: min(230px, 38%); min-width: 215px; align-items: center; justify-content: center; gap: 7px; background: #bb3157; }
+.organization-member-actions .is-danger { display: inline-flex; width: auto; min-width: 260px; align-items: center; justify-content: center; gap: 7px; white-space: nowrap; background: #bb3157; }
 .organization-member-actions .is-danger svg { width: 16px; }
 .organization-member-actions small { color: #a5224d; }
 

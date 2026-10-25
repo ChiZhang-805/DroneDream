@@ -24,6 +24,100 @@ interface CandidateAggregate {
   frontier: boolean;
 }
 
+interface OptimizationDecision {
+  candidate: OptimizationHistory["items"][number];
+  source: string;
+  rationale: string | null;
+  changedParameters: Array<{ name: string; value: unknown }>;
+}
+
+function stringMetadata(
+  metadata: Record<string, unknown> | null | undefined,
+  key: string,
+): string | null {
+  const value = metadata?.[key];
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function latestOptimizationDecision(
+  history: OptimizationHistory,
+): OptimizationDecision | null {
+  const candidate = [...history.items]
+    .filter((item) => !item.is_baseline)
+    .sort((left, right) => (
+      right.generation_index - left.generation_index
+      || right.created_at.localeCompare(left.created_at)
+    ))[0];
+  if (!candidate) return null;
+  const metadata = candidate.optimizer_metadata;
+  const orchestration = metadata?.harness_orchestration;
+  const orchestrationMetadata = orchestration && typeof orchestration === "object"
+    ? orchestration as Record<string, unknown>
+    : null;
+  const parent = history.items.find((item) => item.id === candidate.parent_candidate_id)
+    ?? history.items.find((item) => item.is_baseline)
+    ?? null;
+  const changedParameters = Object.entries(candidate.parameters)
+    .filter(([name, value]) => !parent || parent.parameters[name] !== value)
+    .slice(0, 8)
+    .map(([name, value]) => ({ name, value }));
+  return {
+    candidate,
+    source: stringMetadata(orchestrationMetadata, "tool_id")
+      ?? (stringMetadata(orchestrationMetadata, "revision_source") === "model"
+        ? "Model"
+        : candidate.source_type),
+    rationale: stringMetadata(metadata, "model_rationale")
+      ?? candidate.proposal_reason,
+    changedParameters,
+  };
+}
+
+function OptimizationDecisionSummary({ history }: { history: OptimizationHistory }) {
+  const { locale } = useI18n();
+  const decision = useMemo(() => latestOptimizationDecision(history), [history]);
+  if (!decision) return null;
+  const zh = locale === "zh-CN";
+  const evidence = `${decision.candidate.completed_trial_count}/${decision.candidate.trial_count}`;
+  return (
+    <section className="optimization-decision-summary" aria-label={zh ? "最新调优决策" : "Latest optimization decision"}>
+      <header>
+        <div>
+          <span>{zh ? "最新调优决策" : "LATEST OPTIMIZATION DECISION"}</span>
+          <strong>{decision.candidate.label ?? decision.candidate.id}</strong>
+        </div>
+        <em>{zh ? `第 ${decision.candidate.generation_index} 代` : `Generation ${decision.candidate.generation_index}`}</em>
+      </header>
+      <div className="optimization-decision-grid">
+        <div>
+          <span>{zh ? "调用工具" : "Tool"}</span>
+          <strong>{decision.source}</strong>
+        </div>
+        <div>
+          <span>{zh ? "参数调整" : "Parameter changes"}</span>
+          <strong>{decision.changedParameters.length || (zh ? "无" : "None")}</strong>
+        </div>
+        <div>
+          <span>{zh ? "仿真证据" : "Simulation evidence"}</span>
+          <strong>{evidence}</strong>
+        </div>
+        <div>
+          <span>{zh ? "当前得分" : "Current score"}</span>
+          <strong>{decision.candidate.aggregated_score === null ? "—" : formatNumber(decision.candidate.aggregated_score)}</strong>
+        </div>
+      </div>
+      {decision.changedParameters.length ? (
+        <div className="optimization-decision-parameters">
+          {decision.changedParameters.map((parameter) => (
+            <code key={parameter.name}>{parameter.name}={String(parameter.value)}</code>
+          ))}
+        </div>
+      ) : null}
+      {decision.rationale ? <p>{decision.rationale}</p> : null}
+    </section>
+  );
+}
+
 function aggregateCandidates(trials: TrialSummary[]): CandidateAggregate[] {
   const grouped = new Map<string, TrialSummary[]>();
   for (const trial of trials) {
@@ -333,6 +427,7 @@ export function OptimizationInsights({ trials, history }: OptimizationInsightsPr
 
   return (
     <div className="optimization-insights">
+      {history ? <OptimizationDecisionSummary history={history} /> : null}
       <div className="insight-grid">
         <div>
           <h3>{t("insights.generationTrend")}</h3>

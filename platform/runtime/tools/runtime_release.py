@@ -594,11 +594,16 @@ def _load_private_key_from_environment(variable: str) -> Any:
     encoded = os.environ.get(variable)
     if not encoded:
         raise ReleaseError(f"private signing key environment variable is empty: {variable}")
+    # PowerShell's legacy text writers can prefix an otherwise valid secret
+    # with a Unicode BOM. GitHub preserves that character verbatim. Treat the
+    # BOM as transport metadata, then retain the canonical-base64 check below.
+    normalized = encoded.strip().removeprefix("\ufeff").strip()
     try:
-        raw = base64.b64decode(encoded.strip(), validate=True)
-    except binascii.Error as exc:
+        ascii_secret = normalized.encode("ascii")
+        raw = base64.b64decode(ascii_secret, validate=True)
+    except (binascii.Error, UnicodeEncodeError, ValueError) as exc:
         raise ReleaseError("private signing key must be canonical base64") from exc
-    if len(raw) != 32 or base64.b64encode(raw).decode("ascii") != encoded.strip():
+    if len(raw) != 32 or base64.b64encode(raw).decode("ascii") != normalized:
         raise ReleaseError("private signing key must encode exactly 32 bytes")
     return Ed25519PrivateKey.from_private_bytes(raw)
 

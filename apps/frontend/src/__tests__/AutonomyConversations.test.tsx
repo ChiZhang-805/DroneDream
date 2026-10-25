@@ -5,9 +5,11 @@ import { AutonomyConversationSidebar } from "../components/AutonomyConversationS
 import { acquireAutonomyPlanning } from "../features/autonomy/conversationActivity";
 import { autonomyConversationPath, deleteAutonomyConversation, listAutonomyConversations, loadAutonomyConversation, newAutonomyConversation, preserveLegacyAutonomyConversation, saveAutonomyConversation, setAutonomyConversationPinned } from "../features/autonomy/conversationStore";
 import { defaultAutonomyWorkspace, saveAutonomyWorkspace } from "../features/autonomy/workspaceStore";
-import { AutonomyOverview, AutonomyPlatform } from "../pages/AutonomyPlatform";
+import { registerExperimentWorkspace, updateExperimentWorkspace } from "../features/experiment/workspaceRegistry";
+import { I18nProvider } from "../i18n/I18nProvider";
+import { AutonomyLive, AutonomyMaps, AutonomyOverview, AutonomyPlatform } from "../pages/AutonomyPlatform";
 
-const mocks = vi.hoisted(() => ({ plan: vi.fn(), reconcile: vi.fn(), owner: null as null | { id: string } }));
+const mocks = vi.hoisted(() => ({ plan: vi.fn(), reconcile: vi.fn(), bindCatalog: vi.fn(), boundThread: vi.fn(), runtime: vi.fn(), setup: vi.fn(), execute: vi.fn(), sources: vi.fn(), frame: vi.fn(), telemetry: vi.fn(), owner: null as null | { id: string } }));
 vi.mock("../features/auth/AuthContext", () => ({ useOptionalAuth: () => ({ account: mocks.owner }) }));
 vi.mock("../theme/EditionThemeProvider", () => ({ useEditionTheme: () => ({ id: "autonomy" }) }));
 vi.mock("../features/settings/ModelAccessContext", () => ({ useModelAccess: () => ({
@@ -27,9 +29,31 @@ vi.mock("../features/autonomy/agentCore", async (original) => ({
   ...await original<typeof import("../features/autonomy/agentCore")>(),
   getAgentCoreStatus: async () => ({ available: true }),
   getAgentCoreBootstrap: async () => ({ plugins: [] }),
+  getAgentCoreRuntimeStatus: mocks.runtime,
+  startAgentCoreRuntimeSetup: mocks.setup,
+  getAgentCoreLiveSources: mocks.sources,
+  getAgentCoreLiveFrame: mocks.frame,
+  getAgentCoreLiveTelemetry: mocks.telemetry,
+  listAgentCoreMapResources: async () => ({ resources: [] }),
+  getPreferredAirspace: async (request: { map_asset_id: string; map_content_sha256: string; vehicle_asset_id: string; vehicle_content_sha256: string }) => ({
+    schema_version: "dronedream.preferred-airspace.v1",
+    coordinate_frame: "ENU",
+    authority: "preference-only",
+    airspace_sha256: "c".repeat(64),
+    snapshot_sha256: "d".repeat(64),
+    binding: { sources: request, radius_m: 0.2, height_m: 0.4 },
+    volumes: [[0, 0, 1, 1, 1, 1, 0, 3]],
+    obstacles: [[-1, -1, 0, 1, 1, 0.2]],
+  }),
+}));
+vi.mock("../features/autonomy/agentCorePlanning", async (original) => ({
+  ...await original<typeof import("../features/autonomy/agentCorePlanning")>(),
+  getBoundAgentCoreThread: mocks.boundThread,
+  executeBoundAgentCoreMission: mocks.execute,
 }));
 vi.mock("../features/autonomy/assetPairBinding", async (original) => ({
   ...await original<typeof import("../features/autonomy/assetPairBinding")>(),
+  bindCatalogAssetPair: mocks.bindCatalog,
   reconcileAgentCoreWorkspace: mocks.reconcile,
 }));
 vi.mock("../features/autonomy/autonomyPlanning", async (original) => ({
@@ -50,6 +74,20 @@ function conversation(id: string, content = "拿下快递") {
 }
 
 // 功能：
+//   构造可持久化的展示计划，以真实页面检查执行入口，不授予真实飞行权限。
+// 输入：
+//   id：会话标识。
+// 输出：
+//   workspace：含最小有效图和关联回复的测试会话。
+function preparedConversation(id: string) {
+  const workspace = conversation(id, "帮我取餐");
+  workspace.mission.planningRunId = `revision-${id}`;
+  workspace.mission.compiledPlan = { source: "agent-core", contractId: "contract-test", readiness: "simulation_ready", canExecute: true, feasible: true, routePositionsM: [{ x: -41, y: -83, z: 1.5 }, { x: 0, y: -5, z: 35 }, { x: 43, y: 55, z: 2 }, { x: 0, y: -5, z: 35 }, { x: -41, y: -83, z: 1.5 }], routeMapSha256: "a".repeat(64), routeVehicleSha256: "b".repeat(64), steps: [], issues: [], metrics: { routeLengthM: 10 }, taskGraph: { nodes: [{ task_id: "takeoff", label: "起飞", status: "pending", executor: "px4_bridge", risk: "high", fallback: "land", inserted_by: "compiler", depends_on: [] }] } } as unknown as NonNullable<typeof workspace.mission.compiledPlan>;
+  workspace.mission.messages.push({ id: "plan-message", role: "assistant", content: "计划已生成", createdAt: new Date().toISOString(), planContractId: "contract-test" });
+  return workspace;
+}
+
+// 功能：
 //   装配实际自主任务页面与侧边栏，使用替身规划器验证导航及异步边界。
 // 输入：
 //   initial：初始页面地址。
@@ -61,9 +99,12 @@ function renderWorkspace(initial = "/autonomy") {
     children: [{ path: "/autonomy", element: <AutonomyPlatform />, children: [
       { index: true, element: <AutonomyOverview /> },
       { path: "conversations/:conversationId", element: <AutonomyOverview /> },
+      { path: "conversations/:conversationId/live", element: <AutonomyLive /> },
+      { path: "maps", element: <AutonomyMaps /> },
+      { path: "live", element: <AutonomyLive /> },
     ] }],
   }], { initialEntries: [initial] });
-  render(<RouterProvider router={router} />);
+  render(<I18nProvider><RouterProvider router={router} /></I18nProvider>);
   return router;
 }
 
@@ -72,9 +113,81 @@ beforeEach(() => {
   mocks.owner = null;
   mocks.plan.mockReset().mockResolvedValue({ compiledPlan: null, planningBrief: "你指的是哪个取件处？", planningRunId: "test-plan" });
   mocks.reconcile.mockReset().mockImplementation(async (workspace) => workspace);
+  mocks.bindCatalog.mockReset().mockImplementation(async (workspace) => workspace);
+  mocks.boundThread.mockReset().mockResolvedValue({ thread_id: "core-test", state: "awaiting_confirmation", messages: [] });
+  mocks.runtime.mockReset().mockResolvedValue({ runtime_available: true, resources_ready: true, provisioned: true, issue: null });
+  mocks.setup.mockReset().mockResolvedValue({ schema_version: "dronedream.autonomy.runtime-setup.v1", operation_id: "setup-test", phase: "queued", progress: 0, active: true, error: null, failed_phase: null, started_at: "now", updated_at: "now" });
+  mocks.execute.mockReset().mockResolvedValue({ state: "executing", execution_id: "execution-test" });
+  mocks.sources.mockReset().mockResolvedValue({ sources: [] });
+  mocks.frame.mockReset().mockResolvedValue(new Blob(["test frame"], { type: "image/png" }));
+  mocks.telemetry.mockReset().mockResolvedValue({ schema_version: "dronedream.live-telemetry.v1", mode: "simulation", coordinate_frame: "gazebo-enu", east_m: 2, north_m: 3, up_m: 4, updated_at_unix_ms: 1 });
 });
 
 describe("autonomy conversation persistence", () => {
+  it("adds a newly created parameter optimization to Conversations immediately", async () => {
+    renderWorkspace();
+    act(() => {
+      registerExperimentWorkspace({
+        id: "parameter-workspace-event",
+        ownerId: "local",
+        edition: "autonomy",
+        name: "Optimize position control",
+        source: "manual",
+        activeStep: 0,
+        completedSteps: [],
+      });
+      updateExperimentWorkspace(
+        "local",
+        "parameter-workspace-event",
+        { status: "created" },
+        "autonomy",
+      );
+    });
+
+    expect(await screen.findByRole("link", { name: "Optimize position control" }))
+      .toBeVisible();
+  });
+
+  it("shows Kumpula and Import map and opens an uncluttered interactive map detail", async () => {
+    const workspace = defaultAutonomyWorkspace();
+    workspace.mapPack.agentCoreContentSha256 = "a".repeat(64);
+    workspace.aircraft.agentCoreContentSha256 = "b".repeat(64);
+    saveAutonomyWorkspace("local", "autonomy", workspace);
+    renderWorkspace("/autonomy/maps");
+
+    expect(await screen.findByRole("button", { name: /Kumpula Campus/u })).toBeVisible();
+    expect(screen.queryByText("Map and aircraft pair qualification")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "3D UAV Corridor" })).not.toBeInTheDocument();
+
+    const mapCard = screen.getByRole("button", { name: /Kumpula Campus/u });
+    expect(screen.getByRole("region", { name: "Map repository" }).querySelectorAll("article")).toHaveLength(6);
+    fireEvent.click(mapCard);
+    expect(screen.queryByRole("region", { name: "3D UAV Corridor" })).not.toBeInTheDocument();
+
+    fireEvent.doubleClick(mapCard);
+    const dialog = await screen.findByRole("dialog", { name: "Kumpula Campus" });
+    const corridor = await within(dialog).findByRole("img", { name: "Interactive 3D view of Kumpula Campus" });
+    expect(corridor).toBeVisible();
+    expect(screen.getByRole("region", { name: "Map repository" })).not.toContainElement(corridor);
+  });
+
+  it("uses the interface language for the built-in map repository name", async () => {
+    localStorage.setItem("drone-dream:locale", "zh-CN");
+    renderWorkspace("/autonomy/maps");
+    expect(await screen.findByRole("button", { name: /赫尔辛基大学昆普拉校区/u })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Kumpula Campus/u })).toBeNull();
+  });
+
+  it("always opens the Chatbot root as a blank new task even when an older conversation exists", async () => {
+    const existing = conversation("saved", "这条旧消息不能出现在新任务页");
+    saveAutonomyConversation("local", "autonomy", existing);
+    saveAutonomyWorkspace("local", "autonomy", existing);
+    renderWorkspace("/autonomy");
+    expect(await screen.findByText("What should your drone do?")).toBeVisible();
+    expect(screen.getByRole("textbox")).toHaveValue("");
+    expect(screen.queryByText("这条旧消息不能出现在新任务页")).not.toBeInTheDocument();
+  });
+
   it("isolates accounts and editions and does not create a conversation for an empty composer", () => {
     expect(listAutonomyConversations("local", "autonomy")).toEqual([]);
     saveAutonomyConversation("owner-a", "autonomy", conversation("one"));
@@ -125,12 +238,240 @@ describe("autonomy conversation persistence", () => {
 });
 
 describe("Chatbot to independent conversation", () => {
+  it("renders ordered clarification choices, supports Other, and submits a clicked answer", async () => {
+    mocks.plan.mockResolvedValueOnce({
+      compiledPlan: null,
+      planningBrief: "请确认取餐点。",
+      planningRunId: null,
+      clarification: { questions: [{
+        questionId: "pickup.location",
+        prompt: "你希望去哪个取餐点？",
+        options: [
+          { optionId: "A", label: "食品储藏室", response: "去食品储藏室取餐。" },
+          { optionId: "B", label: "补给站", response: "去补给站取餐。" },
+        ],
+        allowOther: true,
+        otherLabel: "其他",
+      }] },
+    }).mockResolvedValueOnce({ compiledPlan: null, planningBrief: "已收到选择。", planningRunId: null });
+    renderWorkspace();
+    fireEvent.change(await screen.findByRole("textbox"), { target: { value: "帮我取一下外卖" } });
+    fireEvent.click(screen.getByRole("button", { name: "Build mission contract" }));
+
+    expect(await screen.findByRole("button", { name: "A食品储藏室" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "C其他" }));
+    expect(screen.getByRole("textbox", { name: "其他" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "A食品储藏室" }));
+
+    await waitFor(() => expect(mocks.plan).toHaveBeenCalledTimes(2));
+    expect(mocks.plan.mock.calls[1][0]).toEqual(expect.objectContaining({
+      instruction: "去食品储藏室取餐。",
+    }));
+  });
+
+  it("uses one-line cascading mission context menus without duplicate asset links", async () => {
+    renderWorkspace();
+    fireEvent.click(await screen.findByRole("button", { name: "Mission context" }));
+    const menu = screen.getByRole("menu", { name: "Mission context" });
+    expect(within(menu).getByRole("menuitem", { name: "Attach mission files" })).toBeVisible();
+    expect(within(menu).queryByText("Up to 8 files, 25 MB each.")).toBeNull();
+    const aircraft = within(menu).getByRole("menuitem", { name: "Select aircraft" });
+    expect(within(menu).getAllByText("Select aircraft")).toHaveLength(1);
+    fireEvent.pointerEnter(aircraft.parentElement!);
+    const aircraftMenu = screen.getByRole("menu", { name: "Select aircraft" });
+    expect(within(aircraftMenu).getByRole("menuitemradio", { name: "X500 Depth" })).toBeVisible();
+    expect(within(aircraftMenu).queryByText(/compatible pair/u)).toBeNull();
+    fireEvent.click(within(aircraftMenu).getByRole("menuitemradio", { name: "X500 Depth" }));
+    expect(within(menu).getByRole("menuitem", { name: "X500 Depth" })).toBeVisible();
+
+    const map = within(menu).getByRole("menuitem", { name: "Select map" });
+    fireEvent.pointerEnter(map.parentElement!);
+    const mapMenu = screen.getByRole("menu", { name: "Select map" });
+    fireEvent.click(within(mapMenu).getByRole("menuitemradio", { name: "Kumpula Campus" }));
+    expect(within(menu).getByRole("menuitem", { name: "Kumpula Campus" })).toBeVisible();
+    expect(within(menu).queryByRole("link", { name: "Select aircraft" })).toBeNull();
+    expect(within(menu).queryByRole("link", { name: "Select map" })).toBeNull();
+  });
+
+  it.each(["failed", "completed"])("terminal %s state overrides an accepted start receipt", async (state) => {
+    saveAutonomyConversation("local", "autonomy", preparedConversation("terminal"));
+    renderWorkspace("/autonomy/conversations/terminal");
+    const start = await screen.findByRole("button", { name: "开始仿真" });
+    await waitFor(() => expect(start).toBeEnabled());
+    mocks.boundThread.mockResolvedValue({ thread_id: "core-test", state,
+      messages: state === "failed" ? [{ kind: "error", content: "运行插件加载失败" }] : [] });
+    fireEvent.click(start);
+    expect(await screen.findByRole("button", { name: state === "failed" ? "运行失败" : "已完成" }, { timeout: 3500 })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "正在运行" })).toBeNull();
+    if (state === "failed") expect(screen.getByRole("alert")).toHaveTextContent("运行插件加载失败");
+  });
+  it("starts from the plan card, records acceptance only after the receipt, and embeds the inactive simulation viewer", async () => {
+    const requested = preparedConversation("requested");
+    saveAutonomyConversation("local", "autonomy", requested);
+    saveAutonomyWorkspace("local", "autonomy", conversation("other", "检查另一处"));
+    renderWorkspace("/autonomy/conversations/requested");
+    const start = await screen.findByRole("button", { name: "开始仿真" });
+    await waitFor(() => expect(start).toBeEnabled());
+    expect(mocks.execute).not.toHaveBeenCalled();
+    expect(mocks.boundThread).toHaveBeenCalledWith(expect.objectContaining({ conversationId: "requested" }));
+    expect(screen.queryByText(/仿真正在运行/)).toBeNull();
+    fireEvent.click(start);
+    await waitFor(() => expect(mocks.execute).toHaveBeenCalledOnce());
+    expect(mocks.execute).toHaveBeenCalledWith(expect.objectContaining({ conversationId: "requested", planRevisionId: "revision-requested" }));
+    expect(await screen.findByText("已收到你的开始指令，仿真正在运行。")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Live 画面尚未就绪" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "打开运行画面" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "正在运行" })).toBeDisabled();
+    expect(screen.queryByText("真实仿真执行中")).toBeNull();
+  });
+
+  it("shows the confirmation but prevents starting until the runtime is ready", async () => {
+    const workspace = preparedConversation("not-ready");
+    saveAutonomyConversation("local", "autonomy", workspace);
+    mocks.runtime.mockResolvedValue({ runtime_available: false, resources_ready: false, provisioned: true, issue: "RUNTIME_NOT_READY" });
+    renderWorkspace("/autonomy/conversations/not-ready");
+    const start = await screen.findByRole("button", { name: "开始仿真" });
+    expect(start).toBeDisabled();
+    fireEvent.click(start);
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+
+  it("automatically provisions a signed runtime update and enables simulation when ready", async () => {
+    const workspace = preparedConversation("auto-provision");
+    saveAutonomyConversation("local", "autonomy", workspace);
+    mocks.setup.mockImplementation(() => new Promise(() => {}));
+    mocks.runtime
+      .mockResolvedValueOnce({ runtime_available: true, resources_ready: true, provisioned: false, issue: "RUNTIME_PROVISION_REQUIRED" })
+      .mockResolvedValue({ runtime_available: true, resources_ready: true, provisioned: true, issue: null });
+    renderWorkspace("/autonomy/conversations/auto-provision");
+    const start = await screen.findByRole("button", { name: "开始仿真" });
+    expect(start).toBeDisabled();
+    await waitFor(() => expect(mocks.setup).toHaveBeenCalledOnce());
+    await waitFor(() => expect(start).toBeEnabled(), { timeout: 3500 });
+  });
+
+  it("does not announce acceptance after execution rejection", async () => {
+    saveAutonomyConversation("local", "autonomy", preparedConversation("reject"));
+    mocks.execute.mockRejectedValue(new Error("AGENT_CORE_PLAN_CHANGED_REVIEW_AGAIN"));
+    renderWorkspace("/autonomy/conversations/reject");
+    const start = await screen.findByRole("button", { name: "开始仿真" });
+    await waitFor(() => expect(start).toBeEnabled());
+    fireEvent.click(start);
+    expect(await screen.findByRole("alert")).toBeVisible();
+    expect(screen.queryByText(/仿真正在运行/)).toBeNull();
+  });
+
+  it("enables viewing only after a simulation camera frame decodes, not just a source flag", async () => {
+    const workspace = preparedConversation("view");
+    workspace.mission.messages.push({ id: "execution-accepted:revision-view", role: "assistant", content: "执行请求已受理", createdAt: new Date().toISOString(), planContractId: null });
+    saveAutonomyConversation("local", "autonomy", workspace);
+    mocks.boundThread.mockResolvedValue({ thread_id: "core-view", state: "executing", messages: [] });
+    mocks.sources.mockResolvedValue({ sources: [{ id: "front", ready: true, mode: "simulation", transport: "agent-core-frame" }] });
+    let decode: (bitmap: unknown) => void = () => {};
+    vi.stubGlobal("createImageBitmap", vi.fn(() => new Promise((resolve) => { decode = resolve; })));
+    renderWorkspace("/autonomy/conversations/view");
+    await waitFor(() => expect(mocks.frame).toHaveBeenCalled());
+    expect(screen.getByRole("button", { name: "Live 画面尚未就绪" })).toBeDisabled();
+    await act(async () => decode({ width: 640, height: 480, close: vi.fn() }));
+    expect(await screen.findByRole("link", { name: "在 Live 中查看" })).toHaveAttribute("href", "/autonomy/conversations/view/live?source=front&autoplay=1");
+    vi.unstubAllGlobals();
+  });
+
+  it("opens on the projected 2D route and switches to the available simulation camera", async () => {
+    const workspace = preparedConversation("map-view");
+    workspace.mission.messages.push({ id: "execution-accepted:revision-map-view", role: "assistant", content: "执行请求已受理", createdAt: new Date().toISOString(), planContractId: null });
+    saveAutonomyConversation("local", "autonomy", workspace);
+    mocks.boundThread.mockResolvedValue({ thread_id: "core-map-view", state: "executing", messages: [] });
+    mocks.sources.mockResolvedValue({ sources: [{ id: "gazebo-render", kind: "simulation", label: "Gazebo", ready: true, mode: "simulation", transport: "agent-core-frame" }] });
+    vi.stubGlobal("createImageBitmap", vi.fn(async () => ({ width: 640, height: 360, close: vi.fn() })));
+    const canvasContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext")
+      .mockReturnValue({ drawImage: vi.fn() } as unknown as CanvasRenderingContext2D);
+
+    renderWorkspace("/autonomy/conversations/map-view");
+    fireEvent.click(await screen.findByRole("button", { name: "打开运行画面" }));
+    const map = await screen.findByRole("img", { name: "二维任务地图" });
+    expect(map).toBeVisible();
+    expect(within(map).getByText("起点 / 返航")).toBeVisible();
+    expect(await within(map).findByText("无人机")).toBeVisible();
+    await waitFor(() => expect(mocks.telemetry).toHaveBeenCalledWith("core-map-view"));
+
+    const simulation = await screen.findByRole("button", { name: "仿真" });
+    mocks.frame.mockClear();
+    fireEvent.click(simulation);
+    await waitFor(() => expect(mocks.frame).toHaveBeenCalledWith("core-map-view", "gazebo-render"));
+    expect(document.querySelector('canvas[aria-label="仿真"]')).toBeVisible();
+    canvasContext.mockRestore();
+    vi.unstubAllGlobals();
+  });
+
+  it.each(["failed", "completed"])("does not keep waiting for a camera after the run is %s", async (state) => {
+    const workspace = preparedConversation("ended");
+    workspace.mission.messages.push({ id: "execution-accepted:revision-ended", role: "assistant", content: "执行请求已受理", createdAt: new Date().toISOString(), planContractId: null });
+    saveAutonomyConversation("local", "autonomy", workspace);
+    mocks.boundThread.mockResolvedValue({ thread_id: "core-ended", state, messages: [] });
+    renderWorkspace("/autonomy/conversations/ended");
+    expect(await screen.findByRole("button", { name: "Live 画面尚未就绪" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "打开运行画面" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: "运行已结束（无实时画面）" })).toBeNull();
+    expect(mocks.frame).not.toHaveBeenCalled();
+  });
+
+  it("refuses a deleted mission live link without silently selecting another mission", async () => {
+    saveAutonomyWorkspace("local", "autonomy", conversation("other"));
+    renderWorkspace("/autonomy/conversations/missing/live");
+    expect(await screen.findByRole("alert")).toHaveTextContent("could not be read");
+    expect(screen.queryByRole("button", { name: "确认并开始仿真" })).toBeNull();
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+
+  it("does not restore a deleted conversation when the pending model reply arrives", async () => {
+    let complete: (result: unknown) => void = () => {};
+    mocks.plan.mockReturnValue(new Promise((resolve) => { complete = resolve; }));
+    const router = renderWorkspace();
+    fireEvent.change(await screen.findByRole("textbox"), { target: { value: "去外卖点取餐" } });
+    fireEvent.click(screen.getByRole("button", { name: "Build mission contract" }));
+    await waitFor(() => expect(mocks.plan).toHaveBeenCalledOnce());
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    fireEvent.click(screen.getByRole("button", { name: "Delete conversation" }));
+    await screen.findByText("What should your drone do?");
+    await act(async () => { complete({ compiledPlan: null, planningBrief: "迟到的规划回复", planningRunId: "test" }); });
+    expect(router.state.location.pathname).toBe("/autonomy");
+    expect(listAutonomyConversations("local", "autonomy")).toEqual([]);
+    expect(screen.queryByText("迟到的规划回复")).not.toBeInTheDocument();
+  });
+
+  it("stores the model title independently from the full first user message", async () => {
+    mocks.plan.mockImplementation(async (input) => {
+      input.onConversationTitle("去外卖点取餐");
+      return { compiledPlan: null, planningBrief: "请确认取餐点", planningRunId: "title-test" };
+    });
+    renderWorkspace();
+    fireEvent.change(await screen.findByRole("textbox"), { target: { value: "请从办公室出发帮我拿外卖然后返回" } });
+    fireEvent.click(screen.getByRole("button", { name: "Build mission contract" }));
+    expect(await screen.findByRole("link", { name: "去外卖点取餐" })).toBeVisible();
+    expect(await screen.findByText("请确认取餐点")).toBeVisible();
+    expect(screen.getByText("请从办公室出发帮我拿外卖然后返回")).toBeVisible();
+    expect(mocks.plan.mock.calls[0][0].chinese).toBe(true);
+  });
+
+  it("keeps an English conversation in English while the interface is Chinese", async () => {
+    localStorage.setItem("drone-dream:locale", "zh-CN");
+    mocks.plan.mockResolvedValue({ compiledPlan: null, planningBrief: "Which pickup point do you mean?", planningRunId: "english-turn" });
+    renderWorkspace();
+    const composer = await screen.findByRole("textbox");
+    fireEvent.change(composer, { target: { value: "Please collect the lab sample and return." } });
+    fireEvent.submit(composer.closest("form")!);
+    expect(await screen.findByText("Which pickup point do you mean?")).toBeVisible();
+    expect(mocks.plan.mock.calls[0][0].chinese).toBe(false);
+  });
+
   it("exposes the desktop pin and delete controls for every conversation", async () => {
     saveAutonomyConversation("local", "autonomy", conversation("saved", "巡检屋顶"));
     const router = renderWorkspace(autonomyConversationPath("saved"));
-    fireEvent.click(await screen.findByRole("button", { name: "Pin: 巡检屋顶" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Pin conversation" }));
     expect(listAutonomyConversations("local", "autonomy")[0]).toMatchObject({ id: "saved", pinned: true });
-    fireEvent.click(screen.getByRole("button", { name: "Delete: 巡检屋顶" }));
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    fireEvent.click(screen.getByRole("button", { name: "Delete conversation" }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/autonomy"));
     await waitFor(() => expect(screen.queryByRole("link", { name: "巡检屋顶" })).not.toBeInTheDocument());
   });
@@ -143,13 +484,17 @@ describe("Chatbot to independent conversation", () => {
     fireEvent.change(composer, { target: { value: "拿下快递" } });
     fireEvent.click(screen.getByRole("button", { name: "Build mission contract" }));
     await waitFor(() => expect(router.state.location.pathname).toMatch(/^\/autonomy\/conversations\//u));
-    expect(within(screen.getByRole("region", { name: "Conversations" })).getByRole("link", { name: "拿下快递" })).toBeVisible();
-    expect(screen.getByLabelText("Generating mission plan")).toBeVisible();
+    expect(within(screen.getByRole("region", { name: "Conversations" })).getByRole("link", { name: "领取快递" })).toBeVisible();
+    expect(screen.getByLabelText("正在生成任务计划")).toBeVisible();
     await act(async () => { rejectAssets(new Error("ASSET_NOT_READY")); });
-    expect(await screen.findByRole("alert")).toHaveTextContent("ASSET_NOT_READY");
+    expect(await screen.findByRole("alert")).toHaveTextContent("请检查规划模型、任务资产与运行环境后重试。（ASSET_NOT_READY）");
     expect(mocks.plan).not.toHaveBeenCalled();
     const id = listAutonomyConversations("local", "autonomy")[0].id;
-    expect(loadAutonomyConversation("local", "autonomy", id)?.mission.planningError).toContain("ASSET_NOT_READY");
+    const stored = loadAutonomyConversation("local", "autonomy", id);
+    expect(stored?.mission.planningError).toBeNull();
+    expect(stored?.mission.messages.at(-1)).toEqual(expect.objectContaining({
+      role: "assistant", kind: "error", content: "请检查规划模型、任务资产与运行环境后重试。（ASSET_NOT_READY）",
+    }));
   });
 
   it("opens a blank Chatbot while a reply is pending and keeps that reply in its original conversation", async () => {
@@ -171,7 +516,7 @@ describe("Chatbot to independent conversation", () => {
     await screen.findByText("请确认检查范围");
     expect(router.state.location.pathname).not.toBe(firstPath);
     expect(listAutonomyConversations("local", "autonomy")).toHaveLength(2);
-    fireEvent.click(screen.getByRole("link", { name: "去取件处" }));
+    fireEvent.click(screen.getByRole("link", { name: "领取快递" }));
     expect(await screen.findByText("请确认取件处")).toBeVisible();
     expect(screen.queryByText("请确认检查范围")).not.toBeInTheDocument();
   });

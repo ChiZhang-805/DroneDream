@@ -4,7 +4,12 @@
   "contractId": "dronedream-universal-integrated-workspaces/v2",
   "productEdition": "universal",
   "sourceFilesPurpose": "current-build-inputs-not-visual-qualification",
-  "workspaceModes": ["sim", "lab", "field", "autonomy"],
+  "workspaceModes": [
+    "sim",
+    "lab",
+    "field",
+    "autonomy"
+  ],
   "workspaceSwitchMeaning": "presentation-and-module-selection-only",
   "createsCrossEditionHarnessOrchestrator": false,
   "presentationOnly": true,
@@ -14,8 +19,17 @@
   "sharedCapability": {
     "id": "external-asset-qualification",
     "ownerEdition": "autonomy",
-    "routes": ["/autonomy/maps", "/autonomy/aircraft"],
-    "shareTargets": ["universal", "sim", "lab", "field", "autonomy"],
+    "routes": [
+      "/autonomy/maps",
+      "/autonomy/aircraft"
+    ],
+    "shareTargets": [
+      "universal",
+      "sim",
+      "lab",
+      "field",
+      "autonomy"
+    ],
     "builtInModeling": false,
     "automaticReceiverInstallation": false,
     "startsModelHarnessOnImport": false,
@@ -38,7 +52,7 @@
   "sourceFiles": [
     {
       "path": "apps/frontend/scripts/verify-lab-ui.mjs",
-      "sha256": "b74ad16cd43013de1d6338b93c35a67bab1f40b8a2b91351f47cb4e04e91719c",
+      "sha256": "1201ea371d3b0ce9abc90dc93f125b0834977a0509f59ef71ad185713e7a6ef9",
       "donorEdition": "lab",
       "donorBlob": "125386b98af709fbe559cb1dff6013dd52eee3ed",
       "integration": "semantic-universal-profile-and-final-field-adaptation"
@@ -59,35 +73,35 @@
     },
     {
       "path": "apps/frontend/src/field/field.css",
-      "sha256": "22b30a74714d2ff2a1abb6c26c6b5dd57e7c43101fb2c12e5ff96c5622178555",
+      "sha256": "ce0f4b033501be57e17b95f8a3aee7b45914db0de432679221f617f7da1e52c5",
       "donorEdition": "field",
       "donorBlob": "49d715fd854354277352be5f77dfd2db5d06b51a",
       "integration": "semantic-field-settings-and-responsive-chrome"
     },
     {
       "path": "apps/frontend/src/lab/LabSetup.tsx",
-      "sha256": "e5a8cdc0c9a05c06b81aa7b91ba17808af6262b4386fc2f9c74da81d79da4578",
+      "sha256": "00bb154a91c3628c1dc2f38e51744d1d536164d0e2dd4e4452faf2e4e536fcf9",
       "donorEdition": "lab",
       "donorBlob": "b4a3a2198e8ce3b25cf766fe425b922f516bd546",
       "integration": "semantic-universal-auth-and-runtime-adaptation"
     },
     {
       "path": "apps/frontend/src/lab/__tests__/LabSetup.test.tsx",
-      "sha256": "a9c07e6813acdde603bcc69dde711c30338671ab8116d36c4377476d48749d6c",
+      "sha256": "3cf7b8c72c189370c9c4512c4a540fd81e6d3d2c1730aca0cfd1405a244721d7",
       "donorEdition": "lab",
       "donorBlob": "afee9e33fb49e1eb79084e459782de80fc656b42",
-      "integration": "byte-exact"
+      "integration": "semantic-universal-test-path-adaptation"
     },
     {
       "path": "apps/frontend/src/lab/lab-hardware.css",
-      "sha256": "a1f0f717beb9430352c0e5c38c1935d4e20b407db66676f77115c397d1e6c38e",
+      "sha256": "f4a46455abe3e198b9b5b815371a678302729a17ce2168d33e1d10004a200812",
       "donorEdition": "lab",
       "donorBlob": "905ca7b5f783e9a72c3e063e578a2b071aa8e2b5",
       "integration": "semantic-universal-container-height-boundary"
     },
     {
       "path": "apps/frontend/src/lab/lab.css",
-      "sha256": "e21690e3c4ef1c359ca7c71909f13c92a5100aaeb1ec36e3436ea809234890bc",
+      "sha256": "6b66ea73c5ce304b0fb57725123b2044d7c7f2cbfba619f2b71c589a06849b52",
       "donorEdition": "lab",
       "donorBlob": "5968461d1f67e16551c88888a93fee137a481e68",
       "integration": "semantic-universal-layout-and-theme-adaptation"
@@ -101,7 +115,7 @@
     },
     {
       "path": "apps/frontend/src/styles.css",
-      "sha256": "95a4a9c7112e769648bf7c2c09538c4555bfdb03b000d7baaa6f31c52e6da7e6",
+      "sha256": "3f1a528fb337f715a49a45a4fe396a798bffc3d348644f9731dac0bc8f2e8153",
       "donorEdition": "lab",
       "donorBlob": "96deedb311f92dc2b7a058f9a61324509f9dd702",
       "integration": "semantic-universal-workspaces-and-canonical-navigation-theme"
@@ -122,8 +136,15 @@
     }
   ],
   "verificationRequirements": {
-    "locales": ["en", "zh-CN"],
-    "viewports": ["1440x1000", "760x900", "390x844"],
+    "locales": [
+      "en",
+      "zh-CN"
+    ],
+    "viewports": [
+      "1440x1000",
+      "760x900",
+      "390x844"
+    ],
     "assistantSingleScreen": true,
     "hardwareWorkspaceSingleScreen": true,
     "mobileChatPlanAriaTabs": true,

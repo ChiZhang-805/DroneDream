@@ -24,6 +24,7 @@ from pydantic import Field, model_validator
 
 from app.autonomy.catalog import get_bundled_map_manifest, get_scene
 from app.autonomy.models import StrictModel, Vector3
+from app.json_boundaries import json_nesting_within_limit
 
 MAX_MAP_ASSET_BYTES = 25 * 1024 * 1024
 MAX_ASSET_RECEIPTS = 512
@@ -39,11 +40,15 @@ MapRepresentation = Literal["hybrid-3d", "mesh", "point-cloud", "occupancy", "te
 MapCoordinateFrame = Literal["ENU", "NED", "WGS84", "building-local"]
 MapSemanticLayer = Literal[
     "free-space",
+    "building-footprints",
+    "orthophoto",
+    "named-campus-buildings",
     "stairs",
     "doors",
     "gates",
     "people",
     "pickup-zones",
+    "delivery-zones",
     "launch-zones",
     "rooms",
     "corridors",
@@ -54,6 +59,8 @@ MapSemanticLayer = Literal[
 MapPlanningLayer = Literal[
     "collision-geometry",
     "occupancy",
+    "semantic-endpoints",
+    "runtime-3d-route-planning",
     "esdf",
     "dynamic-overlay",
     "confidence",
@@ -474,13 +481,20 @@ def qualify_map_pack(
                 message="Bundled-scene confidence must be at least 95 percent.",
             )
         )
-    required_planning_layers = {"collision-geometry", "occupancy"}
+    required_planning_layers = {
+        "collision-geometry",
+        "semantic-endpoints",
+        "runtime-3d-route-planning",
+    }
     if not required_planning_layers.issubset(set(request.planning_layers)):
         issues.append(
             QualificationIssue(
                 code="map.collision-layers.missing",
                 severity="error",
-                message="Collision geometry and occupancy layers are required.",
+                message=(
+                    "Collision geometry, semantic endpoints and runtime 3-D route "
+                    "planning are required."
+                ),
             )
         )
     if "free-space" not in request.semantic_layers:
@@ -614,6 +628,8 @@ def _finite_json_number(value: str) -> float:
 
 def _decode_asset_json(data: bytes) -> object:
     """Decode inert JSON with finite numbers; callers convert parser failures into receipts."""
+    if not json_nesting_within_limit(data):
+        raise ValueError("asset JSON nesting limit exceeded")
     return json.loads(
         data.decode("utf-8"), parse_constant=_finite_json_number, parse_float=_finite_json_number
     )
@@ -668,12 +684,17 @@ def _json_asset(
             )
         return "gltf-2-json", [] if issues else ["mesh"], issues
     geo_type = payload.get("type") if isinstance(payload, dict) else None
-    if extension == "geojson" or isinstance(geo_type, str) and geo_type in {
-        *GEOJSON_GEOMETRY_TYPES,
-        "FeatureCollection",
-        "Feature",
-        "GeometryCollection",
-    }:
+    if (
+        extension == "geojson"
+        or isinstance(geo_type, str)
+        and geo_type
+        in {
+            *GEOJSON_GEOMETRY_TYPES,
+            "FeatureCollection",
+            "Feature",
+            "GeometryCollection",
+        }
+    ):
         if not _valid_geojson(payload):
             return (
                 "geojson-rfc7946",
@@ -826,6 +847,7 @@ def _inspect_map_asset(
 
 class MapAssetAdmissionRegistry:
     """Retain bounded owner-scoped metadata receipts, never uploaded bytes or executable code."""
+
     def __init__(self, *, maximum_receipts: int = MAX_ASSET_RECEIPTS) -> None:
         """Validate capacity before accepting uploads or mutating the receipt cache."""
         if type(maximum_receipts) is not int or maximum_receipts <= 0:

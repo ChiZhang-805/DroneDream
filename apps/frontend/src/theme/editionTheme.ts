@@ -14,13 +14,16 @@ export type EditionTheme3D = Readonly<{
   gridMinor: number;
 }>;
 
+export type AppearanceMode = "dark" | "light";
+export const DEFAULT_APPEARANCE: AppearanceMode = "light";
+
 export type EditionTheme = Readonly<{
   id: BrandEditionId;
   productName: string;
   gradientStops: readonly [string, string, string];
   lightSurface: string;
   darkSurface: string;
-  appearance: "light";
+  appearance: AppearanceMode;
   presentationOnly: true;
   grantsHardwareAuthority: false;
   three: EditionTheme3D;
@@ -34,18 +37,20 @@ function hexColorNumber(value: string): number {
   return Number.parseInt(value.slice(1), 16);
 }
 
-/** Derive one immutable display palette, keeping runtime objects separate from generated tokens. */
-function createTheme(id: BrandEditionId): EditionTheme {
+/** Derive one immutable display palette, keeping runtime objects separate from generated source tokens. */
+function createTheme(id: BrandEditionId, appearance: AppearanceMode = DEFAULT_APPEARANCE): EditionTheme {
   const token = EDITION_BRAND_TOKENS[id];
   const [primary, secondary, tertiary] = token.gradientStops;
-  const sceneSurface = hexColorNumber(token.darkSurface);
+  const sceneSurface = hexColorNumber(
+    appearance === "dark" ? token.darkSurface : token.lightSurface,
+  );
   return Object.freeze({
     id,
     productName: token.productName,
     gradientStops: Object.freeze([...token.gradientStops] as [string, string, string]),
     lightSurface: token.lightSurface,
     darkSurface: token.darkSurface,
-    appearance: "light",
+    appearance,
     presentationOnly: BRAND_PRESENTATION_ONLY,
     grantsHardwareAuthority: BRAND_GRANTS_HARDWARE_AUTHORITY,
     three: Object.freeze({
@@ -67,7 +72,15 @@ export const EDITION_THEMES = Object.freeze({
   autonomy: createTheme("autonomy"),
 }) satisfies Readonly<Record<BrandEditionId, EditionTheme>>;
 
-/** Return the cached light palette; it contains no model, subscription, or hardware permissions. */
+/** Return the light launch palette; it contains no model, subscription, or hardware permissions. */
 export function editionTheme(id: BrandEditionId): EditionTheme {
   return EDITION_THEMES[id];
+}
+
+/** Recompute light/dark scene surfaces from the same canonical edition colors. */
+export function editionThemeForAppearance(
+  id: BrandEditionId,
+  appearance: AppearanceMode,
+): EditionTheme {
+  return createTheme(id, appearance);
 }

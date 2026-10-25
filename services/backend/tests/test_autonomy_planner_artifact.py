@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import copy
 import io
+import json
 from types import SimpleNamespace
 from urllib.error import HTTPError
 
@@ -203,6 +204,14 @@ def test_deep_receipt_json_fails_with_stable_planner_error() -> None:
     with pytest.raises(PlannerArtifactVerificationError) as rejected:
         planner_artifact_module._read_bounded_response(response, len(payload))
     assert rejected.value.code == "AUTONOMY_PLANNER_RECEIPT_INVALID"
+
+
+def test_receipt_nesting_scan_ignores_escaped_structural_text() -> None:
+    payload = json.dumps({"text": 'literal [{\\"value\\": "]"}] text'}).encode()
+    response = SimpleNamespace(headers={}, read=io.BytesIO(payload).read)
+    assert planner_artifact_module._read_bounded_response(response, len(payload)) == {
+        "text": 'literal [{\\"value\\": "]"}] text'
+    }
 
 
 def test_rejected_http_receipt_closes_its_error_response(monkeypatch: pytest.MonkeyPatch) -> None:

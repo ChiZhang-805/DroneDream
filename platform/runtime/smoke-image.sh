@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 image=${1:?usage: smoke-image.sh IMAGE [REPORT_JSON]}
 report=${2:-"$root/platform/runtime/out/smoke-report.json"}
 container="dronedream-runtime-smoke-$RANDOM-$$"

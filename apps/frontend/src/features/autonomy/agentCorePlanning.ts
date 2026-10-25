@@ -13,12 +13,14 @@ import {
   patchAgentCoreThread,
   prepareAgentCoreMission,
   requestAgentCoreAssetInterpretation,
+  requestAgentCoreConversationTitle,
   submitAgentCoreRuntimeMessage,
   uploadAgentCoreAttachment,
   type AgentCoreAssetKind,
   type AgentCoreAssetQualificationEvidence,
   type AgentCoreAssetQualificationJob,
   type AgentCoreAssetVersion,
+  type AgentCoreBootstrap,
   type AgentCoreMissionPrepareSummary,
   type AgentCoreThread,
 } from "./agentCore";
@@ -28,8 +30,11 @@ import type {
 } from "../../types/api";
 import { verifiedAutonomyHarnessInspection } from "./missionHarness";
 import type { AutonomyWorkspaceState } from "./workspaceStore";
+import { taskUsesChinese } from "./missionPresentation";
 
 const THREAD_BINDING_PREFIX = "dronedream:agent-core-thread:v1";
+import { followPreparationProgress } from "./preparationProgressTransport";
+import type { PreparationProgressEvent } from "./conversationActivity";
 
 export interface AgentCorePlanningInput {
   edition: BrandEditionId;
@@ -49,6 +54,8 @@ export interface AgentCorePlanningInput {
   attachments?: File[];
   inputChannel?: "text" | "voice" | "camera" | "api" | "webhook" | "scheduled";
   transcriptSource?: "web-speech" | "audio-attachment" | null;
+  onConversationTitle?: (title: string) => void;
+  onProgress?: (event: PreparationProgressEvent) => void;
 }
 
 /** BYOK selects a Core-owned credential profile, never a key copied into the draft. */
@@ -109,7 +116,7 @@ function saveThreadBinding(
 }
 
 /**
- * An explicit content hash is a pin: never substitute a newer/different asset.
+ * An explicit content hash is a pin, except for a release-declared bundled upgrade.
  * Without a pin, choose only a qualified version, not merely the newest import.
  */
 function latestAssetVersion(
@@ -117,16 +124,20 @@ function latestAssetVersion(
   assetId: string | null | undefined,
   explicitSha256: string | null | undefined,
   kind: AgentCoreAssetKind,
+  replacements: AgentCoreBootstrap["bundled_asset_replacements"] = [],
 ): AgentCoreAssetVersion {
+  const selectedHash = replacements.find((replacement) => (
+    replacement.asset_id === assetId && replacement.source_content_sha256 === explicitSha256
+  ))?.replacement_content_sha256 ?? explicitSha256;
   const candidates = versions
     .filter((version) => (
       version.asset_id === assetId
       && (version.kind === kind || (kind === "map" && version.kind === "world"))
     ))
     .sort((left, right) => right.imported_at.localeCompare(left.imported_at));
-  const selected = explicitSha256
+  const selected = selectedHash
     ? candidates.find((version) => (
-        version.content_sha256 === explicitSha256 && version.maturity === "qualified"
+        version.content_sha256 === selectedHash && version.maturity === "qualified"
       ))
     : candidates.find((version) => version.maturity === "qualified");
   if (!selected) throw new Error(`AGENT_CORE_ASSET_VERSION_NOT_FOUND:${kind}:${assetId || "unbound"}`);
@@ -154,10 +165,11 @@ export async function interpretAgentCoreAsset(input: Pick<AgentCorePlanningInput
     || (input.accessMode === "byok" && (entry.source !== "custom" || entry.profile_id !== input.agentCoreProfileId))) {
     throw new Error("AGENT_CORE_MODEL_NOT_AVAILABLE");
   }
-  const version = latestAssetVersion(bootstrap.asset_versions, input.assetId, input.contentSha256, input.kind);
+  const version = latestAssetVersion(bootstrap.asset_versions, input.assetId, input.contentSha256, input.kind, bootstrap.bundled_asset_replacements);
   const thread = await createAgentCoreThread({ title: input.locale === "zh-CN" ? "资产解析" : "Asset interpretation", selected_model: modelId });
   const grant = input.accessMode === "platform"
-    ? await issueManagedModelGrant("assistant", thread.thread_id, input.provider as "openai" | "deepseek" | "qwen" | "kimi", input.model)
+    // 资产解析包含验证和有限重试，不能使用只允许两次调用的普通聊天授权。
+    ? await issueManagedModelGrant("job", thread.thread_id, input.provider as "openai" | "deepseek" | "qwen" | "kimi", input.model)
     : await issueAgentCoreCustomModelGrant(input.agentCoreProfileId!, thread.thread_id);
   const result = await requestAgentCoreAssetInterpretation(thread.thread_id, {
     expected_owner_account_id: input.accountId, source_edition: input.edition,
@@ -301,20 +313,54 @@ function assertVerifiedPairEvidence(
 //   workspace：当前地图与飞机选择；页面缓存的回执标识不作为认证依据。
 // 输出：
 //   pair：通过输入包、输出包、运行契约及回执交叉校验的资产组合。
-export async function resolveAgentCoreAssetPair(workspace: AutonomyWorkspaceState) {
+export async function resolveAgentCoreAssetPair(
+  workspace: AutonomyWorkspaceState,
+  preferredQualificationId?: string | null,
+) {
   const bootstrap = await getAgentCoreBootstrap();
-  const mapVersion = latestAssetVersion(
-    bootstrap.asset_versions,
-    workspace.mapPack.agentCoreAssetId,
-    workspace.mapPack.agentCoreContentSha256,
-    "map",
-  );
-  const vehicleVersion = latestAssetVersion(
-    bootstrap.asset_versions,
-    workspace.aircraft.agentCoreAssetId,
-    workspace.aircraft.agentCoreContentSha256,
-    "vehicle",
-  );
+  const preferredJob = preferredQualificationId
+    ? bootstrap.asset_qualification_jobs.find((candidate) => (
+        candidate.qualification_id === preferredQualificationId
+        && candidate.state === "qualified"
+        && candidate.progress_percent === 100
+        && candidate.map_asset_id === workspace.mapPack.agentCoreAssetId
+        && candidate.vehicle_asset_id === workspace.aircraft.agentCoreAssetId
+      ))
+    : null;
+  if (preferredQualificationId && !preferredJob) {
+    throw new Error("AGENT_CORE_ASSET_PAIR_QUALIFICATION_JOB_NOT_FOUND");
+  }
+  const mapVersion = preferredJob
+    ? bootstrap.asset_versions.find((version) => (
+        version.asset_id === preferredJob.map_asset_id
+        && (version.kind === "map" || version.kind === "world")
+        && version.maturity === "qualified"
+        && version.content_sha256 === preferredJob.result_map_content_sha256
+      ))
+    : latestAssetVersion(
+        bootstrap.asset_versions,
+        workspace.mapPack.agentCoreAssetId,
+        workspace.mapPack.agentCoreContentSha256,
+        "map",
+        bootstrap.bundled_asset_replacements,
+      );
+  const vehicleVersion = preferredJob
+    ? bootstrap.asset_versions.find((version) => (
+        version.asset_id === preferredJob.vehicle_asset_id
+        && version.kind === "vehicle"
+        && version.maturity === "qualified"
+        && version.content_sha256 === preferredJob.result_vehicle_content_sha256
+      ))
+    : latestAssetVersion(
+        bootstrap.asset_versions,
+        workspace.aircraft.agentCoreAssetId,
+        workspace.aircraft.agentCoreContentSha256,
+        "vehicle",
+        bootstrap.bundled_asset_replacements,
+      );
+  if (!mapVersion || !vehicleVersion) {
+    throw new Error("AGENT_CORE_ASSET_VERSION_NOT_FOUND:qualification");
+  }
   const jobs = bootstrap.asset_qualification_jobs.filter((candidate) => (
     candidate.state === "qualified"
     && candidate.progress_percent === 100
@@ -324,7 +370,7 @@ export async function resolveAgentCoreAssetPair(workspace: AutonomyWorkspaceStat
     && candidate.vehicle_asset_id === vehicleVersion.asset_id
     && candidate.result_vehicle_content_sha256 === vehicleVersion.content_sha256
   )).sort((left, right) => right.updated_at.localeCompare(left.updated_at));
-  const job = jobs.find((candidate) => (
+  const job = preferredJob ?? jobs.find((candidate) => (
     candidate.qualification_id === workspace.mapPack.qualificationReceiptId
     && candidate.qualification_id === workspace.aircraft.qualificationReceiptId
   )) ?? jobs[0];
@@ -414,12 +460,14 @@ async function ensureThread(input: AgentCorePlanningInput): Promise<{
     input.workspace.mapPack.agentCoreAssetId,
     input.workspace.mapPack.agentCoreContentSha256,
     "map",
+    bootstrap.bundled_asset_replacements,
   );
   const vehicleVersion = latestAssetVersion(
     bootstrap.asset_versions,
     input.workspace.aircraft.agentCoreAssetId,
     input.workspace.aircraft.agentCoreContentSha256,
     "vehicle",
+    bootstrap.bundled_asset_replacements,
   );
   const rememberedThreadId = readThreadBinding(input);
   let thread = bootstrap.threads.find((entry) => entry.thread_id === rememberedThreadId) ?? null;
@@ -429,7 +477,6 @@ async function ensureThread(input: AgentCorePlanningInput): Promise<{
     saveThreadBinding(input, thread.thread_id);
   }
   thread = await patchAgentCoreThread(thread.thread_id, {
-    title,
     selected_model: modelSelectionId,
     selected_map_id: mapVersion.asset_id,
     selected_map_content_sha256: mapVersion.content_sha256,
@@ -439,16 +486,19 @@ async function ensureThread(input: AgentCorePlanningInput): Promise<{
   return { thread, mapVersion, vehicleVersion };
 }
 
-/**
- * Prepare, but do not execute, a mission using a scoped platform/BYOK grant.
- * Attachments and asset hashes accompany the request; returned bindings must
- * match exactly before the plan can be shown for confirmation.
- */
+// 功能：
+//   使用任务级有限授权完成资产理解、规划与复核，核验资产绑定后返回计划，不启动飞行。
+// 输入：
+//   input：账户、会话、模型、精确资产版本及用户自然语言任务。
+// 输出：
+//   summary：真实后端生成、等待用户确认的任务规划结果。
 export async function planWithAgentCore(
   input: AgentCorePlanningInput,
 ): Promise<AgentCoreMissionPrepareSummary> {
   if (!input.accountId) throw new Error("AGENT_CORE_ACCOUNT_REQUIRED");
+  const accountId = input.accountId;
   const { thread, mapVersion, vehicleVersion } = await ensureThread(input);
+  input.onProgress?.({ stage: "assets", zh: "已绑定所选地图和无人机的精确版本，正在准备本次模型调用授权。", en: "Exact selected map and aircraft versions are bound; preparing authorization for this model job." });
   const modelSelectionId = selectedModelId(input);
   const attachmentIds: string[] = [];
   for (const file of (input.attachments ?? []).slice(0, 8)) {
@@ -457,13 +507,38 @@ export async function planWithAgentCore(
   }
   const grant = input.accessMode === "platform"
     ? await issueManagedModelGrant(
-        "assistant",
+        // 一次用户消息对应多阶段 Harness 作业，不是一次普通聊天调用。
+        "job",
         thread.thread_id,
         input.provider as "openai" | "deepseek" | "qwen" | "kimi",
         input.model,
       )
     : await issueAgentCoreCustomModelGrant(input.agentCoreProfileId!, thread.thread_id);
-  const summary = await prepareAgentCoreMission(thread.thread_id, {
+  const onConversationTitle = input.onConversationTitle;
+  if (onConversationTitle && input.requestPurpose === "initial_plan") {
+    // 命名独立进行，不让非关键模型调用阻塞规划或追问。
+    void (async () => {
+      try {
+        // BYOK 授权只能消费一次，命名使用独立授权，不挤占规划连接。
+        const titleGrant = input.accessMode === "platform" ? grant : await issueAgentCoreCustomModelGrant(input.agentCoreProfileId!, thread.thread_id);
+        const result = await requestAgentCoreConversationTitle(thread.thread_id, {
+          expected_owner_account_id: accountId, source_edition: input.edition,
+          message: input.instruction.slice(0, 2000), model_id: modelSelectionId,
+          model_grant: titleGrant.grant, gateway_base_url: modelGatewayBaseUrl(titleGrant), locale: input.locale,
+        });
+        if (taskUsesChinese(result.title) === (input.locale === "zh-CN")) onConversationTitle(result.title);
+      } catch {
+        // 命名失败保留现有标题，主规划独立处理自身结果。
+      }
+    })();
+  }
+  const progressRequestId = crypto.randomUUID();
+  input.onProgress?.({ stage: "assets", zh: "正在提交规划请求；后端将检查已有地图解析，未命中的内容才需要调用模型处理。", en: "Submitting the planning request. The backend will check reusable asset knowledge before requesting new interpretation." });
+  const stopProgress = input.onProgress ? followPreparationProgress(thread.thread_id, progressRequestId, input.onProgress) : () => {};
+  let summary: AgentCoreMissionPrepareSummary;
+  try {
+  summary = await prepareAgentCoreMission(thread.thread_id, {
+    progress_request_id: progressRequestId,
     expected_owner_account_id: input.accountId,
     source_edition: input.edition,
     message: input.instruction,
@@ -495,6 +570,7 @@ export async function planWithAgentCore(
       attachment_count: attachmentIds.length,
     },
   });
+  } finally { stopProgress(); }
   if (
     summary.mission_plan.asset_bindings.map_asset_id !== mapVersion.asset_id
     || summary.mission_plan.asset_bindings.map_content_sha256 !== mapVersion.content_sha256
@@ -573,7 +649,8 @@ export async function executeBoundAgentCoreMission(input: AgentCoreExecutionInpu
   }
   const grant = input.accessMode === "platform"
     ? await issueManagedModelGrant(
-        "assistant",
+        // 执行中的高层复核和重规划使用独立任务授权；飞行确认仍在上方单独校验。
+        "job",
         threadId,
         input.provider as "openai" | "deepseek" | "qwen" | "kimi",
         input.model,

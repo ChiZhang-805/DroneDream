@@ -1,0 +1,30 @@
+[
+  {
+    "assetId": "airport-terminal",
+    "contentSha256": "c6a2eee5cc82ba5b0d72dd8acad828ccd8935a436a99fadb37187566c101de50"
+  },
+  {
+    "assetId": "battle-royale",
+    "contentSha256": "6deded618f9e5b8b38e6aa057d2c518f319d2e1cc372d9b4052949e7c1e9b329"
+  },
+  {
+    "assetId": "campus",
+    "contentSha256": "d9242069a221b8b1455f6bf297eb2c11375f377156ba2134eb775169659f0407"
+  },
+  {
+    "assetId": "clinic",
+    "contentSha256": "b0ac25301a467c9286a8e8dab2d0fe64cf2cca488cd9e68c1bde43af70bda72b"
+  },
+  {
+    "assetId": "hotel",
+    "contentSha256": "ad9940e78001b2b106f3c282c5ee83e943360884aef65a73a9da6a1ce31ede9e"
+  },
+  {
+    "assetId": "office",
+    "contentSha256": "87356c4e0189815fe546f4dbfe1167c296e0e0a9167590b0c83986efa09a442b"
+  },
+  {
+    "assetId": "triple-h",
+    "contentSha256": "8a5dfe3c3befb262af3658becfb46282b208fc77fd483bfced6b80aa70198982"
+  }
+]

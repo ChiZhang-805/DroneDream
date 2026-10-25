@@ -56,29 +56,14 @@ const vehiclePackAdapter = vehiclePackAdapterJson as {
 };
 
 const VIEWS: LabSetupView[] = ["calibration", "setup", "evidence", "safety"];
-const HARDWARE_ACTIONS = [
-  "hardware.parameter.write",
-  "hardware.arm",
-  "hardware.flight",
-  "hardware.hitl.execute",
-] as const;
-
 const COPY = {
   en: {
-    title: "Sim-to-Real calibration laboratory",
-    subtitle:
-      "Model + Harness connects simulation search, controlled real observations, model calibration, independent holdout, and evidence issuance in one bounded job.",
-    packs: "Validated packs",
-    packsValue: "0 of 8",
-    authority: "Hardware authority",
-    deny: "DENY",
+    setup: "Setup",
+    calibration: "Calibration loop",
+    title: "LAB workspace",
     workspaceLabel: "Lab workspace",
     simulation: "Simulation workspace",
     hardware: "Hardware laboratory",
-    switchNotice:
-      "Workspace selection changes the workflow only; it never grants hardware authority.",
-    calibration: "Calibration loop",
-    setup: "Setup",
     evidence: "Qualification evidence",
     safety: "Safety review",
     simulationReady: "Simulation workflow",
@@ -99,13 +84,10 @@ const COPY = {
     arm: "Arm vehicle",
     flight: "Start flight / HITL",
     actionsDenied: "Hardware execution is denied",
-    actionsDeniedBody:
-      "All write, arm, flight, and HITL entry points are disabled because the registry contains zero validated and signed Vehicle Packs.",
     evidenceTitle: "Sim to Lab evidence import preview",
     chooseEvidence: "Choose JSON evidence",
     clearEvidence: "Clear preview",
     noEvidence: "No evidence selected",
-    noEvidenceBody: "A preview never uploads, persists, consumes, or promotes a receipt.",
     previewOnly: "PREVIEW ONLY",
     sourceEdition: "Source edition",
     commonCore: "Common core",
@@ -114,36 +96,18 @@ const COPY = {
     parameters: "Parameters",
     evidenceRejected: "Evidence rejected",
     safetyTitle: "Execution quorum",
-    native: "Native",
-    backend: "Backend",
-    runtime: "Runtime",
-    missing: "Missing",
-    quorumResult: "Quorum result",
-    reasonZeroPacks: "zero-validated-packs",
-    reasonMissingLayers: "native-backend-runtime-missing",
     operatorTitle: "Operator confirmation",
-    operatorBody:
-      "Confirmation requires a short-lived one-time challenge bound to an authorization request. A checkbox or workspace switch is not accepted.",
     challenge: "Operator challenge",
     challengeUnavailable: "Unavailable: authority quorum denied",
     confirm: "Confirm hardware action",
-    deniedCapabilities: "Denied capability IDs",
   },
   "zh-CN": {
-    title: "Sim-to-Real 校准实验室",
-    subtitle:
-      "Model + Harness 在同一份受预算约束的作业中贯通仿真搜索、受控真实观测、模型校准、独立 holdout 与证据签发。",
-    packs: "已验证机型包",
-    packsValue: "0 / 8",
-    authority: "真机权限",
-    deny: "拒绝",
+    setup: "配置",
+    calibration: "校准闭环",
+    title: "LAB 工作区",
     workspaceLabel: "实验室工作区",
     simulation: "仿真工作区",
     hardware: "真机实验室",
-    switchNotice:
-      "切换工作区只改变流程，绝不会授予真机权限。",
-    calibration: "校准闭环",
-    setup: "配置",
     evidence: "资格证据",
     safety: "安全复核",
     simulationReady: "仿真工作流",
@@ -164,13 +128,10 @@ const COPY = {
     arm: "解锁飞行器",
     flight: "启动飞行 / HITL",
     actionsDenied: "真机执行已拒绝",
-    actionsDeniedBody:
-      "注册表中没有已验证且签名的 Vehicle Pack，因此写参数、解锁、飞行与 HITL 入口全部禁用。",
     evidenceTitle: "Sim 到 Lab 证据导入预览",
     chooseEvidence: "选择 JSON 证据",
     clearEvidence: "清除预览",
     noEvidence: "尚未选择证据",
-    noEvidenceBody: "预览不会上传、持久化、消费或晋级任何 receipt。",
     previewOnly: "仅预览",
     sourceEdition: "来源版本",
     commonCore: "公共核心",
@@ -179,20 +140,10 @@ const COPY = {
     parameters: "参数",
     evidenceRejected: "证据已拒绝",
     safetyTitle: "执行权限法定人数",
-    native: "Native",
-    backend: "后端",
-    runtime: "Runtime",
-    missing: "缺失",
-    quorumResult: "法定人数结果",
-    reasonZeroPacks: "零个已验证机型包",
-    reasonMissingLayers: "native、后端与 Runtime 决定缺失",
     operatorTitle: "操作员人工确认",
-    operatorBody:
-      "人工确认必须使用绑定授权请求的短时一次性 challenge；复选框或工作区切换不被接受。",
     challenge: "操作员 challenge",
     challengeUnavailable: "不可用：权限法定人数为拒绝",
     confirm: "确认真机动作",
-    deniedCapabilities: "被拒绝的能力 ID",
   },
 } as const;
 
@@ -284,14 +235,10 @@ export function LabSetup({
       <header className="lab-header">
         <div>
           <h1>{copy.title}</h1>
-          <p className="sr-only">{copy.subtitle}</p>
-        </div>
-        <div className="lab-status-summary" aria-label={copy.authority}>
-          <span><small>{copy.packs}</small><strong>{copy.packsValue}</strong></span>
-          <span className="lab-deny-summary"><small>{copy.authority}</small><strong>{copy.deny}</strong></span>
         </div>
       </header>
 
+      <div className="lab-navigation">
       <div className="lab-workspace-switch" role="group" aria-label={copy.workspaceLabel}>
         <button
           type="button"
@@ -312,7 +259,6 @@ export function LabSetup({
           <span><strong>{copy.hardware}</strong></span>
         </button>
       </div>
-      <p className="sr-only" role="status">{copy.switchNotice}</p>
 
       <div className="lab-view-tabs" role="tablist" aria-label={copy.title}>
         {VIEWS.map((item) => {
@@ -340,6 +286,8 @@ export function LabSetup({
             </button>
           );
         })}
+      </div>
+
       </div>
 
       {view === "calibration" ? (
@@ -442,20 +390,20 @@ export function LabSetup({
                   <small>{selectedPack?.packId} · {selectedController?.model} · {selectedFirmware}</small>
                 </div>
               </div>
-              <div className="lab-deny-banner" role="alert">
-                <XCircle aria-hidden="true" />
-                <div><strong>{copy.actionsDenied}</strong><p>{copy.actionsDeniedBody}</p></div>
-              </div>
-              <div className="lab-hardware-actions" aria-label={copy.actionsDenied}>
+              <div className="lab-actions">
                 <Link to="/lab/hardware" className="btn btn-primary">
                   <RadioTower aria-hidden="true" /> {copy.openHardware}
                 </Link>
+              </div>
+
+                <div className="lab-hardware-actions" aria-label={copy.actionsDenied}>
                 {[copy.discovery, copy.write, copy.arm, copy.flight].map((label) => (
                   <button key={label} type="button" className="btn" disabled>
                     <LockKeyhole aria-hidden="true" /> {label}
                   </button>
                 ))}
-              </div>
+                </div>
+
             </div>
           )}
         </section>
@@ -463,23 +411,27 @@ export function LabSetup({
 
       {view === "evidence" ? (
         <section id="lab-panel-evidence" className="lab-tool" role="tabpanel" aria-labelledby="lab-view-evidence">
+          <div className="lab-action-toolbar">
           <div className="lab-tool-intro">
             <FileCheck2 aria-hidden="true" />
             <h2>{copy.evidenceTitle}</h2>
           </div>
           <div className="lab-evidence-actions">
-            <label className="btn lab-file-button">
+            <label className="btn btn-primary lab-file-button">
               <Upload aria-hidden="true" /> {copy.chooseEvidence}
               <input type="file" accept="application/json,.json" onChange={previewEvidence} />
             </label>
             <button
               type="button"
               className="btn btn-ghost"
+              aria-label={copy.clearEvidence}
+              title={copy.clearEvidence}
               disabled={!evidence && !evidenceError && !evidenceImport.loading}
               onClick={evidenceImport.reset}
             >
-              <RotateCcw aria-hidden="true" /> {copy.clearEvidence}
+              <RotateCcw aria-hidden="true" />
             </button>
+          </div>
           </div>
           {evidenceError ? (
             <div className="lab-deny-banner" role="alert">
@@ -505,7 +457,7 @@ export function LabSetup({
             </div>
           ) : (
             <div className="lab-empty-evidence">
-              <Upload aria-hidden="true" /><strong>{copy.noEvidence}</strong><p className="sr-only">{copy.noEvidenceBody}</p>
+              <Upload aria-hidden="true" /><strong>{copy.noEvidence}</strong>
             </div>
           )}
         </section>
@@ -517,24 +469,11 @@ export function LabSetup({
             <ShieldAlert aria-hidden="true" />
             <h2>{copy.safetyTitle}</h2>
           </div>
-          <div className="lab-quorum" aria-label={copy.safetyTitle}>
-            {[copy.native, copy.backend, copy.runtime].map((layer) => (
-              <div key={layer}><span>{layer}</span><strong><XCircle aria-hidden="true" /> {copy.missing}</strong></div>
-            ))}
-            <div className="lab-quorum-result">
-              <span>{copy.quorumResult}</span><strong>{copy.deny}</strong>
-              <small>{copy.reasonZeroPacks} · {copy.reasonMissingLayers}</small>
-            </div>
-          </div>
           <div className="lab-operator-confirmation">
-            <div><h3>{copy.operatorTitle}</h3><p>{copy.operatorBody}</p></div>
+            <div><h3>{copy.operatorTitle}</h3></div>
             <label><span>{copy.challenge}</span><input value={copy.challengeUnavailable} disabled readOnly /></label>
             <button type="button" className="btn" disabled><CheckCircle2 aria-hidden="true" /> {copy.confirm}</button>
           </div>
-          <details className="lab-denied-capabilities">
-            <summary>{copy.deniedCapabilities}</summary>
-            <ul>{HARDWARE_ACTIONS.map((action) => <li key={action}><code>{action}</code></li>)}</ul>
-          </details>
         </section>
       ) : null}
     </section>

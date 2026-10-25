@@ -21,7 +21,8 @@ PX4_X500_ROTOR_LINK_MASS_KG: Final = 0.016076923076923075
 PX4_X500_ROTOR_COUNT: Final = 4
 PX4_X500_DEPTH_CAMERA_MASS_KG: Final = 0.061
 PX4_X500_DRY_MASS_KG: Final = (
-    PX4_X500_BASE_LINK_MASS_KG + PX4_X500_ROTOR_COUNT * PX4_X500_ROTOR_LINK_MASS_KG
+    PX4_X500_BASE_LINK_MASS_KG
+    + PX4_X500_ROTOR_COUNT * PX4_X500_ROTOR_LINK_MASS_KG
     + PX4_X500_DEPTH_CAMERA_MASS_KG
 )
 PX4_X500_MOTOR_CONSTANT: Final = 8.54858e-06
@@ -30,6 +31,7 @@ PX4_X500_MAXIMUM_THRUST_N: Final = (
     PX4_X500_ROTOR_COUNT * PX4_X500_MOTOR_CONSTANT * PX4_X500_MAX_ROTOR_VELOCITY_RAD_S**2
 )
 PX4_X500_MINIMUM_QUALIFIED_THRUST_TO_WEIGHT: Final = 1.6
+PX4_X500_DEPTH_OPTICAL_CENTER_RELATIVE_TO_BASE_LINK_M: Final = (0.13233, 0.0, 0.26078)
 STANDARD_GRAVITY_M_S2: Final = 9.80665
 
 TAKEOUT_PAYLOAD_MODEL_NAME: Final = "takeout_payload"
@@ -91,8 +93,7 @@ def _model_config() -> str:
     sdf.text = "model.sdf"
     description = ElementTree.SubElement(root, "description")
     description.text = (
-        "PX4 Gazebo X500 with OakD-Lite depth perception and a qualified "
-        "DroneDream payload joint."
+        "PX4 Gazebo X500 with OakD-Lite depth perception and a qualified DroneDream payload joint."
     )
     ElementTree.indent(root, space="  ")
     return '<?xml version="1.0"?>\n' + ElementTree.tostring(root, encoding="unicode") + "\n"
@@ -189,7 +190,9 @@ def get_my_drone_gazebo_artifact() -> MyDroneGazeboArtifact:
             "minimum_depth_m": 0.2,
             "maximum_depth_m": 19.1,
             "camera_mass_kg": PX4_X500_DEPTH_CAMERA_MASS_KG,
-            "optical_center_relative_to_collision_center_m": (0.13233, 0.0, 0.03278),
+            "optical_center_relative_to_base_link_m": (
+                PX4_X500_DEPTH_OPTICAL_CENTER_RELATIVE_TO_BASE_LINK_M
+            ),
         },
         "mission_payload": {
             "model_name": TAKEOUT_PAYLOAD_MODEL_NAME,

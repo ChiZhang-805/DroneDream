@@ -65,8 +65,7 @@ export interface ConsolePreferenceBoundary {
 
 export interface ConsolePreferenceRecord {
   interface_locale: InterfaceLocale;
-  // Retained for database compatibility with records written before palettes
-  // became fixed per edition. New clients always persist "dark".
+  /** Legacy database column retained for backward compatibility; the UI palette is fixed. */
   appearance_mode: "dark" | "light" | "system" | "custom";
   custom_accent: string;
   notifications: Record<string, boolean>;

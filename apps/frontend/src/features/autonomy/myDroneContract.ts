@@ -29,7 +29,7 @@ export const MY_DRONE_CONTRACT = {
   battery: { cells: 4, capacityMah: 5000, nominalEnergyWh: 74 },
   localization: { model: "PX4 Gazebo GPS", rateHz: 10 },
   planningLimits: {
-    maximumSpeedMps: 4,
+    maximumSpeedMps: 6,
     maximumAccelerationMps2: 2.5,
     maximumClimbMps: 1.5,
     maximumDescentMps: 1,

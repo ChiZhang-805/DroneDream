@@ -5,7 +5,7 @@ import {
   BRAND_PRESENTATION_ONLY,
   EDITION_BRAND_TOKENS,
 } from "../brand/edition-brand.generated";
-import { EDITION_THEMES } from "../theme/editionTheme";
+import { EDITION_THEMES, editionThemeForAppearance } from "../theme/editionTheme";
 
 describe("canonical Edition theme contract", () => {
   it("freezes nested returned colors instead of sharing a mutable generated token array", () => {
@@ -21,7 +21,12 @@ describe("canonical Edition theme contract", () => {
       expect(theme.three.primary).toBe(Number.parseInt(expected.gradientStops[0].slice(1), 16));
       expect(theme.three.secondary).toBe(Number.parseInt(expected.gradientStops[1].slice(1), 16));
       expect(theme.three.tertiary).toBe(Number.parseInt(expected.gradientStops[2].slice(1), 16));
-      expect(theme.three.darkSurface).toBe(Number.parseInt(expected.darkSurface.slice(1), 16));
+      expect(theme.appearance).toBe("light");
+      expect(theme.three.darkSurface).toBe(Number.parseInt(expected.lightSurface.slice(1), 16));
+      expect(theme.three.fog).toBe(Number.parseInt(expected.lightSurface.slice(1), 16));
+      const darkTheme = editionThemeForAppearance(edition as keyof typeof EDITION_THEMES, "dark");
+      expect(darkTheme.appearance).toBe("dark");
+      expect(darkTheme.three.darkSurface).toBe(Number.parseInt(expected.darkSurface.slice(1), 16));
     }
   });
 

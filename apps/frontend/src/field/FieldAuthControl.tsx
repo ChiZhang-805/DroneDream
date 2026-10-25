@@ -1,13 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import { LogIn, LogOut, LoaderCircle } from "lucide-react";
-
-import { isDesktopRuntime } from "../desktop/bridge";
+import { useState } from "react";
+import { LogIn, LogOut } from "lucide-react";
 import { useAuthOrLocal } from "../features/auth/AuthContext";
-import {
-  cancelDesktopBrowserSignIn,
-  completeDesktopBrowserSignIn,
-} from "../features/auth/desktopBrowserSignIn";
-import { browserAuthConfiguration } from "../features/auth/supabaseClient";
+import { LauncherAccountForm } from "../components/LauncherAccountForm";
 import type { FieldLocale } from "./catalog";
 
 const COPY = {
@@ -35,8 +29,6 @@ const COPY = {
   },
 } as const;
 
-type AuthStatus = "idle" | "waiting" | "adopting";
-
 interface FieldAuthControlProps {
   locale: FieldLocale;
   launcher?: boolean;
@@ -44,111 +36,21 @@ interface FieldAuthControlProps {
   onAuthenticated?: () => void;
 }
 
-export function FieldAuthControl({
-  locale,
-  launcher = false,
-  launcherReady = true,
-  onAuthenticated,
-}: FieldAuthControlProps) {
-  const { account, configured, signOut } = useAuthOrLocal();
-  const [status, setStatus] = useState<AuthStatus>("idle");
-  const [error, setError] = useState<string | null>(null);
-  const mounted = useRef(true);
-  const browserAuthController = useRef<AbortController | null>(null);
+export function FieldAuthControl({ locale, launcher = false, launcherReady = true, onAuthenticated }: FieldAuthControlProps) {
+  const { account, signOut } = useAuthOrLocal();
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState("");
   const copy = COPY[locale];
-  const available = configured && isDesktopRuntime();
-
-  useEffect(() => () => {
-    mounted.current = false;
-    const controller = browserAuthController.current;
-    if (controller) void cancelDesktopBrowserSignIn(controller);
-  }, []);
-
-  const startSignIn = async () => {
-    if (!available || browserAuthController.current) return;
-    if (!browserAuthConfiguration()) {
-      setError(copy.unavailable);
-      return;
-    }
-    setError(null);
-    setStatus("waiting");
-    const controller = new AbortController();
-    browserAuthController.current = controller;
-    try {
-      // Every click starts a fresh Field browser transaction. Browser cookies
-      // may reduce credential entry, but no other edition session is restored.
-      await completeDesktopBrowserSignIn(locale, {
-        signal: controller.signal,
-        restoreFromVault: false,
-        onAdopting: () => {
-          if (mounted.current) setStatus("adopting");
-        },
-      });
-      if (mounted.current) onAuthenticated?.();
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : String(cause);
-      if (mounted.current && !/cancelled/iu.test(message)) {
-        setError(copy.failed);
-      }
-    } finally {
-      if (browserAuthController.current === controller) {
-        browserAuthController.current = null;
-      }
-      if (mounted.current) setStatus("idle");
-    }
-  };
-
-  const endSession = async () => {
-    setError(null);
-    try {
-      await signOut();
-    } catch {
-      if (mounted.current) setError(copy.failed);
-    }
-  };
-
-  return (
-    <div
-      className={`field-auth-control${launcher ? " field-auth-control-launcher" : ""}`}
-      data-authority="false"
-    >
-      {account && launcher ? (
-        <button
-          type="button"
-          disabled={!launcherReady}
-          onClick={onAuthenticated}
-          aria-label={copy.enter}
-        >
-          <LogIn aria-hidden="true" />
-          <span>{copy.enter}</span>
-        </button>
-      ) : account ? (
-        <button type="button" onClick={() => void endSession()} aria-label={copy.signOut}>
-          <LogOut aria-hidden="true" />
-          <span>{account.displayName}</span>
-        </button>
-      ) : (
-        <button
-          type="button"
-          disabled={!available || status !== "idle" || (launcher && !launcherReady)}
-          onClick={() => void startSignIn()}
-          aria-label={launcher ? copy.signInAndEnter : copy.signIn}
-        >
-          {status === "idle"
-            ? <LogIn aria-hidden="true" />
-            : <LoaderCircle className="field-auth-spinner" aria-hidden="true" />}
-          <span>{status === "waiting"
-            ? copy.waiting
-            : status === "adopting"
-              ? copy.adopting
-              : launcher
-                ? copy.signInAndEnter
-                : copy.signIn}</span>
-        </button>
-      )}
-      <span className="field-auth-status" role={error ? "alert" : undefined} aria-live="polite">
-        {error ?? (account ? `${copy.signedIn} ${account.displayName}` : "")}
-      </span>
-    </div>
-  );
+  return <div className={`field-auth-control${launcher ? " field-auth-control-launcher" : ""}`} data-authority="false">
+    {account && launcher ? <button type="button" disabled={!launcherReady} onClick={onAuthenticated} aria-label={copy.enter}><LogIn aria-hidden="true" />{copy.enter}</button>
+      : account ? <button type="button" aria-label={copy.signOut} onClick={() => { setError(""); void signOut().catch(() => setError(copy.failed)); }}><LogOut aria-hidden="true" />{account.displayName}</button>
+      : <button type="button" aria-label={copy.signIn} onClick={() => setOpen(true)}><LogIn aria-hidden="true" />{copy.signIn}</button>}
+    <span className="field-auth-status" role={error ? "alert" : undefined}>{error}</span>
+    {open && !account ? <div className="launcher-settings-backdrop" onKeyDown={(event) => { if (event.key === "Escape") setOpen(false); }}>
+      <div role="dialog" aria-modal="true" aria-label={copy.signIn} className="launcher-progress-panel">
+        <button type="button" className="launcher-auth-secondary" onClick={() => setOpen(false)}>{locale === "en" ? "Close" : "关闭"}</button>
+        <LauncherAccountForm locale={locale} onAuthenticated={() => { setOpen(false); if (launcherReady) onAuthenticated?.(); }} />
+      </div>
+    </div> : null}
+  </div>;
 }

@@ -237,7 +237,7 @@ class VehicleEnvelope(StrictModel):
     max_takeoff_mass_kg: float = Field(default=2.60, gt=0.1, le=70.0)
     max_total_thrust_n: float = Field(default=39.0, gt=1.0, le=5000.0)
     radius_m: float = Field(default=0.28, ge=0.05, le=3.0)
-    max_speed_mps: float = Field(default=1.30, ge=0.2, le=20.0)
+    max_speed_mps: float = Field(default=6.0, ge=0.2, le=20.0)
     max_acceleration_mps2: float = Field(default=3.0, ge=0.2, le=30.0)
     reserve_battery_percent: float = Field(default=30.0, ge=10.0, le=90.0)
 
@@ -303,6 +303,7 @@ AutonomyPlannerAction = Literal[
     "navigate",
     "traverse",
     "pickup",
+    "deliver",
     "inspect",
     "return",
     "land",
@@ -467,11 +468,7 @@ class AutonomyCompileRequest(StrictModel):
 
     @model_validator(mode="after")
     def validate_planner_task_semantics(self) -> AutonomyCompileRequest:
-        """Apply coarse required-action guards, not full natural-language understanding.
-
-        Canonical targets below apply only to the bundled pickup/return workflow;
-        generic assets still require downstream qualification and route validation.
-        """
+        """Check model-selected action shape without prescribing map-specific targets."""
         planner = self.asset_context.planner_binding if self.asset_context else None
         if planner is None:
             return self
@@ -482,11 +479,21 @@ class AutonomyCompileRequest(StrictModel):
             token in intent
             for token in ("pickup", "takeout", "collect", "retrieve", "取物", "取餐", "外卖")
         )
+        delivery_requested = any(
+            token in intent
+            for token in ("deliver", "delivery", "send", "drop off", "送到", "送往", "交付")
+        )
+        one_way_requested = any(
+            token in intent
+            for token in ("one-way", "do not return", "don't return", "单程", "不用回来", "不回来")
+        )
         return_requested = any(
             token in intent for token in ("return", "come back", "返航", "返回", "回来")
-        )
+        ) or ((pickup_requested or delivery_requested) and not one_way_requested)
         if pickup_requested:
             required.add("pickup")
+        if delivery_requested:
+            required.add("deliver")
         if return_requested:
             required.add("return")
         missing = required - actions
@@ -494,25 +501,6 @@ class AutonomyCompileRequest(StrictModel):
             raise ValueError(
                 "planner task graph is missing required actions: " + ", ".join(sorted(missing))
             )
-        assets = self.asset_context
-        if (
-            pickup_requested
-            and return_requested
-            and assets is not None
-            and assets.aircraft.asset_id == "aircraft-my-drone"
-            and assets.map_pack.asset_id == "map-school"
-        ):
-            required_targets = {
-                ("takeoff", "office-drone-launch-pad"),
-                ("pickup", "takeout-pickup"),
-                ("return", "office-drone-launch-pad"),
-                ("land", "office-drone-launch-pad"),
-            }
-            bound_targets = {(node.action, node.target) for node in planner.task_graph.nodes}
-            if not required_targets.issubset(bound_targets):
-                raise ValueError(
-                    "official School Map planner graph is missing canonical route targets"
-                )
         return self
 
 

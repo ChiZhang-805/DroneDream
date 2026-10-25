@@ -23,8 +23,8 @@ def request(**updates: object) -> TaskWorkflowCompileRequest:
     return TaskWorkflowCompileRequest.model_validate(values)
 
 
-def test_auto_routes_mission_and_keeps_tools_inside_sim_boundary() -> None:
-    contract = compile_task_workflow("user-a", request())
+def test_auto_routes_mission_and_keeps_tools_inside_universal_boundary() -> None:
+    contract = compile_task_workflow("user-a", request(edition="universal"))
     assert contract.task_type == "mission_autonomy"
     assert contract.routing_source == "auto_detect"
     assert contract.model_harness_domain == "autonomy.mission"
@@ -144,6 +144,7 @@ def test_conversation_binding_keeps_thread_and_task_stable_across_turns() -> Non
         request(
             request_id="request-workflow-turn-0001",
             conversation_id="conversation-coffee-0001",
+            edition="universal",
         ),
     )
     second = compile_task_workflow(
@@ -151,6 +152,7 @@ def test_conversation_binding_keeps_thread_and_task_stable_across_turns() -> Non
         request(
             request_id="request-workflow-turn-0002",
             conversation_id="conversation-coffee-0001",
+            edition="universal",
             message="Use the security gate pickup point instead.",
             requested_task_type="mission_autonomy",
         ),
@@ -160,6 +162,7 @@ def test_conversation_binding_keeps_thread_and_task_stable_across_turns() -> Non
         request(
             request_id="request-workflow-turn-0003",
             conversation_id="conversation-coffee-0002",
+            edition="universal",
         ),
     )
 
@@ -249,6 +252,8 @@ def test_legacy_edition_scoped_requests_share_only_the_same_responsibility_domai
     assert control_domains == {"optimization.control_tuning"}
     assert mission.memory_domain == "autonomy.mission"
     assert mission.memory_domain not in control_domains
+    assert mission.status == "blocked"
+    assert "edition.sim.task.mission_autonomy.denied" in mission.blockers
 
     universal = compile_task_workflow(
         "user-a",
@@ -268,6 +273,20 @@ def test_legacy_edition_scoped_requests_share_only_the_same_responsibility_domai
     )
     assert universal.control_plane.selection_sha256 == sim.control_plane.selection_sha256
     assert universal.control_plane.selection_sha256 != mission.control_plane.selection_sha256
+
+
+def test_agent_edition_rejects_parameter_optimization() -> None:
+    control = compile_task_workflow(
+        "user-a",
+        request(
+            edition="autonomy",
+            requested_task_type="control_tuning",
+            message="Tune the PX4 controller.",
+        ),
+    )
+
+    assert control.status == "blocked"
+    assert "edition.autonomy.task.control_tuning.denied" in control.blockers
 
 
 def test_workflow_language_is_bound_into_contract_and_step_copy() -> None:

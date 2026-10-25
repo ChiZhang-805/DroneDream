@@ -31,7 +31,7 @@ def vehicle_payload() -> dict[str, object]:
         "battery_energy_wh": 110.0,
         "reserve_battery_percent": 25.0,
         "maximum_pickup_payload_kg": 0.35,
-        "maximum_speed_mps": 4.0,
+        "maximum_speed_mps": 6.0,
         "maximum_acceleration_mps2": 2.0,
         "maximum_climb_mps": 1.5,
         "maximum_descent_mps": 1.0,
@@ -174,26 +174,32 @@ def test_vehicle_pack_blocks_an_unqualified_localization_stack() -> None:
 
 def map_pack_payload() -> dict[str, object]:
     return {
-        "name": "Engineering building",
-        "pack_id": "engineering-building",
-        "version": 2,
-        "compiler_scene_id": "stairwell-coffee-return",
+        "name": "Kumpula Campus",
+        "pack_id": "kumpula-campus",
+        "version": 1,
+        "compiler_scene_id": "school-campus-v1",
         "representation": "hybrid-3d",
         "coordinate_frame": "ENU",
-        "resolution_m": 0.10,
-        "floor_count": 3,
-        "bounds_m": {"x": 42.0, "y": 28.0, "z": 11.0},
+        "resolution_m": 0.18,
+        "floor_count": 1,
+        "bounds_m": {"x": 500.0, "y": 500.0, "z": 35.0},
         "origin": {"latitude": None, "longitude": None, "altitude_m": None},
-        "live_updates": "depth-fusion",
+        "live_updates": "fixed",
         "calibrated": True,
         "confidence_percent": 100.0,
-        "semantic_layers": ["free-space", "stairs", "doors", "people", "pickup-zones"],
+        "semantic_layers": [
+            "free-space",
+            "building-footprints",
+            "orthophoto",
+            "pickup-zones",
+            "delivery-zones",
+            "launch-zones",
+            "named-campus-buildings",
+        ],
         "planning_layers": [
             "collision-geometry",
-            "occupancy",
-            "esdf",
-            "dynamic-overlay",
-            "confidence",
+            "semantic-endpoints",
+            "runtime-3d-route-planning",
         ],
         "source_asset_receipt_ids": [],
     }
@@ -204,14 +210,14 @@ def test_bundled_map_pack_qualification_binds_exact_scene_manifest() -> None:
     receipt = qualify_map_pack(request)
 
     assert receipt.status == "qualified"
-    assert receipt.compiler_scene_id == "stairwell-coffee-return"
+    assert receipt.compiler_scene_id == "school-campus-v1"
     assert receipt.hardware_authority is False
     assert len(receipt.content_sha256) == 64
 
 
 def test_map_pack_qualification_blocks_scene_manifest_mismatch() -> None:
     payload = map_pack_payload()
-    payload["bounds_m"] = {"x": 40.0, "y": 28.0, "z": 11.0}
+    payload["bounds_m"] = {"x": 490.0, "y": 500.0, "z": 35.0}
     receipt = qualify_map_pack(MapPackQualificationRequest.model_validate(payload))
 
     assert receipt.status == "blocked"

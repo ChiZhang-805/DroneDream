@@ -8,7 +8,7 @@ rights or implies endorsement by an upstream project.
 
 ## Release inventory
 
-The current `0.1.0` runtime is built from the reviewed values in
+The current `0.1.1` runtime is built from the reviewed values in
 [`pins.env`](pins.env) and the exact Python input set in
 [`locks/python-requirements.lock`](locks/python-requirements.lock). Every built
 rootfs also records the effective package closures at:

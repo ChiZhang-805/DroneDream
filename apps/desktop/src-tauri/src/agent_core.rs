@@ -123,7 +123,9 @@ fn normalized_archive_path(root: &Path, path: &Path) -> Result<String, String> {
     Ok(parts.join("/"))
 }
 
-fn collect_asset_directory_files(root: &Path) -> Result<Vec<(PathBuf, String, u64)>, String> {
+pub(crate) fn collect_asset_directory_files(
+    root: &Path,
+) -> Result<Vec<(PathBuf, String, u64)>, String> {
     let mut pending = vec![root.to_path_buf()];
     let mut files = Vec::new();
     let mut total_bytes = 0_u64;
@@ -758,6 +760,9 @@ pub(crate) fn stop(handle: &AppHandle) {
 // 输出：
 //   timeout：包含响应传输余量的最大等待时间，不自动重发请求。
 fn core_request_timeout(method: &str, path: &str) -> Duration {
+    if method == "GET" && path.contains("/preparation-progress?") {
+        return Duration::from_secs(10);
+    }
     let parts: Vec<_> = path.split('/').collect();
     if method == "POST" && parts.len() == 5 && parts[1] == "v1" && parts[2] == "threads" {
         match parts[4] {

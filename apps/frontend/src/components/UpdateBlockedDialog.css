@@ -53,3 +53,8 @@
   font-weight: 700;
   cursor: pointer;
 }
+
+:root[data-dd-appearance="dark"] .update-blocked-dialog {
+  --app-text: #fff;
+  --app-surface: #181327;
+}

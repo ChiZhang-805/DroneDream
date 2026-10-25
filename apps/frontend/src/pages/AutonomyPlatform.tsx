@@ -4,6 +4,7 @@ import {
   Blocks,
   Cable,
   Camera,
+  ChevronRight,
   CircleUserRound,
   Cpu,
   GitBranch,
@@ -12,10 +13,9 @@ import {
   MapPin,
   Mic,
   Paperclip,
-  Navigation2,
   Orbit,
   Plus,
-  Radar,
+  Power,
   Route,
   ShieldCheck,
   Sparkles,
@@ -24,7 +24,7 @@ import {
   Play,
   Square,
   VideoOff,
-  Waypoints,
+  Video,
   X,
 } from "lucide-react";
 import {
@@ -36,6 +36,7 @@ import {
   type Dispatch,
   type FormEvent,
   type SetStateAction,
+  type SVGProps,
 } from "react";
 import {
   Link,
@@ -49,10 +50,31 @@ import {
 import type { BrandEditionId } from "../brand/edition-brand.generated";
 import { apiClient } from "../api/client";
 import { openAppSettings } from "../appSettings";
+import { MapImportDialog } from "../features/autonomy/MapImportDialog";
+import { AircraftImportDialog } from "../features/autonomy/AircraftImportDialog";
 import { AssetInterpretButton } from "../features/autonomy/AssetInterpretButton";
-import { AUTONOMY_CONVERSATIONS_CHANGED, autonomyConversationId, autonomyConversationPath, loadAutonomyConversation, newAutonomyConversation, preserveLegacyAutonomyConversation, saveAutonomyConversation } from "../features/autonomy/conversationStore";
-import { acquireAutonomyPlanning, useAutonomyPlanning } from "../features/autonomy/conversationActivity";
-import { bindVerifiedAssetPair, externalAssetReferenceFromVersion, reconcileAgentCoreWorkspace } from "../features/autonomy/assetPairBinding";
+import { AUTONOMY_CONVERSATIONS_CHANGED, autonomyConversationId, autonomyConversationPath, loadAutonomyConversation, newAutonomyConversation, preserveLegacyAutonomyConversation, saveAutonomyConversation, isAutonomyConversationDeleted, listAutonomyConversations, updateAutonomyConversation } from "../features/autonomy/conversationStore";
+import { acquireAutonomyPlanning, useAutonomyPlanning, useAutonomyProgress, publishAutonomyProgress } from "../features/autonomy/conversationActivity";
+import { PreparationProgress } from "../features/autonomy/PreparationProgress";
+import { InlineMissionMap } from "../features/autonomy/InlineMissionMap";
+import { MissionPlanCard } from "../features/autonomy/MissionPlanCard";
+import { conversationUsesChinese, taskUsesChinese } from "../features/autonomy/missionPresentation";
+import {
+  clarificationBrief,
+  clarificationOptionAnswer,
+  clarificationOptionDisplayAnswer,
+  clarificationOtherAnswer,
+  presentAutonomyClarification,
+} from "../features/autonomy/clarificationPresentation";
+import { RepositoryAsset3DView, type CatalogBuildingSelection } from "../features/autonomy/RepositoryAsset3DView";
+import {
+  catalogAssetDefinitions,
+  catalogAssetKey,
+  catalogAssetPresentation,
+  unrepresentedExternalAssets,
+  type CatalogAssetKind,
+} from "../features/autonomy/assetPresentation";
+import { bindCatalogAssetPair, bindVerifiedAssetPair, externalAssetReferenceFromVersion, reconcileAgentCoreWorkspace } from "../features/autonomy/assetPairBinding";
 import { AssistantModelPicker } from "../components/AssistantModelPicker";
 import {
   defaultAutonomyWorkspace,
@@ -75,7 +97,6 @@ import {
 import {
   autonomyMapPackQualified,
   planAutonomyMission,
-  type AutonomyPlanningModel,
 } from "../features/autonomy/autonomyPlanning";
 import {
   AgentCoreRequestError,
@@ -86,6 +107,7 @@ import {
   getAgentCoreAssetImportJobIssues,
   getAgentCoreAssetQualificationEvidence,
   getAgentCoreBootstrap,
+  getAgentCoreAssetPairCatalog,
   getAgentCoreStatus,
   getAgentCoreAssetQualificationJob,
   getAgentCoreAssetQualificationJobIssues,
@@ -94,7 +116,10 @@ import {
   getAgentCoreLiveSources,
   getAgentCoreLiveTelemetry,
   getAgentCoreRuntimeStatus,
+  startAgentCoreRuntimeSetup,
   listAgentCoreAssetImportJobs,
+  listAgentCoreMapResources,
+  listAgentCoreVehicleResources,
   listAgentCoreAssetSourceAdapters,
   pauseAgentCoreAssetQualificationJob,
   pickAndCreateAgentCoreAssetImportJob,
@@ -104,6 +129,7 @@ import {
   startAgentCoreAssetQualificationJob,
   type AgentCoreAssetImportJob,
   type AgentCoreAssetIssue,
+  type AgentCoreAssetPairCatalog,
   type AgentCoreAssetPairRuntimeContracts,
   type AgentCoreAssetQualificationEvidence,
   type AgentCoreAssetQualificationJob,
@@ -112,8 +138,17 @@ import {
   type AgentCoreExecutionEvidence,
   type AgentCoreLiveSource,
   type AgentCoreLiveTelemetry,
+  type AgentCoreMapResource,
+  type AgentCoreVehicleResource,
   type AgentCorePluginEntry,
 } from "../features/autonomy/agentCore";
+import {
+  compatibleAircraftChoices,
+  compatibleMapChoices,
+  FALLBACK_ASSET_PAIR_CATALOG,
+  selectedPair,
+  type PairCatalogChoice,
+} from "../features/autonomy/assetPairSelection";
 import {
   executeBoundAgentCoreMission,
   getBoundAgentCoreThread,
@@ -146,6 +181,7 @@ type WorkspaceContext = {
   registerExternalAsset: (
     version: AgentCoreAssetVersion,
     qualificationId?: string | null,
+    restore?: boolean,
   ) => AutonomyExternalAssetReference | null;
   bindQualifiedAssetPair: (
     job: AgentCoreAssetQualificationJob,
@@ -161,11 +197,22 @@ type WorkspaceContext = {
 
 const IGNORE_EXTERNAL_ASSET: WorkspaceContext["registerExternalAsset"] = () => null;
 
+function QuadcopterIcon(props: SVGProps<SVGSVGElement>) {
+  return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <circle cx="12" cy="12" r="2.4" />
+    <path d="M10.3 10.3 7.4 7.4M13.7 10.3l2.9-2.9M10.3 13.7l-2.9 2.9M13.7 13.7l2.9 2.9" />
+    <ellipse cx="5.5" cy="5.5" rx="3" ry="1.6" />
+    <ellipse cx="18.5" cy="5.5" rx="3" ry="1.6" />
+    <ellipse cx="5.5" cy="18.5" rx="3" ry="1.6" />
+    <ellipse cx="18.5" cy="18.5" rx="3" ry="1.6" />
+  </svg>;
+}
+
 type AutonomySectionId = "overview" | "aircraft" | "maps" | "plugins" | "live";
 
 const SECTION_ICONS = {
   overview: Orbit,
-  aircraft: Navigation2,
+  aircraft: QuadcopterIcon,
   maps: Layers3,
   plugins: Blocks,
   live: Airplay,
@@ -277,11 +324,45 @@ function localizedAutonomyError(
   chinese: boolean,
   fallback: { zh: string; en: string },
 ): string {
-  const code = value instanceof Error ? value.message.split(":", 1)[0] : "";
+  const raw = value instanceof Error ? value.message : String(value ?? "");
+  const code = raw.split(":", 1)[0];
+  if (
+    code === "MODEL_REQUEST_TOO_LARGE"
+    || code === "MODEL_CONSENSUS_INSUFFICIENT_RESPONSES"
+    || code === "MODEL_INVOCATION_FAILED"
+    || /APIStatusError:status=413/u.test(raw)
+  ) {
+    return chinese
+      ? "规划模型暂时无法处理当前上下文。软件会保留对话，请重试本轮指令。"
+      : "The planning model could not process the current context. Your conversation is preserved; retry this turn.";
+  }
+  if (["HARNESS_CONFIGURATION_UPGRADE_REQUIRED", "AGENT_CORE_INTERNAL_ERROR"].includes(code)) {
+    const id = value instanceof Error ? value.message.split(":")[1] : "";
+    const suffix = id && /^[a-f0-9]{32}$/u.test(id) ? ` (${id})` : "";
+    const message = code === "HARNESS_CONFIGURATION_UPGRADE_REQUIRED"
+      ? (chinese ? "任务流程配置需要升级，原会话已保留。" : "The mission workflow configuration needs an upgrade. Your conversation is preserved.")
+      : (chinese ? "任务处理出现内部错误，诊断记录已保存。" : "Mission processing encountered an internal error. Diagnostic evidence was saved.");
+    return message + suffix;
+  }
+  if (code === "ROUTE_ALTERNATIVE_NO_FEASIBLE_CANDIDATE" || raw.includes("ROUTE_ALTERNATIVE_NO_FEASIBLE_CANDIDATE")) {
+    return chinese
+      ? "当前地点暂时没有满足机体净空的可执行路线。任务已保留，请选择另一个地点或更换地图与无人机后重新规划。"
+      : "No route to this place currently satisfies the aircraft clearance. The task is preserved; choose another place or change the map and aircraft, then replan.";
+  }
+  if (code === "INTENT_REVIEW_EXHAUSTED" || raw.includes("INTENT_REVIEW_EXHAUSTED")) {
+    return chinese
+      ? "任务意图复核未能完成。对话和已选资源均已保留，请重试本轮指令。"
+      : "Mission intent review could not be completed. The conversation and selected resources were preserved; retry this turn.";
+  }
+  if (code === "REQUIRED_TOOL_FAILED" || code === "TOOL_EXECUTION_FAILED") {
+    return chinese
+      ? "路线工具未能完成本轮计算。任务与选择均已保留，请重新规划；若当前地点不可达，系统会改为给出可选地点，而不会显示内部错误。"
+      : "A route tool could not finish this calculation. The task and selections were preserved; replan to receive reachable alternatives instead of an internal error.";
+  }
   if (["AGENT_CORE_ASSET_PAIR_BINDING_REQUIRED", "AGENT_CORE_ASSET_PAIR_QUALIFICATION_ID_MISMATCH",
     "AGENT_CORE_ASSET_PAIR_QUALIFICATION_JOB_NOT_FOUND"].includes(code)) {
-    return chinese ? "所选地图与无人机尚未绑定到同一份有效认证。请在地图页检查组合认证后重试。"
-      : "The selected map and aircraft do not share a verified qualification. Check pair qualification on the Maps page, then retry.";
+    return chinese ? "软件尚未完成所选地图与无人机的自动适配检查。请重新选择组合；系统会在解析地图时自动判断可用机型。"
+      : "The app has not completed automatic compatibility analysis for the selected map and aircraft. Select the pair again; compatible aircraft are determined while the map is parsed.";
   }
   return localeSafeError(value, chinese ? "zh-CN" : "en", fallback);
 }
@@ -301,17 +382,6 @@ function localizedPlanIssue(
 function localizedStructuredTerm(value: string, chinese: boolean): string {
   const authored = STRUCTURED_TERM_COPY[value];
   return authored ? (chinese ? authored.zh : authored.en) : value.replaceAll("_", " ");
-}
-
-function localizedTaskNodeLabel(
-  node: { task_id: string; label: string },
-  index: number,
-  chinese: boolean,
-): string {
-  return localizedAutonomyError(node.label, chinese, {
-    zh: `任务节点 ${index + 1}（${node.task_id}）`,
-    en: `Task node ${index + 1} (${node.task_id})`,
-  });
 }
 
 function AgentCoreAssetIssueDetails({
@@ -427,6 +497,8 @@ export function AutonomyAssetConnectorPanel({
   const [catalogState, setCatalogState] = useState<"loading" | "ready" | "unavailable">("loading");
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [mapImportOpen, setMapImportOpen] = useState(false);
+  const [aircraftImportOpen, setAircraftImportOpen] = useState(false);
   const [remoteOpen, setRemoteOpen] = useState(false);
   const [remoteType, setRemoteType] = useState<"direct_url" | "git">("direct_url");
   const [remoteLocation, setRemoteLocation] = useState("");
@@ -446,7 +518,7 @@ export function AutonomyAssetConnectorPanel({
       bootstrap.asset_versions
         .filter((version) => (
           (version.kind === kind || (kind === "map" && version.kind === "world"))
-          && ["simulation_ready", "flight_ready", "qualified"].includes(version.maturity)
+          && (kind === "map" || ["simulation_ready", "flight_ready", "qualified"].includes(version.maturity))
         ))
         .forEach((version) => registerExternalAsset(
           version,
@@ -507,13 +579,20 @@ export function AutonomyAssetConnectorPanel({
       setImporting(false);
     }
   };
+  if (kind === "map") return <>
+    <div className="autonomy-repository-import">
+      <button type="button" className="btn btn-primary" onClick={() => setMapImportOpen(true)}><Upload aria-hidden="true" />{chinese ? "导入地图" : "Import map"}</button>
+    </div>
+    <MapImportDialog open={mapImportOpen} chinese={chinese} edition={outletWorkspace?.edition ?? "universal"}
+      onClose={() => setMapImportOpen(false)} onImported={version => registerExternalAsset(version, null, true)} />
+  </>;
   if (compact) {
     return (
       <div className="autonomy-repository-import">
         <button
           type="button"
           className="btn btn-primary"
-          onClick={() => void importAsset("file")}
+          onClick={() => setAircraftImportOpen(true)}
           disabled={importing || catalogState !== "ready"}
         >
           <Upload aria-hidden="true" />
@@ -524,6 +603,8 @@ export function AutonomyAssetConnectorPanel({
               : (chinese ? "导入地图" : "Import map")}
         </button>
         {importError ? <span role="alert">{importError}</span> : null}
+        <AircraftImportDialog open={aircraftImportOpen} chinese={chinese} adapters={coreAdapters}
+          onClose={() => setAircraftImportOpen(false)} onImported={version => registerExternalAsset(version)} />
       </div>
     );
   }
@@ -675,10 +756,10 @@ export function AutonomyAssetConnectorPanel({
           />
         </article>;
       })}</div> : null}
-      {assetLibrary.externalAssets.some((asset) => asset.kind === kind || (kind === "map" && asset.kind === "world")) ? (
+      {assetLibrary.externalAssets.some((asset) => asset.kind === kind) ? (
         <div className="autonomy-import-jobs autonomy-imported-sources">
           {assetLibrary.externalAssets
-            .filter((asset) => asset.kind === kind || (kind === "map" && asset.kind === "world"))
+            .filter((asset) => asset.kind === kind)
             .slice(0, 6)
             .map((asset) => (
               <article key={`${asset.id}:${asset.contentSha256}`}>
@@ -754,6 +835,17 @@ export function AutonomyAssetQualificationPanel({ chinese }: { chinese: boolean 
   }, [refresh]);
 
   const activeJob = jobs.find((job) => job.job_id === activeJobId) ?? null;
+  const selectableQualifiedJobs = jobs.filter((job) => (
+    job.state === "qualified"
+    && Boolean(job.qualification_id)
+    && Boolean(job.result_map_content_sha256)
+    && Boolean(job.result_vehicle_content_sha256)
+  ));
+  useEffect(() => {
+    if (!activeJob || activeJob.state !== "qualified") return;
+    if (activeJob.result_map_content_sha256) setMapHash(activeJob.result_map_content_sha256);
+    if (activeJob.result_vehicle_content_sha256) setVehicleHash(activeJob.result_vehicle_content_sha256);
+  }, [activeJob]);
   useEffect(() => {
     if (!activeJob || !["preparing", "running", "validating"].includes(activeJob.state)) return undefined;
     let active = true;
@@ -888,6 +980,10 @@ export function AutonomyAssetQualificationPanel({ chinese }: { chinese: boolean 
       {state === "loading" ? <span className="autonomy-connector-state">{chinese ? "正在读取可认证资产" : "Loading eligible assets"}</span> : null}
       {state === "unavailable" ? <span className="autonomy-connector-state is-unavailable">{chinese ? "需要桌面端认证" : "Desktop qualification required"}</span> : null}
       {state === "ready" ? <div className="autonomy-pair-selectors">
+        {selectableQualifiedJobs.length > 1 ? <label><span>{chinese ? "已认证地图组合" : "Qualified map pair"}</span><select value={activeJobId ?? ""} onChange={(event) => setActiveJobId(event.target.value || null)} disabled={working}><option value="">{chinese ? "选择已认证组合" : "Choose a qualified pair"}</option>{selectableQualifiedJobs.map((job) => {
+          const mapVersion = versions.find((version) => version.asset_id === job.map_asset_id && version.content_sha256 === job.result_map_content_sha256);
+          return <option key={job.job_id} value={job.job_id}>{mapVersion ? qualificationAssetLabel(mapVersion) : job.map_asset_id}</option>;
+        })}</select></label> : null}
         <label><span>{chinese ? "地图版本" : "Map version"}</span><select value={mapHash} onChange={(event) => setMapHash(event.target.value)} disabled={working || Boolean(activeJob && !["qualified", "failed", "cancelled"].includes(activeJob.state))}><option value="">{chinese ? "选择地图" : "Choose map"}</option>{mapVersions.map((version) => <option key={version.content_sha256} value={version.content_sha256}>{qualificationAssetLabel(version)}</option>)}</select></label>
         <label><span>{chinese ? "无人机版本" : "Aircraft version"}</span><select value={vehicleHash} onChange={(event) => setVehicleHash(event.target.value)} disabled={working || Boolean(activeJob && !["qualified", "failed", "cancelled"].includes(activeJob.state))}><option value="">{chinese ? "选择无人机" : "Choose aircraft"}</option>{vehicleVersions.map((version) => <option key={version.content_sha256} value={version.content_sha256}>{qualificationAssetLabel(version)}</option>)}</select></label>
       </div> : null}
@@ -1018,66 +1114,6 @@ function resolveMissionAssets(
   });
 }
 
-function AutonomyMissionPlanCard({
-  chinese,
-  workspace,
-}: {
-  chinese: boolean;
-  workspace: AutonomyWorkspaceState;
-}) {
-  const plan = workspace.mission.compiledPlan;
-  if (!plan) return null;
-  const blockingIssues = plan.issues.filter((issue) => issue.severity === "error");
-  return (
-    <section className="autonomy-inline-plan" aria-live="polite">
-      <header>
-        <span><Waypoints aria-hidden="true" /></span>
-        <div>
-          <small>{chinese ? "自动生成的任务计划" : "Generated mission plan"}</small>
-          <h3>{workspace.mission.intent}</h3>
-        </div>
-        <em className={plan.canExecute ? "is-ready" : "is-blocked"}>
-          {plan.canExecute ? (chinese ? "可进入仿真" : "Simulation ready") : (chinese ? "需要处理" : "Action required")}
-        </em>
-      </header>
-      <div className="autonomy-inline-plan-bindings">
-        <span><Navigation2 aria-hidden="true" /><small>{chinese ? "无人机" : "Aircraft"}</small><strong>{workspace.aircraft.name}</strong></span>
-        <span><Layers3 aria-hidden="true" /><small>{chinese ? "地图" : "Map"}</small><strong>{workspace.mapPack.name}</strong></span>
-          <span><Radar aria-hidden="true" /><small>{chinese ? "感知" : "Perception"}</small><strong>{chinese ? ({ map: "地图", vision: "视觉", fusion: "融合" } as const)[plan.perceptionMode] : plan.perceptionMode}</strong></span>
-        <span><Route aria-hidden="true" /><small>{chinese ? "路线" : "Route"}</small><strong>{plan.metrics.routeLengthM.toFixed(1)} m · {Math.ceil(plan.metrics.estimatedDurationS)} s</strong></span>
-      </div>
-      {blockingIssues.length ? <ul className="autonomy-inline-plan-issues">{blockingIssues.map((issue) => <li key={issue.code}><ShieldCheck aria-hidden="true" /><span>{localizedPlanIssue(issue, chinese)}</span></li>)}</ul> : null}
-      <details className="autonomy-task-graph" open>
-        <summary>
-          <span>{chinese ? "执行任务树" : "Execution task graph"}</span>
-          <small>{plan.taskGraph.nodes.length} {chinese ? "个可审计节点" : "auditable nodes"}</small>
-        </summary>
-        <ol>
-          {plan.taskGraph.nodes.map((node, index) => <li key={node.task_id} data-risk={node.risk}>
-            <i>{String(index + 1).padStart(2, "0")}</i>
-            <div>
-              <strong>{localizedTaskNodeLabel(node, index, chinese)}</strong>
-            <span>{localizedStructuredTerm(node.executor, chinese)} · {chinese ? ({ low: "低风险", medium: "中风险", high: "高风险", critical: "严重风险" } as const)[node.risk] : node.risk} · {node.timeout_s}s · {chinese ? "失败后" : "Fallback"} {localizedStructuredTerm(node.fallback, chinese)}</span>
-              <small>{chinese ? "证据" : "Evidence"}: {node.completion_evidence.join(" · ")}</small>
-            </div>
-          </li>)}
-        </ol>
-      </details>
-      <footer>
-        <span>{plan.source === "backend"
-          ? (chinese ? "后端合同" : "Backend contract")
-          : plan.source === "agent-core"
-            ? (chinese ? "AGENT Core 哈希绑定合同" : "AGENT Core hash-bound contract")
-            : (chinese ? "本地安全预览" : "Local safety preview")} · {plan.contractId}</span>
-        <div>
-          <Link className="btn" to="/autonomy/aircraft">{chinese ? "无人机" : "Aircraft"}</Link>
-          <Link className="btn" to="/autonomy/maps">{chinese ? "地图" : "Maps"}</Link>
-          {plan.canExecute ? <Link className="btn btn-primary" to="/autonomy/live"><Airplay aria-hidden="true" />{chinese ? "进入仿真" : "Open simulation"}</Link> : null}
-        </div>
-      </footer>
-    </section>
-  );
-}
 
 export function AutonomyPlatform() {
   const auth = useOptionalAuth();
@@ -1181,6 +1217,7 @@ export function AutonomyPlatform() {
 
   const persist = useCallback((next: AutonomyWorkspaceState) => {
     const id = next.mission.conversationId;
+    if (id && isAutonomyConversationDeleted(ownerId, edition, id)) return;
     if (id && (next.mission.messages.length || next.mission.compiledPlan)) {
       saveAutonomyConversation(ownerId, edition, next);
     }
@@ -1202,12 +1239,13 @@ export function AutonomyPlatform() {
   const registerExternalAsset = useCallback((
     version: AgentCoreAssetVersion,
     qualificationId: string | null = null,
+    restore = false,
   ) => {
     const reference = externalAssetReferenceFromVersion(version, qualificationId);
     setAssetLibrary((current) => saveAutonomyAssetLibrary(
       ownerId,
       edition,
-      withExternalAutonomyAsset(current, reference),
+      withExternalAutonomyAsset(restore ? { ...current, removedMapIds: current.removedMapIds?.filter(id => id !== reference.id) } : current, reference),
     ));
     return reference;
   }, [edition, ownerId]);
@@ -1238,7 +1276,7 @@ export function AutonomyPlatform() {
       );
     });
     return true;
-  }, [assetLibrary.aircraft, assetLibrary.maps, edition, ownerId, workspace]);
+  }, [assetLibrary, edition, ownerId, workspace]);
 
   const selectAircraft = useCallback((aircraftId: string) => {
     const aircraft = assetLibrary.aircraft.find((candidate) => candidate.id === aircraftId);
@@ -1285,6 +1323,13 @@ export function AutonomyPlatform() {
     id: string,
     contentSha256: string | null = null,
   ) => {
+    if (kind === "map" || (kind === "external" && assetLibrary.externalAssets.some(asset => asset.id === id && asset.kind !== "vehicle"))) {
+      setAssetLibrary(current => saveAutonomyAssetLibrary(ownerId, edition, {
+        ...current,
+        removedMapIds: [...new Set([...(current.removedMapIds ?? []), id])],
+      }));
+      return;
+    }
     if (kind === "external") {
       setAssetLibrary((current) => saveAutonomyAssetLibrary(ownerId, edition, {
         ...current,
@@ -1334,12 +1379,10 @@ export function AutonomyPlatform() {
         aircraft: kind === "aircraft"
           ? current.aircraft.filter((asset) => asset.id !== id)
           : current.aircraft,
-        maps: kind === "map"
-          ? current.maps.filter((asset) => asset.id !== id)
-          : current.maps,
+        maps: current.maps,
       }, savedWorkspace),
     ));
-  }, [edition, ownerId, workspace]);
+  }, [assetLibrary.externalAssets, edition, ownerId, workspace]);
 
   const sections: Array<{ id: AutonomySectionId; to: string }> = [
     { id: "overview", to: "/autonomy" },
@@ -1422,8 +1465,6 @@ export function AutonomyOverview() {
     chinese,
     workspace,
     assetLibrary,
-    selectAircraft,
-    selectMap,
     persist,
     agentCorePlugins,
     missionComposerDraft: composer,
@@ -1433,6 +1474,26 @@ export function AutonomyOverview() {
   const navigate = useNavigate();
   const ownerId = auth?.account?.id ?? "local";
   const generating = useAutonomyPlanning(ownerId, edition, workspace.mission.conversationId);
+  const [executionView, setExecutionView] = useState<{ conversationId: string; state: string; sourceId: string | null } | null>(null);
+  const executionMessageId = `execution-accepted:${workspace.mission.planningRunId ?? ""}`;
+  // 功能：
+  //   在真实执行回执到达后，把受理状态写入原会话；不将受理冒充已经起飞。
+  // 输入：
+  //   无，使用当前已绑定的会话和计划修订。
+  // 输出：
+  //   无，持久化一条幂等的执行受理消息。
+  const recordExecutionAccepted = () => {
+    const id = workspace.mission.conversationId;
+    if (!id) return;
+    const current = loadAutonomyConversation(ownerId, edition, id);
+    if (!current || current.mission.planningRunId !== workspace.mission.planningRunId || current.mission.messages.some((item) => item.id === executionMessageId)) return;
+    const now = new Date().toISOString();
+    persist({ ...current, mission: { ...current.mission, updatedAt: now, messages: [...current.mission.messages, {
+      id: executionMessageId, role: "assistant", createdAt: now, planContractId: null,
+      content: conversationUsesChinese(current) ? "已收到你的开始指令，仿真正在运行。" : "Start command received. Simulation is running.",
+    }] } });
+  };
+  const preparationEvents = useAutonomyProgress(ownerId, edition, workspace.mission.conversationId);
   const submitting = useRef(false);
   const {
     settings: modelAccess,
@@ -1443,6 +1504,10 @@ export function AutonomyOverview() {
     selectProfile,
   } = useModelAccess();
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [contextSubmenu, setContextSubmenu] = useState<"aircraft" | "map" | null>(null);
+  const [selectedContextAircraftId, setSelectedContextAircraftId] = useState<string | null>(null);
+  const [selectedContextMapId, setSelectedContextMapId] = useState<string | null>(null);
+  const [assetPairCatalog, setAssetPairCatalog] = useState<AgentCoreAssetPairCatalog>(FALLBACK_ASSET_PAIR_CATALOG);
   const [voiceConsentPending, setVoiceConsentPending] = useState(false);
   const [voiceConsentGranted, setVoiceConsentGranted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1453,12 +1518,19 @@ export function AutonomyOverview() {
   );
   const [managedModelsReady, setManagedModelsReady] = useState(!auth?.account);
   const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
+  const [clarificationOther, setClarificationOther] = useState<Record<string, string>>({});
+  const [openOtherQuestion, setOpenOtherQuestion] = useState<string | null>(null);
   const [inputProvenance, setInputProvenance] = useState<"text" | "web-speech" | "audio-attachment">("text");
   useEffect(() => {
     setError(null);
     setPendingAttachments([]);
     setInputProvenance("text");
     setContextMenuOpen(false);
+    setContextSubmenu(null);
+    setSelectedContextAircraftId(null);
+    setSelectedContextMapId(null);
+    setClarificationOther({});
+    setOpenOtherQuestion(null);
   }, [ownerId, edition, workspace.mission.conversationId]);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1494,9 +1566,19 @@ export function AutonomyOverview() {
     placeholder: "描述目标、途经点、环境和需要完成的工作…",
     workflow: "自主飞行任务",
     context: "任务上下文",
-    aircraft: "当前无人机",
-    map: "当前地图",
+    aircraft: "选择无人机",
+    map: "选择地图",
     selected: "已选择",
+    notSelected: "未选择",
+    clearSelection: "清除选择",
+    back: "返回",
+    allAircraft: "未选择地图，显示全部 13 种无人机",
+    allMaps: "可用地图",
+    filteredAircraft: "只显示与已选地图匹配的无人机",
+    filteredMaps: "只显示与已选无人机匹配的地图",
+    chooseBoth: "请同时选择一架无人机和一张匹配的地图，或将两项都清除后让系统根据任务自动选择。",
+    pairNeedsQualification: "该无人机与地图在结构上兼容，但尚未完成实际仿真配对验收，请先在资产页完成配对认证。",
+    selectedPairUnavailable: "已选无人机和地图的合格运行资产未安装，不能悄悄改用默认资产。",
     edit: "管理",
     send: "生成任务合同",
     model: "模型",
@@ -1529,9 +1611,19 @@ export function AutonomyOverview() {
     placeholder: "Describe the goal, waypoints, environment, and work to complete…",
     workflow: "Autonomous mission",
     context: "Mission context",
-    aircraft: "Current aircraft",
-    map: "Current map",
+    aircraft: "Select aircraft",
+    map: "Select map",
     selected: "Selected",
+    notSelected: "Not selected",
+    clearSelection: "Clear selection",
+    back: "Back",
+    allAircraft: "No map selected; showing all 13 aircraft",
+    allMaps: "Available maps",
+    filteredAircraft: "Only aircraft compatible with the selected map are shown",
+    filteredMaps: "Only maps compatible with the selected aircraft are shown",
+    chooseBoth: "Select both a compatible aircraft and map, or clear both to let the mission choose automatically.",
+    pairNeedsQualification: "This aircraft and map are structurally compatible but have not completed simulation pair qualification.",
+    selectedPairUnavailable: "The qualified runtime assets for this selection are not installed; the app will not silently use defaults.",
     edit: "Manage",
     send: "Build mission contract",
     model: "Model",
@@ -1560,13 +1652,25 @@ export function AutonomyOverview() {
       { title: "Unknown environment", body: "Use only the start and goal, build a local map in flight, plan a safe route, and replan as the world changes." },
     ],
   };
-  const publicWorkspace = defaultAutonomyWorkspace();
-  const publicAircraft = publicDemoConsole
-    ? assetLibrary.aircraft.find((aircraft) => aircraft.id === publicWorkspace.aircraft.id) ?? publicWorkspace.aircraft
-    : workspace.aircraft;
-  const publicMap = publicDemoConsole
-    ? assetLibrary.maps.find((mapPack) => mapPack.id === publicWorkspace.mapPack.id) ?? publicWorkspace.mapPack
-    : workspace.mapPack;
+  const allAircraftChoices = useMemo(() => compatibleAircraftChoices(assetPairCatalog, null), [assetPairCatalog]);
+  const availableMapCatalog = useMemo(() => ({ ...assetPairCatalog, pairs: assetPairCatalog.pairs.filter(pair => {
+    const assetId = pair.qualified_map_asset_id ?? (pair.map_resource_id === "dronedream-school-map" ? "dronedream.school-map.v1" : pair.map_resource_id);
+    return !(assetLibrary.removedMapIds ?? []).includes(assetId);
+  }) }), [assetPairCatalog, assetLibrary.removedMapIds]);
+  const allMapChoices = useMemo(() => compatibleMapChoices(availableMapCatalog, null), [availableMapCatalog]);
+  const aircraftChoices = useMemo(
+    () => compatibleAircraftChoices(assetPairCatalog, selectedContextMapId),
+    [assetPairCatalog, selectedContextMapId],
+  );
+  const mapChoices = useMemo(
+    () => compatibleMapChoices(availableMapCatalog, selectedContextAircraftId),
+    [availableMapCatalog, selectedContextAircraftId],
+  );
+  const selectedAircraftChoice = allAircraftChoices.find((choice) => choice.resourceId === selectedContextAircraftId) ?? null;
+  const selectedMapChoice = allMapChoices.find((choice) => choice.resourceId === selectedContextMapId) ?? null;
+  const localizedChoiceName = useCallback((choice: PairCatalogChoice | null) => (
+    choice ? choice.name[chinese ? "zh-CN" : "en-US"] : copy.notSelected
+  ), [chinese, copy.notSelected]);
   const appendTranscript = useCallback((transcript: string) => {
     setInputProvenance("web-speech");
     setComposer((current) => {
@@ -1620,12 +1724,24 @@ export function AutonomyOverview() {
           {
             id: "migrated-assistant-message",
             role: "assistant",
-            content: workspace.mission.planningBrief || copy.deterministicPlanReply,
+            content: workspace.mission.planningBrief || (conversationUsesChinese(workspace) ? "任务计划已生成。" : "The mission plan is ready."),
             createdAt: workspace.mission.updatedAt,
             planContractId: workspace.mission.compiledPlan.contractId,
           },
         ]
       : [];
+
+  useEffect(() => {
+    let active = true;
+    void getAgentCoreAssetPairCatalog().then((catalog) => {
+      if (active && catalog.pair_count === catalog.pairs.length) {
+        setAssetPairCatalog(catalog);
+      }
+    }).catch(() => {
+      // The immutable built-in matrix keeps the picker complete while the sidecar starts.
+    });
+    return () => { active = false; };
+  }, []);
 
   useEffect(() => {
     if (!auth?.account) {
@@ -1670,10 +1786,16 @@ export function AutonomyOverview() {
   useEffect(() => {
     if (!contextMenuOpen) return undefined;
     const closeOnOutside = (event: PointerEvent) => {
-      if (!contextMenuRef.current?.contains(event.target as Node)) setContextMenuOpen(false);
+      if (!contextMenuRef.current?.contains(event.target as Node)) {
+        setContextMenuOpen(false);
+        setContextSubmenu(null);
+      }
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setContextMenuOpen(false);
+      if (event.key === "Escape") {
+        if (contextSubmenu) setContextSubmenu(null);
+        else setContextMenuOpen(false);
+      }
     };
     document.addEventListener("pointerdown", closeOnOutside);
     document.addEventListener("keydown", closeOnEscape);
@@ -1681,12 +1803,12 @@ export function AutonomyOverview() {
       document.removeEventListener("pointerdown", closeOnOutside);
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [contextMenuOpen]);
+  }, [contextMenuOpen, contextSubmenu]);
 
-  const submitMission = async (event: FormEvent) => {
-    event.preventDefault();
+  const submitMission = async (event?: FormEvent, intentOverride?: string, displayIntentOverride?: string) => {
+    event?.preventDefault();
     if (submitting.current) return;
-    const intent = composer.trim();
+    const intent = (intentOverride ?? composer).trim();
     if (!intent) return;
     if (intent.length > 2_000) {
       setError(copy.tooLong);
@@ -1704,11 +1826,28 @@ export function AutonomyOverview() {
     submitting.current = true;
     setError(null);
     let submittedWorkspace: AutonomyWorkspaceState | null = null;
+    const responseChinese = taskUsesChinese(intent, conversationUsesChinese(workspace));
     try {
-      const submittedAttachments = pendingAttachments.slice(0, 8);
-      const selectedWorkspace = resolveMissionAssets(workspace, assetLibrary, intent);
+      const submittedAttachments = intentOverride === undefined
+        ? pendingAttachments.slice(0, 8)
+        : [];
+      let selectedWorkspace: AutonomyWorkspaceState;
+      if (!selectedContextAircraftId && !selectedContextMapId) {
+        selectedWorkspace = resolveMissionAssets(workspace, assetLibrary, intent);
+      } else {
+        if (!selectedContextAircraftId || !selectedContextMapId) throw new Error(copy.chooseBoth);
+        const pair = selectedPair(assetPairCatalog, selectedContextMapId, selectedContextAircraftId);
+        if (!pair?.compatible) throw new Error(copy.chooseBoth);
+        if (pair.status !== "qualified_builtin" || !pair.qualification_id) throw new Error(copy.pairNeedsQualification);
+        try {
+          selectedWorkspace = await bindCatalogAssetPair(workspace, assetLibrary, pair);
+        } catch {
+          throw new Error(copy.selectedPairUnavailable);
+        }
+      }
       const turnId = crypto.randomUUID();
-      const followUpPrefix = chinese ? "\n补充指令：" : "\nFollow-up instruction: ";
+      const replyChinese = taskUsesChinese(intent, conversationUsesChinese(selectedWorkspace));
+      const followUpPrefix = replyChinese ? "\n补充指令：" : "\nFollow-up instruction: ";
       const revisedIntent = selectedWorkspace.mission.messages.length || selectedWorkspace.mission.compiledPlan
         ? `${selectedWorkspace.mission.intent.slice(0, Math.max(0, 2_000 - followUpPrefix.length - intent.length))}${followUpPrefix}${intent}`
         : intent;
@@ -1716,7 +1855,7 @@ export function AutonomyOverview() {
       const userMessage: AutonomyConversationMessage = {
         id: `user-${turnId}`,
         role: "user",
-        content: intent,
+        content: (displayIntentOverride ?? intent).trim(),
         createdAt: submittedAt,
         planContractId: null,
         attachments: submittedAttachments.map((file) => ({
@@ -1758,7 +1897,7 @@ export function AutonomyOverview() {
         instruction: intent,
         conversationId: assistantWorkspaceId,
         turnId,
-        chinese,
+        chinese: replyChinese,
         selectedModel: selectedPlanningModel,
         accountId: auth?.account?.id ?? null,
         publicDemo: publicDemoConsole,
@@ -1766,6 +1905,9 @@ export function AutonomyOverview() {
         attachments: submittedAttachments,
         inputChannel: inputProvenance === "text" ? "text" : "voice",
         transcriptSource: inputProvenance === "text" ? null : inputProvenance,
+        onConversationTitle: listAutonomyConversations(ownerId, edition).some((item) => item.id === assistantWorkspaceId && item.generatedTitle)
+          ? undefined : (title) => updateAutonomyConversation(ownerId, edition, assistantWorkspaceId, { title }),
+        onProgress: (event) => publishAutonomyProgress(ownerId, edition, assistantWorkspaceId, event),
       });
       if (!planning.compiledPlan) {
         const updatedAt = new Date().toISOString();
@@ -1775,6 +1917,7 @@ export function AutonomyOverview() {
           content: planning.planningBrief,
           createdAt: updatedAt,
           planContractId: null,
+          clarification: planning.clarification ?? undefined,
         };
         persist(updatedWorkspace(missionWorkspace, {
           mission: {
@@ -1798,7 +1941,7 @@ export function AutonomyOverview() {
       const assistantMessage: AutonomyConversationMessage = {
         id: `assistant-${turnId}`,
         role: "assistant",
-        content: planning.planningBrief || copy.deterministicPlanReply,
+        content: planning.planningBrief || (replyChinese ? "任务计划已生成。" : "The mission plan is ready."),
         createdAt: updatedAt,
         planContractId: planning.compiledPlan.contractId,
       };
@@ -1819,14 +1962,35 @@ export function AutonomyOverview() {
         },
       }));
     } catch (reason) {
-      const message = localizedAutonomyError(reason, chinese, {
+      const message = localizedAutonomyError(reason, responseChinese, {
         zh: "请检查规划模型、任务资产与运行环境后重试。",
         en: "Check the planning model, mission assets, and runtime before trying again.",
       });
       if (submittedWorkspace) {
         try {
-          persist(updatedWorkspace(submittedWorkspace, { mission: { ...submittedWorkspace.mission, planningError: message, compiledPlan: null, updatedAt: new Date().toISOString() } }));
-        } catch { setError(chinese ? "会话保存失败，请检查本机存储。" : "Conversation could not be saved. Check local storage."); }
+          const failedAt = new Date().toISOString();
+          const recovery = reason instanceof AgentCoreRequestError
+            && reason.message === "ROUTE_ALTERNATIVE_NO_FEASIBLE_CANDIDATE"
+            ? (responseChinese
+                ? "当前地图中的命名地点没有找到满足机体净空的可执行三维航迹。系统已保留任务；请检查所选地图与无人机，或更换目标地点后重新规划。"
+                : "No clearance-valid 3D route was found between the named places for this aircraft. The task is preserved; review the selected map and aircraft or choose another destination, then replan.")
+            : message;
+          const failureMessage: AutonomyConversationMessage = {
+            id: `assistant-error-${crypto.randomUUID()}`,
+            role: "assistant",
+            kind: "error",
+            content: recovery,
+            createdAt: failedAt,
+            planContractId: null,
+          };
+          persist(updatedWorkspace(submittedWorkspace, { mission: {
+            ...submittedWorkspace.mission,
+            messages: [...submittedWorkspace.mission.messages, failureMessage].slice(-100),
+            planningError: null,
+            compiledPlan: null,
+            updatedAt: failedAt,
+          } }));
+        } catch { setError(responseChinese ? "会话保存失败，请检查本机存储。" : "Conversation could not be saved. Check local storage."); }
       } else setError(message);
     } finally {
       submitting.current = false;
@@ -1854,8 +2018,69 @@ export function AutonomyOverview() {
                     <span className="autonomy-conversation-avatar" aria-hidden="true"><Sparkles /></span>
                   ) : null}
                   <div className="autonomy-conversation-body">
-                    {/* 模型回复是会话内容，不是错误文案；跨语言澄清问题必须原样保留。 */}
-                    <p>{message.content}</p>
+                    {/* Preserve the conversation while presenting internal clarification fields in the user's language. */}
+                    {message.id === executionMessageId && workspace.mission.conversationId ? (
+                      <InlineSimulationViewer
+                        chinese={conversationUsesChinese(workspace)}
+                        conversationId={workspace.mission.conversationId}
+                        accountId={auth?.account?.id ?? null}
+                        viewState={executionView}
+                        workspace={workspace}
+                      />
+                    ) : <p role={message.kind === "error" ? "alert" : undefined}>{message.clarification
+                      ? clarificationBrief([], presentAutonomyClarification(message.clarification, conversationUsesChinese(workspace)), conversationUsesChinese(workspace))
+                      : message.content}</p>}
+                    {message.clarification?.questions.map((question) => {
+                      const presentedClarification = presentAutonomyClarification({ questions: [question] }, conversationUsesChinese(workspace));
+                      const presentedQuestion = presentedClarification?.questions[0] ?? question;
+                      const key = `${message.id}:${question.questionId}`;
+                      const active = conversationMessages.at(-1)?.id === message.id && !generating;
+                      const otherOpen = openOtherQuestion === key;
+                      return <section className="autonomy-clarification" key={key} aria-label={presentedQuestion.prompt}>
+                        <strong>{presentedQuestion.prompt}</strong>
+                        {presentedQuestion.options.length ? <div className="autonomy-clarification-options">
+                          {presentedQuestion.options.map((option) => <button
+                            type="button"
+                            key={option.optionId}
+                            disabled={!active}
+                            onClick={() => {
+                              const answerChinese = conversationUsesChinese(workspace);
+                              void submitMission(
+                                undefined,
+                                clarificationOptionAnswer(presentedQuestion, option, answerChinese),
+                                clarificationOptionDisplayAnswer(presentedQuestion, option, answerChinese),
+                              );
+                            }}
+                          ><span>{option.optionId}</span><b>{option.label}</b></button>)}
+                          {presentedQuestion.allowOther ? <button
+                            type="button"
+                            disabled={!active}
+                            aria-expanded={otherOpen}
+                            onClick={() => setOpenOtherQuestion((current) => current === key ? null : key)}
+                          ><span>{String.fromCharCode(65 + presentedQuestion.options.length)}</span><b>{presentedQuestion.otherLabel}</b></button> : null}
+                        </div> : null}
+                        {presentedQuestion.allowOther && otherOpen ? <div className="autonomy-clarification-other">
+                          <input
+                            value={clarificationOther[key] ?? ""}
+                            maxLength={240}
+                            autoFocus
+                            aria-label={presentedQuestion.otherLabel}
+                            onChange={(event) => setClarificationOther((current) => ({ ...current, [key]: event.target.value }))}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+                                event.preventDefault();
+                                const answer = (clarificationOther[key] ?? "").trim();
+                                if (answer) void submitMission(undefined, clarificationOtherAnswer(presentedQuestion, answer, conversationUsesChinese(workspace)));
+                              }
+                            }}
+                          />
+                          <button type="button" disabled={!(clarificationOther[key] ?? "").trim() || !active} onClick={() => {
+                            const answer = (clarificationOther[key] ?? "").trim();
+                            if (answer) void submitMission(undefined, clarificationOtherAnswer(presentedQuestion, answer, conversationUsesChinese(workspace)));
+                          }}>{conversationUsesChinese(workspace) ? "提交" : "Submit"}</button>
+                        </div> : null}
+                      </section>;
+                    })}
                     {message.attachments?.length ? (
                       <div className="autonomy-message-attachments">
                         {message.attachments.map((attachment) => (
@@ -1869,7 +2094,7 @@ export function AutonomyOverview() {
                     {message.role === "assistant"
                       && workspace.mission.compiledPlan
                       && message.planContractId === workspace.mission.compiledPlan.contractId
-                      ? <AutonomyMissionPlanCard chinese={chinese} workspace={workspace} />
+                      ? <MissionPlanCard chinese={conversationUsesChinese(workspace)} workspace={workspace} title={listAutonomyConversations(ownerId, edition).find((item) => item.id === workspace.mission.conversationId)?.title ?? (conversationUsesChinese(workspace) ? "任务计划" : "Mission plan")} formatIssue={localizedPlanIssue} controls={edition === "autonomy" && !publicDemoConsole ? <AgentCoreLiveMission key={`${ownerId}:${workspace.mission.conversationId}:${workspace.mission.planningRunId}`} chinese={conversationUsesChinese(workspace)} workspace={workspace} planningModel={workspace.mission.planningModel} accountId={auth?.account?.id ?? null} compact onAccepted={recordExecutionAccepted} onViewState={setExecutionView} /> : undefined} />
                       : null}
                   </div>
                   {message.role === "user" ? (
@@ -1886,9 +2111,9 @@ export function AutonomyOverview() {
                 </article>
               ))}
               {generating ? (
-                <article className="autonomy-conversation-message is-assistant is-generating" aria-label={chinese ? "正在生成任务计划" : "Generating mission plan"}>
+                <article className="autonomy-conversation-message is-assistant is-generating" aria-label={conversationUsesChinese(workspace) ? "正在生成任务计划" : "Generating mission plan"}>
                   <span className="autonomy-conversation-avatar" aria-hidden="true"><Sparkles /></span>
-                  <div className="autonomy-conversation-thinking"><i /><i /><i /></div>
+                  <PreparationProgress events={preparationEvents} chinese={conversationUsesChinese(workspace)} />
                 </article>
               ) : null}
             </div>
@@ -1990,46 +2215,88 @@ export function AutonomyOverview() {
                 title={copy.context}
                 aria-haspopup="dialog"
                 aria-expanded={contextMenuOpen}
-                onClick={() => setContextMenuOpen((current) => !current)}
+                onClick={() => setContextMenuOpen((current) => {
+                  if (current) setContextSubmenu(null);
+                  return !current;
+                })}
               >
                 <Plus aria-hidden="true" strokeWidth={1.8} />
               </button>
               {contextMenuOpen ? (
-                <div className="assistant-add-popover autonomy-context-popover" role="dialog" aria-label={copy.context}>
+                <div className="assistant-add-popover autonomy-context-popover" role="menu" aria-label={copy.context}>
                   <strong className="assistant-task-popover-title">{copy.context}</strong>
-                  {edition === "autonomy" ? (
-                    <button
-                      type="button"
-                      className="autonomy-context-file-action"
-                      onClick={() => {
-                        setContextMenuOpen(false);
-                        fileInputRef.current?.click();
-                      }}
-                    >
-                      <Paperclip aria-hidden="true" />
-                      <span><b>{copy.addFiles}</b><small>{copy.fileLimit}</small></span>
-                    </button>
-                  ) : null}
-                  <section className="autonomy-context-group" aria-label={copy.aircraft}>
-                    <header><span><Navigation2 aria-hidden="true" />{copy.aircraft}</span><Link to="/autonomy/aircraft" onClick={() => setContextMenuOpen(false)}>{copy.edit}</Link></header>
-                    {[publicAircraft].map((aircraft) => <label className="autonomy-context-asset" key={aircraft.id}>
-                      <input type="radio" name="autonomy-aircraft" value={aircraft.id} disabled={!isAutonomyAircraftAssetQualified(aircraft)} checked={aircraft.id === workspace.aircraft.id} onChange={() => selectAircraft(aircraft.id)} />
-                      <span><b>{aircraft.name}</b><small>{aircraft.airframe} · GPS · {aircraft.controlInterface.toUpperCase()}</small></span>
-                      {aircraft.id === workspace.aircraft.id ? <em>{copy.selected}</em> : null}
-                    </label>)}
-                  </section>
-                  <section className="autonomy-context-group" aria-label={copy.map}>
-                    <header><span><Layers3 aria-hidden="true" />{copy.map}</span><Link to="/autonomy/maps" onClick={() => setContextMenuOpen(false)}>{copy.edit}</Link></header>
-                    {[publicMap].map((mapPack) => <label className="autonomy-context-asset" key={mapPack.id}>
-                      <input type="radio" name="autonomy-map" value={mapPack.id} disabled={!autonomyMapPackQualified(mapPack)} checked={mapPack.id === workspace.mapPack.id} onChange={() => selectMap(mapPack.id)} />
-                      <span><b>{mapPack.name}</b><small>{mapRepresentationLabel(mapPack.representation, chinese)} · {mapPack.coordinateFrame}</small></span>
-                      {mapPack.id === workspace.mapPack.id ? <em>{copy.selected}</em> : null}
-                    </label>)}
-                  </section>
+                  {edition === "autonomy" ? <button type="button" role="menuitem" className="autonomy-context-menu-row autonomy-context-file-action" onClick={() => {
+                    setContextMenuOpen(false);
+                    setContextSubmenu(null);
+                    fileInputRef.current?.click();
+                  }}><Paperclip aria-hidden="true" /><b>{copy.addFiles}</b></button> : null}
+                  {(["aircraft", "map"] as const).map((kind) => {
+                    const open = contextSubmenu === kind;
+                    const isAircraft = kind === "aircraft";
+                    const choices = isAircraft ? aircraftChoices : mapChoices;
+                    const selectedId = isAircraft ? selectedContextAircraftId : selectedContextMapId;
+                    const selectedChoice = isAircraft ? selectedAircraftChoice : selectedMapChoice;
+                    const title = selectedChoice ? localizedChoiceName(selectedChoice) : isAircraft ? copy.aircraft : copy.map;
+                    return <div className="autonomy-context-cascade" key={kind} onPointerEnter={() => setContextSubmenu(kind)}>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="autonomy-context-menu-row"
+                        aria-haspopup="menu"
+                        aria-expanded={open}
+                        onFocus={() => setContextSubmenu(kind)}
+                        onClick={() => setContextSubmenu(kind)}
+                      >
+                        {isAircraft ? <QuadcopterIcon aria-hidden="true" /> : <Layers3 aria-hidden="true" />}
+                        <b>{title}</b>
+                        <ChevronRight aria-hidden="true" />
+                      </button>
+                      {open ? <div className="autonomy-context-submenu" role="menu" aria-label={isAircraft ? copy.aircraft : copy.map}>
+                        <button
+                          type="button"
+                          role="menuitemradio"
+                          aria-checked={!selectedId}
+                          className="autonomy-context-choice is-clear"
+                          onClick={() => {
+                            if (isAircraft) setSelectedContextAircraftId(null);
+                            else setSelectedContextMapId(null);
+                            setError(null);
+                            setContextSubmenu(null);
+                          }}
+                        ><b>{copy.clearSelection}</b>{!selectedId ? <span aria-hidden="true">✓</span> : null}</button>
+                        {choices.map((choice) => {
+                          const selected = selectedId === choice.resourceId;
+                          return <button
+                            type="button"
+                            className="autonomy-context-choice"
+                            role="menuitemradio"
+                            aria-checked={selected}
+                            key={choice.resourceId}
+                            onClick={() => {
+                              if (isAircraft) setSelectedContextAircraftId(choice.resourceId);
+                              else setSelectedContextMapId(choice.resourceId);
+                              setError(null);
+                              setContextSubmenu(null);
+                            }}
+                          ><b>{choice.name[chinese ? "zh-CN" : "en-US"]}</b>{selected ? <span aria-hidden="true">✓</span> : null}</button>;
+                        })}
+                      </div> : null}
+                    </div>;
+                  })}
                 </div>
               ) : null}
             </div>
             <span className="assistant-task-chip is-explicit"><Route aria-hidden="true" />{copy.workflow}</span>
+            {selectedAircraftChoice || conversationActive ? <span className="assistant-asset-chip is-aircraft">
+              <QuadcopterIcon aria-hidden="true" />{selectedAircraftChoice
+                ? localizedChoiceName(selectedAircraftChoice)
+                : catalogAssetPresentation("vehicle", workspace.aircraft.agentCoreAssetId?.trim() || workspace.aircraft.id, workspace.aircraft.name, chinese).name}
+            </span> : null}
+            {selectedMapChoice || conversationActive ? <span className="assistant-asset-chip is-map">
+              <Layers3 aria-hidden="true" />{selectedMapChoice
+                ? localizedChoiceName(selectedMapChoice)
+                : catalogAssetPresentation("map", workspace.mapPack.agentCoreAssetId?.trim() || workspace.mapPack.id, workspace.mapPack.name, chinese).name}
+            </span> : null}
             <span className="assistant-composer-spacer" />
             <AssistantModelPicker
               ariaLabel={copy.model}
@@ -2125,20 +2392,257 @@ function mapRepresentationLabel(value: AutonomyMapPack["representation"], chines
   return chinese ? MAP_REPRESENTATION_LABELS[value].zh : MAP_REPRESENTATION_LABELS[value].en;
 }
 
+const VEHICLE_DETAIL_LABELS: Record<string, string> = {
+  air_pressure: "气压计",
+  air_speed: "空速计",
+  altitude_hold: "定高飞行",
+  basic_control: "基础控制",
+  camera: "相机",
+  camera_imu: "相机惯性测量单元",
+  camera_perception_without_camera_dependency: "未安装相机时的视觉感知",
+  camera_pointing: "定向拍摄",
+  corridor_navigation: "走廊导航",
+  custom_optical_flow: "光流",
+  depth_avoidance: "深度避障",
+  depth_avoidance_without_additional_sensor: "未增加深度传感器时的深度避障",
+  depth_camera: "深度相机",
+  depth_only_vertical_clearance: "仅依赖深度相机的垂直净空判断",
+  doorways: "门口通行",
+  external_vision: "外部视觉定位",
+  forward_avoidance: "前向避障",
+  forward_obstacle_avoidance_without_additional_sensor: "未增加前视传感器时的前向避障",
+  full_surround_avoidance_without_additional_sensor: "未增加环视传感器时的全向避障",
+  gps_denied_hover: "无卫星定位悬停",
+  gpu_lidar: "激光雷达",
+  ground_clearance: "离地净空",
+  horizontal_clearance: "水平净空",
+  hover: "悬停",
+  imu: "惯性测量单元",
+  indoor_autonomy_without_perception: "无感知设备的室内自主飞行",
+  indoor_corridors: "室内走廊",
+  indoor_navigation: "室内导航",
+  indoor_position_hold: "室内定点",
+  inspection: "巡检",
+  landmark_navigation: "视觉路标导航",
+  long_range_fixed_wing: "固定翼长航程",
+  magnetometer: "磁力计",
+  marker_detection: "标记识别",
+  metric_depth_without_additional_sensor: "未增加测距传感器时的绝对深度估计",
+  navsat: "卫星定位",
+  near_field_avoidance: "近场避障",
+  odometry_publisher: "视觉里程计",
+  open_area: "开放场地",
+  outdoor_long_range: "室外长航程",
+  outdoor_research: "室外研究",
+  precision_landing: "精确降落",
+  site_transit: "场地间转运",
+  stairs: "楼梯间",
+  state_fusion: "状态融合",
+  target_tracking: "目标跟踪",
+  tight_doorways: "狭窄门口",
+  transition_flight: "转换飞行",
+  vertical_takeoff: "垂直起降",
+  visual_detection: "视觉检测",
+  visual_odometry: "视觉里程计",
+  vtol_research: "垂直起降研究",
+};
+
+function localizedVehicleDetails(values: string[], chinese: boolean): string {
+  if (values.length === 0) return "—";
+  return values.map((value) => chinese ? (VEHICLE_DETAIL_LABELS[value] ?? value) : value).join(" · ");
+}
+
+function RepositoryAssetPreview({
+  kind,
+  previewUrl,
+  previewKey,
+  name,
+}: {
+  kind: CatalogAssetKind;
+  previewUrl: string | null;
+  previewKey: string | null;
+  name: string;
+}) {
+  const FallbackIcon = kind === "map" ? Layers3 : QuadcopterIcon;
+  return (
+    <span
+      className={`autonomy-repository-preview is-${kind === "map" ? "map" : "aircraft"}`}
+      data-preview-key={previewKey ?? undefined}
+    >
+      <FallbackIcon aria-hidden="true" />
+      {previewUrl ? (
+        <img
+          src={previewUrl}
+          alt={name}
+          loading="lazy"
+          onError={(event) => { event.currentTarget.hidden = true; }}
+        />
+      ) : null}
+    </span>
+  );
+}
+
+const REPOSITORY_PENDING_SLOTS = [1, 2, 3, 4, 5] as const;
+
+function RepositoryPendingCard({ kind, index, chinese }: { kind: CatalogAssetKind; index: number; chinese: boolean }) {
+  const name = kind === "map"
+    ? (chinese ? "地图待添加" : "Map Pending")
+    : (chinese ? "无人机待添加" : "Aircraft Pending");
+  const previewUrl = `${import.meta.env.BASE_URL}asset-previews/${kind === "map" ? "maps/kumpula-campus-source.jpg" : "vehicles/x500-depth.webp"}`;
+  return <article className="autonomy-repository-pending" aria-disabled="true" data-pending-slot={index}>
+    <div className="autonomy-repository-card-surface" aria-label={`${name} ${index}`}>
+      <RepositoryAssetPreview kind={kind} previewUrl={previewUrl} previewKey={null} name={`${name} ${index}`} />
+      <span className="autonomy-repository-copy"><strong>{name}</strong></span>
+    </div>
+    <button
+      type="button"
+      className="autonomy-repository-delete"
+      aria-label={chinese ? `删除待添加${kind === "map" ? "地图" : "无人机"}` : `Delete pending ${kind}`}
+      disabled
+    ><Trash2 aria-hidden="true" /></button>
+  </article>;
+}
+
+type RepositoryDetails = {
+  title: string;
+  description?: string;
+  rows: Array<[string, string]>;
+  kind: CatalogAssetKind;
+  previewKey: string | null;
+};
+
+function useHiddenCatalogResources(kind: CatalogAssetKind): [Set<string>, (key: string) => void] {
+  const storageKey = `dronedream:autonomy-hidden-catalog:v1:${kind}`;
+  const [hidden, setHidden] = useState<Set<string>>(() => {
+    try {
+      const parsed = JSON.parse(window.localStorage.getItem(storageKey) ?? "[]") as unknown;
+      return new Set(Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string").slice(0, 100) : []);
+    } catch {
+      return new Set();
+    }
+  });
+  const hide = (key: string) => setHidden((current) => {
+    const next = new Set(current);
+    next.add(key);
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify([...next].slice(0, 100)));
+    } catch {
+      // The catalog remains hidden for this session when storage is disabled.
+    }
+    return next;
+  });
+  return [hidden, hide];
+}
+
 export function AutonomyAircraft() {
-  const { edition, chinese, workspace, assetLibrary, selectAircraft, removeAsset } = useAutonomyWorkspace();
-  const [details, setDetails] = useState<{ title: string; rows: Array<[string, string]> } | null>(null);
-  const defaultAircraftId = defaultAutonomyWorkspace().aircraft.id;
-  const externalAircraft = assetLibrary.externalAssets.filter((asset) => asset.kind === "vehicle");
+  const {
+    edition,
+    chinese,
+    assetLibrary,
+    selectAircraft,
+    registerExternalAsset,
+    removeAsset,
+  } = useAutonomyWorkspace();
+  const [details, setDetails] = useState<RepositoryDetails | null>(null);
+  const [selectedRepositoryAircraftId, setSelectedRepositoryAircraftId] = useState<string | null>(null);
+  const [hiddenCatalogResources, hideCatalogResource] = useHiddenCatalogResources("vehicle");
+  const [defaultResources, setDefaultResources] = useState<AgentCoreVehicleResource[]>([]);
+  const [resourceStates, setResourceStates] = useState<Record<string, "idle" | "working" | "qualification" | "ready" | "error">>({});
+  const catalogDefinitions = catalogAssetDefinitions("vehicle");
+  const customAircraft = assetLibrary.aircraft.filter((aircraft) => !catalogDefinitions.some(definition => definition.key === catalogAssetKey(
+    "vehicle",
+    aircraft.agentCoreAssetId?.trim() || aircraft.id,
+    aircraft.name,
+  )));
+  const externalAircraft = unrepresentedExternalAssets(
+    "vehicle",
+    [
+      ...catalogDefinitions.map((definition) => ({ id: definition.resourceId, name: definition.en })),
+      ...customAircraft.map((aircraft) => ({ id: aircraft.agentCoreAssetId?.trim() || aircraft.id, name: aircraft.name })),
+    ],
+    assetLibrary.externalAssets,
+  );
   const openAircraftDetails = (aircraft: AutonomyWorkspaceState["aircraft"]) => setDetails({
-    title: aircraft.name,
+    title: catalogAssetPresentation("vehicle", aircraft.agentCoreAssetId?.trim() || aircraft.id, aircraft.name, chinese).name,
+    kind: "vehicle",
+    previewKey: catalogAssetKey("vehicle", aircraft.agentCoreAssetId?.trim() || aircraft.id, aircraft.name),
     rows: [
       [chinese ? "制造商" : "Manufacturer", aircraft.manufacturer || "—"],
       [chinese ? "机架" : "Airframe", aircraft.airframe || "—"],
       [chinese ? "飞控" : "Flight controller", aircraft.flightController || "—"],
-      [chinese ? "传感器" : "Sensors", aircraft.sensors.join(" · ") || "—"],
+      [chinese ? "传感器" : "Sensors", localizedVehicleDetails(aircraft.sensors, chinese)],
+      [chinese ? "固件" : "Firmware", aircraft.firmware || aircraft.autopilot.toUpperCase()],
+      [chinese ? "控制接口" : "Control interface", aircraft.controlInterface.toUpperCase()],
+      [chinese ? "机身尺寸" : "Body size", `${aircraft.bodyLengthM} × ${aircraft.bodyWidthM} × ${aircraft.bodyHeightM} m`],
+      [chinese ? "空机质量" : "Dry mass", `${aircraft.dryMassKg.toFixed(2)} kg`],
+      [chinese ? "最大起飞质量" : "Takeoff mass", `${aircraft.maximumTakeoffMassKg.toFixed(2)} kg`],
+      [chinese ? "任务载荷" : "Payload", `${aircraft.maximumPickupPayloadKg} kg`],
+      [chinese ? "电池能量" : "Battery", `${aircraft.batteryEnergyWh} Wh`],
+      [chinese ? "速度上限" : "Speed limit", `${aircraft.maximumSpeedMps} m/s`],
     ],
   });
+  useEffect(() => {
+    let active = true;
+    void listAgentCoreVehicleResources().then((catalog) => {
+      if (active) setDefaultResources(catalog.resources);
+    }).catch(() => {
+      if (active) setDefaultResources([]);
+    });
+    return () => { active = false; };
+  }, []);
+  const resourceName = (resource: AgentCoreVehicleResource) => resource.display_name[chinese ? "zh-CN" : "en-US"];
+  const openResourceDetails = (resource: AgentCoreVehicleResource) => setDetails({
+    title: resourceName(resource),
+    kind: "vehicle",
+    previewKey: catalogAssetKey("vehicle", resource.resource_id, resourceName(resource)),
+    rows: [
+      [chinese ? "说明" : "Description", resource.description[chinese ? "zh-CN" : "en-US"]],
+      [chinese ? "来源" : "Source", `PX4 Gazebo Models @ ${resource.analysis.source_commit.slice(0, 12)}`],
+      [chinese ? "许可证" : "License", resource.license.spdx_id],
+      [chinese ? "机型" : "Vehicle class", chinese
+        ? (resource.vehicle_class === "multicopter" ? "多旋翼" : resource.vehicle_class === "vtol" ? "垂直起降固定翼" : resource.vehicle_class)
+        : resource.vehicle_class],
+      [chinese ? "传感器" : "Sensors", localizedVehicleDetails(resource.analysis.resolved_sensor_types, chinese)],
+      [chinese ? "模型依赖" : "Model dependencies", resource.analysis.dependency_models.join(" · ") || (chinese ? "无外部模型依赖" : "No external model dependency")],
+      [chinese ? "适合任务" : "Recommended for", localizedVehicleDetails(resource.analysis.recommended_for, chinese)],
+      [chinese ? "不适合任务" : "Excluded from", localizedVehicleDetails(resource.analysis.excluded_from, chinese)],
+      [chinese ? "预解析" : "Pre-analysis", chinese ? "已完成 SDF、传感器、插件和依赖解析" : "SDF, sensor, plugin, and dependency analysis complete"],
+      [chinese ? "飞行状态" : "Flight", chinese ? "需解析依赖并与具体地图配对验收" : "Requires dependencies and aircraft-map qualification"],
+    ],
+  });
+  const prepareDefaultResource = async (resource: AgentCoreVehicleResource) => {
+    if (resourceStates[resource.resource_id] === "working") return;
+    setResourceStates((current) => ({ ...current, [resource.resource_id]: "working" }));
+    try {
+      const created = await createAgentCoreRemoteAssetImportJob({
+        source_type: resource.source.source_type,
+        location: resource.source.location,
+        expected_kind: resource.source.expected_kind,
+        source_format: resource.source.source_format,
+        expected_sha256: resource.source.expected_sha256,
+        git_ref: resource.source.git_ref,
+        subpath: resource.source.subpath,
+      });
+      const processed = await processAgentCoreAssetImportJob(created.job_id);
+      if (processed.asset_id) {
+        const contentSha256 = processed.qualified_content_sha256
+          ?? processed.normalized_content_sha256;
+        const bootstrap = await getAgentCoreBootstrap();
+        const version = bootstrap.asset_versions.find((candidate) => (
+          candidate.asset_id === processed.asset_id
+          && (!contentSha256 || candidate.content_sha256 === contentSha256)
+        ));
+        if (version) registerExternalAsset(version);
+      }
+      setResourceStates((current) => ({
+        ...current,
+        [resource.resource_id]: processed.state === "qualified" ? "ready"
+          : processed.state === "needs_input" ? "qualification" : "error",
+      }));
+    } catch {
+      setResourceStates((current) => ({ ...current, [resource.resource_id]: "error" }));
+    }
+  };
 
   return (
     <section className="autonomy-repository-page">
@@ -2148,31 +2652,78 @@ export function AutonomyAircraft() {
         <AutonomyAssetConnectorPanel kind="vehicle" chinese={chinese} compact />
       </div>
       <div className="autonomy-repository-grid" aria-label={chinese ? "无人机仓库" : "Aircraft repository"}>
-        {assetLibrary.aircraft.map((aircraft) => (
-          <article key={aircraft.id} data-selected={workspace.aircraft.id === aircraft.id}>
+        {catalogDefinitions.filter((definition) => !hiddenCatalogResources.has(definition.key)).map((definition) => {
+          const aircraft = assetLibrary.aircraft.find((candidate) => catalogAssetKey(
+            "vehicle",
+            candidate.agentCoreAssetId?.trim() || candidate.id,
+            candidate.name,
+          ) === definition.key);
+          const resource = defaultResources.find((candidate) => (
+            candidate.resource_id === definition.resourceId
+            || catalogAssetKey("vehicle", candidate.resource_id, resourceName(candidate)) === definition.key
+          ));
+          const presentation = catalogAssetPresentation("vehicle", definition.resourceId, definition.en, chinese);
+          const state = resource ? resourceStates[resource.resource_id] ?? "idle" : "idle";
+          return <article
+            key={definition.key}
+            data-catalog-resource="true"
+            data-selected={Boolean(aircraft && selectedRepositoryAircraftId === aircraft.id)}
+          >
             <button
               type="button"
               className="autonomy-repository-card-surface"
-              onClick={() => selectAircraft(aircraft.id)}
-              onDoubleClick={() => openAircraftDetails(aircraft)}
+              onClick={() => {
+                if (aircraft) {
+                  setSelectedRepositoryAircraftId(aircraft.id);
+                  selectAircraft(aircraft.id);
+                }
+              }}
+              onDoubleClick={() => {
+                if (aircraft) openAircraftDetails(aircraft);
+                else if (resource) openResourceDetails(resource);
+                else setDetails({ title: presentation.name, kind: "vehicle", previewKey: presentation.key, rows: [[chinese ? "状态" : "Status", chinese ? "资源目录可见，运行服务启动后加载详情" : "Catalogued; details load when the runtime is ready"]] });
+              }}
             >
-              <span className="autonomy-repository-preview is-aircraft"><Navigation2 aria-hidden="true" /></span>
+              <RepositoryAssetPreview kind="vehicle" previewUrl={presentation.previewUrl} previewKey={presentation.key} name={presentation.name} />
               <span className="autonomy-repository-copy">
-                <strong>{aircraft.name}</strong>
-                <small>{[aircraft.manufacturer, aircraft.airframe].filter(Boolean).join(" · ")}</small>
+                <strong title={presentation.name}>{presentation.name}</strong>
               </span>
             </button>
+            {resource && !aircraft ? <button
+              type="button"
+              className="autonomy-repository-interpret"
+              data-state={state === "working" ? "busy" : state === "ready" ? "done" : state === "error" ? "error" : undefined}
+              disabled={state === "working" || state === "ready" || state === "qualification"}
+              aria-label={chinese ? `准备 ${presentation.name}` : `Prepare ${presentation.name}`}
+              title={chinese ? "准备这个无人机资源" : "Prepare this aircraft resource"}
+              onClick={() => void prepareDefaultResource(resource)}
+            ><Upload aria-hidden="true" /></button> : null}
+            <button
+              type="button"
+              className="autonomy-repository-delete"
+              aria-label={chinese ? "删除无人机" : "Delete aircraft"}
+              title={chinese ? `删除 ${presentation.name}` : `Delete ${presentation.name}`}
+              onClick={() => {
+                hideCatalogResource(definition.key);
+                if (aircraft?.id === selectedRepositoryAircraftId) setSelectedRepositoryAircraftId(null);
+              }}
+            ><Trash2 aria-hidden="true" /></button>
+          </article>;
+        })}
+        {customAircraft.map((aircraft) => {
+          const presentation = catalogAssetPresentation("vehicle", aircraft.agentCoreAssetId?.trim() || aircraft.id, aircraft.name, chinese);
+          return <article key={aircraft.id} data-selected={selectedRepositoryAircraftId === aircraft.id}>
+            <button type="button" className="autonomy-repository-card-surface" onClick={() => {
+              setSelectedRepositoryAircraftId(aircraft.id);
+              selectAircraft(aircraft.id);
+            }} onDoubleClick={() => openAircraftDetails(aircraft)}>
+              <RepositoryAssetPreview kind="vehicle" previewUrl={presentation.previewUrl} previewKey={presentation.key} name={presentation.name} />
+              <span className="autonomy-repository-copy"><strong title={presentation.name}>{presentation.name}</strong></span>
+            </button>
             <AssetInterpretButton edition={edition} chinese={chinese} kind="vehicle" assetId={aircraft.agentCoreAssetId ?? null} contentSha256={aircraft.agentCoreContentSha256 ?? null} name={aircraft.name} />
-            {aircraft.id !== defaultAircraftId ? (
-              <button
-                type="button"
-                className="autonomy-repository-delete"
-                aria-label={chinese ? `删除 ${aircraft.name}` : `Delete ${aircraft.name}`}
-                onClick={() => removeAsset("aircraft", aircraft.id)}
-              ><Trash2 aria-hidden="true" /></button>
-            ) : null}
-          </article>
-        ))}
+            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? "删除无人机" : "Delete aircraft"} title={chinese ? `删除 ${aircraft.name}` : `Delete ${aircraft.name}`} onClick={() => removeAsset("aircraft", aircraft.id)}><Trash2 aria-hidden="true" /></button>
+          </article>;
+        })}
         {externalAircraft.map((asset) => (
           <article key={`${asset.id}:${asset.contentSha256}`}>
             <button
@@ -2180,6 +2731,8 @@ export function AutonomyAircraft() {
               className="autonomy-repository-card-surface"
               onDoubleClick={() => setDetails({
                 title: asset.name,
+                kind: "vehicle",
+                previewKey: catalogAssetKey("vehicle", asset.id, asset.name),
                 rows: [
                   [chinese ? "来源" : "Source", asset.sourceApplication || "—"],
                   [chinese ? "格式" : "Format", asset.sourceFormat.toUpperCase()],
@@ -2187,13 +2740,17 @@ export function AutonomyAircraft() {
                 ],
               })}
             >
-              <span className="autonomy-repository-preview is-aircraft is-imported"><Navigation2 aria-hidden="true" /></span>
-              <span className="autonomy-repository-copy"><strong>{asset.name}</strong><small>{asset.sourceApplication || asset.sourceFormat}</small></span>
+              <RepositoryAssetPreview kind="vehicle" previewUrl={null} previewKey={null} name={asset.name} />
+              <span className="autonomy-repository-copy"><strong title={asset.name}>{asset.name}</strong></span>
             </button>
             <AssetInterpretButton edition={edition} chinese={chinese} kind="vehicle" assetId={asset.id} contentSha256={asset.contentSha256} name={asset.name} />
-            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${asset.name}` : `Delete ${asset.name}`} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
+            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? "删除无人机" : "Delete aircraft"} title={chinese ? `删除 ${asset.name}` : `Delete ${asset.name}`} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
           </article>
         ))}
+        {catalogDefinitions.length + customAircraft.length + externalAircraft.length < 6
+          ? REPOSITORY_PENDING_SLOTS.slice(0, 6 - catalogDefinitions.length - customAircraft.length - externalAircraft.length)
+            .map((slot) => <RepositoryPendingCard key={`vehicle-pending-${slot}`} kind="vehicle" index={slot} chinese={chinese} />)
+          : null}
       </div>
       {details ? <RepositoryDetailsDialog chinese={chinese} details={details} onClose={() => setDetails(null)} /> : null}
     </section>
@@ -2201,48 +2758,128 @@ export function AutonomyAircraft() {
 }
 
 export function AutonomyMaps() {
-  const { edition, chinese, workspace, assetLibrary, selectMap, removeAsset } = useAutonomyWorkspace();
-  const [details, setDetails] = useState<{ title: string; rows: Array<[string, string]> } | null>(null);
-  const defaultMapId = defaultAutonomyWorkspace().mapPack.id;
-  const externalMaps = assetLibrary.externalAssets.filter((asset) => asset.kind === "map" || asset.kind === "world");
-  const openMapDetails = (mapPack: AutonomyMapPack) => setDetails({
-    title: mapPack.name,
+  const {
+    chinese,
+    edition,
+    removeAsset,
+    assetLibrary,
+    selectMap,
+  } = useAutonomyWorkspace();
+  const [details, setDetails] = useState<RepositoryDetails | null>(null);
+  const [selectedRepositoryMapId, setSelectedRepositoryMapId] = useState<string | null>(null);
+  const [defaultResources, setDefaultResources] = useState<AgentCoreMapResource[]>([]);
+  const catalogDefinitions = catalogAssetDefinitions("map").filter(
+    (definition) => definition.key === "kumpula-campus" && !(assetLibrary.removedMapIds ?? []).includes("dronedream.school-map.v1"),
+  );
+  const openMapDetails = useCallback((
+    mapPack: AutonomyMapPack,
+    resource: AgentCoreMapResource | undefined,
+    title: string,
+  ) => setDetails({
+    title,
+    kind: "map",
+    previewKey: catalogAssetKey("map", mapPack.agentCoreAssetId?.trim() || mapPack.id, mapPack.name),
     rows: [
       [chinese ? "类型" : "Type", mapRepresentationLabel(mapPack.representation, chinese)],
-      [chinese ? "坐标系" : "Coordinate frame", mapPack.coordinateFrame],
+      [chinese ? "坐标系" : "Coordinates", mapPack.coordinateFrame],
       [chinese ? "分辨率" : "Resolution", `${mapPack.resolutionM} m`],
-      [chinese ? "楼层" : "Floors", String(mapPack.floorCount)],
+      [chinese ? "建筑" : "Buildings", String(resource?.analysis.building_count ?? resource?.analysis.model_count ?? "—")],
+      [chinese ? "范围" : "Size", `${mapPack.boundsM.x} × ${mapPack.boundsM.y} × ${mapPack.boundsM.z} m`],
+      [chinese ? "来源" : "Source", resource?.source.source_type === "bundled_ddpkg" ? "Helsinki · OpenStreetMap" : resource?.source.source_type ?? "DroneDream"],
+    ],
+  }), [chinese]);
+
+  useEffect(() => {
+    let active = true;
+    void listAgentCoreMapResources().then((catalog) => {
+      if (active) setDefaultResources(catalog.resources);
+    }).catch(() => {
+      if (active) setDefaultResources([]);
+    });
+    return () => { active = false; };
+  }, []);
+  const resourceName = (resource: AgentCoreMapResource) => resource.display_name[chinese ? "zh-CN" : "en-US"];
+  const openResourceDetails = (resource: AgentCoreMapResource) => setDetails({
+    title: resourceName(resource),
+    kind: "map",
+    previewKey: catalogAssetKey("map", resource.resource_id, resourceName(resource)),
+    rows: [
+      [chinese ? "建筑" : "Buildings", String(resource.analysis.building_count ?? resource.analysis.model_count ?? 0)],
+      [chinese ? "坐标系" : "Coordinates", resource.analysis.coordinate_frame ?? "—"],
+      [chinese ? "来源" : "Source", resource.source.source_type === "bundled_ddpkg" ? "Helsinki · OpenStreetMap" : resource.source.source_type],
+      [chinese ? "许可" : "License", resource.license.spdx_id],
     ],
   });
-
   return (
-    <section className="autonomy-repository-page">
+    <section className="autonomy-repository-page autonomy-map-repository">
       <h1 className="sr-only">{chinese ? "地图" : "Maps"}</h1>
       <div className="autonomy-repository-toolbar">
         <p>{chinese ? "双击卡片查看详情" : "Double-click a card for details"}</p>
         <AutonomyAssetConnectorPanel kind="map" chinese={chinese} compact />
       </div>
-      <div className="autonomy-repository-grid" aria-label={chinese ? "地图仓库" : "Map repository"}>
-        {assetLibrary.maps.map((mapPack) => (
-          <article key={mapPack.id} data-selected={workspace.mapPack.id === mapPack.id}>
-            <button type="button" className="autonomy-repository-card-surface" onClick={() => selectMap(mapPack.id)} onDoubleClick={() => openMapDetails(mapPack)}>
-              <span className="autonomy-repository-preview is-map"><Layers3 aria-hidden="true" /></span>
-              <span className="autonomy-repository-copy"><strong>{mapPack.name}</strong><small>{mapRepresentationLabel(mapPack.representation, chinese)}</small></span>
+      <div
+        className="autonomy-repository-grid"
+        role="region"
+        aria-label={chinese ? "地图仓库" : "Map repository"}
+      >
+        {catalogDefinitions.map((definition) => {
+          const mapPack = assetLibrary.maps.find((candidate) => catalogAssetKey(
+            "map",
+            candidate.agentCoreAssetId?.trim() || candidate.id,
+            candidate.name,
+          ) === definition.key);
+          const resource = defaultResources.find((candidate) => (
+            candidate.resource_id === definition.resourceId
+            || catalogAssetKey("map", candidate.resource_id, resourceName(candidate)) === definition.key
+          ));
+          const presentation = catalogAssetPresentation("map", definition.resourceId, definition.en, chinese);
+          return <article
+            key={definition.key}
+            data-catalog-resource="true"
+            data-selected={Boolean(mapPack && selectedRepositoryMapId === mapPack.id)}
+          >
+            <button
+              type="button"
+              className="autonomy-repository-card-surface"
+              onClick={() => {
+                if (mapPack) {
+                  setSelectedRepositoryMapId(mapPack.id);
+                  selectMap(mapPack.id);
+                }
+              }}
+              onDoubleClick={() => {
+                if (mapPack) openMapDetails(mapPack, resource, presentation.name);
+                else if (resource) openResourceDetails(resource);
+                else setDetails({ title: presentation.name, kind: "map", previewKey: presentation.key, rows: [[chinese ? "状态" : "Status", chinese ? "资源目录可见，运行服务启动后加载详情" : "Catalogued; details load when the runtime is ready"]] });
+              }}
+            >
+              <RepositoryAssetPreview kind="map" previewUrl={presentation.previewUrl} previewKey={presentation.key} name={presentation.name} />
+              <span className="autonomy-repository-copy"><strong title={presentation.name}>{presentation.name}</strong></span>
             </button>
-            <AssetInterpretButton edition={edition} chinese={chinese} kind="map" assetId={mapPack.agentCoreAssetId ?? null} contentSha256={mapPack.agentCoreContentSha256 ?? null} name={mapPack.name} />
-            {mapPack.id !== defaultMapId ? <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${mapPack.name}` : `Delete ${mapPack.name}`} onClick={() => removeAsset("map", mapPack.id)}><Trash2 aria-hidden="true" /></button> : null}
-          </article>
-        ))}
-        {externalMaps.map((asset) => (
-          <article key={`${asset.id}:${asset.contentSha256}`}>
-            <button type="button" className="autonomy-repository-card-surface" onDoubleClick={() => setDetails({ title: asset.name, rows: [[chinese ? "来源" : "Source", asset.sourceApplication || "—"], [chinese ? "格式" : "Format", asset.sourceFormat.toUpperCase()], [chinese ? "状态" : "Status", asset.maturity.replaceAll("_", " ")]] })}>
-              <span className="autonomy-repository-preview is-map is-imported"><Layers3 aria-hidden="true" /></span>
-              <span className="autonomy-repository-copy"><strong>{asset.name}</strong><small>{asset.sourceApplication || asset.sourceFormat}</small></span>
+            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? "删除地图" : "Delete map"} onClick={() => removeAsset("map", mapPack?.agentCoreAssetId || "dronedream.school-map.v1")}><Trash2 aria-hidden="true" /></button>
+          </article>;
+        })}
+        {unrepresentedExternalAssets("map", catalogDefinitions.map((item) => ({ id: item.resourceId, name: item.en })), assetLibrary.externalAssets).map((asset) => {
+          const name = asset.name;
+          return <article key={`${asset.id}:${asset.contentSha256}`}>
+            <button type="button" className="autonomy-repository-card-surface" onDoubleClick={() => setDetails({
+              title: name, kind: "map", previewKey: null,
+              rows: [[chinese ? "格式" : "Format", asset.sourceFormat], [chinese ? "来源" : "Source", asset.sourceApplication]],
+            })}>
+              <RepositoryAssetPreview kind="map" previewUrl={null} previewKey={null} name={name} />
+              <span className="autonomy-repository-copy"><strong>{name}</strong></span>
             </button>
-            <AssetInterpretButton edition={edition} chinese={chinese} kind="map" assetId={asset.id} contentSha256={asset.contentSha256} name={asset.name} />
-            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? `删除 ${asset.name}` : `Delete ${asset.name}`} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
-          </article>
-        ))}
+            <AssetInterpretButton edition={edition} chinese={chinese} kind="map" assetId={asset.id} contentSha256={asset.contentSha256} name={name} />
+            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? "删除地图" : "Delete map"} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
+          </article>;
+        })}
+        {(() => {
+          const externalCount = unrepresentedExternalAssets("map", catalogDefinitions.map((item) => ({ id: item.resourceId, name: item.en })), assetLibrary.externalAssets).length;
+          return catalogDefinitions.length + externalCount < 6
+            ? REPOSITORY_PENDING_SLOTS.slice(0, 6 - catalogDefinitions.length - externalCount)
+              .map((slot) => <RepositoryPendingCard key={`map-pending-${slot}`} kind="map" index={slot} chinese={chinese} />)
+            : null;
+        })()}
       </div>
       {details ? <RepositoryDetailsDialog chinese={chinese} details={details} onClose={() => setDetails(null)} /> : null}
     </section>
@@ -2255,31 +2892,248 @@ function RepositoryDetailsDialog({
   onClose,
 }: {
   chinese: boolean;
-  details: { title: string; rows: Array<[string, string]> };
+  details: RepositoryDetails;
   onClose: () => void;
 }) {
+  const [selectedBuilding, setSelectedBuilding] = useState<CatalogBuildingSelection | null>(null);
   return (
     <div className="autonomy-repository-dialog-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
     }}>
-      <section className="autonomy-repository-dialog" role="dialog" aria-modal="true" aria-label={details.title}>
+      <section className="autonomy-repository-dialog" data-kind={details.kind} role="dialog" aria-modal="true" aria-label={details.title}>
         <header><h2>{details.title}</h2><button type="button" onClick={onClose} aria-label={chinese ? "关闭" : "Close"}><X aria-hidden="true" /></button></header>
-        <dl>{details.rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+        <div className="autonomy-repository-dialog-body">
+          <div className="autonomy-repository-dialog-copy">
+            {details.description ? <p>{details.description}</p> : null}
+            <dl>{details.rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+            {details.kind === "map" && selectedBuilding ? <aside
+              className="autonomy-repository-building-card"
+              aria-live="polite"
+              data-building-number={selectedBuilding.number}
+            >
+              <dl>
+                <div><dt>{chinese ? "编号" : "No."}</dt><dd>{selectedBuilding.number}</dd></div>
+                <div><dt>{chinese ? "名称" : "Name"}</dt><dd>{chinese ? selectedBuilding.name_zh : selectedBuilding.name}</dd></div>
+                <div><dt>{chinese ? "功能" : "Function"}</dt><dd>{chinese ? selectedBuilding.function_zh : selectedBuilding.function}</dd></div>
+              </dl>
+            </aside> : null}
+          </div>
+          <RepositoryAsset3DView
+            kind={details.kind}
+            previewKey={details.previewKey}
+            name={details.title}
+            chinese={chinese}
+            onBuildingSelect={details.kind === "map" ? setSelectedBuilding : undefined}
+          />
+        </div>
       </section>
     </div>
   );
 }
 
+// 将当前 Gazebo 摄像机帧嵌入执行回执；电源键只控制画面拉取，不启动或停止任务。
+function InlineSimulationViewer({
+  chinese,
+  conversationId,
+  accountId,
+  viewState,
+  workspace,
+}: {
+  chinese: boolean;
+  conversationId: string;
+  accountId: string | null;
+  viewState: { conversationId: string; state: string; sourceId: string | null } | null;
+  workspace: AutonomyWorkspaceState;
+}) {
+  const [powered, setPowered] = useState(false);
+  const [threadId, setThreadId] = useState("");
+  const [sources, setSources] = useState<AgentCoreLiveSource[]>([]);
+  const [activeView, setActiveView] = useState("map");
+  const [telemetry, setTelemetry] = useState<AgentCoreLiveTelemetry | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const binding = useMemo(() => ({
+    edition: "autonomy" as const,
+    accountId,
+    conversationId,
+  }), [accountId, conversationId]);
+  const sourceId = viewState?.conversationId === conversationId ? viewState.sourceId : null;
+  const executionComplete = viewState?.conversationId === conversationId
+    && ["complete", "completed", "verified"].includes(viewState.state.toLowerCase());
+
+  useEffect(() => {
+    let cancelled = false;
+    const bind = async () => {
+      try {
+        const thread = await getBoundAgentCoreThread(binding);
+        if (!cancelled) setThreadId(thread?.thread_id ?? "");
+      } catch {
+        if (!cancelled) setThreadId("");
+      }
+    };
+    void bind();
+    const timer = window.setInterval(() => void bind(), 1_500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [binding]);
+
+  useEffect(() => {
+    if (!threadId) {
+      setSources([]);
+      return undefined;
+    }
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const catalog = await getAgentCoreLiveSources(threadId);
+        if (!cancelled) setSources(catalog.sources.filter((source) => source.ready && (source.kind === "simulation" || source.kind === "camera")));
+      } catch {
+        if (!cancelled) setSources([]);
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 1_200);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [threadId]);
+
+  useEffect(() => {
+    if (activeView !== "map" && !sources.some((source) => source.id === activeView)) setActiveView("map");
+  }, [activeView, sources]);
+
+  useEffect(() => {
+    if (!powered || !threadId) {
+      setTelemetry(null);
+      return undefined;
+    }
+    setTelemetry(null);
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const value = await getAgentCoreLiveTelemetry(threadId);
+        if (!cancelled) setTelemetry(value);
+      } catch {
+        // Keep the latest measured altitude visible while a completed run is being archived.
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 400);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [powered, threadId]);
+
+  const selectedSource = sources.find((source) => source.id === activeView) ?? null;
+
+  useEffect(() => {
+    if (!powered || !threadId || selectedSource?.transport !== "agent-core-frame") return undefined;
+    let cancelled = false;
+    let drawing = false;
+    const draw = async () => {
+      if (drawing) return;
+      drawing = true;
+      try {
+        const frame = await getAgentCoreLiveFrame(threadId, selectedSource.id);
+        const bitmap = await createImageBitmap(frame);
+        const canvas = canvasRef.current;
+        if (canvas && !cancelled) {
+          if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) {
+            canvas.width = bitmap.width;
+            canvas.height = bitmap.height;
+          }
+          canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
+        }
+        bitmap.close();
+      } catch {
+        // Gazebo may need a moment before the next camera frame is available.
+      } finally {
+        drawing = false;
+      }
+    };
+    void draw();
+    const timer = window.setInterval(() => void draw(), 120);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [powered, selectedSource?.id, selectedSource?.transport, threadId]);
+
+  const sourceLabel = (source: AgentCoreLiveSource) => {
+    const identity = `${source.id} ${source.label}`.toLowerCase();
+    if (identity.includes("gimbal")) return chinese ? "云台" : "Gimbal";
+    if (identity.includes("front") || identity.includes("forward")) return chinese ? "前视" : "Forward";
+    return source.kind === "simulation" ? (chinese ? "仿真" : "Simulation") : source.label;
+  };
+  const previewUrl = workspace.mapPack.agentCoreAssetId === "dronedream.school-map.v1" || workspace.mapPack.id === "map-school"
+    ? "/asset-previews/maps/kumpula-campus-orthophoto.jpg"
+    : null;
+
+  const livePath = sourceId
+    ? `/autonomy/conversations/${encodeURIComponent(conversationId)}/live?source=${encodeURIComponent(sourceId)}&autoplay=1`
+    : null;
+  return <section className="autonomy-inline-simulation" data-state={viewState?.state ?? "unbound"}>
+    <header>
+      <span>{executionComplete
+        ? (chinese ? "任务已完成。" : "Mission completed.")
+        : (chinese ? "已收到你的开始指令，仿真正在运行。" : "Start command received. Simulation is running.")}</span>
+      {livePath
+        ? <Link className="autonomy-inline-simulation-live" to={livePath} aria-label={chinese ? "在 Live 中查看" : "Open in Live"}><Video aria-hidden="true" /></Link>
+        : <button className="autonomy-inline-simulation-live" type="button" disabled aria-label={chinese ? "Live 画面尚未就绪" : "Live view is not ready"}><Video aria-hidden="true" /></button>}
+    </header>
+    <div className="autonomy-inline-television">
+      <div className="autonomy-inline-television-screen" data-powered={powered}>
+        {powered && activeView === "map" ? <InlineMissionMap
+          chinese={chinese}
+          routePositions={workspace.mission.compiledPlan?.routePositionsM ?? []}
+          telemetry={telemetry}
+          bounds={workspace.mapPack.boundsM}
+          previewUrl={previewUrl}
+        /> : null}
+        {powered && selectedSource?.transport === "agent-core-frame" ? <canvas ref={canvasRef} aria-label={sourceLabel(selectedSource)} /> : null}
+        {powered && selectedSource?.transport === "video" && selectedSource.url ? <video src={selectedSource.url} autoPlay playsInline muted /> : null}
+        {powered && selectedSource?.transport === "image" && selectedSource.url ? <img src={selectedSource.url} alt={sourceLabel(selectedSource)} /> : null}
+        <button
+          className="autonomy-inline-television-power"
+          type="button"
+          aria-pressed={powered}
+          aria-label={powered ? (chinese ? "关闭运行画面" : "Turn off simulation view") : (chinese ? "打开运行画面" : "Turn on simulation view")}
+          onClick={() => setPowered((current) => !current)}
+        ><Power aria-hidden="true" /></button>
+        <div className="autonomy-inline-view-switch" role="group" aria-label={chinese ? "切换运行视角" : "Switch live view"}>
+          <button type="button" data-active={activeView === "map"} aria-pressed={activeView === "map"} onClick={() => setActiveView("map")}><MapPin aria-hidden="true" /><span>{chinese ? "二维" : "2D"}</span></button>
+          {sources.map((source) => <button key={source.id} type="button" data-active={activeView === source.id} aria-pressed={activeView === source.id} onClick={() => setActiveView(source.id)}><Camera aria-hidden="true" /><span>{sourceLabel(source)}</span></button>)}
+        </div>
+      </div>
+    </div>
+  </section>;
+}
+
+// 功能：
+//   显示当前任务状态与显式启动入口；仅在确认时调用绑定计划的执行接口。
+// 输入：
+//   chinese：对话语言；workspace：当前会话；planningModel：规划时的模型；accountId：账户。
+// 输出：
+//   panel：启动检查、确认按钮及执行状态面板。
 export function AgentCoreLiveMission({
   chinese,
   workspace,
   planningModel,
   accountId,
+  compact = false,
+  onAccepted,
+  onViewState,
 }: {
   chinese: boolean;
   workspace: AutonomyWorkspaceState;
-  planningModel: AutonomyPlanningModel;
+  planningModel: AutonomyWorkspaceState["mission"]["planningModel"];
   accountId: string | null;
+  compact?: boolean;
+  onAccepted?: () => void;
+  onViewState?: (value: { conversationId: string; state: string; sourceId: string | null }) => void;
 }) {
   const [thread, setThread] = useState<Awaited<ReturnType<typeof getBoundAgentCoreThread>>>(null);
   const [runtimeReady, setRuntimeReady] = useState<boolean | null>(null);
@@ -2288,6 +3142,11 @@ export function AgentCoreLiveMission({
   const [working, setWorking] = useState(false);
   const [runtimeMessage, setRuntimeMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const callbacks = useRef({ onAccepted, onViewState });
+  callbacks.current = { onAccepted, onViewState };
+  const startLock = useRef(false);
+  const runtimeSetupLock = useRef(false);
+  const [accepted, setAccepted] = useState(false);
   const conversationId = workspace.mission.conversationId;
   const binding = useMemo(() => ({
     edition: "autonomy" as const,
@@ -2296,9 +3155,16 @@ export function AgentCoreLiveMission({
   }), [accountId, conversationId]);
 
   useEffect(() => {
+    setThread(null);
+    setRuntimeReady(null);
+    setExecutionEvidence(null);
+    setError(null);
     if (!conversationId) return undefined;
     let cancelled = false;
+    let refreshing = false;
     const refresh = async () => {
+      if (refreshing) return;
+      refreshing = true;
       try {
         const [nextThread, runtime] = await Promise.all([
           getBoundAgentCoreThread(binding),
@@ -2306,9 +3172,40 @@ export function AgentCoreLiveMission({
         ]);
         if (cancelled) return;
         setThread(nextThread);
-        setRuntimeReady(runtime.runtime_available && runtime.resources_ready && runtime.provisioned);
+        const nextRuntimeReady = runtime.runtime_available && runtime.resources_ready && runtime.provisioned;
+        setRuntimeReady(nextRuntimeReady);
         setRuntimeIssue(runtime.issue);
-        if (nextThread && ["executing", "completed", "failed"].includes(nextThread.state)) {
+        if (nextRuntimeReady) runtimeSetupLock.current = false;
+        if (
+          !nextRuntimeReady
+          && runtime.runtime_available
+          && runtime.resources_ready
+          && !runtime.provisioned
+          && runtime.issue === "RUNTIME_PROVISION_REQUIRED"
+          && !runtimeSetupLock.current
+        ) {
+          runtimeSetupLock.current = true;
+          void startAgentCoreRuntimeSetup().catch(() => {
+            runtimeSetupLock.current = false;
+          });
+        }
+        if (compact && callbacks.current.onViewState) {
+          let sourceId: string | null = null;
+          if (nextThread && ["executing", "holding", "landing"].includes(nextThread.state)) {
+            try {
+              const catalog = await getAgentCoreLiveSources(nextThread.thread_id);
+              const source = catalog.sources.find((item) => item.mode === "simulation" && item.ready && item.transport === "agent-core-frame");
+              if (source) {
+                const frame = await getAgentCoreLiveFrame(nextThread.thread_id, source.id);
+                const bitmap = await createImageBitmap(frame);
+                if (bitmap.width > 0 && bitmap.height > 0) sourceId = source.id;
+                bitmap.close();
+              }
+            } catch { /* No decodable current frame: keep viewing disabled. */ }
+          }
+          if (!cancelled) callbacks.current.onViewState({ conversationId, state: nextThread?.state ?? "unbound", sourceId });
+        }
+        if (!compact && nextThread && ["executing", "completed", "failed"].includes(nextThread.state)) {
           try {
             setExecutionEvidence(await getAgentCoreExecutionEvidence(nextThread.thread_id));
           } catch (reason) {
@@ -2319,10 +3216,16 @@ export function AgentCoreLiveMission({
           setExecutionEvidence(null);
         }
       } catch (reason) {
-        if (!cancelled) setError(localizedAutonomyError(reason, chinese, {
+        if (!cancelled) {
+          setRuntimeReady(false);
+          callbacks.current.onViewState?.({ conversationId, state: "unavailable", sourceId: null });
+          setError(localizedAutonomyError(reason, chinese, {
           zh: "AGENT Core 暂时不可用。",
           en: "AGENT Core is unavailable.",
         }));
+        }
+      } finally {
+        refreshing = false;
       }
     };
     void refresh();
@@ -2331,7 +3234,7 @@ export function AgentCoreLiveMission({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [binding, chinese, conversationId]);
+  }, [binding, chinese, conversationId, compact]);
 
   const executionInput = {
     ...binding,
@@ -2347,17 +3250,22 @@ export function AgentCoreLiveMission({
       : null,
   };
   const start = async () => {
+    if (startLock.current || accepted || working || runtimeReady !== true || thread?.state !== "awaiting_confirmation" || !workspace.mission.planningRunId) return;
+    startLock.current = true;
     setWorking(true);
     setError(null);
     try {
-      await executeBoundAgentCoreMission(executionInput);
-      setThread(await getBoundAgentCoreThread(binding));
+      const receipt = await executeBoundAgentCoreMission(executionInput);
+      setAccepted(true);
+      setThread((current) => current ? { ...current, state: receipt.state } : current);
+      callbacks.current.onAccepted?.();
     } catch (reason) {
       setError(localizedAutonomyError(reason, chinese, {
         zh: "AGENT Core 执行失败。",
         en: "AGENT Core execution failed.",
       }));
     } finally {
+      startLock.current = false;
       setWorking(false);
     }
   };
@@ -2391,9 +3299,9 @@ export function AgentCoreLiveMission({
           : thread.state === "landing"
             ? (chinese ? "安全降落中" : "Landing safely")
             : thread.state === "completed"
-              ? (chinese ? "已通过验收" : "Acceptance passed")
+              ? (chinese ? "运行已完成" : "Run completed")
               : thread.state === "failed"
-                ? (chinese ? "未通过验收" : "Acceptance failed")
+                ? (chinese ? "运行失败，请查看下方原因" : "Run failed; see details below")
                 : chinese ? "正在准备任务" : "Preparing mission";
   const statusMessages = (thread?.messages ?? [])
     .filter((message) => message.kind === "status" || message.kind === "error")
@@ -2401,6 +3309,13 @@ export function AgentCoreLiveMission({
   const evidenceResult = executionEvidence?.result;
   const evidenceGates = evidenceResult ? Object.values(evidenceResult.gates) : [];
   const passedEvidenceGates = evidenceGates.filter(Boolean).length;
+  if (compact) return <div className="autonomy-mission-start-controls">
+    <button className="btn btn-primary" type="button" disabled={accepted || working || runtimeReady !== true || thread?.state !== "awaiting_confirmation" || !workspace.mission.planningRunId} onClick={() => void start()}><Play aria-hidden="true" />{thread?.state === "failed" ? (chinese ? "运行失败" : "Run failed") : thread?.state === "completed" ? (chinese ? "已完成" : "Completed") : working ? (chinese ? "正在启动" : "Starting") : accepted || ["executing", "holding", "landing"].includes(thread?.state ?? "") ? (chinese ? "正在运行" : "Running") : (chinese ? "开始仿真" : "Start simulation")}</button>
+    {thread?.state === "failed" ? <p role="alert">{statusMessages.filter((message) => message.kind === "error").at(-1)?.content || (chinese ? "本次运行已结束，未取得成功完成的证据。请保留对话和运行日志以便排查。" : "This run ended without successful completion evidence. Keep the conversation and logs for diagnosis.")}</p> : null}
+    {thread?.state === "awaiting_confirmation" && runtimeReady === null ? <small>{chinese ? "正在检查运行环境" : "Checking runtime"}</small> : null}
+    {thread?.state === "awaiting_confirmation" && runtimeReady === false ? <small>{runtimeIssue === "RUNTIME_PROVISION_REQUIRED" ? (chinese ? "正在自动准备运行环境" : "Preparing the runtime automatically") : localizedAutonomyError(runtimeIssue, chinese, { zh: "运行环境尚未就绪", en: "Runtime not ready" })}</small> : null}
+    {error ? <p role="alert">{error}</p> : null}
+  </div>;
   return (
     <section className="agent-core-live-mission" aria-live="polite">
       <header>
@@ -2410,15 +3325,16 @@ export function AgentCoreLiveMission({
       </header>
       <div className="agent-core-live-bindings">
         <span><Layers3 aria-hidden="true" /><small>{chinese ? "地图哈希" : "Map hash"}</small><strong>{workspace.mapPack.agentCoreContentSha256?.slice(0, 16) ?? "—"}</strong></span>
-        <span><Navigation2 aria-hidden="true" /><small>{chinese ? "无人机哈希" : "Aircraft hash"}</small><strong>{workspace.aircraft.agentCoreContentSha256?.slice(0, 16) ?? "—"}</strong></span>
+        <span><QuadcopterIcon aria-hidden="true" /><small>{chinese ? "无人机哈希" : "Aircraft hash"}</small><strong>{workspace.aircraft.agentCoreContentSha256?.slice(0, 16) ?? "—"}</strong></span>
         <span><Cpu aria-hidden="true" /><small>{chinese ? "模型" : "Model"}</small><strong>{planningModel.provider} · {planningModel.model}</strong></span>
       </div>
-      {runtimeReady === false ? <p className="agent-core-live-warning"><ShieldCheck aria-hidden="true" />{localizedAutonomyError(runtimeIssue, chinese, { zh: "运行环境尚未就绪，请从首屏完成环境安装。", en: "The runtime is not ready. Complete setup from the launch screen." })}</p> : null}
+      {runtimeReady === false ? <p className="agent-core-live-warning"><ShieldCheck aria-hidden="true" />{runtimeIssue === "RUNTIME_PROVISION_REQUIRED" ? (chinese ? "正在自动准备运行环境，完成后即可开始仿真。" : "Preparing the runtime automatically. Simulation will be available when it finishes.") : localizedAutonomyError(runtimeIssue, chinese, { zh: "运行环境尚未就绪，请检查运行环境。", en: "The runtime is not ready. Check the runtime environment." })}</p> : null}
       {error ? <p className="agent-core-live-error">{error}</p> : null}
       {thread?.state === "awaiting_confirmation" ? (
         <div className="agent-core-live-confirmation">
           <p>{chinese ? "确认后才会启动真实的 Gazebo 与 PX4 SITL；规划合同、地图和无人机哈希在启动前会再次校验。" : "Gazebo and PX4 SITL start only after confirmation. The mission contract and exact asset hashes are revalidated before launch."}</p>
-          <button className="btn btn-primary" type="button" disabled={working || runtimeReady !== true} onClick={() => void start()}><Airplay aria-hidden="true" />{working ? (chinese ? "正在启动" : "Starting") : (chinese ? "确认并开始仿真" : "Confirm and start simulation")}</button>
+          <button className="btn btn-primary" type="button" disabled={working || runtimeReady !== true || !workspace.mission.planningRunId} onClick={() => void start()}><Airplay aria-hidden="true" />{working ? (chinese ? "正在启动" : "Starting") : (chinese ? "确认并开始仿真" : "Confirm and start simulation")}</button>
+          {!workspace.mission.planningRunId ? <p role="alert">{chinese ? "当前计划缺少版本标识，请返回对话重新生成计划。" : "The plan revision is missing. Return to the conversation and generate a new plan."}</p> : null}
         </div>
       ) : null}
       {thread?.state === "executing" ? (
@@ -2501,7 +3417,10 @@ async function persistLiveRecording(blob: Blob, fileName: string) {
 }
 
 export function AutonomyLive() {
-  const { chinese, workspace } = useAutonomyWorkspace();
+  const location = useLocation();
+  const autoplayedRequest = useRef<string | null>(null);
+  const { chinese: interfaceChinese, workspace } = useAutonomyWorkspace();
+  const chinese = workspace.mission.messages.length ? conversationUsesChinese(workspace) : interfaceChinese;
   const auth = useOptionalAuth();
   const edition = useEditionTheme().id;
   const conversationId = workspace.mission.conversationId;
@@ -2625,6 +3544,16 @@ export function AutonomyLive() {
   }, [stream]);
 
   const selectedSource = sources.find((source) => source.id === sourceId) ?? null;
+  // 仅自动打开经过真实帧就绪检查的仿真来源，绝不自动启用用户摄像头或启动飞行。
+  useEffect(() => {
+    const query = new URLSearchParams(location.search);
+    const requestKey = location.pathname + location.search;
+    if (autoplayedRequest.current === requestKey) return;
+    const requested = query.get("source");
+    if (query.get("autoplay") !== "1" || !requested) return;
+    const source = coreSources.find((item) => item.id === requested && item.ready && item.mode === "simulation" && item.transport === "agent-core-frame");
+    if (source) { autoplayedRequest.current = requestKey; setSourceId(source.id); setPlaying(true); }
+  }, [location.pathname, location.search, coreSources]);
   const play = async () => {
     if (!selectedSource) return;
     if (selectedSource.transport === "media-device") {
@@ -2648,7 +3577,7 @@ export function AutonomyLive() {
       if (busy) return;
       busy = true;
       try {
-        const frame = await getAgentCoreLiveFrame(threadId);
+        const frame = await getAgentCoreLiveFrame(threadId, selectedSource.id);
         const bitmap = await createImageBitmap(frame);
         const canvas = canvasRef.current;
         if (canvas && !cancelled) {
@@ -2671,7 +3600,7 @@ export function AutonomyLive() {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [playing, selectedSource?.transport, threadId]);
+  }, [playing, selectedSource?.transport, selectedSource?.id, threadId]);
 
   useEffect(() => {
     if (!playing || selectedSource?.kind !== "gps") {

@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.7
 ARG UBUNTU_BASE_IMAGE=ubuntu:24.04@sha256:52df9b1ee71626e0088f7d400d5c6b5f7bb916f8f0c82b474289a4ece6cf3faf
 FROM ${UBUNTU_BASE_IMAGE}
 
@@ -49,7 +48,8 @@ RUN curl --fail --location --silent --show-error "${GAZEBO_APT_KEY_URL}" \
       "${GAZEBO_METAPACKAGE}=${GAZEBO_METAPACKAGE_VERSION}" && \
     rm -rf /var/lib/apt/lists/* /tmp/gazebo.gpg
 
-RUN git clone --branch "${PX4_VERSION}" --depth 1 --recursive \
+RUN git -c http.version=HTTP/1.1 clone \
+      --branch "${PX4_VERSION}" --depth 1 --filter=blob:none \
       "${PX4_GIT_URL}" /opt/PX4-Autopilot && \
     test "$(git -C /opt/PX4-Autopilot rev-parse HEAD)" = "${PX4_GIT_COMMIT}" && \
     cd /opt/PX4-Autopilot && \
@@ -58,7 +58,9 @@ RUN git clone --branch "${PX4_VERSION}" --depth 1 --recursive \
 
 USER dronedream
 RUN cd /opt/PX4-Autopilot && \
-    make px4_sitl_default -j"${PX4_BUILD_JOBS}"
+    git config --global http.version HTTP/1.1 && \
+    CI=true make px4_sitl_default -j"${PX4_BUILD_JOBS}" && \
+    cp -a build/px4_sitl_default/etc build/px4_sitl_default/rootfs/etc
 USER root
 
 RUN git clone --filter=blob:none "${VALKEY_GIT_URL}" /tmp/valkey && \
@@ -130,7 +132,8 @@ RUN test -n "${OIDC_ISSUER}" && test -n "${OIDC_JWKS_URL}" && \
       -e "s|__OIDC_JWKS_URL__|${OIDC_JWKS_URL}|g" \
       -e "s|__MODEL_GATEWAY_BASE_URL__|${MODEL_GATEWAY_BASE_URL}|g" \
       /usr/lib/dronedream/runtime.env.default && \
-    ! grep -q '__[A-Z0-9_]*__' /usr/lib/dronedream/runtime.env.default && \
+    ! grep -Eq '__OIDC_ISSUER__|__OIDC_JWKS_URL__|__MODEL_GATEWAY_BASE_URL__' \
+      /usr/lib/dronedream/runtime.env.default && \
     chmod 0755 /usr/lib/dronedream/runtime-init.sh \
       /usr/lib/dronedream/runtime-check.sh /usr/lib/dronedream/px4-gazebo-smoke.py \
       /usr/lib/dronedream/px4-log-cleanup.py /usr/lib/dronedream/engine-pack-manager.py \
@@ -175,9 +178,14 @@ RUN test -n "${OIDC_ISSUER}" && test -n "${OIDC_JWKS_URL}" && \
     test -x /usr/bin/journalctl && \
     test -x /usr/bin/ss && \
     test -x /usr/bin/ip && \
+    test -x /opt/PX4-Autopilot/build/px4_sitl_default/bin/px4 && \
+    test -s /opt/PX4-Autopilot/build/px4_sitl_default/rootfs/etc/init.d-posix/rcS && \
+    test -s /opt/PX4-Autopilot/build/px4_sitl_default/rootfs/gz_env.sh && \
+    test -s /opt/PX4-Autopilot/Tools/simulation/gz/models/x500/model.sdf && \
     test -s /usr/share/doc/valkey/COPYING && \
     test -s /usr/share/doc/dronedream-runtime/LICENSE && \
     test -s /usr/share/doc/dronedream-runtime/THIRD_PARTY_NOTICES.md && \
+    chmod 0644 /etc/systemd/system/*.service /etc/systemd/system/*.timer && \
     systemd-analyze cat-config systemd/journald.conf >/dev/null && \
     systemd-analyze verify /etc/systemd/system/dronedream-runtime-init.service \
       /etc/systemd/system/valkey.service /etc/systemd/system/dronedream-api.service \

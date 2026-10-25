@@ -1,0 +1,219 @@
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useAuthOrLocal } from "../features/auth/AuthContext";
+import { AuthCaptcha } from "../features/auth/AuthCaptcha";
+import { captchaProtectionConfigured, githubAuthEnabled, googleAuthEnabled, slackAuthEnabled, turnstileSiteKey } from "../features/auth/supabaseClient";
+import { cancelDesktopBrowserSignIn, completeDesktopBrowserSignIn } from "../features/auth/desktopBrowserSignIn";
+import type { BrowserAuthRequest } from "../desktop/bridge";
+import { SocialProviderIcon } from "./SocialProviderIcon";
+
+const COPY = {
+  en: { title: "Welcome to DroneDream", login: "Sign in", register: "Create account", email: "Email", password: "Password", code: "Email code", send: "Send code", verify: "Verify & continue", busy: "Please wait…", sent: "Check your email for a code.", failed: "Sign-in failed. Try again.", codeFailed: "Code not sent. Try again.", verifyFailed: "Check the code and try again.", unavailable: "Account access is unavailable.", forgot: "Forgot password?", recovery: "Reset your password", newPassword: "New password", back: "Back to sign in", reset: "Reset & sign in", passwordHint: "At least 8 characters" },
+  "zh-CN": { title: "欢迎使用 DroneDream", login: "登录", register: "注册", email: "邮箱", password: "密码", code: "邮箱验证码", send: "发送验证码", verify: "验证并继续", busy: "请稍候…", sent: "验证码已发送，请查看邮箱。", failed: "登录失败，请重试。", codeFailed: "发送失败，请重试。", verifyFailed: "验证码有误，请重试。", unavailable: "账户服务暂不可用。", forgot: "忘记密码？", recovery: "找回密码", newPassword: "新密码", back: "返回登录", reset: "重置并登录", passwordHint: "至少 8 位字符" },
+} as const;
+
+/** Shared by all launchers; account operations stay in the existing provider. */
+export function LauncherAccountForm({ locale, onAuthenticated }: {
+  locale: "en" | "zh-CN";
+  onAuthenticated?: () => void;
+}) {
+  const auth = useAuthOrLocal();
+  const copy = COPY[locale];
+  const [mode, setMode] = useState<"login" | "register" | "recovery">("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaAttempt, setCaptchaAttempt] = useState(0);
+  const [socialMessage, setSocialMessage] = useState("");
+  const [socialError, setSocialError] = useState(false);
+  const [socialPending, setSocialPending] = useState(false);
+  const socialController = useRef<AbortController | null>(null);
+  const submitting = useRef(false);
+  const emailInput = useRef<HTMLInputElement>(null);
+  const registrationCopy = locale === "zh-CN"
+    ? { confirm: "确认密码", complete: "完成注册", mismatch: "两次输入的密码不一致。", resend: "重新发送", sendFirst: "请先发送邮箱验证码。" }
+    : { confirm: "Confirm password", complete: "Create account", mismatch: "Passwords do not match.", resend: "Resend code", sendFirst: "Send an email code first." };
+  const socialCopy = locale === "zh-CN"
+    ? { group: "快捷登录", continue: (name: string) => `使用 ${name} 登录`, waiting: (name: string) => `请在浏览器完成：${name}`, adopting: "正在验证账户…", failed: "快捷登录未完成，请重试。", cancel: "取消", cancelled: "已取消登录，可以重试。" }
+    : { group: "Social sign-in", continue: (name: string) => `Continue with ${name}`, waiting: (name: string) => `Finish in browser: ${name}`, adopting: "Verifying your account…", failed: "Social sign-in could not be completed. Try again.", cancel: "Cancel", cancelled: "Sign-in cancelled. You can try again." };
+  const providers = [
+    { id: "google" as const, name: "Google", enabled: googleAuthEnabled },
+    { id: "github" as const, name: "GitHub", enabled: githubAuthEnabled },
+    { id: "slack_oidc" as const, name: "Slack", enabled: slackAuthEnabled },
+  ].filter((provider) => provider.enabled);
+
+  useEffect(() => () => {
+    const controller = socialController.current;
+    socialController.current = null;
+    if (controller) void cancelDesktopBrowserSignIn(controller);
+  }, []);
+
+  const signInWithSocialProvider = async (provider: NonNullable<BrowserAuthRequest["provider"]>, name: string) => {
+    if (submitting.current || !auth.configured) return;
+    const controller = new AbortController();
+    socialController.current = controller;
+    submitting.current = true;
+    setBusy(true);
+    setError("");
+    setSocialError(false);
+    setSocialPending(true);
+    setSocialMessage(socialCopy.waiting(name));
+    try {
+      await completeDesktopBrowserSignIn(locale, {
+        provider,
+        signal: controller.signal,
+        onAdopting: () => {
+          if (!controller.signal.aborted && socialController.current === controller) {
+            setSocialMessage(socialCopy.adopting);
+          }
+        },
+      });
+      if (controller.signal.aborted || socialController.current !== controller) return;
+      socialController.current = null;
+      submitting.current = false;
+      setBusy(false);
+      setSocialPending(false);
+      setSocialMessage("");
+      onAuthenticated?.();
+    } catch {
+      if (controller.signal.aborted || socialController.current !== controller) return;
+      socialController.current = null;
+      submitting.current = false;
+      setBusy(false);
+      setSocialPending(false);
+      setSocialError(true);
+      setSocialMessage(socialCopy.failed);
+    }
+  };
+
+  const cancelSocialSignIn = async () => {
+    const controller = socialController.current;
+    if (!controller) return;
+    await cancelDesktopBrowserSignIn(controller);
+    if (socialController.current !== controller) return;
+    socialController.current = null;
+    submitting.current = false;
+    setBusy(false);
+    setSocialPending(false);
+    setSocialError(false);
+    setSocialMessage(socialCopy.cancelled);
+  };
+  const sendRegistrationCode = async () => {
+    if (submitting.current || !emailInput.current?.reportValidity()) return;
+    submitting.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      await auth.sendRegistrationCode(email, captcha ?? undefined);
+      setSent(true);
+    } catch {
+      setError(copy.codeFailed);
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+      setCaptcha(null);
+      setCaptchaAttempt((value) => value + 1);
+    }
+  };
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (submitting.current) return;
+    if (mode === "register" && password !== confirmPassword) {
+      setError(registrationCopy.mismatch);
+      return;
+    }
+    if (mode === "register" && !sent) {
+      setError(registrationCopy.sendFirst);
+      return;
+    }
+    submitting.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      if (mode === "login") {
+        await auth.signInWithPassword(email, password, captcha ?? undefined);
+        setPassword("");
+        setConfirmPassword("");
+        onAuthenticated?.();
+      } else if (!sent) {
+        await auth.sendRecoveryCode(email, captcha ?? undefined);
+        setSent(true);
+      } else {
+        if (mode === "recovery") await auth.verifyRecoveryCode(email, code, password);
+        else await auth.verifyRegistrationCode(email, code, password);
+        setPassword("");
+        setConfirmPassword("");
+        onAuthenticated?.();
+      }
+    } catch {
+      setError(mode === "login" ? copy.failed : sent ? copy.verifyFailed : copy.codeFailed);
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+      setCaptcha(null);
+      setCaptchaAttempt((value) => value + 1);
+    }
+  };
+  const message = error || (!auth.configured ? copy.unavailable : sent ? copy.sent : "");
+  const caption = <span className="launcher-auth-message" role={error ? "alert" : "status"} aria-live="polite" title={message}>{message}</span>;
+  return (
+    <form className="launcher-account-form" data-mode={mode} onSubmit={(event) => void submit(event)}>
+      <h2>{mode === "recovery" ? copy.recovery : copy.title}</h2>
+      <div role="tablist" className="launcher-auth-tabs" hidden={mode === "recovery"} aria-label={copy.title}>
+        {(["login", "register"] as const).map((value) => <button role="tab" key={value} type="button" disabled={busy}
+          aria-selected={mode === value} onClick={() => { setMode(value); setError(""); setSent(false); setCode(""); setPassword(""); setConfirmPassword(""); }}>
+          {copy[value]}
+        </button>)}
+      </div>
+      <label>{copy.email}<input ref={emailInput} type="email" autoComplete="username" required value={email} disabled={busy || (sent && mode === "recovery")}
+        onChange={(event) => { setEmail(event.target.value); setSent(false); setCode(""); setError(""); }} /></label>
+      <label hidden={sent && mode === "recovery"}><span className="launcher-auth-caption">{mode === "recovery" ? copy.newPassword : copy.password}{!sent && mode !== "register" ? caption : null}</span><input aria-label={mode === "recovery" ? copy.newPassword : copy.password} aria-invalid={Boolean(error) && mode !== "register"} type="password" autoComplete={mode === "login" ? "current-password" : "new-password"}
+        required minLength={mode !== "login" ? 8 : undefined} placeholder={mode !== "login" ? copy.passwordHint : undefined}
+        value={password} disabled={busy} onChange={(event) => { setPassword(event.target.value); setError(""); }} /></label>
+      {mode === "register" ? <>
+        <label>{registrationCopy.confirm}<input type="password" autoComplete="new-password" required minLength={8}
+          aria-invalid={error === registrationCopy.mismatch} value={confirmPassword} disabled={busy}
+          onChange={(event) => { setConfirmPassword(event.target.value); setError(""); }} /></label>
+        <div className="launcher-registration-code">
+          <label>{copy.code}<input autoComplete="one-time-code" inputMode="numeric" required value={code}
+            onChange={(event) => setCode(event.target.value)} disabled={busy} /></label>
+          <button className="btn launcher-send-code" type="button" onClick={() => void sendRegistrationCode()}
+            disabled={busy || !auth.configured || (captchaProtectionConfigured && !captcha)}>{sent ? registrationCopy.resend : copy.send}</button>
+        </div>
+        {captchaProtectionConfigured ? <AuthCaptcha key={captchaAttempt} siteKey={turnstileSiteKey} locale={locale} onTokenChange={setCaptcha} /> : null}
+        {message ? <div className="launcher-registration-message" role={error ? "alert" : "status"} aria-live="polite">{message}</div> : null}
+      </> : <div className="launcher-auth-verification" hidden={!sent && !captchaProtectionConfigured}>
+        {sent ? <label><span className="launcher-auth-caption">{copy.code}{caption}</span><input aria-label={copy.code} aria-invalid={Boolean(error)} autoComplete="one-time-code" inputMode="numeric" required value={code}
+          onChange={(event) => setCode(event.target.value)} disabled={busy} /></label>
+          : captchaProtectionConfigured ? <AuthCaptcha key={captchaAttempt} siteKey={turnstileSiteKey} locale={locale} onTokenChange={setCaptcha} /> : null}
+      </div>}
+      <button className="btn btn-primary" type="submit" disabled={busy || !auth.configured || (mode !== "register" && captchaProtectionConfigured && !sent && !captcha)}>
+        {busy ? copy.busy : mode === "register" ? registrationCopy.complete : mode === "login" ? copy.login : sent ? copy.reset : copy.send}
+      </button>
+      <button className="launcher-auth-secondary" type="button" disabled={busy} onClick={() => {
+        setMode(mode === "login" ? "recovery" : "login"); setSent(false); setCode(""); setPassword(""); setConfirmPassword(""); setError("");
+      }}>{mode === "login" ? copy.forgot : copy.back}</button>
+      {mode === "login" && providers.length > 0 ? (
+        <section className="launcher-auth-social" aria-label={socialCopy.group}>
+          <div className="launcher-social-actions" role="group" aria-label={socialCopy.group}>
+            {providers.map((provider) => <button key={provider.id} type="button"
+              className={`launcher-social-button is-${provider.id}`}
+              aria-label={socialCopy.continue(provider.name)} title={socialCopy.continue(provider.name)}
+              disabled={busy || !auth.configured}
+              onClick={() => void signInWithSocialProvider(provider.id, provider.name)}>
+              <SocialProviderIcon provider={provider.id} />
+            </button>)}
+          </div>
+          {socialMessage ? <div className="launcher-social-status">
+            <span role={socialError ? "alert" : "status"} aria-live="polite">{socialMessage}</span>
+            {socialPending ? <button type="button" onClick={() => void cancelSocialSignIn()}>{socialCopy.cancel}</button> : null}
+          </div> : null}
+        </section>
+      ) : null}
+    </form>
+  );
+}

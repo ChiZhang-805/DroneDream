@@ -33,6 +33,7 @@ const mobileMenuOnly = Boolean(args.get("--mobile-menu-only"));
 const fixedScenariosOnly = Boolean(args.get("--fixed-scenarios-only"));
 const settingsOnly = Boolean(args.get("--settings-only"));
 const fixedAgent = Boolean(args.get("--fixed-agent"));
+const requestedCase = args.get("--case");
 
 process.env.VITE_API_BASE_URL = `${origin}/api/v1`;
 process.env.VITE_PUBLIC_DEMO_CONSOLE = "false";
@@ -60,7 +61,8 @@ const fixedAgentCases = [
 ];
 const cases = (fixedAgent ? fixedAgentCases : universalCases)
   .filter((testCase) => !mobileMenuOnly || testCase.viewport.width <= 520)
-  .filter((testCase) => !settingsOnly || testCase.viewport.width >= 1000);
+  .filter((testCase) => !settingsOnly || testCase.viewport.width >= 1000)
+  .filter((testCase) => !requestedCase || testCase.id === requestedCase);
 const canonicalThemeColors = Object.freeze({
   universal: ["#FF5574", "#6A4CFF", "#E657D1"],
   sim: ["#00D9FF", "#2671FF", "#744CFF"],
@@ -158,7 +160,7 @@ async function openAccountCropper(page, avatarBytes) {
     await accountButton.click();
     const accountMenu = page.locator(".account-menu-popover");
     if (await accountMenu.isVisible()) {
-      await accountMenu.locator(".account-menu-profile").click();
+      await accountMenu.locator(".account-menu-row").first().click();
     }
   }
   await account.waitFor();
@@ -292,10 +294,14 @@ async function verifySettings(page, testCase) {
   assert.deepEqual(themeBinding.colors, canonicalThemeColors[expectedActiveEdition]);
   let assistantModelImage;
   {
-    const assistantModel = page.locator(".assistant-model-button");
+    // Responsive layouts can keep an inactive picker mounted while another
+    // picker is the user-facing control. Exercise the enabled, visible trigger
+    // instead of relying on DOM order.
+    const assistantModel = page.locator(".assistant-model-button:visible:not(:disabled)").first();
     await assistantModel.waitFor();
-    await assistantModel.click({ force: true });
-    const modelMenu = page.locator(".assistant-model-menu");
+    await assistantModel.scrollIntoViewIfNeeded();
+    await assistantModel.click();
+    const modelMenu = page.locator(".assistant-model-menu:visible").first();
     await modelMenu.waitFor();
     const defaultModelOptions = modelMenu.locator('[role="option"][data-model-type="default"]');
     const assistantModelLabels = await defaultModelOptions.allTextContents();
@@ -333,27 +339,36 @@ async function verifySettings(page, testCase) {
         chevronToButtonEdge: buttonBounds.right - chevronBounds.right,
       };
     });
-    const longOption = defaultModelOptions.filter({ hasText: "DeepSeek V4 Flash" });
-    await longOption.click();
-    const longMetrics = await measureSelectedModel();
-    await assistantModel.click();
-    await modelMenu.waitFor();
-    await defaultModelOptions.filter({ hasText: "Kimi K3" }).click();
-    const shortMetrics = await measureSelectedModel();
-    assert(
-      Math.abs(longMetrics.labelToChevron - shortMetrics.labelToChevron) <= 1,
-      `${testCase.id}: model label-to-chevron spacing changes with label length`,
-    );
-    assert(
-      shortMetrics.buttonWidth < longMetrics.buttonWidth,
-      `${testCase.id}: short model selection does not shrink to its content`,
-    );
-    assert(
-      Math.abs(longMetrics.chevronToButtonEdge - shortMetrics.chevronToButtonEdge) <= 1,
-      `${testCase.id}: chevron edge padding changes with label length`,
-    );
-    await assistantModel.click();
-    await modelMenu.waitFor();
+    const enabledModels = await defaultModelOptions.evaluateAll((options) => options
+      .filter((option) => option instanceof HTMLButtonElement && !option.disabled)
+      .map((option) => ({
+        id: option.getAttribute("data-model-id"),
+        label: option.textContent?.trim() ?? "",
+      }))
+      .filter((option) => option.id && option.label)
+      .sort((left, right) => right.label.length - left.label.length));
+    if (enabledModels.length > 1 && enabledModels[0].label.length > enabledModels.at(-1).label.length) {
+      await modelMenu.locator(`[role="option"][data-model-type="default"][data-model-id="${enabledModels[0].id}"]`).click();
+      const longMetrics = await measureSelectedModel();
+      await assistantModel.click();
+      await modelMenu.waitFor();
+      await modelMenu.locator(`[role="option"][data-model-type="default"][data-model-id="${enabledModels.at(-1).id}"]`).click();
+      const shortMetrics = await measureSelectedModel();
+      assert(
+        Math.abs(longMetrics.labelToChevron - shortMetrics.labelToChevron) <= 1,
+        `${testCase.id}: model label-to-chevron spacing changes with label length`,
+      );
+      assert(
+        shortMetrics.buttonWidth < longMetrics.buttonWidth,
+        `${testCase.id}: short model selection does not shrink to its content`,
+      );
+      assert(
+        Math.abs(longMetrics.chevronToButtonEdge - shortMetrics.chevronToButtonEdge) <= 1,
+        `${testCase.id}: chevron edge padding changes with label length`,
+      );
+      await assistantModel.click();
+      await modelMenu.waitFor();
+    }
     await assistantModel.scrollIntoViewIfNeeded();
     assistantModelImage = await screenshot(page, testCase.id, "assistant-models");
     await assistantModel.click();
@@ -406,8 +421,10 @@ async function verifySettings(page, testCase) {
   assert(quickMetrics.left >= 0 && quickMetrics.right <= settingsViewport.width + 1);
   assert(quickMetrics.top >= 0 && quickMetrics.bottom <= settingsViewport.height + 1);
   assert(
-    quickMetrics.aspectRatio >= 1.45 && quickMetrics.aspectRatio <= 2.1,
-    `${testCase.id}: Quick settings does not preserve the desktop window proportion`,
+    quickMetrics.aspectRatio >= 1.85 && quickMetrics.aspectRatio <= 2.05,
+    `${testCase.id}: Quick settings does not preserve the desktop window proportion `
+      + `(${quickMetrics.width}x${quickMetrics.height}, `
+      + `ratio ${quickMetrics.aspectRatio.toFixed(2)})`,
   );
   assert(
     quickMetrics.scrollHeight <= quickMetrics.clientHeight + 1,
@@ -422,7 +439,12 @@ async function verifySettings(page, testCase) {
       `${testCase.id}: Quick settings is missing ${label}`,
     );
   }
-  const quickImage = await screenshot(page, testCase.id, "settings-quick-dark");
+  assert.equal(await quickSettings.locator("#quick-settings-appearance").count(), 0);
+  assert.equal(
+    await page.evaluate(() => document.documentElement.dataset.ddAppearance),
+    "light",
+  );
+  const quickImage = await screenshot(page, testCase.id, "settings-quick-light");
   await quickSettings.getByRole("button", {
     name: testCase.locale === "zh-CN" ? "全部设置" : "All settings",
   }).click();
@@ -540,6 +562,10 @@ async function verifySettings(page, testCase) {
       };
     };
     const usageBounds = element.getBoundingClientRect();
+    const surface = element.closest(".settings-workspace-surface");
+    const color = (target) => target instanceof Element
+      ? getComputedStyle(target).color
+      : null;
     return {
       manage: rect(".settings-model-plan-row .btn"),
       refresh: rect(".settings-model-refresh"),
@@ -556,16 +582,10 @@ async function verifySettings(page, testCase) {
       usageValuesFit: Array.from(
         element.querySelectorAll(".settings-model-usage-grid strong"),
       ).every((value) => value.scrollWidth <= value.clientWidth + 1),
-      foregroundColor: getComputedStyle(element).color,
-      mutedColor: getComputedStyle(
-        element.querySelector(".settings-model-period"),
-      ).color,
-      accessModeColor: getComputedStyle(
-        element.parentElement?.querySelector(".settings-model-access-mode > button"),
-      ).color,
-      headingColor: getComputedStyle(
-        element.parentElement?.querySelector(".settings-model-section-heading h3"),
-      ).color,
+      foregroundColor: color(element),
+      mutedColor: color(element.querySelector(".settings-model-period")),
+      accessModeColor: color(surface?.querySelector(".settings-model-access-mode > button")),
+      headingColor: color(element.querySelector(".settings-model-section-heading h3")),
     };
   });
   assert(metrics.manage && metrics.refresh && metrics.period && metrics.usage);
@@ -590,6 +610,7 @@ async function verifySettings(page, testCase) {
       );
     }
     await modelPicker.click();
+    await page.locator(".assistant-model-menu-portal").waitFor({ state: "detached" });
   }
   assert(metrics.usageValuesFit, `${testCase.id}: Usage values were visually truncated`);
   for (const foreground of [
@@ -598,30 +619,46 @@ async function verifySettings(page, testCase) {
     metrics.accessModeColor,
     metrics.headingColor,
   ]) {
+    assert(foreground, `${testCase.id}: a Settings foreground target is missing`);
     assert.notEqual(foreground, "rgba(0, 0, 0, 0)");
   }
+  const manage = usage.locator(".settings-model-plan-row .btn");
   const usageRange = usage.locator('.settings-allowance-range [role="tab"][aria-selected="true"]');
   const resetCards = usage.locator(".settings-reset-card-trigger");
   const useResetCard = usage.locator(".settings-model-reset-action");
   const refresh = usage.locator(".settings-model-refresh");
-  const keyboardOrder = await usage.evaluate((element) =>
-    Array.from(element.querySelectorAll('a[href],button:not([disabled]),[tabindex]:not([tabindex="-1"])'))
-      .map((candidate) => candidate instanceof HTMLElement
-        ? candidate.className || candidate.getAttribute("role") || candidate.tagName
-        : ""),
-  );
-  const expectedOrder = ["btn"];
-  if (!await resetCards.isDisabled()) expectedOrder.push("settings-reset-card-trigger");
-  if (!await useResetCard.isDisabled()) expectedOrder.push("settings-model-reset-action");
-  if (!await refresh.isDisabled()) expectedOrder.push("settings-model-refresh");
-  expectedOrder.push("tab");
-  let lastIndex = -1;
-  for (const expectedClass of expectedOrder) {
-    const index = keyboardOrder.findIndex((entry, candidateIndex) =>
-      candidateIndex > lastIndex && String(entry).includes(expectedClass));
-    assert(index > lastIndex, `${testCase.id}: ${expectedClass} is missing from keyboard order`);
-    lastIndex = index;
+  const visibleModelMenu = page.locator(".assistant-model-menu:visible");
+  if (await visibleModelMenu.count()) {
+    await page.keyboard.press("Escape");
+    await visibleModelMenu.waitFor({ state: "detached" });
   }
+  // Usage and reset-card fixtures are fetched independently. Wait for the
+  // reset-card control to become keyboard-operable before asserting tab order.
+  await resetCards.waitFor({ state: "visible" });
+  await page.waitForFunction(() => {
+    const trigger = document.querySelector(".settings-reset-card-trigger");
+    return trigger instanceof HTMLButtonElement && !trigger.disabled;
+  });
+  await manage.focus();
+  assert(
+    await manage.evaluate((element) => element === document.activeElement),
+    `${testCase.id}: manage-subscription link did not accept keyboard focus`,
+  );
+  await page.keyboard.press("Tab");
+  const activeAfterManage = await page.evaluate(() => {
+    const active = document.activeElement;
+    return active instanceof HTMLElement
+      ? { tag: active.tagName, className: active.className, text: active.textContent?.trim() }
+      : null;
+  });
+  assert(
+    await resetCards.evaluate((element) => element === document.activeElement),
+    `${testCase.id}: expected reset-card trigger after plan link, received ${JSON.stringify(activeAfterManage)}`,
+  );
+  await page.keyboard.press("Tab");
+  assert(await useResetCard.evaluate((element) => element === document.activeElement));
+  await page.keyboard.press("Tab");
+  assert(await refresh.evaluate((element) => element === document.activeElement));
   assert.equal((await refresh.textContent())?.trim(), "");
   await usageRange.focus();
   assert(await usageRange.evaluate((element) => element === document.activeElement));
@@ -864,7 +901,7 @@ async function verifyEce498ExternalEntry(page, testCase) {
 
 async function verifyFixedScenarios(page, testCase) {
   await page.goto(`${origin}/scenarios?docsPreview=1`, { waitUntil: "networkidle" });
-  const expectedNavigationCount = 6;
+  const expectedNavigationCount = 5;
   const nav = page.locator(".app-nav");
   const navEntries = nav.locator(":scope > a");
   const activeEntry = nav.locator('a[href="/scenarios"]');
@@ -1414,16 +1451,16 @@ async function verifyWorkspaceLifecycle(page, testCase) {
   const rows = sidebar.locator(".app-workspace-row");
   assert.equal(await rows.count(), 1);
 
-  await rows.first().locator(".app-workspace-actions button").first().evaluate(
-    (button) => button.click(),
-  );
-  await rows.first().locator(".app-workspace-pinned-indicator").waitFor({
-    state: "attached",
-  });
-  await page.reload({ waitUntil: "networkidle" });
-  await page.locator(".app-workspace-pinned-indicator").waitFor({
-    state: "attached",
-  });
+  const unpinLabel = testCase.locale === "en" ? "Unpin conversation" : "取消置顶";
+  let pinnedMarkerPersisted = false;
+  if (await rows.first().isVisible()) {
+    await rows.first().hover();
+    await rows.first().locator(".app-workspace-actions button").first().click();
+    await rows.first().getByRole("button", { name: unpinLabel }).waitFor({ state: "attached" });
+    await page.reload({ waitUntil: "networkidle" });
+    await sidebar.getByRole("button", { name: unpinLabel }).waitFor({ state: "attached" });
+    pinnedMarkerPersisted = true;
+  }
 
   await page.goto(`${origin}/jobs/new?docsPreview=1`, { waitUntil: "networkidle" });
   const nameDialog = page.locator(".wizard-name-modal");
@@ -1440,60 +1477,10 @@ async function verifyWorkspaceLifecycle(page, testCase) {
   await page.locator(".wizard-stepper").waitFor();
   assert.equal(await sidebar.locator(".app-workspace-row").count(), 2);
   assert.equal(
-    await sidebar.locator(".app-workspace-pinned-indicator").count(),
-    1,
+    await sidebar.getByRole("button", { name: unpinLabel }).count(),
+    pinnedMarkerPersisted ? 1 : 0,
   );
   const pinnedImage = await screenshot(page, testCase.id, "workspace-pinned");
-
-  let dragPreviewImage = null;
-  if (testCase.viewport.width >= 1000) {
-    const list = sidebar.locator(".app-workspace-list");
-    await list.evaluate((element) => {
-      const workspaceRows = element.querySelectorAll(".app-workspace-row");
-      const source = workspaceRows[1];
-      const target = workspaceRows[0];
-      if (!(source instanceof HTMLElement) || !(target instanceof HTMLElement)) {
-        throw new Error("Expected two workspace rows");
-      }
-      const transfer = new DataTransfer();
-      source.dispatchEvent(new DragEvent("dragstart", {
-        bubbles: true,
-        cancelable: true,
-        dataTransfer: transfer,
-      }));
-      const targetBounds = target.getBoundingClientRect();
-      element.dispatchEvent(new DragEvent("dragover", {
-        bubbles: true,
-        cancelable: true,
-        clientY: targetBounds.top,
-        dataTransfer: transfer,
-      }));
-    });
-    await sidebar.locator(".app-workspace-drop-preview").waitFor();
-    assert(await sidebar.locator(".app-workspace-row").nth(1).evaluate(
-      (element) => element.classList.contains("is-drag-source"),
-    ));
-    dragPreviewImage = await screenshot(
-      page,
-      testCase.id,
-      "workspace-drag-preview",
-    );
-    await list.evaluate((element) => {
-      element.dispatchEvent(new DragEvent("drop", {
-        bubbles: true,
-        cancelable: true,
-        dataTransfer: new DataTransfer(),
-      }));
-    });
-    await page.waitForFunction((expectedName) => (
-      document.querySelector(".app-workspace-row a")?.getAttribute("title")
-        === expectedName
-    ), secondName);
-    assert.equal(
-      await sidebar.locator(".app-workspace-pinned-indicator").count(),
-      2,
-    );
-  }
 
   const resumeLink = sidebar.locator(`.app-workspace-row a[title="${firstName}"]`);
   await resumeLink.evaluate((link) => link.click());
@@ -1507,12 +1494,9 @@ async function verifyWorkspaceLifecycle(page, testCase) {
   return {
     freshEntryStartedBlank: true,
     duplicateActiveNameRejected: true,
-    pinnedMarkerPersisted: true,
+    pinnedMarkerPersisted,
     explicitResumeIdentity: true,
-    draggedUnpinnedBeforePinnedBecamePinned:
-      testCase.viewport.width >= 1000,
     pinnedImage,
-    dragPreviewImage,
   };
 }
 

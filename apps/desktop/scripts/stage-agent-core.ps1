@@ -177,7 +177,6 @@ $required = @(
     $isolatorBinary,
     $consoleBinary,
     (Join-Path $sourceResources "runtime\runtime-manifest.json"),
-    (Join-Path $sourceResources "runtime\local-policy\catalog.json"),
     (Join-Path $sourceResources "official-plugins\index.json"),
     (Join-Path $sourceResources "default-assets\index.json"),
     (Join-Path $sourceResources "default-assets\school-map.ddpkg"),
@@ -187,6 +186,18 @@ foreach ($path in $required) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
         throw "The AGENT Core package is incomplete: $path"
     }
+}
+
+# Verify the two DDPKG archives that will be copied into the installer.
+# Catalog labels and prior build receipts do not replace byte-level asset qualification.
+$assetVerifier = Join-Path $repoRoot 'apps\desktop\scripts\verify-qualified-default-assets.py'
+$assetSource = Join-Path $sourceResources 'default-assets'
+$assetLicenseManifest = Join-Path $coreRoot 'runtime\default-assets-licenses.json'
+& $corePython $assetVerifier `
+    --asset-root $assetSource `
+    --license-manifest $assetLicenseManifest
+if ($LASTEXITCODE -ne 0) {
+    throw 'The bundled map/vehicle pair failed release qualification.'
 }
 
 $targetBinaryRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "apps\desktop\src-tauri\binaries"))
@@ -230,8 +241,15 @@ if (-not $runtimeManifest.files -or $runtimeEntries.Count -eq 0) {
     throw "The AGENT Core Runtime manifest contains no files."
 }
 $runtimePaths = @($runtimeEntries | ForEach-Object { [string]$_.path })
-if ($runtimePaths -cnotcontains "local-policy/catalog.json") {
-    throw "The AGENT Core Runtime manifest omits its local expert catalog."
+$localPolicyPaths = @($runtimePaths | Where-Object {
+    $_.StartsWith("local-policy/", [StringComparison]::Ordinal)
+})
+$hasLocalPolicy = $localPolicyPaths.Count -gt 0
+if ($hasLocalPolicy -and (
+        $runtimePaths -cnotcontains "local-policy/catalog.json" -or
+        $runtimePaths -cnotcontains "local-policy/licenses.json"
+    )) {
+    throw "A staged local policy must include both its catalog and redistribution licenses."
 }
 if (@($runtimePaths | Where-Object {
     $_ -match '(^|/)__pycache__(/|$)' -or $_ -match '\.pyc$'
@@ -239,19 +257,21 @@ if (@($runtimePaths | Where-Object {
     throw "The AGENT Core Runtime manifest contains a Python cache."
 }
 $localPolicyCatalogPath = Join-Path $runtimeSource "local-policy\catalog.json"
-$localPolicyCatalog = Get-Content -LiteralPath $localPolicyCatalogPath -Raw | ConvertFrom-Json
-$localPolicyEntries = @($localPolicyCatalog.entries)
-if ($localPolicyCatalog.schema_version -cne "dronedream.local-policy-runtime-catalog.v2" -or
-    $localPolicyCatalog.deployment_scope -cnotin @("simulation-only", "production-qualified") -or
-    $localPolicyEntries.Count -ne 1) {
-    throw "The AGENT Core local expert catalog is not the current single-package contract."
-}
-$localPolicyReceiptKind = [string]$localPolicyEntries[0].receipt.kind
-if (($localPolicyCatalog.deployment_scope -ceq "simulation-only" -and
-        $localPolicyReceiptKind -cne "simulation-admission") -or
-    ($localPolicyCatalog.deployment_scope -ceq "production-qualified" -and
-        $localPolicyReceiptKind -cne "qualification")) {
-    throw "The AGENT Core local expert catalog scope and receipt kind disagree."
+if ($hasLocalPolicy) {
+    $localPolicyCatalog = Get-Content -LiteralPath $localPolicyCatalogPath -Raw | ConvertFrom-Json
+    $localPolicyEntries = @($localPolicyCatalog.entries)
+    if ($localPolicyCatalog.schema_version -cne "dronedream.local-policy-runtime-catalog.v2" -or
+        $localPolicyCatalog.deployment_scope -cnotin @("simulation-only", "production-qualified") -or
+        $localPolicyEntries.Count -ne 1) {
+        throw "The AGENT Core local expert catalog is not the current single-package contract."
+    }
+    $localPolicyReceiptKind = [string]$localPolicyEntries[0].receipt.kind
+    if (($localPolicyCatalog.deployment_scope -ceq "simulation-only" -and
+            $localPolicyReceiptKind -cne "simulation-admission") -or
+        ($localPolicyCatalog.deployment_scope -ceq "production-qualified" -and
+            $localPolicyReceiptKind -cne "qualification")) {
+        throw "The AGENT Core local expert catalog scope and receipt kind disagree."
+    }
 }
 New-Item -ItemType Directory -Path $runtimeTarget -Force | Out-Null
 Copy-Item -LiteralPath $runtimeManifestPath -Destination (Join-Path $runtimeTarget "runtime-manifest.json")
@@ -281,15 +301,30 @@ foreach ($plugin in @($pluginIndex.plugins)) {
         -ExpectedSha256 ([string]$plugin.sha256)
 }
 
-$assetSource = Join-Path $sourceResources "default-assets"
 $assetTarget = Join-Path $targetResourceRoot "default-assets"
 $assetIndexPath = Join-Path $assetSource "index.json"
 $assetIndex = Get-Content -LiteralPath $assetIndexPath -Raw | ConvertFrom-Json
-$assetPackages = @($assetIndex.qualified_pair.packages)
-if ($assetPackages.Count -ne 2 -or
-    @($assetPackages | Where-Object { $_.kind -eq "map" }).Count -ne 1 -or
-    @($assetPackages | Where-Object { $_.kind -eq "vehicle" }).Count -ne 1) {
-    throw "The AGENT Core default-asset index must contain one map and one vehicle package."
+$assetPairs = @(
+    if ($assetIndex.schema_version -ceq "dronedream.bundled-assets.v3") {
+        $assetIndex.qualified_pairs
+    } elseif ($assetIndex.schema_version -ceq "dronedream.bundled-assets.v2") {
+        $assetIndex.qualified_pair
+    } else {
+        throw "The AGENT Core default-asset index schema is unsupported."
+    }
+)
+if ($assetPairs.Count -lt 1) {
+    throw "The AGENT Core default-asset index contains no qualified pair."
+}
+$assetPackages = @()
+foreach ($pair in $assetPairs) {
+    $pairPackages = @($pair.packages)
+    if ($pairPackages.Count -ne 2 -or
+        @($pairPackages | Where-Object { $_.kind -eq "map" }).Count -ne 1 -or
+        @($pairPackages | Where-Object { $_.kind -eq "vehicle" }).Count -ne 1) {
+        throw "Every AGENT Core default-asset pair must contain one map and one vehicle package."
+    }
+    $assetPackages += $pairPackages
 }
 New-Item -ItemType Directory -Path $assetTarget -Force | Out-Null
 Copy-Item -LiteralPath $assetIndexPath -Destination (Join-Path $assetTarget "index.json")
@@ -297,6 +332,9 @@ foreach ($asset in $assetPackages) {
     if ([IO.Path]::GetExtension([string]$asset.file) -cne ".ddpkg") {
         throw "The AGENT Core default-asset index may reference only current DDPKG packages."
     }
+    $assetDestination = Join-Path $assetTarget ([string]$asset.file)
+    $assetDestinationParent = Split-Path -Parent $assetDestination
+    New-Item -ItemType Directory -Path $assetDestinationParent -Force | Out-Null
     Copy-VerifiedManifestFile `
         -SourceRoot $assetSource `
         -TargetRoot $assetTarget `
@@ -360,9 +398,13 @@ $receipt = [ordered]@{
     defaultAssetIndexSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath (
         Join-Path $targetResourceRoot "default-assets\index.json"
     )).Hash.ToLowerInvariant()
-    localPolicyCatalogSha256 = (Get-FileHash -Algorithm SHA256 -LiteralPath (
-        Join-Path $targetResourceRoot "runtime\local-policy\catalog.json"
-    )).Hash.ToLowerInvariant()
+    localPolicyCatalogSha256 = if ($hasLocalPolicy) {
+        (Get-FileHash -Algorithm SHA256 -LiteralPath (
+            Join-Path $targetResourceRoot "runtime\local-policy\catalog.json"
+        )).Hash.ToLowerInvariant()
+    } else {
+        $null
+    }
     stagedAt = [DateTimeOffset]::UtcNow.ToString("o")
 }
 [IO.File]::WriteAllBytes((Join-Path $targetResourceRoot 'core-components-build.json'), $boundReceiptBytes)

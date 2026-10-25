@@ -15,11 +15,8 @@ import { useEvidenceImport } from "./useEvidenceImport";
 const COPY = {
   en: {
     title: "SIM / FIELD evidence bridge",
-    sim: "SIM candidate",
-    field: "FIELD observation",
     importSim: "Import SIM receipt",
     importField: "Import FIELD receipt",
-    missing: "Not bound",
     verified: "Integrity verified",
     waiting: "Waiting for both receipts",
     matched: "Candidate lineage matched · normalization required",
@@ -30,16 +27,12 @@ const COPY = {
     snapshot: "Snapshot",
     blockers: "Remaining gates",
     pass: "Recorded evidence passed",
-    safety: "Evidence import never grants hardware authority.",
     error: "Evidence rejected",
   },
   "zh-CN": {
     title: "SIM / FIELD 证据桥",
-    sim: "SIM 候选参数",
-    field: "FIELD 真实观测",
     importSim: "导入 SIM 回执",
     importField: "导入 FIELD 回执",
-    missing: "尚未绑定",
     verified: "完整性已核验",
     waiting: "等待两侧回执",
     matched: "候选链路已匹配 · 需要指标归一化",
@@ -50,7 +43,6 @@ const COPY = {
     snapshot: "快照",
     blockers: "剩余门禁",
     pass: "记录证据已通过",
-    safety: "导入证据绝不授予真机权限。",
     error: "证据已拒绝",
   },
 } as const;
@@ -109,22 +101,19 @@ export function LabEvidenceBridgePanel() {
       <header>
         <GitCompareArrows aria-hidden="true" />
         <h3 id="lab-evidence-bridge-title">{copy.title}</h3>
-        <strong data-state={decision.state}>{status}</strong>
+        {(simulation || field) && <strong data-state={decision.state}>{status}</strong>}
       </header>
 
       <div className="lab-evidence-bridge-inputs">
         <div>
-          <span><small>{copy.sim}</small><strong>{simulation?.fileName ?? copy.missing}</strong></span>
+          {simulation && <span><strong>{simulation.fileName}</strong></span>}
           <label className="btn lab-file-button">
             <Upload aria-hidden="true" /> {copy.importSim}
             <input type="file" accept="application/json,.json" onChange={importSimulation} />
           </label>
         </div>
         <div>
-          <span>
-            <small>{copy.field}</small>
-            <strong>{field ? `${field.fileName} · ${copy.verified}` : copy.missing}</strong>
-          </span>
+          {field && <span><strong>{field.fileName}</strong></span>}
           <label className="btn lab-file-button">
             <Upload aria-hidden="true" /> {copy.importField}
             <input type="file" accept="application/json,.json" onChange={importField} />
@@ -146,13 +135,12 @@ export function LabEvidenceBridgePanel() {
         </div>
       ) : null}
 
-      {decision.blockers.length > 0 ? (
+      {(simulation || field) && decision.blockers.length > 0 ? (
         <details className="lab-evidence-bridge-blockers">
           <summary>{copy.blockers} · {decision.blockers.length}</summary>
           <ul>{decision.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul>
         </details>
       ) : null}
-      <p className="lab-evidence-bridge-safety"><ShieldX aria-hidden="true" />{copy.safety}</p>
     </section>
   );
 }

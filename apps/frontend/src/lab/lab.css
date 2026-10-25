@@ -312,14 +312,14 @@
   background: color-mix(in srgb, var(--lab-lime) 7%, #ffffff);
 }
 
-.lab-evidence-bridge > header {
+.lab-evidence-bridge > summary {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.65rem;
 }
 
-.lab-evidence-bridge > header svg {
+.lab-evidence-bridge > summary svg {
   width: 1.2rem;
   height: 1.2rem;
   color: var(--lab-deep-green);
@@ -330,13 +330,13 @@
   font-size: 0.95rem;
 }
 
-.lab-evidence-bridge > header strong {
+.lab-evidence-bridge > summary strong {
   color: #657078;
   font-size: 0.74rem;
   text-align: right;
 }
 
-.lab-evidence-bridge > header strong[data-state="mismatch-denied"] {
+.lab-evidence-bridge > summary strong[data-state="mismatch-denied"] {
   color: #a42643;
 }
 
@@ -1247,4 +1247,94 @@
   .lab-gap-table > div {
     grid-template-columns: 1fr 1fr;
   }
+}
+
+/* Compact LAB tools: one navigation row and one action bar per task. */
+.lab-header { grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding: 18px 24px; }
+.lab-header h1 { font-size: 22px; }
+.lab-status-summary { display: flex; border: 0; background: transparent; gap: 12px; }
+.lab-status-summary > span { min-height: 0; padding: 6px 10px; flex-direction: row; align-items: center; gap: 8px; border: 0; border-radius: 6px; }
+.lab-navigation { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; padding: 12px 24px; background: #fff; border-bottom: 1px solid #e0e5e3; }
+.lab-navigation .lab-workspace-switch { display: flex; padding: 0; flex: 0 1 auto; }
+.lab-navigation .lab-workspace-switch button { display: flex; gap: 8px; min-height: 40px; padding: 8px 12px; font-size: 13px; }
+.lab-navigation .lab-workspace-switch svg { width: 17px; height: 17px; }
+.lab-navigation .lab-view-tabs { flex-wrap: wrap; gap: 16px; padding: 0; border: 0; }
+.lab-navigation .lab-view-tabs button { min-height: 40px; font-size: 13px; }
+.lab-tool { padding: 20px 24px; gap: 16px; }
+.lab-action-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.lab-action-toolbar .lab-tool-intro { grid-template-columns: auto minmax(0, 1fr); gap: 10px; }
+.lab-action-toolbar .lab-tool-intro > svg { width: 20px; height: 20px; padding: 0; border: 0; background: transparent; }
+.lab-action-toolbar h2 { font-size: 18px; }
+.lab-action-toolbar .lab-evidence-actions { margin: 0; }
+.lab-action-toolbar .btn { min-height: 40px; }
+.lab-calibration { gap: 16px; }
+.lab-calibration-controls { grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 16px; gap: 20px; }
+.lab-calibration-controls > label { font-size: 13px; }
+.lab-calibration-controls input[type="range"] { height: 40px; margin: 0; }
+.lab-evidence-bridge { display: block; padding: 14px 16px; background: #fff; border-color: #dce3df; }
+.lab-evidence-bridge > summary { grid-template-columns: auto minmax(0, 1fr) auto auto; cursor: pointer; list-style: none; }
+.lab-evidence-bridge > summary::after { content: "⌄"; color: #64736b; transition: transform .15s; }
+.lab-evidence-bridge[open] > summary::after { transform: rotate(180deg); }
+.lab-evidence-bridge[open] > summary { margin-bottom: 16px; }
+.lab-evidence-bridge-inputs { gap: 12px; }
+.lab-evidence-bridge-inputs > div { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 14px; }
+.lab-evidence-bridge-inputs .btn { justify-content: center; }
+.lab-evidence-bridge-blockers { margin-top: 12px; }
+.lab-details { padding: 12px 0; color: #66736c; font-size: 13px; }
+.lab-details > summary { cursor: pointer; }
+.lab-details .lab-role-strip { margin-top: 12px; }
+.lab-page .lab-empty-evidence { min-height: 130px; padding: 24px; gap: 10px; background: #fff; }
+.lab-page .lab-empty-evidence svg { width: 24px; height: 24px; }
+.lab-page .lab-empty-evidence strong { font-size: 14px; font-weight: 500; }
+.lab-page .lab-field-grid { gap: 16px; }
+.lab-page .lab-actions, .lab-page .lab-hardware-actions { gap: 10px; flex-wrap: wrap; }
+.lab-page .lab-operator-confirmation { gap: 16px; align-items: end; }
+@media (max-width: 760px) {
+  .lab-header { grid-template-columns: 1fr; gap: 12px; }
+  .lab-header, .lab-navigation, .lab-tool { padding: 16px; }
+  .lab-status-summary { flex-wrap: wrap; gap: 6px; }
+  .lab-navigation { gap: 12px; }
+  .lab-navigation .lab-workspace-switch { width: 100%; }
+  .lab-navigation .lab-workspace-switch button { flex: 1; justify-content: center; }
+  .lab-calibration-controls, .lab-evidence-bridge-inputs { grid-template-columns: 1fr; }
+  .lab-evidence-bridge > summary { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .lab-evidence-bridge > summary strong { grid-column: 2; grid-row: 2; text-align: left; }
+  .lab-evidence-bridge > summary::after { grid-column: 3; grid-row: 1; }
+}
+.lab-page .btn-primary { border-color: var(--lab-deep-green); background: var(--lab-deep-green); color: #fff; box-shadow: none; }
+.lab-action-toolbar .btn-ghost { width: 40px; padding: 0; justify-content: center; }
+@media (max-width: 760px) {
+  .lab-action-toolbar .lab-calibration-import, .lab-action-toolbar .lab-evidence-actions { display: flex; flex-wrap: nowrap; }
+  .lab-action-toolbar .lab-calibration-import .btn, .lab-action-toolbar .lab-evidence-actions .btn { width: auto; }
+  .lab-action-toolbar .lab-calibration-import .btn-ghost, .lab-action-toolbar .lab-evidence-actions .btn-ghost { width: 40px; flex: 0 0 40px; }
+}
+/* Keep the workspace inside the window; results use the remaining height. */
+.app-shell:has(.lab-page) { height: 100dvh; min-height: 0; overflow: hidden; }
+.app-shell:has(.lab-page) .app-sidebar,
+.app-shell:has(.lab-page) .app-body { min-height: 0; }
+.app-shell:has(.lab-page) .app-body { height: 100%; overflow: hidden; }
+.app-shell .app-main:has(.lab-page) { display: flex; flex: 1 1 0; min-height: 0; padding: 0; overflow: hidden; }
+.lab-page { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.lab-header, .lab-navigation { flex: 0 0 auto; }
+.lab-page > .lab-tool { flex: 1; min-height: 0; overflow: auto; }
+.lab-calibration { flex: 1; min-height: 0; }
+.lab-calibration > :not(.lab-calibration-results):not(.lab-empty-evidence) { flex-shrink: 0; }
+.lab-page .lab-empty-evidence { flex: 1; min-height: 180px; }
+.lab-calibration-results { display: flex; flex-direction: column; gap: 16px; min-height: 0; flex: 1; overflow: auto; }
+.lab-calibration-results > * { flex-shrink: 0; }
+.lab-evidence-bridge { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(0, 2fr); gap: 12px 24px; align-items: center; }
+.lab-evidence-bridge > header { display: flex; flex-wrap: wrap; gap: 8px; }
+.lab-evidence-bridge > header h3 { font-size: 15px; }
+.lab-evidence-bridge > header strong { font-size: 12px; }
+.lab-evidence-bridge-inputs { display: flex; justify-content: flex-end; flex-wrap: wrap; }
+.lab-evidence-bridge-inputs > div { display: flex; flex-direction: column; padding: 0; border: 0; background: transparent; }
+.lab-evidence-bridge-inputs .btn { min-height: 40px; }
+.lab-evidence-bridge-error, .lab-evidence-bridge-binding, .lab-evidence-bridge-blockers { grid-column: 1 / -1; }
+.lab-setup-layout { flex: 1; align-content: start; }
+.lab-page .lab-operator-confirmation { padding: 24px; background: #fff; }
+@media (max-width: 900px) {
+  .lab-calibration { flex: 1 0 auto; }
+  .lab-evidence-bridge { grid-template-columns: 1fr; }
+  .lab-evidence-bridge-inputs { justify-content: flex-start; }
+  .lab-calibration-results { flex: 1 0 auto; overflow: visible; }
 }

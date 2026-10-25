@@ -36,6 +36,7 @@ import {
   MailCheck,
   MapPinned,
   Menu,
+  Moon,
   MonitorCog,
   Navigation2,
   RadioTower,
@@ -47,15 +48,12 @@ import {
   Sparkles,
   TicketCheck,
   Trophy,
+  Sun,
   X,
   type LucideIcon,
 } from "lucide-react";
 
-import { apiClient } from "./api/client";
-import {
-  ArchivedExperimentManager,
-  ExperimentWorkspaceSidebar,
-} from "./components/ExperimentWorkspaceSidebar";
+import { ArchivedConversationManager } from "./components/ArchivedConversationManager";
 import { AutonomyConversationSidebar } from "./components/AutonomyConversationSidebar";
 import {
   AvatarCropDialog,
@@ -109,6 +107,7 @@ import {
 } from "./appSettings";
 import { AuthCaptcha } from "./features/auth/AuthCaptcha";
 import { AuthProvider, useAuth } from "./features/auth/AuthContext";
+import { recordDesktopApplicationActivity } from "./features/licensing/applicationActivity";
 import {
   cancelDesktopBrowserSignIn,
   completeDesktopBrowserSignIn,
@@ -137,10 +136,7 @@ import {
   type ManagedModelUsageDay,
   type ManagedModelUsageSnapshot,
 } from "./features/settings/cloudModelAccess";
-import {
-  hasExperimentDraft,
-  persistExperimentDraftsForExit,
-} from "./features/experiment/draftStorage";
+import { persistExperimentDraftsForExit } from "./features/experiment/draftStorage";
 import {
   loadUniversalMode,
   parseUniversalMode,
@@ -159,8 +155,6 @@ import { getAssistantWorkspaceIndex } from "./features/experiment/assistantOrche
 import { localeSafeError, useI18n } from "./i18n/I18nProvider";
 import type { InterfaceLocale, TranslationKey } from "./i18n/I18nProvider";
 import type {
-  Job,
-  JobStatus,
   StarterExperienceTemplateKey,
   UserDefaultTrackType,
 } from "./types/api";
@@ -175,7 +169,7 @@ import {
   type ModelHarnessMemoryNamespace,
 } from "./features/settings/consolePreferences";
 import { ECE498BH_COURSE_URL } from "./externalLinks";
-import { EditionThemeProvider } from "./theme/EditionThemeProvider";
+import { EditionThemeProvider, useEditionTheme } from "./theme/EditionThemeProvider";
 import {
   BUILD_EDITION,
   EDITION_IS_FIXED,
@@ -229,11 +223,6 @@ const AUTONOMY_NAV_ITEM: NavigationItem = {
 const SIM_NAV_ITEMS: NavigationItem[] = [
   { ...ASSISTANT_NAV_ITEM, sectionKey: "app.navSectionAutonomy" },
   AUTONOMY_NAV_ITEM,
-  {
-    to: "/jobs/new",
-    labelKey: "app.experimentBuilder",
-    icon: SlidersHorizontal,
-  },
   DASHBOARD_NAV_ITEM,
   SCENARIOS_NAV_ITEM,
   HISTORY_NAV_ITEM,
@@ -256,11 +245,6 @@ const LAB_WORKSPACE_NAV_ITEMS: NavigationItem[] = [
 const LAB_NAV_ITEMS: NavigationItem[] = [
   { ...ASSISTANT_NAV_ITEM, sectionKey: "app.navSectionAutonomy" },
   AUTONOMY_NAV_ITEM,
-  {
-    to: "/jobs/new",
-    labelKey: "app.experimentBuilder",
-    icon: SlidersHorizontal,
-  },
   LAB_WORKSPACE_NAV_ITEMS[0],
   LAB_WORKSPACE_NAV_ITEMS[1],
   { to: "/lab/validation", labelKey: "app.labValidation", icon: ShieldCheck },
@@ -352,14 +336,6 @@ const EDITION_PLATFORM_LABEL: Record<BrandEditionId, TranslationKey> = {
   autonomy: "app.platformAutonomy",
 };
 
-const EXIT_GUARD_JOB_STATUSES: JobStatus[] = [
-  "CREATED",
-  "QUEUED",
-  "RUNNING",
-  "AGGREGATING",
-  "FINALIZING",
-];
-
 const DOCS_PREVIEW_MANAGED_USAGE: ManagedModelUsageSnapshot = {
   plan: {
     id: "plus",
@@ -431,11 +407,22 @@ const DOCS_PREVIEW_MANAGED_USAGE: ManagedModelUsageSnapshot = {
 
 const DOCS_PREVIEW_MANAGED_MODELS: ManagedModelCatalogEntry[] =
   DEFAULT_MANAGED_MODEL_CATALOG;
-const ACTIVE_JOB_CHECK_TIMEOUT_MS = 2_500;
-const ACTIVE_JOB_CANCEL_TIMEOUT_MS = 2_000;
 const RUNTIME_EXIT_TIMEOUT_MS = 6_000;
-const ACTIVE_JOB_PAGE_SIZE = 100;
 const MOBILE_NAVIGATION_QUERY = "(max-width: 520px)";
+const SETTINGS_WORKSPACE_STORAGE_KEY = "dronedream.settings-workspace:v1";
+
+function restoredSettingsWorkspace(): SettingsSurfaceTabId | null {
+  if (!isDesktopRuntime() || typeof window === "undefined") return null;
+  try {
+    const tab = window.sessionStorage.getItem(SETTINGS_WORKSPACE_STORAGE_KEY);
+    return tab && ["general", "memory", "model", "course", "administration", "runtime"]
+      .includes(tab)
+      ? tab as SettingsSurfaceTabId
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 function subscribeToMobileNavigation(onChange: () => void): () => void {
   if (typeof window === "undefined" || !window.matchMedia) return () => undefined;
@@ -448,7 +435,6 @@ function mobileNavigationSnapshot(): boolean {
   return typeof window !== "undefined"
     && Boolean(window.matchMedia?.(MOBILE_NAVIGATION_QUERY).matches);
 }
-const MAX_ACTIVE_JOB_PAGES_PER_STATUS = 10;
 
 interface ExperiencePreferenceDraft {
   account_memory_enabled: boolean;
@@ -521,7 +507,9 @@ type SettingsCopy = Readonly<{
   title: string;
   tabs: readonly [string, string, string, string];
   language: string;
+  interface: string;
   notifications: string;
+  appearance: readonly [string, string];
   notificationLabels: readonly [string, string, string, string, string, string, string, string];
   memoryTitle: string;
   memoryEnabled: readonly [string, string];
@@ -548,7 +536,9 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     title: "Settings",
     tabs: ["General", "Memory", "Model", "Runtime"],
     language: "Language",
+    interface: "Interface",
     notifications: "Notifications",
+    appearance: ["Dark", "Light"],
     notificationLabels: ["Allow notifications", "Experiment and task completed", "AI response completed", "Product updates", "Approval required", "Allowance or card expiring", "Security and sign-in", "Device or runtime status"],
     memoryTitle: "Memory",
     memoryEnabled: ["Memory off", "Memory on"],
@@ -563,7 +553,9 @@ const SETTINGS_COPY: Readonly<Record<InterfaceLocale, SettingsCopy>> = {
     title: "设置",
     tabs: ["常规", "记忆", "模型", "运行环境"],
     language: "语言",
+    interface: "界面",
     notifications: "通知",
+    appearance: ["深色", "浅色"],
     notificationLabels: ["允许通知", "实验与任务完成", "AI 回复完成", "产品更新", "需要审批", "额度或重置卡即将到期", "安全与登录提醒", "设备或运行环境状态"],
     memoryTitle: "记忆",
     memoryEnabled: ["记忆已关闭", "记忆已开启"],
@@ -806,104 +798,6 @@ function AllowanceUsageHistory({
   );
 }
 
-interface ExitPromptState {
-  hasDraft: boolean;
-  draftPreserved: boolean;
-  activeJobCount: number;
-  activeJobs: Pick<Job, "id" | "control_version">[];
-  activeJobsUnknown: boolean;
-}
-
-async function listActiveJobsForStatus(status: JobStatus): Promise<{
-  count: number;
-  jobs: Pick<Job, "id" | "control_version">[];
-}> {
-  const first = await apiClient.listJobs({
-    page: 1,
-    page_size: ACTIVE_JOB_PAGE_SIZE,
-    status,
-  });
-  const pageCount = Math.ceil(first.total / ACTIVE_JOB_PAGE_SIZE);
-  if (pageCount > MAX_ACTIVE_JOB_PAGES_PER_STATUS) {
-    throw new Error("Too many active experiments to enumerate safely before exit.");
-  }
-  const remaining = pageCount > 1
-    ? await Promise.all(
-        Array.from({ length: pageCount - 1 }, (_, index) =>
-          apiClient.listJobs({
-            page: index + 2,
-            page_size: ACTIVE_JOB_PAGE_SIZE,
-            status,
-          })
-        ),
-      )
-    : [];
-  return {
-    count: first.total,
-    jobs: Array.from(
-      new Map(
-        [first, ...remaining]
-          .flatMap((page) => page.items)
-          .map((job) => [job.id, {
-            id: job.id,
-            control_version: job.control_version,
-          }] as const),
-      ).values(),
-    ),
-  };
-}
-
-async function findActiveJobsBeforeExit(): Promise<{
-  count: number;
-  jobs: Pick<Job, "id" | "control_version">[];
-}> {
-  let timeoutId: number | undefined;
-  const timeout = new Promise<never>((_resolve, reject) => {
-    timeoutId = window.setTimeout(
-      () => reject(new Error("Timed out while checking active experiments.")),
-      ACTIVE_JOB_CHECK_TIMEOUT_MS,
-    );
-  });
-  try {
-    const statuses = await Promise.race([
-      Promise.all(EXIT_GUARD_JOB_STATUSES.map(listActiveJobsForStatus)),
-      timeout,
-    ]);
-    return {
-      count: statuses.reduce((total, result) => total + result.count, 0),
-      jobs: Array.from(
-        new Map(
-          statuses
-            .flatMap((result) => result.jobs)
-            .map((job) => [job.id, job] as const),
-        ).values(),
-      ),
-    };
-  } finally {
-    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
-  }
-}
-
-async function stopKnownActiveJobsBeforeExit(
-  jobs: Pick<Job, "id" | "control_version">[],
-): Promise<void> {
-  if (jobs.length === 0) return;
-  let timeoutId: number | undefined;
-  const timeout = new Promise<void>((resolve) => {
-    timeoutId = window.setTimeout(resolve, ACTIVE_JOB_CANCEL_TIMEOUT_MS);
-  });
-  try {
-    await Promise.race([
-      Promise.allSettled(
-        jobs.map((job) => apiClient.cancelJob(job.id, job.control_version)),
-      ).then(() => undefined),
-      timeout,
-    ]);
-  } finally {
-    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
-  }
-}
-
 async function stopDesktopRuntimeBeforeExit(): Promise<void> {
   let timeoutId: number | undefined;
   const timeout = new Promise<void>((resolve) => {
@@ -997,9 +891,11 @@ function SettingsDialog({
   presentation?: "quick" | "workspace";
   preferenceSaveQueueRef: MutableRefObject<Promise<boolean>>;
 }) {
-  const { locale, interfaceLocale, setLocale, t } = useI18n();
+  const { locale, interfaceLocale, setLocale, restoreLocale, t } = useI18n();
   const navigate = useNavigate();
   const settingsCopy = SETTINGS_COPY[interfaceLocale];
+  const editionTheme = useEditionTheme();
+  const setCustomAccentPreference = editionTheme.setCustomAccent;
   const auth = useAuth();
   const adminAccess = useAdminAccess();
   const {
@@ -1079,10 +975,8 @@ function SettingsDialog({
     draft: ExperiencePreferenceDraft = experiencePreferenceDraft,
   ): ConsolePreferenceRecord => ({
     interface_locale: interfaceLocale,
-    // These legacy database columns remain populated for schema compatibility;
-    // the product exposes exactly one fixed palette per edition.
-    appearance_mode: "light",
-    custom_accent: "#8d72ee",
+    appearance_mode: editionTheme.appearancePreference,
+    custom_accent: editionTheme.customAccent,
     notifications: notificationPreferences,
     memory_enabled: draft.memory_enabled,
     memory_scopes: draft.memory_scopes,
@@ -1097,6 +991,8 @@ function SettingsDialog({
       report_format: draft.default_report_format,
     },
   }), [
+    editionTheme.appearancePreference,
+    editionTheme.customAccent,
     experiencePreferenceDraft,
     interfaceLocale,
     notificationPreferences,
@@ -1256,7 +1152,10 @@ function SettingsDialog({
               ...DEFAULT_NOTIFICATION_PREFERENCES,
               ...preferences.notifications,
             });
-            setLocale(preferences.interface_locale);
+            restoreLocale(preferences.interface_locale);
+            // Appearance is session-only: opening settings must not restore a
+            // previous cloud theme or override the user's current session.
+            setCustomAccentPreference(preferences.custom_accent);
           }
         } else {
           persistedExperiencePreferenceRef.current = EMPTY_EXPERIENCE_PREFERENCE_DRAFT;
@@ -1277,7 +1176,8 @@ function SettingsDialog({
     initialPreferenceDraft,
     localDesktopPreferences,
     preferenceBoundary,
-    setLocale,
+    setCustomAccentPreference,
+    restoreLocale,
   ]);
   useEffect(() => {
     if (
@@ -1725,20 +1625,26 @@ function SettingsDialog({
       ? {
           title: "设置",
           language: "语言",
+          appearance: "外观",
           accountMemory: "账户记忆",
           editionMemory: "本软件记忆",
           model: "默认平台模型",
           runtime: "Runtime",
           allSettings: "全部设置",
+          dark: "深色",
+          light: "浅色",
         }
       : {
           title: "Settings",
           language: "Language",
+          appearance: "Appearance",
           accountMemory: "Account memory",
           editionMemory: "This edition's memory",
           model: "Default platform model",
           runtime: "Runtime",
           allSettings: "All settings",
+          dark: "Dark",
+          light: "Light",
         };
     const availableModels = managedModels.filter(managedModelAvailableForAssistant);
     const selectedModel = `${modelAccess.managedProvider}:${modelAccess.managedModel}`;
@@ -1780,6 +1686,33 @@ function SettingsDialog({
                   <span>{option.label}</span>
                 </button>
               ))}
+            </div>
+          </div>
+          <div className="quick-settings-item quick-settings-appearance">
+            <span>{quickCopy.appearance}</span>
+            <div
+              className="quick-settings-appearance-options"
+              role="group"
+              aria-label={quickCopy.appearance}
+            >
+              <button
+                type="button"
+                className={editionTheme.appearancePreference === "dark" ? "selected" : undefined}
+                aria-pressed={editionTheme.appearancePreference === "dark"}
+                onClick={() => editionTheme.setAppearance("dark")}
+              >
+                <Moon aria-hidden="true" />
+                <span>{quickCopy.dark}</span>
+              </button>
+              <button
+                type="button"
+                className={editionTheme.appearancePreference === "light" ? "selected" : undefined}
+                aria-pressed={editionTheme.appearancePreference === "light"}
+                onClick={() => editionTheme.setAppearance("light")}
+              >
+                <Sun aria-hidden="true" />
+                <span>{quickCopy.light}</span>
+              </button>
             </div>
           </div>
           {auth.account || docsPreview ? (
@@ -1916,6 +1849,37 @@ function SettingsDialog({
                 </button>
               ))}
             </fieldset>
+          </div>
+          <div className="settings-general-card settings-interface-card">
+            <div className="settings-card-heading">
+              <span><SlidersHorizontal aria-hidden="true" />{settingsCopy.interface}</span>
+            </div>
+            <div
+              className="settings-appearance-options"
+              role="group"
+              aria-label={t("settings.general.appearance")}
+            >
+              <button
+                type="button"
+                className={editionTheme.appearancePreference === "dark" ? "selected" : undefined}
+                aria-pressed={editionTheme.appearancePreference === "dark"}
+                onClick={() => editionTheme.setAppearance("dark")}
+              >
+                <Moon aria-hidden="true" />
+                <strong>{settingsCopy.appearance[0]}</strong>
+                <i aria-hidden="true">✓</i>
+              </button>
+              <button
+                type="button"
+                className={editionTheme.appearancePreference === "light" ? "selected" : undefined}
+                aria-pressed={editionTheme.appearancePreference === "light"}
+                onClick={() => editionTheme.setAppearance("light")}
+              >
+                <Sun aria-hidden="true" />
+                <strong>{settingsCopy.appearance[1]}</strong>
+                <i aria-hidden="true">✓</i>
+              </button>
+            </div>
           </div>
           <div className="settings-general-card settings-notification-card">
             <div className="settings-card-heading">
@@ -2629,140 +2593,6 @@ function SettingsDialog({
   );
 }
 
-function ExitGuardDialog({
-  state,
-  onReturn,
-  onConfirmExit,
-}: {
-  state: ExitPromptState;
-  onReturn: () => void;
-  onConfirmExit: () => void;
-}) {
-  const { t } = useI18n();
-  const backdropRef = useRef<HTMLDivElement>(null);
-  const dialogRef = useRef<HTMLElement>(null);
-  const returnButtonRef = useRef<HTMLButtonElement>(null);
-  const paragraphKey: TranslationKey = state.hasDraft
-    ? state.activeJobsUnknown
-      ? "exitGuard.draftActiveUnknown"
-      : state.activeJobCount > 0
-        ? "exitGuard.draftActive"
-        : "exitGuard.draft"
-    : state.activeJobsUnknown
-      ? "exitGuard.activeUnknown"
-      : "exitGuard.active";
-
-  useEffect(() => {
-    const previousFocus = document.activeElement instanceof HTMLElement
-      ? document.activeElement
-      : null;
-    const backdrop = backdropRef.current;
-    const parent = backdrop?.parentElement;
-    const siblings = parent && backdrop
-      ? Array.from(parent.children)
-        .filter((element): element is HTMLElement => (
-          element instanceof HTMLElement && element !== backdrop
-        ))
-        .map((element) => ({
-          element,
-          inert: element.hasAttribute("inert"),
-          ariaHidden: element.getAttribute("aria-hidden"),
-        }))
-      : [];
-    for (const { element } of siblings) {
-      element.setAttribute("inert", "");
-      element.setAttribute("aria-hidden", "true");
-    }
-
-    const focusFrame = window.requestAnimationFrame(() => returnButtonRef.current?.focus());
-    const keepFocusInside = (event: globalThis.KeyboardEvent) => {
-      const dialog = dialogRef.current;
-      if (!dialog) return;
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onReturn();
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const controls = Array.from(dialog.querySelectorAll<HTMLElement>(
-        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-      )).filter((element) => !element.closest("[inert]"));
-      if (controls.length === 0) {
-        event.preventDefault();
-        return;
-      }
-      const first = controls[0];
-      const last = controls[controls.length - 1];
-      const active = document.activeElement;
-      if (event.shiftKey && (active === first || !dialog.contains(active))) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && (active === last || !dialog.contains(active))) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", keepFocusInside, true);
-    return () => {
-      window.cancelAnimationFrame(focusFrame);
-      document.removeEventListener("keydown", keepFocusInside, true);
-      for (const { element, inert, ariaHidden } of siblings) {
-        if (!inert) element.removeAttribute("inert");
-        if (ariaHidden === null) element.removeAttribute("aria-hidden");
-        else element.setAttribute("aria-hidden", ariaHidden);
-      }
-      window.requestAnimationFrame(() => {
-        const fallback = document.querySelector<HTMLElement>(
-          '.settings-workspace-sidebar [role="tab"][aria-selected="true"], .launcher-settings-button, .account-button',
-        );
-        const target = previousFocus && previousFocus.isConnected && previousFocus !== document.body
-          ? previousFocus
-          : fallback;
-        if (target && !target.closest("[inert]")) target.focus();
-      });
-    };
-  }, [onReturn]);
-
-  return (
-    <div ref={backdropRef} className="app-exit-backdrop" role="presentation">
-      <section
-        ref={dialogRef}
-        className="app-exit-dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="app-exit-title"
-        aria-describedby="app-exit-description"
-      >
-        <h2 id="app-exit-title">{t("exitGuard.title")}</h2>
-        <p id="app-exit-description">
-          {t(paragraphKey, { count: state.activeJobCount })}
-        </p>
-        {state.hasDraft ? (
-          <p role={state.draftPreserved ? "status" : "alert"}>
-            {t(
-              state.draftPreserved
-                ? "exitGuard.draftSaved"
-                : "exitGuard.draftSaveFailed",
-            )}
-          </p>
-        ) : null}
-        <div className="app-exit-actions">
-          <button ref={returnButtonRef} type="button" className="btn" onClick={onReturn}>
-            {t("exitGuard.return")}
-          </button>
-          <button
-            type="button"
-            className="btn app-exit-confirm"
-            onClick={onConfirmExit}
-          >
-            {t(state.hasDraft ? "exitGuard.exitKeep" : "exitGuard.exitAnyway")}
-          </button>
-        </div>
-      </section>
-    </div>
-  );
-}
-
 const ACCOUNT_COPY = {
   en: {
     title: "DroneDream account",
@@ -2792,6 +2622,10 @@ const ACCOUNT_COPY = {
     createAccount: "Create account",
     registerNow: "New to DroneDream? Register now",
     backToSignIn: "Already registered? Sign in",
+    forgotPassword: "Forgot password",
+    recoveryTitle: "Reset password",
+    recoveryBody: "Enter your email, request a verification code, and choose a new password.",
+    resetPassword: "Reset password and sign in",
     code: "Verification code",
     codePlaceholder: "Six-digit code",
     passwordTooShort: "Password must contain at least 8 characters.",
@@ -2802,6 +2636,7 @@ const ACCOUNT_COPY = {
     github: "Continue with GitHub",
     slack: "Continue with Slack",
     apple: "Continue with Apple",
+    socialSignIn: "Social sign-in options",
     username: "Username",
     usernamePlaceholder: "Choose a username",
     saveUsername: "Save username",
@@ -2872,6 +2707,10 @@ const ACCOUNT_COPY = {
     createAccount: "创建账号",
     registerNow: "还没有账号？立即注册",
     backToSignIn: "已经注册？返回登录",
+    forgotPassword: "忘记密码",
+    recoveryTitle: "重置密码",
+    recoveryBody: "填写邮箱、获取验证码，并设置新的登录密码。",
+    resetPassword: "重置密码并登录",
     code: "邮箱验证码",
     codePlaceholder: "六位验证码",
     passwordTooShort: "密码至少需要 8 个字符。",
@@ -2882,6 +2721,7 @@ const ACCOUNT_COPY = {
     github: "使用 GitHub 登录",
     slack: "使用 Slack 登录",
     apple: "使用 Apple 登录",
+    socialSignIn: "快捷登录选项",
     username: "用户名",
     usernamePlaceholder: "输入用户名",
     saveUsername: "保存用户名",
@@ -3025,12 +2865,14 @@ function AccountMenuPopover({
   onEditProfile,
   onOpenAllowance,
   onOpenSettings,
+  onSignedOut,
 }: {
   menuRef: RefObject<HTMLDivElement>;
   onClose: () => void;
   onEditProfile: () => void;
   onOpenAllowance: () => void;
   onOpenSettings: () => void;
+  onSignedOut: () => void;
 }) {
   const auth = useAuth();
   const { interfaceLocale } = useI18n();
@@ -3073,6 +2915,7 @@ function AccountMenuPopover({
     try {
       await auth.signOut();
       onClose();
+      onSignedOut();
     } catch {
       setSignOutError(true);
       setSignOutPending(false);
@@ -3081,12 +2924,7 @@ function AccountMenuPopover({
 
   return (
     <div ref={menuRef} className="account-menu-popover" role="menu" aria-label={copy.account}>
-      <button
-        type="button"
-        className="account-menu-row account-menu-profile"
-        role="menuitem"
-        onClick={onEditProfile}
-      >
+      <button type="button" className="account-menu-row" role="menuitem" onClick={onEditProfile}>
         <CircleUserRound aria-hidden="true" strokeWidth={1.8} />
         <span>{copy.editProfile}</span>
       </button>
@@ -3121,6 +2959,7 @@ export function AccountDialog({
   desktopBrowserAuthReady = false,
   onOpenDesktopSetup,
   onClose,
+  onSignedOut,
 }: {
   closeRef: RefObject<HTMLButtonElement>;
   required: boolean;
@@ -3128,6 +2967,7 @@ export function AccountDialog({
   desktopBrowserAuthReady?: boolean;
   onOpenDesktopSetup?: () => void;
   onClose: () => void;
+  onSignedOut: () => void;
 }) {
   const { locale } = useI18n();
   const copy = ACCOUNT_COPY[locale];
@@ -3140,7 +2980,7 @@ export function AccountDialog({
   const [captchaCycle, setCaptchaCycle] = useState(0);
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
-  const [authMode, setAuthMode] = useState<"sign-in" | "register">("sign-in");
+  const [authMode, setAuthMode] = useState<"sign-in" | "register" | "recovery">("sign-in");
   const [displayName, setDisplayName] = useState(
     auth.account?.displayName ?? "",
   );
@@ -3381,38 +3221,62 @@ export function AccountDialog({
     return true;
   };
 
+  const changeAuthMode = (mode: "sign-in" | "register" | "recovery") => {
+    setAuthMode(mode);
+    setCode("");
+    setCodeSent(false);
+    setCaptchaToken(null);
+    setCaptchaCycle((current) => current + 1);
+    setPassword("");
+    setPasswordConfirmation("");
+    setError(null);
+  };
+
   return (
     <section
-      className="account-dialog"
+      className={`account-dialog${auth.configured && !auth.account ? " is-auth-entry" : ""}`}
       role="dialog"
       aria-modal="true"
-      aria-labelledby="account-dialog-title"
+      aria-labelledby={auth.account ? undefined : "account-dialog-title"}
+      aria-label={auth.account ? copy.title : undefined}
     >
       <header>
-        <div className="account-dialog-title">
-          <CircleUserRound aria-hidden="true" strokeWidth={1.75} />
-          <h2 id="account-dialog-title">
-            {!auth.configured
-              ? copy.localTitle
-              : auth.account
-                ? copy.title
-                : authMode === "register"
-                  ? copy.registerTitle
-                  : copy.signInTitle}
-          </h2>
+        <BrandLockup edition="universal" className="account-dialog-brand" />
+        <div className="account-dialog-header-actions">
+          {auth.configured && !auth.account && !desktopRuntime ? (
+            <button
+              type="button"
+              className="account-auth-mode"
+              disabled={pending}
+              onClick={() => changeAuthMode(authMode === "sign-in" ? "register" : "sign-in")}
+            >
+              <CircleUserRound aria-hidden="true" strokeWidth={1.8} />
+              {authMode === "sign-in" ? copy.register : copy.backToSignIn}
+            </button>
+          ) : null}
+          {!required ? (
+            <button
+              ref={closeRef}
+              type="button"
+              className="account-dialog-close"
+              aria-label={copy.close}
+              onClick={onClose}
+            >
+              <X aria-hidden="true" strokeWidth={1.9} />
+            </button>
+          ) : null}
         </div>
-        {!required ? (
-          <button
-            ref={closeRef}
-            type="button"
-            className="account-dialog-close"
-            aria-label={copy.close}
-            onClick={onClose}
-          >
-            <X aria-hidden="true" strokeWidth={1.9} />
-          </button>
-        ) : null}
       </header>
+
+      {!auth.account ? <h2 id="account-dialog-title">
+        {!auth.configured
+          ? copy.localTitle
+          : authMode === "register"
+              ? copy.registerTitle
+              : authMode === "recovery"
+                ? copy.recoveryTitle
+                : copy.signInTitle}
+      </h2> : null}
 
       {!auth.configured ? (
         <p className="account-dialog-copy">{copy.localBody}</p>
@@ -3440,7 +3304,10 @@ export function AccountDialog({
               type="button"
               className="btn account-sign-out"
               disabled={pending}
-              onClick={() => void run(auth.signOut)}
+              onClick={() => void run(async () => {
+                await auth.signOut();
+                onSignedOut();
+              })}
             >
               {copy.signOut}
             </button>
@@ -3589,6 +3456,9 @@ export function AccountDialog({
         </div>
       ) : (
         <>
+          {authMode === "recovery" ? (
+            <p className="account-dialog-copy account-recovery-copy">{copy.recoveryBody}</p>
+          ) : null}
           <form
             className="account-email-form"
             onSubmit={(event) => {
@@ -3616,6 +3486,15 @@ export function AccountDialog({
                     }
                   }
                 });
+                return;
+              }
+              if (authMode === "recovery") {
+                if (!registrationPasswordIsValid()) return;
+                if (!codeSent || !code.trim()) {
+                  setError(copy.codeRequired);
+                  return;
+                }
+                void run(() => auth.verifyRecoveryCode(email, code, password));
                 return;
               }
               if (!registrationPasswordIsValid()) return;
@@ -3647,7 +3526,7 @@ export function AccountDialog({
                 required
                 minLength={8}
                 autoComplete={
-                  authMode === "register" ? "new-password" : "current-password"
+                  authMode === "sign-in" ? "current-password" : "new-password"
                 }
                 value={password}
                 placeholder={copy.passwordPlaceholder}
@@ -3655,7 +3534,7 @@ export function AccountDialog({
                 onChange={(event) => setPassword(event.target.value)}
               />
             </label>
-            {authMode === "register" ? (
+            {authMode !== "sign-in" ? (
               <>
                 <label>
                   <span>{copy.confirmPassword}</span>
@@ -3705,12 +3584,17 @@ export function AccountDialog({
                       void run(async () => {
                           try {
                             if (captchaToken) {
-                              await auth.sendRegistrationCode(
-                                email,
-                                captchaToken,
-                              );
+                              if (authMode === "register") {
+                                await auth.sendRegistrationCode(email, captchaToken);
+                              } else {
+                                await auth.sendRecoveryCode(email, captchaToken);
+                              }
                             } else {
-                              await auth.sendRegistrationCode(email);
+                              if (authMode === "register") {
+                                await auth.sendRegistrationCode(email);
+                              } else {
+                                await auth.sendRecoveryCode(email);
+                              }
                             }
                             setCodeSent(true);
                           } finally {
@@ -3737,96 +3621,86 @@ export function AccountDialog({
             ) : null}
             <button type="submit" className="btn btn-primary" disabled={pending}>
               <MailCheck aria-hidden="true" strokeWidth={1.8} />
-              {authMode === "register" ? copy.createAccount : copy.signIn}
+              {authMode === "register"
+                ? copy.createAccount
+                : authMode === "recovery"
+                  ? copy.resetPassword
+                  : copy.signIn}
             </button>
           </form>
-          <button
-            type="button"
-            className="account-auth-mode"
-            disabled={pending}
-            onClick={() => {
-              setAuthMode((current) =>
-                current === "sign-in" ? "register" : "sign-in",
-              );
-              setCode("");
-              setCodeSent(false);
-              setCaptchaToken(null);
-              setCaptchaCycle((current) => current + 1);
-              setPassword("");
-              setPasswordConfirmation("");
-              setError(null);
-            }}
-          >
-            {authMode === "sign-in"
-              ? copy.registerNow
-              : copy.backToSignIn}
-          </button>
-          {auth.googleEnabled || auth.githubEnabled || auth.slackEnabled || auth.appleEnabled ? (
-            <div className="account-social-actions">
-              {auth.githubEnabled ? (
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={pending}
-                  onClick={() =>
-                    void run(() => auth.signInWithProvider("github"))
-                  }
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path fill="currentColor" d="M12 .7a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2.23c-3.22.7-3.9-1.37-3.9-1.37-.52-1.34-1.29-1.69-1.29-1.69-1.05-.72.08-.71.08-.71 1.17.08 1.78 1.2 1.78 1.2 1.04 1.78 2.72 1.27 3.39.97.1-.75.4-1.27.74-1.56-2.57-.29-5.27-1.28-5.27-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.47.11-3.05 0 0 .97-.31 3.16 1.18a10.98 10.98 0 0 1 5.76 0c2.19-1.49 3.15-1.18 3.15-1.18.63 1.58.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.71 5.38-5.29 5.67.42.36.79 1.06.79 2.15v3.2c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .7Z" />
-                  </svg>
-                  {copy.github}
-                </button>
-              ) : null}
-              {auth.googleEnabled ? (
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={pending}
-                  onClick={() =>
-                    void run(() => auth.signInWithProvider("google"))
-                  }
-                >
-                  <LogIn aria-hidden="true" strokeWidth={1.8} />
-                  {copy.google}
-                </button>
-              ) : null}
-              {auth.slackEnabled ? (
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={pending}
-                  onClick={() =>
-                    void run(() => auth.signInWithProvider("slack_oidc"))
-                  }
-                >
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path fill="#e01e5a" d="M5.04 15.16a2.52 2.52 0 1 1-2.52-2.52h2.52v2.52Zm1.27 0a2.53 2.53 0 0 1 5.05 0v6.32a2.53 2.53 0 0 1-5.05 0v-6.32Z" />
-                    <path fill="#36c5f0" d="M8.84 5.04a2.52 2.52 0 1 1 2.52-2.52v2.52H8.84Zm0 1.27a2.53 2.53 0 0 1 0 5.05H2.52a2.53 2.53 0 0 1 0-5.05h6.32Z" />
-                    <path fill="#2eb67d" d="M18.96 8.84a2.52 2.52 0 1 1 2.52 2.52h-2.52V8.84Zm-1.27 0a2.53 2.53 0 0 1-5.05 0V2.52a2.53 2.53 0 0 1 5.05 0v6.32Z" />
-                    <path fill="#ecb22e" d="M15.16 18.96a2.52 2.52 0 1 1-2.52 2.52v-2.52h2.52Zm0-1.27a2.53 2.53 0 0 1 0-5.05h6.32a2.53 2.53 0 0 1 0 5.05h-6.32Z" />
-                  </svg>
-                  {copy.slack}
-                </button>
-              ) : null}
+          {authMode === "sign-in" ? (
+            <button
+              type="button"
+              className="account-forgot-password"
+              disabled={pending}
+              onClick={() => changeAuthMode("recovery")}
+            >
+              {copy.forgotPassword}
+            </button>
+          ) : null}
+          {(authMode === "sign-in" || authMode === "register") ? (
+            <div className="account-social-actions" role="group" aria-label={copy.socialSignIn}>
+              <button
+                type="button"
+                className="account-provider-icon is-github"
+                aria-label={copy.github}
+                title={copy.github}
+                disabled={pending || !auth.githubEnabled}
+                onClick={() => void run(() => auth.signInWithProvider("github"))}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="currentColor" d="M12 .7a11.5 11.5 0 0 0-3.64 22.41c.58.11.79-.25.79-.56v-2.23c-3.22.7-3.9-1.37-3.9-1.37-.52-1.34-1.29-1.69-1.29-1.69-1.05-.72.08-.71.08-.71 1.17.08 1.78 1.2 1.78 1.2 1.04 1.78 2.72 1.27 3.39.97.1-.75.4-1.27.74-1.56-2.57-.29-5.27-1.28-5.27-5.68 0-1.26.45-2.28 1.19-3.09-.12-.29-.52-1.47.11-3.05 0 0 .97-.31 3.16 1.18a10.98 10.98 0 0 1 5.76 0c2.19-1.49 3.15-1.18 3.15-1.18.63 1.58.23 2.76.11 3.05.74.81 1.19 1.83 1.19 3.09 0 4.41-2.71 5.38-5.29 5.67.42.36.79 1.06.79 2.15v3.2c0 .31.21.67.8.56A11.5 11.5 0 0 0 12 .7Z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="account-provider-icon is-google"
+                aria-label={copy.google}
+                title={copy.google}
+                disabled={pending || !auth.googleEnabled}
+                onClick={() => void run(() => auth.signInWithProvider("google"))}
+              >
+                <svg viewBox="0 0 18 18" aria-hidden="true">
+                  <path fill="#4285f4" d="M17.64 9.205c0-.638-.057-1.252-.164-1.841H9v3.481h4.844a4.14 4.14 0 0 1-1.797 2.716v2.258h2.909c1.703-1.568 2.684-3.879 2.684-6.614Z" />
+                  <path fill="#34a853" d="M9 18c2.43 0 4.468-.806 5.956-2.182l-2.909-2.258c-.806.54-1.836.86-3.047.86-2.344 0-4.328-1.585-5.037-3.714H.956v2.332A9 9 0 0 0 9 18Z" />
+                  <path fill="#fbbc05" d="M3.963 10.706A5.42 5.42 0 0 1 3.682 9c0-.592.102-1.168.281-1.706V4.962H.956A9 9 0 0 0 0 9c0 1.452.347 2.827.956 4.038l3.007-2.332Z" />
+                  <path fill="#ea4335" d="M9 3.58c1.321 0 2.507.454 3.441 1.346l2.581-2.581C13.464.892 11.43 0 9 0A9 9 0 0 0 .956 4.962l3.007 2.332C4.672 5.165 6.656 3.58 9 3.58Z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className="account-provider-icon is-slack"
+                aria-label={copy.slack}
+                title={copy.slack}
+                disabled={pending || !auth.slackEnabled}
+                onClick={() => void run(() => auth.signInWithProvider("slack_oidc"))}
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path fill="#e01e5a" d="M5.04 15.16a2.52 2.52 0 1 1-2.52-2.52h2.52v2.52Zm1.27 0a2.53 2.53 0 0 1 5.05 0v6.32a2.53 2.53 0 0 1-5.05 0v-6.32Z" />
+                  <path fill="#36c5f0" d="M8.84 5.04a2.52 2.52 0 1 1 2.52-2.52v2.52H8.84Zm0 1.27a2.53 2.53 0 0 1 0 5.05H2.52a2.53 2.53 0 0 1 0-5.05h6.32Z" />
+                  <path fill="#2eb67d" d="M18.96 8.84a2.52 2.52 0 1 1 2.52 2.52h-2.52V8.84Zm-1.27 0a2.53 2.53 0 0 1-5.05 0V2.52a2.53 2.53 0 0 1 5.05 0v6.32Z" />
+                  <path fill="#ecb22e" d="M15.16 18.96a2.52 2.52 0 1 1-2.52 2.52v-2.52h2.52Zm0-1.27a2.53 2.53 0 0 1 0-5.05h6.32a2.53 2.53 0 0 1 0 5.05h-6.32Z" />
+                </svg>
+              </button>
               {auth.appleEnabled ? (
                 <button
                   type="button"
-                  className="btn"
+                  className="account-provider-icon is-apple"
+                  aria-label={copy.apple}
+                  title={copy.apple}
                   disabled={pending}
                   onClick={() =>
                     void run(() => auth.signInWithProvider("apple"))
                   }
                 >
                   <Apple aria-hidden="true" strokeWidth={1.8} />
-                  {copy.apple}
                 </button>
               ) : null}
             </div>
           ) : null}
         </>
       )}
-      <ArchivedExperimentManager
+      <ArchivedConversationManager
         ownerId={auth.account?.id ?? "local"}
         locale={locale}
         edition={edition}
@@ -3847,6 +3721,14 @@ function AppShellContent() {
   const runtimeAccess = useDesktopRuntimeAccess();
   const auth = useAuth();
   const updater = useAppUpdaterState();
+
+  useEffect(() => {
+    const accountId = auth.account?.id;
+    if (!desktopRuntime || !accountId) return;
+    void recordDesktopApplicationActivity(accountId).catch(() => {
+      // Sign-in remains usable while activity telemetry is temporarily offline.
+    });
+  }, [auth.account?.id, desktopRuntime]);
 
   useEffect(() => {
     const ownerId = auth.account?.id;
@@ -3904,9 +3786,12 @@ function AppShellContent() {
     () => false,
   );
   const [launcherSettingsOpen, setLauncherSettingsOpen] = useState(false);
-  const [settingsWorkspaceOpen, setSettingsWorkspaceOpen] = useState(false);
+  const restoredSettingsTab = useMemo(restoredSettingsWorkspace, []);
+  const [settingsWorkspaceOpen, setSettingsWorkspaceOpen] = useState(
+    restoredSettingsTab !== null,
+  );
   const [settingsInitialTab, setSettingsInitialTab] =
-    useState<SettingsSurfaceTabId>("general");
+    useState<SettingsSurfaceTabId>(restoredSettingsTab ?? "general");
   const [settingsPreferenceHandoff, setSettingsPreferenceHandoff] =
     useState<ExperiencePreferenceDraft | null>(null);
   const [universalMode, setUniversalMode] = useState(() => {
@@ -3923,7 +3808,6 @@ function AppShellContent() {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [externalNavigationError, setExternalNavigationError] = useState<string | null>(null);
-  const [exitPrompt, setExitPrompt] = useState<ExitPromptState | null>(null);
   const launcherSettingsButtonRef = useRef<HTMLButtonElement>(null);
   const launcherSettingsCloseRef = useRef<HTMLButtonElement>(null);
   const accountButtonRef = useRef<HTMLButtonElement>(null);
@@ -3934,10 +3818,6 @@ function AppShellContent() {
   const settingsWorkspaceOpenerRef = useRef<"account" | "settings">("settings");
   const settingsPreferenceSaveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const desktopWindowRef = useRef<DesktopWindowHandle | null>(null);
-  const currentPathRef = useRef(location.pathname);
-  const exitPromptRef = useRef<ExitPromptState | null>(null);
-  const exitCheckInFlightRef = useRef(false);
-  const exitApprovedRef = useRef(false);
   const launcherMode = desktopRuntime && location.pathname === "/desktop/setup";
   const experimentWizardMode = location.pathname === "/jobs/new";
   const activeThemeEdition: BrandEditionId = EDITION_IS_FIXED
@@ -3947,12 +3827,6 @@ function AppShellContent() {
       : universalMode;
   const runtimeIsBusy = runtimeAccess.status === "checking" ||
     runtimeAccess.status === "starting";
-  const launcherRuntimeChecking =
-    runtimeAccess.isChecking ||
-    runtimeIsBusy;
-  const launcherRuntimeChecked =
-    runtimeAccess.status === "ready" &&
-    !runtimeAccess.isChecking;
   const runtimeNavDescription = runtimeAccess.status === "checking"
     ? t("runtimeGate.navChecking")
     : runtimeAccess.status === "starting"
@@ -4140,6 +4014,13 @@ function AppShellContent() {
     });
   }, [mobileNavigationEnabled]);
 
+  const openQuickSettings = useCallback(() => {
+    setSettingsInitialTab("general");
+    setAccountMenuOpen(false);
+    setMobileMenuOpen(false);
+    setLauncherSettingsOpen(true);
+  }, []);
+
   const openSettingsWorkspace = useCallback((
     tab: SettingsSurfaceTabId = "general",
     opener: "account" | "settings" = "settings",
@@ -4152,6 +4033,11 @@ function AppShellContent() {
     setAccountMenuOpen(false);
     setMobileMenuOpen(false);
     setSettingsWorkspaceOpen(true);
+    try {
+      window.sessionStorage.setItem(SETTINGS_WORKSPACE_STORAGE_KEY, tab);
+    } catch {
+      // Settings still opens when sessionStorage is unavailable.
+    }
   }, []);
   const openAllSettings = useCallback((
     tab: SettingsSurfaceTabId = "general",
@@ -4164,6 +4050,11 @@ function AppShellContent() {
     setSettingsWorkspaceOpen(false);
     setSettingsPreferenceHandoff(null);
     setSettingsInitialTab("general");
+    try {
+      window.sessionStorage.removeItem(SETTINGS_WORKSPACE_STORAGE_KEY);
+    } catch {
+      // The in-memory close remains authoritative for this render.
+    }
     requestAnimationFrame(() => {
       const opener = settingsWorkspaceOpenerRef.current === "account"
         ? accountButtonRef.current
@@ -4226,6 +4117,15 @@ function AppShellContent() {
     });
   }, [accountRequired, mobileNavigationEnabled]);
 
+  const returnToLauncherAfterSignOut = useCallback(() => {
+    setAccountMenuOpen(false);
+    setAccountOpen(false);
+    setLauncherSettingsOpen(false);
+    setSettingsWorkspaceOpen(false);
+    setMobileMenuOpen(false);
+    navigate(desktopRuntime ? "/desktop/setup" : "/", { replace: true });
+  }, [desktopRuntime, navigate]);
+
   useEffect(() => {
     if (!mobileMenuExpanded) return;
     const closeMobileMenu = (restoreFocus: boolean) => {
@@ -4268,34 +4168,6 @@ function AppShellContent() {
       window.removeEventListener(OPEN_ACCOUNT_DIALOG_EVENT, openAccountDialog);
   }, [launcherMode]);
 
-  const returnFromExitPrompt = useCallback(() => {
-    exitPromptRef.current = null;
-    setExitPrompt(null);
-  }, []);
-
-  const confirmExit = useCallback(async () => {
-    const desktopWindow = desktopWindowRef.current;
-    if (!desktopWindow || exitApprovedRef.current) return;
-    persistExperimentDraftsForExit();
-    exitApprovedRef.current = true;
-    const activeJobs = exitPromptRef.current?.activeJobs ?? [];
-    await stopKnownActiveJobsBeforeExit(activeJobs);
-    await stopDesktopRuntimeBeforeExit();
-    try {
-      await desktopWindow.destroy();
-    } catch {
-      exitApprovedRef.current = false;
-    }
-  }, []);
-
-  useEffect(() => {
-    currentPathRef.current = location.pathname;
-  }, [location.pathname]);
-
-  useEffect(() => {
-    exitPromptRef.current = exitPrompt;
-  }, [exitPrompt]);
-
   useEffect(() => {
     if (!desktopRuntime) return;
     const desktopWindow = getDesktopWindowHandle();
@@ -4305,52 +4177,10 @@ function AppShellContent() {
     let unlisten: (() => void) | undefined;
 
     void desktopWindow.onCloseRequested(async (event) => {
-      if (exitApprovedRef.current) return;
       event.preventDefault();
-      if (exitCheckInFlightRef.current || exitPromptRef.current) return;
-      exitCheckInFlightRef.current = true;
-
-      const path = currentPathRef.current;
-      const hasDraft = path === "/jobs/new" || hasExperimentDraft();
-      const draftPreserved = hasDraft
-        ? persistExperimentDraftsForExit()
-        : true;
-      let activeJobCount = 0;
-      let activeJobs: Pick<Job, "id" | "control_version">[] = [];
-      let activeJobsUnknown = false;
-      if (path !== "/desktop/setup") {
-        try {
-          const activeJobResult = await findActiveJobsBeforeExit();
-          activeJobCount = activeJobResult.count;
-          activeJobs = activeJobResult.jobs;
-        } catch {
-          activeJobsUnknown = true;
-        }
-      }
-
-      const state = {
-        hasDraft,
-        draftPreserved,
-        activeJobCount,
-        activeJobs,
-        activeJobsUnknown,
-      };
-      const mustConfirm = hasDraft || activeJobCount > 0 || activeJobsUnknown;
-      if (mustConfirm) {
-        if (!cancelled) {
-          exitPromptRef.current = state;
-          setExitPrompt(state);
-        }
-      } else {
-        exitApprovedRef.current = true;
-        await stopDesktopRuntimeBeforeExit();
-        try {
-          await desktopWindow.destroy();
-        } catch {
-          exitApprovedRef.current = false;
-        }
-      }
-      exitCheckInFlightRef.current = false;
+      persistExperimentDraftsForExit();
+      await stopDesktopRuntimeBeforeExit();
+      if (!cancelled) await desktopWindow.destroy();
     }).then((dispose) => {
       if (cancelled) dispose();
       else unlisten = dispose;
@@ -4492,13 +4322,6 @@ function AppShellContent() {
     };
   }, [accountDialogOpen, accountDialogRequired, closeAccount]);
 
-  const exitGuard = exitPrompt ? (
-    <ExitGuardDialog
-      state={exitPrompt}
-      onReturn={returnFromExitPrompt}
-      onConfirmExit={confirmExit}
-    />
-  ) : null;
   const accountDialog = accountDialogOpen ? (
     <div
       className="account-dialog-backdrop"
@@ -4515,6 +4338,7 @@ function AppShellContent() {
         desktopBrowserAuthReady={runtimeAccess.canUseRuntime}
         onOpenDesktopSetup={() => navigate("/desktop/setup")}
         onClose={closeAccount}
+        onSignedOut={returnToLauncherAfterSignOut}
       />
     </div>
   ) : null;
@@ -4558,22 +4382,14 @@ function AppShellContent() {
             <BrandLockup edition={activeThemeEdition} />
           </Link>
           <div className="launcher-chrome-actions">
-            <span className={`launcher-runtime-indicator${launcherRuntimeChecked ? " is-checked" : ""}`}>
-              <span aria-hidden="true" />
-              {launcherRuntimeChecking
-                ? t("runtimeGate.checkingShort")
-                : launcherRuntimeChecked
-                  ? t("runtimeGate.checkedShort")
-                  : t("runtimeGate.requiredShort")}
-            </span>
             <button
               ref={launcherSettingsButtonRef}
               type="button"
               className="launcher-settings-button"
               aria-label={t("app.settings")}
-              aria-haspopup={auth.account ? "menu" : "dialog"}
+              aria-haspopup="dialog"
               aria-expanded={launcherSettingsOpen}
-              onClick={() => setLauncherSettingsOpen(true)}
+              onClick={openQuickSettings}
             >
               <Settings aria-hidden="true" strokeWidth={1.85} />
             </button>
@@ -4605,7 +4421,6 @@ function AppShellContent() {
            <Outlet key={activeThemeEdition} />
          </main>
          {settingsWorkspace}
-         {exitGuard}
          </div>
       </EditionThemeProvider>
     );
@@ -4730,17 +4545,11 @@ function AppShellContent() {
             );
           })}
           </nav>
-          {activeThemeEdition === "autonomy" || activeThemeEdition === "universal" ? <AutonomyConversationSidebar
+          <AutonomyConversationSidebar
             ownerId={auth.account?.id ?? "local"}
             locale={locale}
             edition={activeThemeEdition}
             onNavigate={() => setMobileMenuOpen(false)}
-          /> : null}
-          <ExperimentWorkspaceSidebar
-            ownerId={auth.account?.id ?? "local"}
-            locale={locale}
-            edition={activeThemeEdition}
-            hideWhenEmpty={activeThemeEdition === "autonomy"}
           />
           <div className="app-sidebar-footer">
             {accountMenuOpen && auth.account ? (
@@ -4757,6 +4566,7 @@ function AppShellContent() {
                 onOpenSettings={() => {
                   openSettingsWorkspace("general", "account");
                 }}
+                onSignedOut={returnToLauncherAfterSignOut}
               />
             ) : null}
             <button
@@ -4824,7 +4634,7 @@ function AppShellContent() {
               aria-expanded={launcherSettingsOpen}
               onClick={() => {
                 setMobileMenuOpen(false);
-                setLauncherSettingsOpen(true);
+                openQuickSettings();
               }}
             >
               <Settings aria-hidden="true" strokeWidth={1.75} />
@@ -4847,7 +4657,7 @@ function AppShellContent() {
                 aria-label={t("app.settings")}
                 aria-haspopup="dialog"
                 aria-expanded={launcherSettingsOpen}
-                onClick={() => setLauncherSettingsOpen(true)}
+                onClick={openQuickSettings}
               >
                 <Settings aria-hidden="true" strokeWidth={1.85} />
               </button>
@@ -4894,7 +4704,6 @@ function AppShellContent() {
         </main>
       </div>
       {settingsWorkspace}
-      {exitGuard}
       <UpdateBlockedDialog
         block={updater.blockedActivity}
         locale={locale}

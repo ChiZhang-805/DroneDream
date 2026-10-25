@@ -10,17 +10,62 @@ const STARTUP_SETTLE_TIME: Duration = Duration::from_millis(250);
 #[cfg(target_os = "windows")]
 const EXIT_TERMINATION_TIMEOUT: Duration = Duration::from_secs(5);
 
+#[cfg(target_os = "windows")]
+struct RuntimeSession {
+    child: ContainedChild,
+    lease: std::fs::File,
+    lease_path: std::path::PathBuf,
+}
+
+#[cfg(target_os = "windows")]
+fn open_session_lease(path: &std::path::Path) -> std::io::Result<std::fs::File> {
+    std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(path)
+}
+
+#[cfg(target_os = "windows")]
+fn acquire_session_lease() -> Result<(std::fs::File, std::path::PathBuf), String> {
+    let local = std::env::var_os("LOCALAPPDATA")
+        .ok_or_else(|| "LOCALAPPDATA is unavailable.".to_string())?;
+    let directory = std::path::PathBuf::from(local).join("io.dronedream.runtime-base-manager");
+    std::fs::create_dir_all(&directory)
+        .map_err(|error| format!("Unable to create Runtime session directory: {error}"))?;
+    let path = directory.join("desktop-sessions-v1.lock");
+    let file = open_session_lease(&path)
+        .map_err(|error| format!("Unable to open Runtime session lease: {error}"))?;
+    // Each open edition holds a shared kernel lock. An exit owns the exclusive
+    // lock only when the last session has closed; new starts wait for that exit.
+    file.lock_shared()
+        .map_err(|error| format!("Unable to acquire Runtime session lease: {error}"))?;
+    Ok((file, path))
+}
+
+#[cfg(target_os = "windows")]
+fn claim_last_session_exit(path: &std::path::Path) -> Result<Option<std::fs::File>, String> {
+    let file = open_session_lease(path)
+        .map_err(|error| format!("Unable to open Runtime exit lease: {error}"))?;
+    match file.try_lock() {
+        Ok(()) => Ok(Some(file)),
+        Err(std::fs::TryLockError::WouldBlock) => Ok(None),
+        Err(error) => Err(format!("Unable to acquire Runtime exit lease: {error}")),
+    }
+}
+
 #[derive(Clone, Default)]
 pub(crate) struct RuntimeKeepalive {
     #[cfg(target_os = "windows")]
-    inner: Arc<Mutex<Option<ContainedChild>>>,
+    inner: Arc<Mutex<Option<RuntimeSession>>>,
     #[cfg(not(target_os = "windows"))]
     inner: Arc<Mutex<()>>,
 }
 
 impl RuntimeKeepalive {
     #[cfg(target_os = "windows")]
-    fn take_owned_child(&self) -> Result<Option<ContainedChild>, String> {
+    fn take_owned_child(&self) -> Result<Option<RuntimeSession>, String> {
         let mut guard = self
             .inner
             .lock()
@@ -39,13 +84,15 @@ impl RuntimeKeepalive {
             .map_err(|_| "DroneDreamRuntime keepalive state is unavailable.".to_string())?;
 
         if let Some(child) = guard.as_mut() {
-            if child.is_running()? {
+            if child.child.is_running()? {
                 return Ok(());
             }
         }
         // Drop a completed helper before replacing it. A live helper never
         // reaches this branch, so this cannot interrupt a healthy Runtime.
         guard.take();
+
+        let (lease, lease_path) = acquire_session_lease()?;
 
         let mut command = windows_command("wsl.exe");
         command.args(keepalive_wsl_args());
@@ -58,7 +105,11 @@ impl RuntimeKeepalive {
                     .to_string(),
             );
         }
-        *guard = Some(child);
+        *guard = Some(RuntimeSession {
+            child,
+            lease,
+            lease_path,
+        });
         Ok(())
     }
 
@@ -89,10 +140,8 @@ impl RuntimeKeepalive {
         Ok(())
     }
 
-    /// Stop only the dedicated DroneDream WSL distribution before the desktop
-    /// process exits. This is intentionally stronger than dropping the
-    /// keepalive: queued/running simulator children must not outlive an
-    /// explicit exit decision.
+    /// Stop the dedicated distribution only after its last desktop session
+    /// closes. Each edition's Core is stopped separately before this call.
     #[cfg(target_os = "windows")]
     fn terminate_for_exit(&self) -> Result<(), String> {
         // The launcher must remain immediately closable on a bare machine. If
@@ -102,7 +151,16 @@ impl RuntimeKeepalive {
         let Some(owned_child) = self.take_owned_child()? else {
             return Ok(());
         };
-        drop(owned_child);
+        let RuntimeSession {
+            child,
+            lease,
+            lease_path,
+        } = owned_child;
+        drop(child);
+        drop(lease);
+        let Some(_last_session_exit) = claim_last_session_exit(&lease_path)? else {
+            return Ok(());
+        };
         let mut command = windows_command("wsl.exe");
         command.args(terminate_wsl_args());
         let output = command_output(
@@ -160,6 +218,30 @@ mod tests {
     use super::*;
     #[cfg(target_os = "windows")]
     use std::time::Instant;
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn sibling_session_survives_until_last_owner_exits() {
+        let path =
+            std::env::temp_dir().join(format!("runtime-session-{}.lock", uuid::Uuid::new_v4()));
+        let first = open_session_lease(&path).unwrap();
+        let second = open_session_lease(&path).unwrap();
+        first.lock_shared().unwrap();
+        second.lock_shared().unwrap();
+        drop(first);
+        assert!(claim_last_session_exit(&path).unwrap().is_none());
+        drop(second);
+        let exit = claim_last_session_exit(&path).unwrap().unwrap();
+        let new_session = open_session_lease(&path).unwrap();
+        assert!(matches!(
+            new_session.try_lock_shared(),
+            Err(std::fs::TryLockError::WouldBlock)
+        ));
+        drop(exit);
+        new_session.try_lock_shared().unwrap();
+        drop(new_session);
+        std::fs::remove_file(path).unwrap();
+    }
 
     #[test]
     fn keepalive_targets_only_the_dedicated_runtime_without_a_shell() {

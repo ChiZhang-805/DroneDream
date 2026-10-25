@@ -15,6 +15,10 @@
 *.cjs text eol=lf
 *.css text eol=lf
 *.html text eol=lf
+*.sdf text eol=lf
+*.obj text eol=lf
+*.mtl text eol=lf
+*.config text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
 *.rs text eol=lf

@@ -189,7 +189,8 @@
 .field-app-embedded-lab .field-tuning-primary,
 .field-app-embedded-lab .field-adapter-install-button {
   border-color: #087e69;
-  background: #087e69;
+  color: #0b6d58;
+  background: #e7f7f1;
 }
 
 @media (max-width: 760px) {
@@ -244,4 +245,12 @@
     margin-bottom: 0;
     padding: 7px;
   }
+}
+
+.lab-hardware-heading { padding: 16px 24px; background: #fff; }
+.lab-hardware-heading h1 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 22px; }
+.lab-hardware-deny { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; padding: 6px 10px; }
+@media (max-width: 760px) {
+  .lab-hardware-heading { padding: 12px 16px; }
+  .lab-hardware-deny { width: auto; justify-self: start; }
 }

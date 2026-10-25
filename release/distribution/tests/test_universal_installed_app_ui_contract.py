@@ -93,10 +93,10 @@ def test_headed_browser_observer_covers_pre_auth_without_bypassing_account_gate(
         "validationSurface: authenticatedWorkspace "
         '? "authenticated-workspace" : "pre-auth-launcher"',
         "drone-dream:locale",
-        "data-theme-grants-hardware-authority",
+        ".launcher-flight-illustration",
         "data-grants-hardware-authority",
         'assert.equal(theme.grantsHardwareAuthority, "false")',
-        'assert.equal(scene.grantsHardwareAuthority, "false")',
+        'launcherSurface = { renderer: "lightweight-svg", canvasCount: 0 }',
         "assert.equal(await tabs.count(), 4",
         "measurement.dialogScrollHeight <= measurement.dialogClientHeight + 1",
         "measurement.panelScrollHeight <= measurement.panelClientHeight + 1",

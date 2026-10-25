@@ -47,7 +47,7 @@ def _mission() -> AutonomyCompileRequest:
                 "max_takeoff_mass_kg": 2.1653076923076924,
                 "max_total_thrust_n": 34.19432,
                 "radius_m": 0.38,
-                "max_speed_mps": 4.0,
+                "max_speed_mps": 6.0,
                 "max_acceleration_mps2": 2.5,
                 "reserve_battery_percent": 30.0,
             },
@@ -68,7 +68,7 @@ def _mission() -> AutonomyCompileRequest:
                         "maximum_takeoff_mass_kg": 2.1653076923076924,
                         "maximum_thrust_n": 34.19432,
                         "maximum_pickup_payload_kg": 0.04,
-                        "maximum_speed_mps": 4.0,
+                        "maximum_speed_mps": 6.0,
                         "maximum_acceleration_mps2": 2.5,
                         "reserve_battery_percent": 30.0,
                         "localization_sources": ["gps"],
@@ -273,7 +273,7 @@ def test_simulation_execution_is_model_bound_owner_scoped_and_idempotent(
     assert len(processes) == 1
     assert processes[0].argv[1].endswith("school_map_px4_mission.py")
     assert "--run-dir" in processes[0].argv
-    assert processes[0].argv[processes[0].argv.index("--velocity-m-s") + 1] == "1.2"
+    assert processes[0].argv[processes[0].argv.index("--velocity-m-s") + 1] == "6"
     assert processes[0].argv[processes[0].argv.index("--acceleration-m-s2") + 1] == "0.8"
     assert _mission().natural_language not in processes[0].argv
     with pytest.raises(AutonomyRuntimeError) as hidden:
@@ -1095,7 +1095,7 @@ def test_execution_abort_cannot_be_overwritten_by_late_verified_evidence(
     assert sessions.get("owner-a", session.session_id).phase == "aborted"
 
 
-def test_fixed_runner_obeys_lower_qualified_motion_limits(
+def test_fixed_runner_rejects_retired_low_speed_profiles(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -1113,12 +1113,10 @@ def test_fixed_runner_obeys_lower_qualified_motion_limits(
         RuntimeSessionCreateRequest(mission=mission, client_request_id="runtime-request-slow"),
     )
 
-    registry.start("owner-a", _start_request(session.session_id, session.contract_id))
-
-    argv = processes[0].argv
-    assert argv[argv.index("--velocity-m-s") + 1] == "0.4"
-    assert argv[argv.index("--acceleration-m-s2") + 1] == "0.3"
-    processes[0].finish(1)
+    with pytest.raises(AutonomyRuntimeError) as caught:
+        registry.start("owner-a", _start_request(session.session_id, session.contract_id))
+    assert caught.value.code == "SIMULATION_ASSET_PROFILE_MISMATCH"
+    assert not processes
 
 
 def test_fixed_runner_rejects_a_server_verified_noncanonical_vehicle_identity(
@@ -1236,8 +1234,22 @@ def test_noncanonical_assets_or_model_targets_never_start_the_fixed_runner(
     wrong_target["asset_context"]["planner_binding"]["task_graph"]["nodes"][1]["target"] = (
         "cafeteria-counter"
     )
-    with pytest.raises(ValueError, match="canonical route targets"):
-        AutonomyCompileRequest.model_validate(wrong_target)
+    # Generic planning accepts any model-resolved semantic target. The legacy
+    # fixed qualification runner remains scoped to its historical route and
+    # must reject that target only when someone tries to launch this adapter.
+    target_session = _create_session(
+        sessions,
+        "owner-a",
+        RuntimeSessionCreateRequest(
+            mission=AutonomyCompileRequest.model_validate(wrong_target),
+            client_request_id="runtime-request-generic-target",
+        ),
+    )
+    with pytest.raises(AutonomyRuntimeError, match="canonical office-to-takeout roundtrip"):
+        registry.start(
+            "owner-a",
+            _start_request(target_session.session_id, target_session.contract_id),
+        )
     assert processes == []
 
 

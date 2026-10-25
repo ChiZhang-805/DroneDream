@@ -2,13 +2,14 @@ import { webcrypto } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import * as core from "../features/autonomy/agentCore";
 import { inspectAgentCoreAssetBindings, resolveAgentCoreAssetPair } from "../features/autonomy/agentCorePlanning";
-import { bindVerifiedAssetPair, reconcileAgentCoreWorkspace } from "../features/autonomy/assetPairBinding";
+import { bindCatalogAssetPair, bindVerifiedAssetPair, reconcileAgentCoreWorkspace } from "../features/autonomy/assetPairBinding";
+import { FALLBACK_ASSET_PAIR_CATALOG, selectedPair } from "../features/autonomy/assetPairSelection";
 import { autonomyHarnessRequest } from "../features/autonomy/missionHarness";
 import { defaultAutonomyWorkspace, normalizeAutonomyWorkspace } from "../features/autonomy/workspaceStore";
 import { loadAutonomyAssetLibrary } from "../features/autonomy/assetLibraryStore";
 import sample from "./fixtures/qualifiedAssetPair.json";
 
-// 来源为本机 Core 返回的历史认证合同，仅用于复现协议错误，不是本次飞行验收。
+// 历史内置 Kumpula/My Drone 回执夹具验证绑定协议；当前目录 ID 另有目录一致性测试。
 let fixture: typeof sample;
 beforeEach(() => {
   fixture = structuredClone(sample);
@@ -23,6 +24,38 @@ beforeEach(() => {
 });
 
 describe("qualified map and vehicle bindings", () => {
+  it("resolves a catalog resource selection to its installed package IDs", async () => {
+    const original = defaultAutonomyWorkspace();
+    const pair = { ...selectedPair(FALLBACK_ASSET_PAIR_CATALOG, "dronedream-school-map", "px4-x500-depth")!, qualification_id: fixture.job.qualification_id };
+    expect(pair?.qualified_map_asset_id).toBe("dronedream.school-map.v1");
+    const bound = await bindCatalogAssetPair(
+      original,
+      loadAutonomyAssetLibrary("catalog", "autonomy", original),
+      pair!,
+    );
+    expect(bound.mapPack.agentCoreAssetId).toBe(fixture.job.map_asset_id);
+    expect(bound.aircraft.agentCoreAssetId).toBe(fixture.job.vehicle_asset_id);
+    expect(bound.mapPack.qualificationReceiptId).toBe(fixture.job.qualification_id);
+  });
+
+  it("resolves the receipt-bound vehicle version instead of an unrelated newer version", async () => {
+    const vehicle = fixture.versions.find((version) => version.kind === "vehicle")!;
+    fixture.versions.push({
+      ...vehicle,
+      content_sha256: "f".repeat(64),
+      imported_at: "2099-01-01T00:00:00.000Z",
+    });
+    const original = defaultAutonomyWorkspace();
+    const pair = { ...selectedPair(FALLBACK_ASSET_PAIR_CATALOG, "dronedream-school-map", "px4-x500-depth")!, qualification_id: fixture.job.qualification_id };
+    const bound = await bindCatalogAssetPair(
+      original,
+      loadAutonomyAssetLibrary("catalog-exact-receipt", "autonomy", original),
+      pair,
+    );
+    expect(bound.aircraft.agentCoreContentSha256).toBe(fixture.job.result_vehicle_content_sha256);
+    expect(bound.aircraft.agentCoreContentSha256).not.toBe("f".repeat(64));
+  });
+
   it("restores an unbound selected pair, then passes real harness inspection", async () => {
     const original = defaultAutonomyWorkspace();
     const bound = await reconcileAgentCoreWorkspace(original, loadAutonomyAssetLibrary("test", "autonomy", original));
@@ -75,6 +108,25 @@ describe("qualified map and vehicle bindings", () => {
     workspace.mapPack.agentCoreContentSha256 = "a".repeat(64);
     await expect(resolveAgentCoreAssetPair(workspace)).rejects.toThrow("ASSET_VERSION_NOT_FOUND");
     expect(core.getAgentCoreAssetQualificationEvidence).not.toHaveBeenCalled();
+  });
+
+  it("migrates an explicitly superseded bundled pin and binds the new pair receipt", async () => {
+    const workspace = defaultAutonomyWorkspace();
+    const oldHash = "a".repeat(64);
+    workspace.mapPack.agentCoreContentSha256 = oldHash;
+    vi.mocked(core.getAgentCoreBootstrap).mockResolvedValue({
+      asset_versions: fixture.versions,
+      asset_qualification_jobs: [fixture.job],
+      bundled_asset_replacements: [{
+        asset_id: fixture.job.map_asset_id,
+        source_content_sha256: oldHash,
+        replacement_content_sha256: fixture.job.result_map_content_sha256,
+      }],
+    } as unknown as Awaited<ReturnType<typeof core.getAgentCoreBootstrap>>);
+    const bound = await reconcileAgentCoreWorkspace(workspace, loadAutonomyAssetLibrary("upgraded", "autonomy", workspace));
+    expect(bound.mapPack.agentCoreContentSha256).toBe(fixture.job.result_map_content_sha256);
+    expect(bound.mapPack.qualificationReceiptId).toBe(fixture.job.qualification_id);
+    expect(workspace.mapPack.agentCoreContentSha256).toBe(oldHash);
   });
 
   it.each(["state", "progress", "output-map", "output-vehicle", "asset-id"])("rejects a job with invalid %s", async (field) => {

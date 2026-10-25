@@ -20,13 +20,16 @@ describe("motion preferences", () => {
     expect(() => persistUniversalMode("sim")).not.toThrow();
   });
 
-  it("keeps the fixed light theme usable with no persistent storage", () => {
+  it("keeps theme controls usable with no persistent storage", () => {
     vi.spyOn(window, "localStorage", "get").mockImplementation(() => { throw new DOMException("blocked", "SecurityError"); });
     const { result } = renderHook(() => useEditionTheme(), {
       wrapper: ({ children }) => <EditionThemeProvider edition="sim">{children}</EditionThemeProvider>,
     });
-    expect(result.current.appearance).toBe("light");
-    expect(result.current.presentationOnly).toBe(true);
+    expect(result.current.appearancePreference).toBe("light");
+    act(() => result.current.setAppearance("dark"));
+    expect(result.current.appearancePreference).toBe("dark");
+    act(() => result.current.setCustomAccent("#AABBCC"));
+    expect(result.current.customAccent).toBe("#aabbcc");
   });
   it("keeps a denied storage read from crashing the UI", () => {
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new DOMException("blocked", "SecurityError"); });

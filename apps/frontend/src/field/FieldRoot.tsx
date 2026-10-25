@@ -1,11 +1,11 @@
 import { Settings } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 
-import { DroneLaunchSceneCore } from "../components/DroneLaunchScene";
+import { LauncherFlightIllustration } from "../components/LauncherFlightIllustration";
+import { LauncherAccountForm } from "../components/LauncherAccountForm";
 import type { SettingsSurfaceTabId } from "../components/EditionSettingsSurface";
 import { useAuthOrLocal } from "../features/auth/AuthContext";
 import { ModelAccessProvider } from "../features/settings/ModelAccessProvider";
-import { FieldAuthControl } from "./FieldAuthControl";
 import { FieldBrandLockup } from "./FieldBrandLockup";
 import { useFieldLocale } from "./FieldLocaleProvider";
 import { FieldSettingsDialog } from "./FieldSettingsDialog";
@@ -21,27 +21,23 @@ const COPY = {
     brand: "DroneDream · FIELD",
     loading: "Preparing the real-device tuning workspace",
     ready: "Field workspace ready",
-    system: "REAL DEVICE DOMAIN",
-    active: "SAFETY GATES ACTIVE",
-    standby: "SAFE STANDBY",
     settings: "Open settings",
-    tagline: "Let Every Flight Flow Like a Dream",
-    attitude: "ATTITUDE",
-    hold: "HOLD",
-    cruise: "STARFLIGHT",
+    illustrationTitle: "Ready for takeoff",
+    illustrationDescription: "",
+    cardKicker: "FIELD STARTUP",
+    cardTitle: "Starting workspace",
+    stages: ["Check system", "Start device services", "Connect services", "Open workspace"],
   },
   "zh-CN": {
     brand: "DroneDream · FIELD",
-    loading: "正在准备真机调优工作区",
+    loading: "正在启动工作区",
     ready: "Field 工作区已就绪",
-    system: "真机工作域",
-    active: "安全门已启用",
-    standby: "安全待机",
     settings: "打开设置",
-    tagline: "蝶 梦 水 云 乡",
-    attitude: "飞行姿态",
-    hold: "悬停",
-    cruise: "星际巡航",
+    illustrationTitle: "无人机校园插画",
+    illustrationDescription: "",
+    cardKicker: "FIELD 启动",
+    cardTitle: "正在启动工作区",
+    stages: ["检查系统", "启动设备服务", "连接服务", "进入工作区"],
   },
 } as const;
 
@@ -50,6 +46,7 @@ function FieldLaunchScreen({
   locale,
   progress,
   onEnter,
+  onAuthenticated,
   onLocaleChange,
   settingsOpen,
   onSettingsOpen,
@@ -60,14 +57,17 @@ function FieldLaunchScreen({
   locale: FieldLocale;
   progress: number;
   onEnter: () => void;
+  onAuthenticated: () => void;
   onLocaleChange: (locale: FieldLocale) => void;
   settingsOpen: boolean;
   onSettingsOpen: () => void;
   onSettingsClose: () => void;
   onOpenSettingsWorkspace: (tab: SettingsSurfaceTabId) => void;
 }) {
+  const { account } = useAuthOrLocal();
   const copy = COPY[locale];
   const ready = progress === 100;
+  const activeStage = ready ? 4 : progress < 25 ? 0 : progress < 60 ? 1 : progress < 95 ? 2 : 3;
   const launcherChromeRef = useRef<HTMLElement>(null);
   const launcherMainRef = useRef<HTMLElement>(null);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
@@ -136,10 +136,6 @@ function FieldLaunchScreen({
           <FieldBrandLockup />
         </div>
         <div className="launcher-chrome-actions">
-          <span className={`launcher-runtime-indicator${ready ? " is-checked" : ""}`}>
-            <span aria-hidden="true" />
-            {ready ? copy.ready : copy.loading}
-          </span>
           <button
             ref={settingsButtonRef}
             className="launcher-settings-button"
@@ -161,32 +157,31 @@ function FieldLaunchScreen({
         <div className="desktop-launcher">
           <div className="launcher-hero">
             <div className="launcher-hero-visual">
-              <DroneLaunchSceneCore
-                active={ready}
+              <LauncherFlightIllustration
+                active={!ready}
+                description={copy.illustrationDescription}
                 progress={progress}
-                labels={{
-                  locale,
-                  tagline: copy.tagline,
-                  system: copy.system,
-                  active: copy.active,
-                  standby: copy.standby,
-                  attitude: copy.attitude,
-                  hold: copy.hold,
-                  cruise: copy.cruise,
-                }}
+                title={copy.illustrationTitle}
               />
             </div>
-            {ready ? (
-              <div className="launcher-ready-actions">
-                <FieldAuthControl
-                  launcher
-                  launcherReady
-                  locale={locale}
-                  onAuthenticated={onEnter}
-                />
+            <div className="launcher-progress-panel">
+              {!account ? <LauncherAccountForm locale={locale} onAuthenticated={onAuthenticated} /> : <>
+              <div className="launcher-status-card-heading">
+                <span>{copy.cardKicker}</span>
+                <h2>{copy.cardTitle}</h2>
               </div>
-            ) : null}
-            <div className="launcher-progress-panel" role="status" aria-live="polite">
+              <ol className="launcher-stage-list" aria-label={copy.loading}>
+                {copy.stages.map((stage, index) => (
+                  <li
+                    className={index < activeStage ? "is-complete" : index === activeStage ? "is-current" : ""}
+                    aria-current={index === activeStage ? "step" : undefined}
+                    key={stage}
+                  >
+                    <span aria-hidden="true">{index < activeStage ? "✓" : index + 1}</span>
+                    <strong>{stage}</strong>
+                  </li>
+                ))}
+              </ol>
               <div
                 className="launcher-progress-track"
                 role="progressbar"
@@ -203,6 +198,12 @@ function FieldLaunchScreen({
                 </strong>
                 <span className="launcher-progress-percent">{progress}%</span>
               </div>
+              <div className="launcher-card-actions">
+                <button className="btn btn-primary" disabled={!ready} onClick={onEnter}>
+                  {locale === "zh-CN" ? "进入工作区" : "Enter workspace"}
+                </button>
+              </div>
+              </>}
             </div>
           </div>
         </div>
@@ -233,6 +234,7 @@ export function FieldRoot() {
   const { locale, setLocale } = useFieldLocale();
   const { account } = useAuthOrLocal();
   const [entered, setEntered] = useState(false);
+  const [authCompleted, setAuthCompleted] = useState(false);
   const [settingsPresentation, setSettingsPresentation] = useState<
     "closed" | "quick" | "workspace"
   >("closed");
@@ -294,8 +296,8 @@ export function FieldRoot() {
     };
     void run().catch((reason: unknown) => {
       if (active && !(reason instanceof DOMException && reason.name === "AbortError")) {
-        // Readiness fails closed at 0%. The launcher never reveals a sign-in
-        // action until every product, localization, theme and 3D gate passes.
+        // Readiness fails closed at 0%. Inline sign-in cannot open the workspace
+        // until every product, localization, theme and 3D gate passes.
         setProgress(0);
       }
     });
@@ -304,10 +306,18 @@ export function FieldRoot() {
     };
   }, []);
 
-  if (entered) {
+  if (entered || (authCompleted && account && progress === 100)) {
     return (
       <Suspense fallback={null}>
-        <FieldApp initialLocale={locale} focusOnMount />
+        <FieldApp
+          initialLocale={locale}
+          focusOnMount
+          onSignedOut={() => {
+            setEntered(false);
+            setAuthCompleted(false);
+            setSettingsPresentation("closed");
+          }}
+        />
       </Suspense>
     );
   }
@@ -328,6 +338,7 @@ export function FieldRoot() {
         locale={locale}
         progress={progress}
         onEnter={() => setEntered(true)}
+        onAuthenticated={() => setAuthCompleted(true)}
         onLocaleChange={setLocale}
         settingsOpen={settingsPresentation === "quick"}
         onSettingsOpen={() => setSettingsPresentation("quick")}
