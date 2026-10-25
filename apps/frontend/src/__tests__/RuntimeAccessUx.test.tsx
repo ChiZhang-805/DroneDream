@@ -158,6 +158,7 @@ afterEach(() => {
     distributionPlanMocks.validate.mockClear();
     delete window.__TAURI__;
     window.localStorage.clear();
+    window.sessionStorage.clear();
     vi.restoreAllMocks();
   });
 
@@ -194,7 +195,9 @@ afterEach(() => {
 
     expect(await screen.findByText("Runtime disconnected"))
       .toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Experiment" }))
+    expect(screen.queryByRole("link", { name: "Experiment" }))
+      .not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Lab workspace" }))
       .not.toHaveClass("runtime-locked");
     expect(screen.getByRole("link", { name: "Run History" }))
       .not.toHaveClass("runtime-locked");
@@ -222,7 +225,7 @@ afterEach(() => {
     expect(screen.queryByRole("link", { name: "Batch Runs" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Environment" })).not.toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Primary navigation" })
-      .querySelectorAll("a")).toHaveLength(7);
+      .querySelectorAll("a")).toHaveLength(6);
     expect(listJobs).not.toHaveBeenCalled();
     expect(invoke.mock.calls.filter(([command]) => command === "probe_runtime_status"))
       .toHaveLength(0);
@@ -578,8 +581,8 @@ afterEach(() => {
         ([command]) => command === "probe_runtime_status",
       )).toHaveLength(initialRuntimeProbeCount + 1);
     }, { timeout: 7_000 });
-    expect(workspace.querySelector(".settings-runtime-status"))
-      .toHaveAttribute("title", expect.stringContaining("DroneDreamRuntime is not installed."));
+    expect(within(workspace).getByText("DroneDreamRuntime is not installed."))
+      .toBeInTheDocument();
     fireEvent.click(within(workspace).getByRole("button", { name: "Back to app" }));
     expect(screen.getByLabelText("Email")).toBeInTheDocument();
     expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();

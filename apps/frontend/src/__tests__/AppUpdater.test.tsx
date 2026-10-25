@@ -142,6 +142,7 @@ afterEach(() => {
   resetDesktopReadinessSession();
   delete window.__TAURI__;
   window.localStorage.clear();
+  window.sessionStorage.clear();
   window.history.replaceState(null, "", "/");
   updaterState.current = {
     ...updaterState.current,

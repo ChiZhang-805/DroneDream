@@ -34,6 +34,7 @@
   --edition-accent: var(--accent);
   --line-subtle: var(--border);
   --surface-raised: var(--panel);
+  --surface: var(--panel);
   --text-primary: var(--text);
 }
 
@@ -19842,6 +19843,7 @@ html[data-dd-reduced-motion="true"] .assistant-voice-button.requesting svg {
 
 .app-workspace-actions {
   position: absolute;
+  z-index: 2;
   top: 50%;
   right: 0.35rem;
   display: flex;
@@ -22483,7 +22485,7 @@ body {
 }
 
 .quick-settings-dialog {
-  width: min(680px, calc(100vw - 40px));
+  width: min(780px, calc(100vw - 40px));
   height: auto;
   min-width: 0;
   min-height: 0;

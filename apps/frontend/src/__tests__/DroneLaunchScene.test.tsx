@@ -34,13 +34,13 @@ describe("DroneLaunchScene localization", () => {
     expect(scene).toHaveAttribute("data-theme-grants-hardware-authority", "false");
   });
 
-  it("ignores retired appearance preferences and keeps the fixed light palette", () => {
+  it("starts each mounted scene in light mode without rewriting stored legacy state", () => {
     window.localStorage.setItem("dronedream:appearance", "dark");
     const { container } = renderScene("en");
     const scene = container.querySelector(".drone-launch-scene");
 
     expect(scene).toHaveAttribute("data-theme-appearance", "light");
-    expect(window.localStorage.getItem("dronedream:appearance")).toBeNull();
+    expect(window.localStorage.getItem("dronedream:appearance")).toBe("dark");
     expect(scene).toHaveAttribute("data-scene-stars", "true");
     expect(scene).toHaveAttribute("data-scene-particles", "true");
   });

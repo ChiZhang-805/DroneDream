@@ -20,7 +20,10 @@ export function AutonomyConversationSidebar({ ownerId, edition, locale, onNaviga
     const refresh = () => setRevision((value) => value + 1);
     const onChange = (event: Event) => {
       const detail = (event as CustomEvent).detail;
-      if (detail?.ownerId === ownerId && detail?.edition === edition) refresh();
+      if (
+        detail?.ownerId === ownerId
+        && (detail?.edition === undefined || detail.edition === edition)
+      ) refresh();
     };
     window.addEventListener(AUTONOMY_CONVERSATIONS_CHANGED, onChange);
     window.addEventListener(EXPERIMENT_WORKSPACES_CHANGED_EVENT, onChange);

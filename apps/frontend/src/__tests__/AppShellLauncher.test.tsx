@@ -118,6 +118,8 @@ function renderLauncher() {
 
 async function openSettingsWorkspace() {
   fireEvent.click(screen.getByRole("button", { name: /Settings|设置/ }));
+  const quickSettings = await screen.findByRole("dialog", { name: /Settings|设置/ });
+  fireEvent.click(within(quickSettings).getByRole("button", { name: /All settings|全部设置/ }));
   return screen.findByRole("region", { name: /Settings|设置/ });
 }
 
@@ -242,7 +244,7 @@ describe("desktop launcher chrome", () => {
     router.dispose();
   });
 
-  it("opens the complete settings workspace directly from the header gear", async () => {
+  it("opens quick settings from the header gear and reaches the complete workspace from All settings", async () => {
     launcherAuthState.current = {
       configured: true,
       loading: false,
@@ -278,6 +280,9 @@ describe("desktop launcher chrome", () => {
 
     fireEvent.click(settings);
     expect(settings).toHaveAttribute("aria-expanded", "true");
+    const quickSettings = await screen.findByRole("dialog", { name: "Settings" });
+    expect(within(quickSettings).getByRole("group", { name: "Appearance" })).toBeVisible();
+    fireEvent.click(within(quickSettings).getByRole("button", { name: "All settings" }));
     const workspace = await screen.findByRole("region", { name: "Settings" });
     expect(screen.queryByRole("dialog", { name: "Settings" })).not.toBeInTheDocument();
     expect(within(workspace).getByRole("button", { name: "English" })).toHaveAttribute(
@@ -352,6 +357,8 @@ describe("desktop launcher chrome", () => {
     const { router } = renderLauncher();
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    const quickSettings = await screen.findByRole("dialog", { name: "Settings" });
+    fireEvent.click(within(quickSettings).getByRole("button", { name: "All settings" }));
     const workspace = await screen.findByRole("region", { name: "Settings" });
     const selectedTab = within(workspace).getByRole("tab", { name: "General" });
     await waitFor(() => expect(selectedTab).toHaveFocus());

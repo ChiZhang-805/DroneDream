@@ -84,7 +84,7 @@ describe("workspace account entry", () => {
     const { container, router } = renderWorkspace();
 
     const links = container.querySelectorAll(".app-nav a");
-    expect(links).toHaveLength(6);
+    expect(links).toHaveLength(5);
     expect(screen.queryByRole("link", { name: "SIM" }))
       .not.toBeInTheDocument();
     links.forEach((link) => {
@@ -119,7 +119,6 @@ describe("workspace account entry", () => {
     expect(navigationLabels()).toEqual([
       "Chatbot",
       "Autonomy",
-      "Experiment",
       "Dashboard",
       "Scenarios",
       "Run History",
@@ -129,7 +128,6 @@ describe("workspace account entry", () => {
     expect(navigationLabels()).toEqual([
       "Chatbot",
       "Autonomy",
-      "Experiment",
       "Lab workspace",
       "Hardware Lab",
       "Evidence Review",

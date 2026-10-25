@@ -53,9 +53,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import {
-  ArchivedExperimentManager,
-} from "./components/ExperimentWorkspaceSidebar";
+import { ArchivedConversationManager } from "./components/ArchivedConversationManager";
 import { AutonomyConversationSidebar } from "./components/AutonomyConversationSidebar";
 import {
   AvatarCropDialog,
@@ -3702,7 +3700,7 @@ export function AccountDialog({
           ) : null}
         </>
       )}
-      <ArchivedExperimentManager
+      <ArchivedConversationManager
         ownerId={auth.account?.id ?? "local"}
         locale={locale}
         edition={edition}
@@ -4015,6 +4013,13 @@ function AppShellContent() {
       else launcherSettingsButtonRef.current?.focus();
     });
   }, [mobileNavigationEnabled]);
+
+  const openQuickSettings = useCallback(() => {
+    setSettingsInitialTab("general");
+    setAccountMenuOpen(false);
+    setMobileMenuOpen(false);
+    setLauncherSettingsOpen(true);
+  }, []);
 
   const openSettingsWorkspace = useCallback((
     tab: SettingsSurfaceTabId = "general",
@@ -4383,8 +4388,8 @@ function AppShellContent() {
               className="launcher-settings-button"
               aria-label={t("app.settings")}
               aria-haspopup="dialog"
-              aria-expanded={settingsWorkspaceOpen}
-              onClick={() => openSettingsWorkspace("general")}
+              aria-expanded={launcherSettingsOpen}
+              onClick={openQuickSettings}
             >
               <Settings aria-hidden="true" strokeWidth={1.85} />
             </button>
@@ -4626,10 +4631,10 @@ function AppShellContent() {
               className="app-mobile-settings-entry"
               aria-label={t("app.settings")}
               aria-haspopup="dialog"
-              aria-expanded={settingsWorkspaceOpen}
+              aria-expanded={launcherSettingsOpen}
               onClick={() => {
                 setMobileMenuOpen(false);
-                openSettingsWorkspace("general");
+                openQuickSettings();
               }}
             >
               <Settings aria-hidden="true" strokeWidth={1.75} />
@@ -4651,8 +4656,8 @@ function AppShellContent() {
                 className="launcher-settings-button"
                 aria-label={t("app.settings")}
                 aria-haspopup="dialog"
-                aria-expanded={settingsWorkspaceOpen}
-                onClick={() => openSettingsWorkspace("general")}
+                aria-expanded={launcherSettingsOpen}
+                onClick={openQuickSettings}
               >
                 <Settings aria-hidden="true" strokeWidth={1.85} />
               </button>

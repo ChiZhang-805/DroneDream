@@ -5,6 +5,7 @@ import { AutonomyConversationSidebar } from "../components/AutonomyConversationS
 import { acquireAutonomyPlanning } from "../features/autonomy/conversationActivity";
 import { autonomyConversationPath, deleteAutonomyConversation, listAutonomyConversations, loadAutonomyConversation, newAutonomyConversation, preserveLegacyAutonomyConversation, saveAutonomyConversation, setAutonomyConversationPinned } from "../features/autonomy/conversationStore";
 import { defaultAutonomyWorkspace, saveAutonomyWorkspace } from "../features/autonomy/workspaceStore";
+import { registerExperimentWorkspace, updateExperimentWorkspace } from "../features/experiment/workspaceRegistry";
 import { I18nProvider } from "../i18n/I18nProvider";
 import { AutonomyLive, AutonomyMaps, AutonomyOverview, AutonomyPlatform } from "../pages/AutonomyPlatform";
 
@@ -123,6 +124,30 @@ beforeEach(() => {
 });
 
 describe("autonomy conversation persistence", () => {
+  it("adds a newly created parameter optimization to Conversations immediately", async () => {
+    renderWorkspace();
+    act(() => {
+      registerExperimentWorkspace({
+        id: "parameter-workspace-event",
+        ownerId: "local",
+        edition: "autonomy",
+        name: "Optimize position control",
+        source: "manual",
+        activeStep: 0,
+        completedSteps: [],
+      });
+      updateExperimentWorkspace(
+        "local",
+        "parameter-workspace-event",
+        { status: "created" },
+        "autonomy",
+      );
+    });
+
+    expect(await screen.findByRole("link", { name: "Optimize position control" }))
+      .toBeVisible();
+  });
+
   it("shows Kumpula and Import map and opens an uncluttered interactive map detail", async () => {
     const workspace = defaultAutonomyWorkspace();
     workspace.mapPack.agentCoreContentSha256 = "a".repeat(64);
@@ -135,7 +160,7 @@ describe("autonomy conversation persistence", () => {
     expect(screen.queryByRole("region", { name: "3D UAV Corridor" })).not.toBeInTheDocument();
 
     const mapCard = screen.getByRole("button", { name: /Kumpula Campus/u });
-    expect(screen.getByRole("region", { name: "Map repository" }).querySelectorAll("article")).toHaveLength(1);
+    expect(screen.getByRole("region", { name: "Map repository" }).querySelectorAll("article")).toHaveLength(6);
     fireEvent.click(mapCard);
     expect(screen.queryByRole("region", { name: "3D UAV Corridor" })).not.toBeInTheDocument();
 
