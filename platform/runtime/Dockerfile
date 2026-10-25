@@ -51,7 +51,6 @@ RUN curl --fail --location --silent --show-error "${GAZEBO_APT_KEY_URL}" \
 
 RUN git -c http.version=HTTP/1.1 clone \
       --branch "${PX4_VERSION}" --depth 1 --filter=blob:none \
-      --recurse-submodules --shallow-submodules --also-filter-submodules --jobs 4 \
       "${PX4_GIT_URL}" /opt/PX4-Autopilot && \
     test "$(git -C /opt/PX4-Autopilot rev-parse HEAD)" = "${PX4_GIT_COMMIT}" && \
     cd /opt/PX4-Autopilot && \
@@ -60,7 +59,8 @@ RUN git -c http.version=HTTP/1.1 clone \
 
 USER dronedream
 RUN cd /opt/PX4-Autopilot && \
-    make px4_sitl_default -j"${PX4_BUILD_JOBS}"
+    git config --global http.version HTTP/1.1 && \
+    CI=true make px4_sitl_default -j"${PX4_BUILD_JOBS}"
 USER root
 
 RUN git clone --filter=blob:none "${VALKEY_GIT_URL}" /tmp/valkey && \
