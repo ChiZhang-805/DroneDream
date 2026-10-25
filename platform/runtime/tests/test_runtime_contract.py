@@ -238,6 +238,15 @@ class RuntimeManifestContractTests(unittest.TestCase):
         ):
             self.assertIn(placeholder, template)
             self.assertIn(placeholder, dockerfile)
+        # These two values are intentionally generated on first boot, after
+        # the public service endpoints have already been injected at build time.
+        self.assertIn("APP_SECRET_KEY=__APP_SECRET_KEY__", template)
+        self.assertIn("DRONEDREAM_RUNTIME_ID=__RUNTIME_ID__", template)
+        self.assertIn(
+            "! grep -Eq '__OIDC_ISSUER__|__OIDC_JWKS_URL__|__MODEL_GATEWAY_BASE_URL__'",
+            dockerfile,
+        )
+        self.assertNotIn("! grep -q '__[A-Z0-9_]*__'", dockerfile)
         self.assertIn("VITE_SUPABASE_URL", build)
         self.assertIn("/auth/v1/.well-known/jwks.json", build)
         self.assertIn("/functions/v1/model-gateway", build)

@@ -132,7 +132,8 @@ RUN test -n "${OIDC_ISSUER}" && test -n "${OIDC_JWKS_URL}" && \
       -e "s|__OIDC_JWKS_URL__|${OIDC_JWKS_URL}|g" \
       -e "s|__MODEL_GATEWAY_BASE_URL__|${MODEL_GATEWAY_BASE_URL}|g" \
       /usr/lib/dronedream/runtime.env.default && \
-    ! grep -q '__[A-Z0-9_]*__' /usr/lib/dronedream/runtime.env.default && \
+    ! grep -Eq '__OIDC_ISSUER__|__OIDC_JWKS_URL__|__MODEL_GATEWAY_BASE_URL__' \
+      /usr/lib/dronedream/runtime.env.default && \
     chmod 0755 /usr/lib/dronedream/runtime-init.sh \
       /usr/lib/dronedream/runtime-check.sh /usr/lib/dronedream/px4-gazebo-smoke.py \
       /usr/lib/dronedream/px4-log-cleanup.py /usr/lib/dronedream/engine-pack-manager.py \
