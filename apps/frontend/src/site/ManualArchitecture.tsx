@@ -68,7 +68,7 @@ const architectureVehicleExample = `{
     "dry_mass_kg": 2.0643076923,
     "maximum_takeoff_mass_kg": 2.1643076923,
     "maximum_thrust_n": 34.19432,
-    "maximum_speed_mps": 4.0,
+    "maximum_speed_mps": 6.0,
     "maximum_acceleration_mps2": 2.5,
     "maximum_pickup_payload_kg": 0.1,
     "reserve_battery_percent": 30,

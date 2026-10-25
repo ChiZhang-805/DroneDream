@@ -2482,6 +2482,27 @@ function RepositoryAssetPreview({
   );
 }
 
+const REPOSITORY_PENDING_SLOTS = [1, 2, 3, 4, 5] as const;
+
+function RepositoryPendingCard({ kind, index, chinese }: { kind: CatalogAssetKind; index: number; chinese: boolean }) {
+  const name = kind === "map"
+    ? (chinese ? "地图待添加" : "Map Pending")
+    : (chinese ? "无人机待添加" : "Aircraft Pending");
+  const previewUrl = `${import.meta.env.BASE_URL}asset-previews/${kind === "map" ? "maps/kumpula-campus-source.jpg" : "vehicles/x500-depth.webp"}`;
+  return <article className="autonomy-repository-pending" aria-disabled="true" data-pending-slot={index}>
+    <div className="autonomy-repository-card-surface" aria-label={`${name} ${index}`}>
+      <RepositoryAssetPreview kind={kind} previewUrl={previewUrl} previewKey={null} name={`${name} ${index}`} />
+      <span className="autonomy-repository-copy"><strong>{name}</strong></span>
+    </div>
+    <button
+      type="button"
+      className="autonomy-repository-delete"
+      aria-label={chinese ? `删除待添加${kind === "map" ? "地图" : "无人机"}` : `Delete pending ${kind}`}
+      disabled
+    ><Trash2 aria-hidden="true" /></button>
+  </article>;
+}
+
 type RepositoryDetails = {
   title: string;
   description?: string;
@@ -2726,6 +2747,10 @@ export function AutonomyAircraft() {
             <button type="button" className="autonomy-repository-delete" aria-label={chinese ? "删除无人机" : "Delete aircraft"} title={chinese ? `删除 ${asset.name}` : `Delete ${asset.name}`} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
           </article>
         ))}
+        {catalogDefinitions.length + customAircraft.length + externalAircraft.length < 6
+          ? REPOSITORY_PENDING_SLOTS.slice(0, 6 - catalogDefinitions.length - customAircraft.length - externalAircraft.length)
+            .map((slot) => <RepositoryPendingCard key={`vehicle-pending-${slot}`} kind="vehicle" index={slot} chinese={chinese} />)
+          : null}
       </div>
       {details ? <RepositoryDetailsDialog chinese={chinese} details={details} onClose={() => setDetails(null)} /> : null}
     </section>
@@ -2848,6 +2873,13 @@ export function AutonomyMaps() {
             <button type="button" className="autonomy-repository-delete" aria-label={chinese ? "删除地图" : "Delete map"} onClick={() => removeAsset("external", asset.id, asset.contentSha256)}><Trash2 aria-hidden="true" /></button>
           </article>;
         })}
+        {(() => {
+          const externalCount = unrepresentedExternalAssets("map", catalogDefinitions.map((item) => ({ id: item.resourceId, name: item.en })), assetLibrary.externalAssets).length;
+          return catalogDefinitions.length + externalCount < 6
+            ? REPOSITORY_PENDING_SLOTS.slice(0, 6 - catalogDefinitions.length - externalCount)
+              .map((slot) => <RepositoryPendingCard key={`map-pending-${slot}`} kind="map" index={slot} chinese={chinese} />)
+            : null;
+        })()}
       </div>
       {details ? <RepositoryDetailsDialog chinese={chinese} details={details} onClose={() => setDetails(null)} /> : null}
     </section>

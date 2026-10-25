@@ -237,7 +237,7 @@ class VehicleEnvelope(StrictModel):
     max_takeoff_mass_kg: float = Field(default=2.60, gt=0.1, le=70.0)
     max_total_thrust_n: float = Field(default=39.0, gt=1.0, le=5000.0)
     radius_m: float = Field(default=0.28, ge=0.05, le=3.0)
-    max_speed_mps: float = Field(default=1.30, ge=0.2, le=20.0)
+    max_speed_mps: float = Field(default=6.0, ge=0.2, le=20.0)
     max_acceleration_mps2: float = Field(default=3.0, ge=0.2, le=30.0)
     reserve_battery_percent: float = Field(default=30.0, ge=10.0, le=90.0)
 

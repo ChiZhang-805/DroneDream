@@ -357,7 +357,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--run-dir", required=True, type=Path)
     parser.add_argument("--px4-root", type=Path, default=DEFAULT_PX4_ROOT)
-    parser.add_argument("--velocity-m-s", type=float, default=1.2)
+    parser.add_argument("--velocity-m-s", type=float, default=6.0)
     parser.add_argument("--acceleration-m-s2", type=float, default=0.8)
     parser.add_argument("--setpoint-rate-hz", type=float, default=20.0)
     parser.add_argument("--takeoff-timeout-seconds", type=float, default=90.0)

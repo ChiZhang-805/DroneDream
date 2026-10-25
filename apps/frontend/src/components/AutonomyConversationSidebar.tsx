@@ -1,8 +1,9 @@
-import { Pin, PinOff, Trash2 } from "lucide-react";
+import { Archive, Pin, PinOff, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import type { BrandEditionId } from "../brand/edition-brand.generated";
 import { AUTONOMY_CONVERSATIONS_CHANGED, autonomyConversationPath, listAutonomyConversations, preserveLegacyAutonomyConversation, updateAutonomyConversation } from "../features/autonomy/conversationStore";
+import { EXPERIMENT_WORKSPACES_CHANGED_EVENT, experimentWorkspacePath, listExperimentWorkspaces, updateExperimentWorkspace } from "../features/experiment/workspaceRegistry";
 
 // 功能：
 //   展示独立自主任务会话入口，首条消息保存后立即更新，切换账户时隔离列表。
@@ -22,10 +23,12 @@ export function AutonomyConversationSidebar({ ownerId, edition, locale, onNaviga
       if (detail?.ownerId === ownerId && detail?.edition === edition) refresh();
     };
     window.addEventListener(AUTONOMY_CONVERSATIONS_CHANGED, onChange);
+    window.addEventListener(EXPERIMENT_WORKSPACES_CHANGED_EVENT, onChange);
     window.addEventListener("storage", refresh);
     try { preserveLegacyAutonomyConversation(ownerId, edition); setError(false); refresh(); } catch { setError(true); }
     return () => {
       window.removeEventListener(AUTONOMY_CONVERSATIONS_CHANGED, onChange);
+      window.removeEventListener(EXPERIMENT_WORKSPACES_CHANGED_EVENT, onChange);
       window.removeEventListener("storage", refresh);
     };
   }, [ownerId, edition]);
@@ -33,6 +36,7 @@ export function AutonomyConversationSidebar({ ownerId, edition, locale, onNaviga
   let conversations: ReturnType<typeof listAutonomyConversations> = [];
   let unavailable = error;
   try { conversations = listAutonomyConversations(ownerId, edition); } catch { unavailable = true; }
+  const experimentConversations = listExperimentWorkspaces(ownerId, edition).filter((workspace) => !workspace.archived);
   const heading = locale === "zh-CN" ? "对话" : "Conversations";
   return (
     <section className="app-workspaces app-conversations" aria-label={heading}>
@@ -60,6 +64,24 @@ export function AutonomyConversationSidebar({ ownerId, edition, locale, onNaviga
               </div>
             </div>
           );
+        })}
+        {experimentConversations.map((workspace) => {
+          const path = experimentWorkspacePath(workspace);
+          return <div key={`experiment:${workspace.id}`} className={`app-workspace-row${location.pathname + location.search === path ? " active" : ""}`}>
+            <NavLink to={path} title={workspace.name} onClick={onNavigate}>
+              <span className="app-workspace-label">{workspace.pinned ? <Pin size={12} aria-hidden="true" /> : null}<strong>{workspace.name}</strong></span>
+            </NavLink>
+            <div className="app-workspace-actions">
+              <button type="button" aria-label={locale === "zh-CN" ? (workspace.pinned ? "取消置顶" : "置顶对话") : (workspace.pinned ? "Unpin conversation" : "Pin conversation")} onClick={() => {
+                updateExperimentWorkspace(ownerId, workspace.id, { pinned: !workspace.pinned }, edition);
+                setRevision((value) => value + 1);
+              }}>{workspace.pinned ? <PinOff /> : <Pin />}</button>
+              <button type="button" aria-label={locale === "zh-CN" ? "归档对话" : "Archive conversation"} onClick={() => {
+                updateExperimentWorkspace(ownerId, workspace.id, { archived: true }, edition);
+                setRevision((value) => value + 1);
+              }}><Archive /></button>
+            </div>
+          </div>;
         })}
       </div>
       {unavailable ? <p role="alert">{locale === "zh-CN" ? "无法读取或保存本机会话。" : "Local conversations could not be read or saved."}</p> : null}

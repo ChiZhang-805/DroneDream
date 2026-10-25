@@ -56,7 +56,7 @@ CANONICAL_ROUTE_TARGETS: dict[AutonomyPlannerAction, str] = {
 }
 CANONICAL_AIRCRAFT_VERSION = 1
 CANONICAL_MAP_VERSION = 1
-FIXED_RUNNER_MAXIMUM_SPEED_M_S = 1.2
+FIXED_RUNNER_MAXIMUM_SPEED_M_S = 6.0
 FIXED_RUNNER_MAXIMUM_ACCELERATION_M_S2 = 0.8
 RUNTIME_CONTROL_POLL_SECONDS = 0.1
 
@@ -80,7 +80,7 @@ CANONICAL_FIXED_ADAPTER_VEHICLE_REQUEST = VehiclePackQualificationRequest.model_
         "battery_energy_wh": 74.0,
         "reserve_battery_percent": 30.0,
         "maximum_pickup_payload_kg": TAKEOUT_PAYLOAD_MASS_KG,
-        "maximum_speed_mps": 4.0,
+        "maximum_speed_mps": 6.0,
         "maximum_acceleration_mps2": 2.5,
         "maximum_climb_mps": 1.5,
         "maximum_descent_mps": 1.0,
@@ -334,7 +334,8 @@ class SimulationExecutionRegistry:
                 assets.aircraft.capabilities.get("maximum_speed_mps"),
                 vehicle.max_speed_mps,
             )
-            or vehicle.max_speed_mps > 4.0
+            or vehicle.max_speed_mps < 5.0
+            or vehicle.max_speed_mps > 6.0
             or not _same_number(
                 assets.aircraft.capabilities.get("maximum_acceleration_mps2"),
                 vehicle.max_acceleration_mps2,

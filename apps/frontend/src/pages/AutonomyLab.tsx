@@ -459,7 +459,7 @@ const DEFAULT_VEHICLE: AutonomyCompileRequest["vehicle"] = {
   max_takeoff_mass_kg: 2.164307692307692,
   max_total_thrust_n: 34.19432,
   radius_m: 0.38,
-  max_speed_mps: 4.0,
+  max_speed_mps: 6.0,
   max_acceleration_mps2: 2.5,
   reserve_battery_percent: 30,
 };

@@ -33,7 +33,7 @@ KUMPULA_SCENE = TerrainScene(
     ),
     bounds_m=Vector3(x=500.0, y=500.0, z=35.0),
     floors=1,
-    minimum_clearance_m=1.2,
+    minimum_clearance_m=10.0,
     tags=[
         "real-geospatial-data",
         "university-campus",
@@ -82,15 +82,15 @@ KUMPULA_SCENE = TerrainScene(
         ),
     ],
     reference_path=[
-        _point(-41.0, -83.0, 1.5, "launch", 0.55),
-        _point(-41.0, -83.0, 35.0, "transit", 1.2),
-        _point(0.0, -5.0, 35.0, "transit", 1.2),
-        _point(43.0, 55.0, 35.0, "transit", 1.2),
-        _point(43.0, 55.0, 2.0, "pickup", 0.45),
-        _point(43.0, 55.0, 35.0, "return", 1.2),
-        _point(0.0, -5.0, 35.0, "return", 1.2),
-        _point(-41.0, -83.0, 35.0, "return", 1.2),
-        _point(-41.0, -83.0, 1.5, "land", 0.35),
+        _point(-41.0, -83.0, 1.5, "launch", 5.0),
+        _point(-41.0, -83.0, 35.0, "transit", 6.0),
+        _point(0.0, -5.0, 35.0, "transit", 6.0),
+        _point(43.0, 55.0, 35.0, "transit", 6.0),
+        _point(43.0, 55.0, 2.0, "pickup", 5.0),
+        _point(43.0, 55.0, 35.0, "return", 6.0),
+        _point(0.0, -5.0, 35.0, "return", 6.0),
+        _point(-41.0, -83.0, 35.0, "return", 6.0),
+        _point(-41.0, -83.0, 1.5, "land", 5.0),
     ],
 )
 

@@ -160,10 +160,8 @@ try {
             }
             if (shellState === "quick-settings" || shellState?.startsWith("settings-")) {
               await page.locator(".app-header .launcher-settings-button").click();
-              await page.locator(".quick-settings-dialog").waitFor({ state: "visible" });
+              await page.locator(".settings-workspace-host").waitFor({ state: "visible" });
               if (shellState?.startsWith("settings-")) {
-                await page.getByRole("button", { name: "All settings" }).click();
-                await page.locator(".settings-workspace-host").waitFor({ state: "visible" });
                 const tab = shellState.replace(/^settings-/u, "");
                 await page.locator(`#settings-tab-${tab}`).click();
                 await page.locator(`#settings-panel-${tab}`).waitFor({ state: "visible" });

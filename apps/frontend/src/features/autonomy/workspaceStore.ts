@@ -147,7 +147,7 @@ export const AUTONOMY_AIRCRAFT_LIMITS = {
   batteryEnergyWh: { min: 1, max: 1_000_000 },
   reserveBatteryPercent: { min: 10, max: 90 },
   maximumPickupPayloadKg: { min: 0, max: 20 },
-  maximumSpeedMps: { min: 0.2, max: 20 },
+  maximumSpeedMps: { min: 5, max: 6 },
   maximumAccelerationMps2: { min: 0.2, max: 30 },
   maximumClimbMps: { min: 0.1, max: 15 },
   maximumDescentMps: { min: 0.1, max: 10 },

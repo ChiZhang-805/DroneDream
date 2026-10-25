@@ -68,6 +68,10 @@ try {
   await openProductPage(page, "/console/autonomy/maps", ".autonomy-repository-page");
   const schoolMap = page.locator(".autonomy-repository-grid article").filter({ hasText: "Kumpula Campus" });
   if (await schoolMap.count() !== 1) throw new Error("Map repository must expose exactly one Kumpula Campus card.");
+  if (await page.locator(".autonomy-repository-grid article").count() !== 6) throw new Error("Map repository must reserve exactly six visible cards.");
+  const pendingMaps = page.locator(".autonomy-repository-grid article.autonomy-repository-pending");
+  if (await pendingMaps.count() !== 5) throw new Error("Map repository must expose five disabled pending cards.");
+  if (await pendingMaps.locator(".autonomy-repository-delete:disabled").count() !== 5) throw new Error("Pending map delete controls must remain visible and disabled.");
   if (await schoolMap.getAttribute("data-selected") !== "false") throw new Error("Map repository must begin without a selected map.");
   if (await page.locator(".autonomy-asset-toolbar button").count() !== 0) throw new Error("Map repository must not expose an in-product map creator.");
   if (await page.getByRole("button", { name: "Import map", exact: true }).count() !== 1) throw new Error("The map repository must expose the upload checklist.");
@@ -116,9 +120,12 @@ try {
   await mapDialog.getByRole("button", { name: "Close", exact: true }).click();
 
   await openProductPage(page, "/console/autonomy/aircraft", ".autonomy-repository-page");
-  if (await page.locator(".autonomy-repository-grid article").count() !== 1) {
-    throw new Error("Aircraft repository must expose only the admitted X500 Depth model.");
+  if (await page.locator(".autonomy-repository-grid article").count() !== 6) {
+    throw new Error("Aircraft repository must expose one admitted X500 Depth model and five pending cards.");
   }
+  const pendingAircraft = page.locator(".autonomy-repository-grid article.autonomy-repository-pending");
+  if (await pendingAircraft.count() !== 5) throw new Error("Aircraft repository must expose five disabled pending cards.");
+  if (await pendingAircraft.locator(".autonomy-repository-delete:disabled").count() !== 5) throw new Error("Pending aircraft delete controls must remain visible and disabled.");
   const myDrone = page.locator(".autonomy-repository-grid article").filter({ hasText: "X500 Depth" });
   if (await myDrone.count() !== 1) throw new Error("Aircraft repository must expose exactly one X500 Depth card.");
   if (await myDrone.getAttribute("data-selected") !== "false") throw new Error("Aircraft repository must begin without a selected aircraft.");
@@ -126,6 +133,29 @@ try {
   if (await page.getByRole("button", { name: "Import aircraft", exact: true }).count() !== 1) throw new Error("Aircraft repository is missing its external import action.");
   const aircraftScreenshot = path.join(outputRoot, `${screenshotPrefix}my-drone-repository-1600x1000.png`);
   await page.screenshot({ path: aircraftScreenshot, fullPage: false });
+  await myDrone.locator(".autonomy-repository-card-surface").dblclick();
+  const aircraftDialog = page.getByRole("dialog", { name: "X500 Depth" });
+  await aircraftDialog.waitFor({ state: "visible" });
+  const aircraftCanvas = aircraftDialog.locator(".autonomy-repository-3d-view canvas");
+  await aircraftCanvas.waitFor({ state: "visible" });
+  const aircraftCanvasBox = await aircraftCanvas.boundingBox();
+  if (!aircraftCanvasBox) throw new Error("X500 canvas geometry could not be measured.");
+  const partCard = aircraftDialog.locator(".autonomy-vehicle-part-card");
+  if (await partCard.count()) throw new Error("The X500 part card must stay hidden until a part is selected.");
+  for (const [xRatio, yRatio] of [[0.5, 0.5], [0.48, 0.44], [0.57, 0.48], [0.42, 0.52]]) {
+    await aircraftCanvas.click({ position: { x: aircraftCanvasBox.width * xRatio, y: aircraftCanvasBox.height * yRatio } });
+    if (await partCard.isVisible()) break;
+  }
+  if (!await partCard.isVisible()) throw new Error("Clicking an X500 component must open its part card.");
+  if (!await aircraftDialog.locator(".autonomy-repository-3d-view[data-selected-vehicle-part]").count()) {
+    throw new Error("Clicking an X500 component must mark that component as the highlighted selection.");
+  }
+  if (await partCard.locator("dt").allTextContents().then((labels) => labels.join("|") !== "No.|Name|Function")) {
+    throw new Error("A selected aircraft part must show its number, name, and function.");
+  }
+  const aircraftDetailScreenshot = path.join(outputRoot, `${screenshotPrefix}x500-depth-3d-detail-1600x1000.png`);
+  await page.screenshot({ path: aircraftDetailScreenshot, fullPage: false });
+  await aircraftDialog.getByRole("button", { name: "Close", exact: true }).click();
 
   await openProductPage(page, "/console/autonomy", ".autonomy-command-page");
   await page.locator(".assistant-add-button").click();
@@ -165,7 +195,7 @@ try {
 
   process.stdout.write(`${JSON.stringify({
     status: "pass",
-    screenshots: [mapScreenshot, mapDetailScreenshot, aircraftScreenshot, contextScreenshot],
+    screenshots: [mapScreenshot, mapDetailScreenshot, aircraftScreenshot, aircraftDetailScreenshot, contextScreenshot],
   }, null, 2)}\n`);
   await context.close();
 } finally {

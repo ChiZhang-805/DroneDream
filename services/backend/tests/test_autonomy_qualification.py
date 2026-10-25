@@ -31,7 +31,7 @@ def vehicle_payload() -> dict[str, object]:
         "battery_energy_wh": 110.0,
         "reserve_battery_percent": 25.0,
         "maximum_pickup_payload_kg": 0.35,
-        "maximum_speed_mps": 4.0,
+        "maximum_speed_mps": 6.0,
         "maximum_acceleration_mps2": 2.0,
         "maximum_climb_mps": 1.5,
         "maximum_descent_mps": 1.0,

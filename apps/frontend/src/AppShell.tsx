@@ -55,7 +55,6 @@ import {
 
 import {
   ArchivedExperimentManager,
-  ExperimentWorkspaceSidebar,
 } from "./components/ExperimentWorkspaceSidebar";
 import { AutonomyConversationSidebar } from "./components/AutonomyConversationSidebar";
 import {
@@ -4551,17 +4550,11 @@ function AppShellContent() {
             );
           })}
           </nav>
-          {activeThemeEdition === "autonomy" || activeThemeEdition === "universal" ? <AutonomyConversationSidebar
+          <AutonomyConversationSidebar
             ownerId={auth.account?.id ?? "local"}
             locale={locale}
             edition={activeThemeEdition}
             onNavigate={() => setMobileMenuOpen(false)}
-          /> : null}
-          <ExperimentWorkspaceSidebar
-            ownerId={auth.account?.id ?? "local"}
-            locale={locale}
-            edition={activeThemeEdition}
-            hideWhenEmpty={activeThemeEdition === "autonomy"}
           />
           <div className="app-sidebar-footer">
             {accountMenuOpen && auth.account ? (
