@@ -9,6 +9,10 @@
 !platform/
 !platform/runtime/**
 !platform/engine-pack/**
+!shared/
+!shared/brand/
+!shared/brand/report/
+!shared/brand/report/**
 !release/
 !release/distribution/**
 **/target/
