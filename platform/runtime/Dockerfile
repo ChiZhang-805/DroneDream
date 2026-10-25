@@ -59,7 +59,9 @@ RUN git -c http.version=HTTP/1.1 clone \
 USER dronedream
 RUN cd /opt/PX4-Autopilot && \
     git config --global http.version HTTP/1.1 && \
-    CI=true make px4_sitl_default -j"${PX4_BUILD_JOBS}"
+    make distclean && \
+    CI=true make px4_sitl_default -j"${PX4_BUILD_JOBS}" && \
+    ninja -C build/px4_sitl_default -t targets all | grep -q '^gz_x500:'
 USER root
 
 RUN git clone --filter=blob:none "${VALKEY_GIT_URL}" /tmp/valkey && \

@@ -569,6 +569,15 @@ class SystemdContractTests(unittest.TestCase):
         self.assertLess(unprivileged, build)
         self.assertNotIn("NOPASSWD", dockerfile)
 
+    def test_runtime_image_prebuilds_the_same_px4_gazebo_target_used_by_smoke(self) -> None:
+        dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
+        smoke = (RUNTIME / "scripts" / "px4-gazebo-smoke.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("make distclean", dockerfile)
+        self.assertIn("grep -q '^gz_x500:'", dockerfile)
+        self.assertIn('["make", "px4_sitl", "gz_x500"]', smoke)
+
     def test_build_checks_and_forwards_every_reported_component_version(self) -> None:
         dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
         build_script = (RUNTIME / "build-rootfs.sh").read_text(encoding="utf-8")
