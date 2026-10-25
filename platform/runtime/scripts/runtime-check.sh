@@ -195,6 +195,7 @@ input_path = root / "dry-run-input.json"
 input_path.write_text(json.dumps(payload), encoding="utf-8")
 environment = os.environ.copy()
 environment["PX4_GAZEBO_DRY_RUN"] = "true"
+environment["PX4_AUTOPILOT_DIR"] = "/opt/PX4-Autopilot"
 result = subprocess.run(
     [
         "/opt/dronedream/venv/bin/python",

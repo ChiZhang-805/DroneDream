@@ -59,7 +59,8 @@ RUN git -c http.version=HTTP/1.1 clone \
 USER dronedream
 RUN cd /opt/PX4-Autopilot && \
     git config --global http.version HTTP/1.1 && \
-    CI=true make px4_sitl_default -j"${PX4_BUILD_JOBS}"
+    CI=true make px4_sitl_default -j"${PX4_BUILD_JOBS}" && \
+    cp -a build/px4_sitl_default/etc build/px4_sitl_default/rootfs/etc
 USER root
 
 RUN git clone --filter=blob:none "${VALKEY_GIT_URL}" /tmp/valkey && \
@@ -178,6 +179,7 @@ RUN test -n "${OIDC_ISSUER}" && test -n "${OIDC_JWKS_URL}" && \
     test -x /usr/bin/ss && \
     test -x /usr/bin/ip && \
     test -x /opt/PX4-Autopilot/build/px4_sitl_default/bin/px4 && \
+    test -s /opt/PX4-Autopilot/build/px4_sitl_default/rootfs/etc/init.d-posix/rcS && \
     test -s /opt/PX4-Autopilot/build/px4_sitl_default/rootfs/gz_env.sh && \
     test -s /opt/PX4-Autopilot/Tools/simulation/gz/models/x500/model.sdf && \
     test -s /usr/share/doc/valkey/COPYING && \
