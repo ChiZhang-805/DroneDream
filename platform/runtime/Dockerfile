@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1.7
 ARG UBUNTU_BASE_IMAGE=ubuntu:24.04@sha256:52df9b1ee71626e0088f7d400d5c6b5f7bb916f8f0c82b474289a4ece6cf3faf
 FROM ${UBUNTU_BASE_IMAGE}
 
