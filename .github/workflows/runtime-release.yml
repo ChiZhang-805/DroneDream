@@ -40,9 +40,12 @@ jobs:
           # workflow's contents:write credential in the checkout's Git config;
           # only the explicit publish steps below receive GH_TOKEN.
           persist-credentials: false
-      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
-        with:
-          python-version: "3.12"
+      - name: Verify runner Python
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          python --version
+          python -m pip --version
 
       - name: Validate manual release inputs and trust anchor
         shell: bash
