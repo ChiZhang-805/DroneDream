@@ -132,6 +132,23 @@ class RuntimeReleaseTests(unittest.TestCase):
             )
             self.assertEqual(output.read_bytes(), rootfs.read_bytes())
 
+    def test_sign_accepts_transport_bom_before_canonical_base64(self) -> None:
+        with tempfile.TemporaryDirectory() as name:
+            directory = Path(name)
+            _, manifest_path = self._package(directory)
+            private_key = directory / "private-key.txt"
+            keyring = directory / "trusted-keys.json"
+            runtime_release.generate_key(private_key, keyring)
+            secret = "\ufeff" + private_key.read_text(encoding="ascii").strip()
+            variable = "DRONEDREAM_TEST_RELEASE_PRIVATE_KEY"
+            with _temporary_environment(variable, secret):
+                signature = runtime_release.sign_manifest(manifest_path, variable, None)
+            runtime_release.verify_signature(
+                manifest_path,
+                signature,
+                keyring,
+            )
+
     def test_tampered_part_fails_before_reassembly_is_published(self) -> None:
         with tempfile.TemporaryDirectory() as name:
             directory = Path(name)
