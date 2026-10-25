@@ -574,7 +574,7 @@ class SystemdContractTests(unittest.TestCase):
         smoke = (RUNTIME / "scripts" / "px4-gazebo-smoke.py").read_text(
             encoding="utf-8"
         )
-        self.assertIn("make distclean", dockerfile)
+        self.assertIn("rm -rf build/px4_sitl_default", dockerfile)
         self.assertIn("grep -q '^gz_x500:'", dockerfile)
         self.assertIn('["make", "px4_sitl", "gz_x500"]', smoke)
 
