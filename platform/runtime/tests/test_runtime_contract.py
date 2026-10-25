@@ -99,6 +99,13 @@ class RuntimeManifestContractTests(unittest.TestCase):
         self.assertIn("python -m pytest platform/runtime/tests -q", readme)
         self.assertNotIn("unittest discover -s platform/runtime/tests", readme)
 
+    def test_runtime_shell_entrypoints_resolve_the_repository_root(self) -> None:
+        expected = 'root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)'
+        for script_name in ("build-rootfs.sh", "smoke-image.sh", "export-rootfs.sh"):
+            script = (RUNTIME / script_name).read_text(encoding="utf-8")
+            with self.subTest(script=script_name):
+                self.assertIn(expected, script)
+
     def test_promotion_is_atomic_and_requires_every_real_check(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             temp = Path(directory)

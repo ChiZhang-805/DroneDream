@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 image=${1:?usage: export-rootfs.sh IMAGE SMOKE_REPORT OUTPUT_TAR}
 report=${2:?usage: export-rootfs.sh IMAGE SMOKE_REPORT OUTPUT_TAR}
 output=${3:?usage: export-rootfs.sh IMAGE SMOKE_REPORT OUTPUT_TAR}
