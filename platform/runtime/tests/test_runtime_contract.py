@@ -574,9 +574,10 @@ class SystemdContractTests(unittest.TestCase):
         smoke = (RUNTIME / "scripts" / "px4-gazebo-smoke.py").read_text(
             encoding="utf-8"
         )
-        self.assertIn("rm -rf build/px4_sitl_default", dockerfile)
-        self.assertIn("grep -q '^gz_x500:'", dockerfile)
-        self.assertIn('["make", "px4_sitl", "gz_x500"]', smoke)
+        self.assertIn("build/px4_sitl_default/bin/px4", dockerfile)
+        self.assertIn("Tools/simulation/gz/models/x500/model.sdf", dockerfile)
+        self.assertIn('"PX4_SIM_MODEL": "gz_x500"', smoke)
+        self.assertIn('[str(executable), "-d", "-w", str(rootfs), str(rootfs)]', smoke)
 
     def test_build_checks_and_forwards_every_reported_component_version(self) -> None:
         dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")

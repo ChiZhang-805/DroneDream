@@ -80,11 +80,20 @@ def main() -> int:
     marker.unlink(missing_ok=True)
     log_path = SMOKE_ROOT / "px4-gazebo.log"
     env = os.environ.copy()
-    env.update({"HEADLESS": "1", "PX4_GZ_MODEL": "x500"})
+    env.update(
+        {
+            "HEADLESS": "1",
+            "PX4_GZ_MODEL": "x500",
+            "PX4_SIM_MODEL": "gz_x500",
+            "GZ_IP": "127.0.0.1",
+        }
+    )
+    rootfs = PX4_ROOT / "build" / "px4_sitl_default" / "rootfs"
+    executable = PX4_ROOT / "build" / "px4_sitl_default" / "bin" / "px4"
     with log_path.open("w", encoding="utf-8") as log:
         process = subprocess.Popen(  # noqa: S603 - executable and argv are fixed.
-            ["make", "px4_sitl", "gz_x500"],  # noqa: S607 - fixed build command.
-            cwd=PX4_ROOT,
+            [str(executable), "-d", "-w", str(rootfs), str(rootfs)],
+            cwd=rootfs,
             env=env,
             stdout=log,
             stderr=subprocess.STDOUT,
