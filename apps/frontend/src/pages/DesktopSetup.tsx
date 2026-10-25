@@ -1381,6 +1381,7 @@ export function DesktopSetup() {
             !postSignInBlocked &&
             !updaterBlocksWorkspace
           }
+          runtimeUpgradeRequired={updater.status === "runtimeBaseRequired"}
           automaticStartPending={automaticStartPending}
           commandBusy={installState.commandBusy}
         >
@@ -2514,6 +2515,7 @@ function RuntimeLauncherHero({
   installationRequired,
   gateBlocked,
   accountRequired,
+  runtimeUpgradeRequired,
   automaticStartPending,
   commandBusy,
 }: {
@@ -2528,6 +2530,7 @@ function RuntimeLauncherHero({
   installationRequired: boolean;
   gateBlocked: boolean;
   accountRequired: boolean;
+  runtimeUpgradeRequired: boolean;
   automaticStartPending: boolean;
   commandBusy: boolean;
 }) {
@@ -2583,7 +2586,7 @@ function RuntimeLauncherHero({
       </div>
 
       <div className="launcher-progress-panel">
-        {accountForm || <>
+        {accountForm && !runtimeUpgradeRequired ? accountForm : <>
         <div className="launcher-status-card-heading">
           <span>{t("launcher.cardKicker")}</span>
           <h2>{t("launcher.cardTitle")}</h2>
