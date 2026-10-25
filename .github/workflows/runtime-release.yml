@@ -153,7 +153,8 @@ jobs:
           rootfs="platform/runtime/out/DroneDreamRuntime-${version}-amd64.tar"
           output="platform/runtime/out/release/$RELEASE_TAG"
           base_url="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG"
-          build_timestamp=$(docker image inspect --format '{{.Created}}' "$IMAGE")
+          image_created=$(docker image inspect --format '{{.Created}}' "$IMAGE")
+          build_timestamp=$(date --utc --date="$image_created" '+%Y-%m-%dT%H:%M:%SZ')
           test ! -e "$output"
           python platform/runtime/tools/runtime_release.py package \
             --rootfs "$rootfs" \

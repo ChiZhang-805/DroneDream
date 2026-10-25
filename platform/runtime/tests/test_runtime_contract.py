@@ -306,6 +306,10 @@ class RuntimeReleaseImmutabilityContractTests(unittest.TestCase):
             workflow,
         )
         self.assertIn('if [[ "$tag_status" -ne 2 ]]', workflow)
+        self.assertIn(
+            "date --utc --date=\"$image_created\" '+%Y-%m-%dT%H:%M:%SZ'",
+            workflow,
+        )
 
     def test_rootfs_export_refuses_every_existing_release_artifact(self) -> None:
         script = (RUNTIME / "export-rootfs.sh").read_text(encoding="utf-8")
