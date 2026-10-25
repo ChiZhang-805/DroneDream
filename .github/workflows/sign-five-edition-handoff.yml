@@ -132,6 +132,11 @@ jobs:
               $env:TAURI_SIGNING_PRIVATE_KEY,
               (New-Object Text.UTF8Encoding($false))
             )
+            # The current Tauri CLI also consumes TAURI_SIGNING_PRIVATE_KEY
+            # automatically. This workflow deliberately supplies the same key
+            # through a temporary file, so remove the duplicate child-process
+            # input before invoking the shared signer helper.
+            Remove-Item Env:TAURI_SIGNING_PRIVATE_KEY
             foreach ($product in $products) {
               $installer = Join-Path $env:HANDOFF_ROOT "${product}_1.0.0_x64-setup.exe"
               ./apps/desktop/scripts/invoke-tauri-updater-signer.ps1 `
