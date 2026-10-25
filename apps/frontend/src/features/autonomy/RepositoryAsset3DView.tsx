@@ -10,6 +10,7 @@ type Props = {
   previewKey: string | null;
   name: string;
   chinese: boolean;
+  onBuildingSelect?: (building: CatalogBuildingSelection | null) => void;
 };
 
 type CatalogCollisionPrimitive = {
@@ -45,7 +46,9 @@ type CatalogBuildingFootprint = {
   function_zh: string;
 };
 
-type SelectedBuilding = Pick<CatalogBuildingFootprint, "building_id" | "name" | "name_zh" | "function" | "function_zh">;
+export type CatalogBuildingSelection = Pick<CatalogBuildingFootprint, "building_id" | "name" | "name_zh" | "function" | "function_zh"> & {
+  number: string;
+};
 
 type CatalogMapGeometry = {
   schema_version: "dronedream.catalog-map-geometry.v1";
@@ -92,7 +95,23 @@ function catalogMapUrl(previewKey: string): string {
   return `${base}asset-geometry/maps/${encodeURIComponent(previewKey)}.json`;
 }
 
-function catalogMapModel(geometry: CatalogMapGeometry): THREE.Group {
+function numberedBuildingFootprints(footprints: CatalogBuildingFootprint[]): Array<CatalogBuildingFootprint & { number: string }> {
+  const priority = ["Chemicum", "Exactum and Physicum", "Dynamicum", "Kumpula Campus Library", "Kumpula Campus Sports Centre"];
+  return [...footprints]
+    .sort((left, right) => {
+      const leftPriority = priority.indexOf(left.name);
+      const rightPriority = priority.indexOf(right.name);
+      if (leftPriority !== rightPriority) {
+        if (leftPriority < 0) return 1;
+        if (rightPriority < 0) return -1;
+        return leftPriority - rightPriority;
+      }
+      return left.name.localeCompare(right.name, "en");
+    })
+    .map((footprint, index) => ({ ...footprint, number: String(index + 1).padStart(3, "0") }));
+}
+
+function catalogMapModel(geometry: CatalogMapGeometry): { root: THREE.Group; buildings: THREE.Mesh[] } {
   const root = new THREE.Group();
   const base = import.meta.env.BASE_URL.endsWith("/") ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
   const terrainTexture = geometry.texture_url
@@ -111,7 +130,7 @@ function catalogMapModel(geometry: CatalogMapGeometry): THREE.Group {
   });
   const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xb7bdc9, roughness: 0.78, metalness: 0.03 });
   const obstacleMaterial = new THREE.MeshStandardMaterial({ color: 0x8d96a5, roughness: 0.8, metalness: 0.04 });
-  const buildingMaterial = new THREE.MeshStandardMaterial({ color: 0xb7bdc9, roughness: 0.78, metalness: 0.03 });
+  const buildings: THREE.Mesh[] = [];
   const hasExactBuildingFootprints = Boolean(geometry.building_footprints?.length);
   for (const primitive of geometry.primitives) {
     if (primitive.semantic === "building" && hasExactBuildingFootprints) continue;
@@ -128,7 +147,7 @@ function catalogMapModel(geometry: CatalogMapGeometry): THREE.Group {
     root.add(mesh);
   }
 
-  for (const footprint of geometry.building_footprints ?? []) {
+  for (const footprint of numberedBuildingFootprints(geometry.building_footprints ?? [])) {
     if (footprint.points.length < 3 || !Number.isFinite(footprint.height_m) || footprint.height_m <= 0) continue;
     const shape = new THREE.Shape();
     footprint.points.forEach(([x, y], index) => {
@@ -145,7 +164,12 @@ function catalogMapModel(geometry: CatalogMapGeometry): THREE.Group {
     // ExtrudeGeometry grows along local +Z. Rotating -90 degrees maps that
     // height to world +Y while preserving map ENU as world (X, -Z).
     buildingGeometry.rotateX(-Math.PI / 2);
-    const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
+    const building = new THREE.Mesh(buildingGeometry, new THREE.MeshStandardMaterial({
+      color: 0xc2c8d2,
+      roughness: 0.76,
+      metalness: 0.03,
+      emissive: 0x000000,
+    }));
     building.name = footprint.building_id;
     building.userData.catalogBuilding = {
       building_id: footprint.building_id,
@@ -153,10 +177,12 @@ function catalogMapModel(geometry: CatalogMapGeometry): THREE.Group {
       name_zh: footprint.name_zh,
       function: footprint.function,
       function_zh: footprint.function_zh,
-    } satisfies SelectedBuilding;
+      number: footprint.number,
+    } satisfies CatalogBuildingSelection;
     building.castShadow = true;
     building.receiveShadow = true;
     root.add(building);
+    buildings.push(building);
   }
 
   const nodeById = new Map(geometry.nodes.map((node) => [node.node_id, node]));
@@ -185,13 +211,14 @@ function catalogMapModel(geometry: CatalogMapGeometry): THREE.Group {
     const center = bounds.getCenter(new THREE.Vector3());
     root.position.set(-center.x, -bounds.min.y, -center.z);
   }
-  return root;
+  return { root, buildings };
 }
 
 function fitCameraToModel(
   camera: THREE.PerspectiveCamera,
   controls: OrbitControls,
   model: THREE.Object3D,
+  padding = 1.12,
 ): void {
   const bounds = new THREE.Box3().setFromObject(model);
   if (bounds.isEmpty()) return;
@@ -199,7 +226,7 @@ function fitCameraToModel(
   const radius = bounds.getBoundingSphere(new THREE.Sphere()).radius;
   const verticalFov = THREE.MathUtils.degToRad(camera.fov * 0.5);
   const horizontalFov = Math.atan(Math.tan(verticalFov) * camera.aspect);
-  const distance = radius / Math.sin(Math.min(verticalFov, horizontalFov)) * 1.12;
+  const distance = radius / Math.sin(Math.min(verticalFov, horizontalFov)) * padding;
   controls.target.copy(center);
   camera.position.copy(center).add(
     new THREE.Vector3(0.74, 0.56, 0.86).normalize().multiplyScalar(distance),
@@ -230,11 +257,15 @@ function vehicleModel(key: string | null): THREE.Group {
   return drone;
 }
 
-export function RepositoryAsset3DView({ kind, previewKey, name, chinese }: Props) {
+export function RepositoryAsset3DView({ kind, previewKey, name, chinese, onBuildingSelect }: Props) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [selectedBuilding, setSelectedBuilding] = useState<SelectedBuilding | null>(null);
+  const onBuildingSelectRef = useRef(onBuildingSelect);
+
+  useEffect(() => {
+    onBuildingSelectRef.current = onBuildingSelect;
+  }, [onBuildingSelect]);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -256,7 +287,7 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese }: Props
     renderer.shadowMap.enabled = true;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
     mount.appendChild(renderer.domElement);
-    setSelectedBuilding(null);
+    onBuildingSelectRef.current?.(null);
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0xf7fafc);
@@ -283,6 +314,24 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese }: Props
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     let pointerDown: { x: number; y: number } | null = null;
+    let buildings: THREE.Mesh[] = [];
+    let selectedBuildingId: string | null = null;
+    const themeColorText = getComputedStyle(mount).getPropertyValue("--dd-brand-middle").trim() || "#a94cff";
+    const themeColor = new THREE.Color(themeColorText);
+    const selectBuilding = (selection: CatalogBuildingSelection | null) => {
+      if (!selection) return;
+      selectedBuildingId = selection.building_id;
+      for (const building of buildings) {
+        const material = building.material as THREE.MeshStandardMaterial;
+        const selected = building.userData.catalogBuilding?.building_id === selectedBuildingId;
+        material.color.set(selected ? themeColor : 0xc2c8d2);
+        material.emissive.set(selected ? themeColor : 0x000000);
+        material.emissiveIntensity = selected ? 0.26 : 0;
+        material.roughness = selected ? 0.52 : 0.76;
+        building.scale.y = selected ? 1.025 : 1;
+      }
+      onBuildingSelectRef.current?.(selection);
+    };
     const onPointerDown = (event: PointerEvent) => {
       pointerDown = { x: event.clientX, y: event.clientY };
     };
@@ -299,7 +348,8 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese }: Props
       raycaster.setFromCamera(pointer, camera);
       const hit = raycaster.intersectObjects(modelRoot.children, true)
         .find((intersection) => Boolean(intersection.object.userData.catalogBuilding));
-      setSelectedBuilding((hit?.object.userData.catalogBuilding as SelectedBuilding | undefined) ?? null);
+      const selection = hit?.object.userData.catalogBuilding as CatalogBuildingSelection | undefined;
+      if (selection) selectBuilding(selection);
     };
     renderer.domElement.addEventListener("pointerdown", onPointerDown);
     renderer.domElement.addEventListener("pointerup", onPointerUp);
@@ -321,8 +371,11 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese }: Props
         .then((geometry) => {
           if (cancelled || geometry.schema_version !== "dronedream.catalog-map-geometry.v1") return;
           const model = catalogMapModel(geometry);
-          modelRoot.add(model);
-          fitCameraToModel(camera, controls, modelRoot);
+          buildings = model.buildings;
+          modelRoot.add(model.root);
+          fitCameraToModel(camera, controls, modelRoot, 0.94);
+          const firstBuilding = buildings[0]?.userData.catalogBuilding as CatalogBuildingSelection | undefined;
+          if (firstBuilding) selectBuilding(firstBuilding);
           setLoading(false);
         })
         .catch(() => {
@@ -340,7 +393,7 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese }: Props
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      if (modelRoot.children.length) fitCameraToModel(camera, controls, modelRoot);
+      if (modelRoot.children.length) fitCameraToModel(camera, controls, modelRoot, kind === "map" ? 0.94 : 1.12);
     };
     const observer = new ResizeObserver(resize);
     observer.observe(mount);
@@ -377,13 +430,6 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese }: Props
         ? (chinese ? "没有可验证的三维几何，未生成替代模型。" : "No verified 3D geometry is available; no substitute model was generated.")
         : (chinese ? "当前设备无法创建三维视图。" : "3D view is unavailable on this device.")}</p> : null}
       {loading ? <p className="autonomy-repository-3d-loading">{chinese ? "正在加载三维场景…" : "Loading 3D scene…"}</p> : null}
-      {selectedBuilding ? <aside className="autonomy-repository-building-card" aria-live="polite">
-        <dl>
-          <div><dt>{chinese ? "建筑名称" : "Name"}</dt><dd>{chinese ? selectedBuilding.name_zh : selectedBuilding.name}</dd></div>
-          <div><dt>{chinese ? "建筑功能" : "Function"}</dt><dd>{chinese ? selectedBuilding.function_zh : selectedBuilding.function}</dd></div>
-        </dl>
-        <button type="button" onClick={() => setSelectedBuilding(null)} aria-label={chinese ? "关闭建筑介绍" : "Close building details"}>×</button>
-      </aside> : null}
     </div>
   );
 }

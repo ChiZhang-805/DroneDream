@@ -93,17 +93,24 @@ try {
       }
     }
   }
-  const canvasBox = await mapCanvas.boundingBox();
-  if (!canvasBox) throw new Error("Kumpula Campus canvas geometry could not be measured.");
-  for (const [xRatio, yRatio] of [[0.52, 0.5], [0.47, 0.54], [0.57, 0.46], [0.43, 0.47]]) {
-    await mapCanvas.click({ position: { x: canvasBox.width * xRatio, y: canvasBox.height * yRatio } });
-    if (await mapDialog.locator(".autonomy-repository-building-card").count()) break;
-  }
   const buildingCard = mapDialog.locator(".autonomy-repository-building-card");
   await buildingCard.waitFor({ state: "visible" });
-  if (await buildingCard.locator("dt").allTextContents().then((labels) => labels.join("|") !== "Name|Function")) {
-    throw new Error("A selected building must show only its name and function.");
+  if (await buildingCard.locator("dt").allTextContents().then((labels) => labels.join("|") !== "No.|Name|Function")) {
+    throw new Error("A selected building must show its number, name, and function.");
   }
+  if (await buildingCard.getAttribute("data-building-number") !== "001") throw new Error("Building 001 must be selected by default.");
+  if (await buildingCard.getByRole("button").count()) throw new Error("The persistent building card must not expose a separate close button.");
+  const canvasBox = await mapCanvas.boundingBox();
+  if (!canvasBox) throw new Error("Kumpula Campus canvas geometry could not be measured.");
+  let changedBuilding = false;
+  for (const [xRatio, yRatio] of [[0.43, 0.49], [0.55, 0.54], [0.62, 0.47], [0.49, 0.43], [0.68, 0.52]]) {
+    await mapCanvas.click({ position: { x: canvasBox.width * xRatio, y: canvasBox.height * yRatio } });
+    if (await buildingCard.getAttribute("data-building-number") !== "001") {
+      changedBuilding = true;
+      break;
+    }
+  }
+  if (!changedBuilding) throw new Error("Clicking another building must update the persistent building card.");
   const mapDetailScreenshot = path.join(outputRoot, `${screenshotPrefix}kumpula-campus-3d-detail-1600x1000.png`);
   await page.screenshot({ path: mapDetailScreenshot, fullPage: false });
   await mapDialog.getByRole("button", { name: "Close", exact: true }).click();
