@@ -7,47 +7,47 @@ import universalMark from "../../../../shared/brand/icons/universal-mark.png";
 export type HeaderDownloadId = "universal" | "sim" | "lab" | "field" | "autonomy";
 
 const RELEASE_BASE =
-  "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.0-build-2128";
+  "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.0-build-2130";
 
 export const headerDownloadCatalog = [
   {
     id: "universal",
     label: "DroneDream Universal",
     fileName: "DroneDream-Universal_1.0.0_x64-setup.exe",
-    sizeBytes: 217_922_676,
-    sha256: "08ae74da7589f6976984fd082c567ec442a4f6ce88c788e04a23009bacad1515",
+    sizeBytes: 217_917_925,
+    sha256: "38f36f1f4f56ef308ce2a31500dc420365f354be57371a3b8e32850497f764c1",
     mark: universalMark,
   },
   {
     id: "sim",
     label: "DroneDream SIM",
     fileName: "DroneDream-Sim_1.0.0_x64-setup.exe",
-    sizeBytes: 217_369_645,
-    sha256: "d5e5abc639f15222a3cdc10d8c6bbfcb76189bcf32612750725891db0602bc6d",
+    sizeBytes: 217_373_821,
+    sha256: "aad68e0951dd5339f21d7918a00225996ef8c954e9d07043de2324b7060337a1",
     mark: simMark,
   },
   {
     id: "lab",
     label: "DroneDream LAB",
     fileName: "DroneDream-Lab_1.0.0_x64-setup.exe",
-    sizeBytes: 217_020_430,
-    sha256: "21c4b7eed0829e2776c671555ddbaa8f27642e8503580f1642781befaf5a170c",
+    sizeBytes: 217_883_488,
+    sha256: "23d6d4d8936917a192a99851f9c4aba6eebd1ab0a3631f7db90343f1081fa8e9",
     mark: labMark,
   },
   {
     id: "field",
     label: "DroneDream FIELD",
     fileName: "DroneDream-Field_1.0.0_x64-setup.exe",
-    sizeBytes: 216_589_442,
-    sha256: "5ba1dd090dfca0c3f4ec91f5be8dde8390a9886f61bf49700927048900db6a4d",
+    sizeBytes: 216_580_094,
+    sha256: "69e509c795543dfddab36c258f5242ff8f90413f1f14ca4331131dfa011fad59",
     mark: fieldMark,
   },
   {
     id: "autonomy",
     label: "DroneDream AGENT",
     fileName: "DroneDream-Agent_1.0.0_x64-setup.exe",
-    sizeBytes: 217_871_085,
-    sha256: "cad3c540303a5b30a31915c8f999e06d26dd3cda64f3a625a514b9cd27bc6fce",
+    sizeBytes: 217_741_867,
+    sha256: "1774a298cd9f096e9083ff0763dcc2fe2c23d1ba7c603bfa2df1a608bb4e1490",
     mark: autonomyMark,
   },
 ].map((download) => ({

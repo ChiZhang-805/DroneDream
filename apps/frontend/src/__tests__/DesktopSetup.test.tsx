@@ -31,6 +31,7 @@ const updaterState = vi.hoisted(() => ({
       | "installingComponents"
       | "componentUpdateDeferred"
       | "componentError"
+      | "runtimeBaseRequired"
       | "error",
     availableVersion: null as string | null,
     updateRequired: false,
@@ -912,6 +913,37 @@ describe("DesktopSetup", () => {
     expect(screen.queryByRole("button", {
       name: "Version 1.0.1 is available. Click to update.",
     })).not.toBeInTheDocument();
+  });
+
+  it("offers a required Runtime Base upgrade before sign-in", async () => {
+    optionalAuthState.current = {
+      configured: true,
+      loading: false,
+      account: null,
+    };
+    updaterState.current = {
+      ...updaterState.current,
+      status: "runtimeBaseRequired",
+      updateRequired: true,
+    };
+    vi.stubEnv(
+      "VITE_RUNTIME_RELEASE_MANIFEST_URL",
+      "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.1-beta.1/runtime-release.json",
+    );
+    window.__TAURI__ = { core: { invoke: vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return runtime;
+      if (command === "get_runtime_install_progress") return idleInstallSnapshot;
+      if (command === "get_installer_runtime_intent") return noInstallerRuntimeIntent;
+      throw new Error(`Unexpected command: ${command}`);
+    }) } };
+
+    renderPage();
+
+    expect(await screen.findByRole("button", { name: "Upgrade Runtime Base" }))
+      .toBeEnabled();
+    expect(screen.queryByRole("button", { name: "Sign in" }))
+      .not.toBeInTheDocument();
   });
 
   it("keeps checking through a transient system-probe timeout instead of showing an error", async () => {
