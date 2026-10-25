@@ -27,7 +27,6 @@ jobs:
     # runners. Register a dedicated Linux amd64 runner with this custom label.
     runs-on: [self-hosted, Linux, X64, dronedream-runtime-builder]
     timeout-minutes: 240
-    environment: runtime-release
     env:
       IMAGE: dronedream/runtime:${{ github.run_id }}-${{ github.run_attempt }}
       RELEASE_TAG: ${{ inputs.release_tag }}
@@ -97,9 +96,13 @@ jobs:
             echo "could not verify that the release tag is unused: $RELEASE_TAG" >&2
             exit 2
           fi
-          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "release already exists and will never be overwritten: $RELEASE_TAG" >&2
-            exit 2
+          if is_draft=$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --json isDraft --jq .isDraft 2>/dev/null); then
+            if [[ "$is_draft" != "true" ]]; then
+              echo "release tag is already reserved: $RELEASE_TAG" >&2
+              exit 2
+            fi
+            echo "resuming the existing draft release: $RELEASE_TAG"
           fi
 
       - name: Confirm signing secret is configured
@@ -205,14 +208,22 @@ jobs:
           # `package` enforces every part is strictly under GitHub's 2 GiB
           # per-asset ceiling. Assets enter an invisible draft first so a
           # network/upload failure cannot expose a partial public release.
-          gh release create "$RELEASE_TAG" \
-            --repo "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" \
-            --title "DroneDreamRuntime $RELEASE_TAG" \
-            --notes "Signed beta WSL2 runtime. Real PX4/Gazebo smoke evidence is attached." \
-            --draft
-          gh release upload "$RELEASE_TAG" "$output"/* \
-            --repo "$GITHUB_REPOSITORY"
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" \
+              --title "DroneDreamRuntime $RELEASE_TAG" \
+              --notes "Signed beta WSL2 runtime. Real PX4/Gazebo smoke evidence is attached." \
+              --draft
+          fi
+          for asset in "$output"/*; do
+            for attempt in 1 2 3; do
+              gh release upload "$RELEASE_TAG" "$asset" \
+                --repo "$GITHUB_REPOSITORY" --clobber && break
+              [[ "$attempt" -lt 3 ]] || exit 1
+              sleep 15
+            done
+          done
           gh release edit "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --draft=false \

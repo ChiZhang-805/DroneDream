@@ -160,11 +160,14 @@ try {
             }
             if (shellState === "quick-settings" || shellState?.startsWith("settings-")) {
               await page.locator(".app-header .launcher-settings-button").click();
-              await page.locator(".settings-workspace-host").waitFor({ state: "visible" });
               if (shellState?.startsWith("settings-")) {
+                await page.getByRole("button", { name: "All settings", exact: true }).click();
+                await page.locator(".settings-workspace-host").waitFor({ state: "visible" });
                 const tab = shellState.replace(/^settings-/u, "");
                 await page.locator(`#settings-tab-${tab}`).click();
                 await page.locator(`#settings-panel-${tab}`).waitFor({ state: "visible" });
+              } else {
+                await page.locator(".quick-settings-dialog").waitFor({ state: "visible" });
               }
             } else if (shellState === "account-menu") {
               await page.locator(".app-account-button").click();
