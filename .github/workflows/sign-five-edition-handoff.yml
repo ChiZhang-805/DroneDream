@@ -1,0 +1,174 @@
+name: Sign five-edition handoff
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Draft five-edition release containing the unsigned handoff
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sign-five-edition-handoff-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  sign:
+    runs-on: windows-latest
+    steps:
+      - name: Validate release tag
+        shell: pwsh
+        run: |
+          if ("${{ inputs.release_tag }}" -cnotmatch '^five-edition-v1\.0\.0-build-[1-9][0-9]*$') {
+            throw "The handoff tag does not match the five-edition release contract."
+          }
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/desktop/package-lock.json
+
+      - name: Install updater signer
+        shell: pwsh
+        run: npm ci --prefix apps/desktop --ignore-scripts
+
+      - name: Download and validate unsigned handoff
+        id: handoff
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $root = Join-Path $env:RUNNER_TEMP "five-edition-handoff"
+          New-Item -ItemType Directory -Path $root | Out-Null
+          gh release download $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY --dir $root
+          if ($LASTEXITCODE -ne 0) { throw "The draft handoff could not be downloaded." }
+
+          $release = gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY `
+            --json isDraft,targetCommitish,assets | ConvertFrom-Json
+          if (-not $release.isDraft) { throw "The handoff release must remain a draft while signing." }
+          if (@($release.assets).Count -ne 15) {
+            throw "The unsigned handoff must contain exactly 15 assets."
+          }
+
+          $expectedEditions = @("universal", "sim", "lab", "field", "autonomy")
+          $productNames = @{
+            universal = "DroneDream-Universal"
+            sim = "DroneDream-Sim"
+            lab = "DroneDream-Lab"
+            field = "DroneDream-Field"
+            autonomy = "DroneDream-Agent"
+          }
+          $sourceCommit = $null
+          $buildNumber = $null
+          foreach ($edition in $expectedEditions) {
+            $product = $productNames[$edition]
+            $installer = Join-Path $root "${product}_1.0.0_x64-setup.exe"
+            $checksum = "${installer}.sha256"
+            $receiptPath = "${installer}.receipt.json"
+            foreach ($path in @($installer, $checksum, $receiptPath)) {
+              if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+                throw "Missing unsigned handoff asset: $path"
+              }
+            }
+            $receipt = Get-Content -LiteralPath $receiptPath -Raw -Encoding UTF8 | ConvertFrom-Json
+            $hash = (Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash.ToLowerInvariant()
+            $checksumLine = (Get-Content -LiteralPath $checksum -Raw -Encoding ASCII).Trim()
+            if ([string]$receipt.kind -cne "dronedream-five-edition-build-receipt" -or
+                [string]$receipt.editionId -cne $edition -or
+                [string]$receipt.installer.fileName -cne [IO.Path]::GetFileName($installer) -or
+                [string]$receipt.installer.sha256 -cne $hash -or
+                [Int64]$receipt.installer.bytes -ne (Get-Item -LiteralPath $installer).Length -or
+                $checksumLine -cnotmatch "^${hash}\s+") {
+              throw "The $edition handoff receipt or checksum is invalid."
+            }
+            if ($null -eq $sourceCommit) {
+              $sourceCommit = [string]$receipt.sourceCommit
+              $buildNumber = [UInt64]$receipt.buildNumber
+            } elseif ([string]$receipt.sourceCommit -cne $sourceCommit -or
+                      [UInt64]$receipt.buildNumber -ne $buildNumber) {
+              throw "All five handoffs must share one source commit and build number."
+            }
+          }
+          if ($env:RELEASE_TAG -cne "five-edition-v1.0.0-build-${buildNumber}") {
+            throw "The release tag does not match build $buildNumber."
+          }
+          if ([string]$release.targetCommitish -cne $sourceCommit) {
+            throw "The draft release target does not match source commit $sourceCommit."
+          }
+          "root=$root" >> $env:GITHUB_OUTPUT
+
+      - name: Sign all five installers and update receipts
+        shell: pwsh
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          HANDOFF_ROOT: ${{ steps.handoff.outputs.root }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) {
+            throw "TAURI_SIGNING_PRIVATE_KEY is required."
+          }
+          $keyPath = Join-Path $env:RUNNER_TEMP "dronedream-updater.key"
+          $products = @(
+            "DroneDream-Universal",
+            "DroneDream-Sim",
+            "DroneDream-Lab",
+            "DroneDream-Field",
+            "DroneDream-Agent"
+          )
+          try {
+            [IO.File]::WriteAllText(
+              $keyPath,
+              $env:TAURI_SIGNING_PRIVATE_KEY,
+              (New-Object Text.UTF8Encoding($false))
+            )
+            foreach ($product in $products) {
+              $installer = Join-Path $env:HANDOFF_ROOT "${product}_1.0.0_x64-setup.exe"
+              ./apps/desktop/scripts/invoke-tauri-updater-signer.ps1 `
+                -NodeExecutable ((Get-Command node.exe).Source) `
+                -TauriCliPath (Resolve-Path "./apps/desktop/node_modules/@tauri-apps/cli/tauri.js") `
+                -UpdaterKeyPath $keyPath `
+                -InstallerPath $installer
+              $receiptPath = "${installer}.receipt.json"
+              $receipt = Get-Content -LiteralPath $receiptPath -Raw -Encoding UTF8 | ConvertFrom-Json
+              $receipt.installer.updaterSignature = $true
+              $receipt | ConvertTo-Json -Depth 20 | Set-Content -LiteralPath $receiptPath -Encoding UTF8
+              gh release upload $env:RELEASE_TAG "${installer}.sig" $receiptPath `
+                --repo $env:GITHUB_REPOSITORY --clobber
+              if ($LASTEXITCODE -ne 0) { throw "Failed to upload signed assets for $product." }
+            }
+          } finally {
+            Remove-Item -LiteralPath $keyPath -Force -ErrorAction SilentlyContinue
+          }
+
+      - name: Verify signed draft inventory
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          $release = gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY `
+            --json isDraft,assets | ConvertFrom-Json
+          if (-not $release.isDraft) { throw "Signing must not publish the draft release." }
+          $names = @($release.assets | ForEach-Object { [string]$_.name })
+          if ($names.Count -ne 20 -or @($names | Sort-Object -Unique).Count -ne 20) {
+            throw "The signed draft must contain exactly 20 unique assets."
+          }
+          foreach ($product in @("Universal", "Sim", "Lab", "Field", "Agent")) {
+            $base = "DroneDream-${product}_1.0.0_x64-setup.exe"
+            foreach ($suffix in @("", ".sig", ".sha256", ".receipt.json")) {
+              if ($names -cnotcontains "${base}${suffix}") {
+                throw "The signed draft is missing ${base}${suffix}."
+              }
+            }
+          }
