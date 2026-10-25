@@ -1,10 +1,10 @@
 {
   "edition": "universal",
-  "buildNumber": 2102,
+  "buildNumber": 2106,
   "version": "1.0.0",
   "fileName": "DroneDream-Universal_1.0.0_x64-setup.exe",
-  "releaseTag": "five-edition-v1.0.0-build-2102",
-  "sha256": "3f770af798598fab5f703241d13fe3ffe1e614373aafcd2cfcc19548b863f915",
-  "sizeBytes": 217900145,
+  "releaseTag": "five-edition-v1.0.0-build-2106",
+  "sha256": "90d1f2ceeb8f3016aa4e1178e9d4461fb4e9f5654b14f1e79c03c9399792b3d6",
+  "sizeBytes": 218045843,
   "publishedAt": "2026-10-25"
 }
