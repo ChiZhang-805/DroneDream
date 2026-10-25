@@ -180,6 +180,7 @@ RUN test -n "${OIDC_ISSUER}" && test -n "${OIDC_JWKS_URL}" && \
     test -s /usr/share/doc/valkey/COPYING && \
     test -s /usr/share/doc/dronedream-runtime/LICENSE && \
     test -s /usr/share/doc/dronedream-runtime/THIRD_PARTY_NOTICES.md && \
+    chmod 0644 /etc/systemd/system/*.service /etc/systemd/system/*.timer && \
     systemd-analyze cat-config systemd/journald.conf >/dev/null && \
     systemd-analyze verify /etc/systemd/system/dronedream-runtime-init.service \
       /etc/systemd/system/valkey.service /etc/systemd/system/dronedream-api.service \

@@ -265,6 +265,10 @@ class ThirdPartyNoticeContractTests(unittest.TestCase):
         self.assertIn("!platform/runtime/**", dockerignore)
         self.assertNotIn("platform/runtime/THIRD_PARTY_NOTICES.md", dockerignore)
         self.assertIn("!shared/brand/report/**", dockerignore)
+        self.assertIn(
+            "chmod 0644 /etc/systemd/system/*.service /etc/systemd/system/*.timer",
+            dockerfile,
+        )
         self.assertIn("/usr/share/doc/valkey/COPYING", dockerfile)
         self.assertIn("/usr/share/doc/dronedream-runtime/LICENSE", dockerfile)
         self.assertIn(
