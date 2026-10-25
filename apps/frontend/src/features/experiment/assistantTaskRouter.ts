@@ -21,10 +21,10 @@ export interface AssistantTaskOption {
 
 const TASKS_BY_EDITION: Readonly<Record<BrandEditionId, readonly AssistantTaskType[]>> = {
   universal: ["control_tuning", "mission_autonomy"],
-  sim: ["control_tuning", "mission_autonomy"],
+  sim: ["control_tuning"],
   lab: ["control_tuning", "mission_autonomy"],
   field: ["control_tuning", "mission_autonomy"],
-  autonomy: ["control_tuning", "mission_autonomy"],
+  autonomy: ["mission_autonomy"],
 };
 
 const EN: Record<AssistantTaskType, Omit<AssistantTaskOption, "id">> = {

@@ -147,7 +147,6 @@ EDITION_TASKS: Final[dict[EditionId, frozenset[TaskType]]] = {
     "sim": frozenset(
         {
             "control_tuning",
-            "mission_autonomy",
             "asset_import_qualification",
             "simulation_experiment",
         }

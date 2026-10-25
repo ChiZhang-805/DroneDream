@@ -48,10 +48,10 @@ not run on a normal GitHub-hosted runner.
 bash platform/runtime/build-rootfs.sh
 ```
 
-The default image is `dronedream/runtime:0.1.0`. Override it consistently:
+The default image is `dronedream/runtime:0.1.1`. Override it consistently:
 
 ```bash
-IMAGE=ghcr.io/example/dronedream-runtime:0.1.0 bash platform/runtime/build-rootfs.sh
+IMAGE=ghcr.io/example/dronedream-runtime:0.1.1 bash platform/runtime/build-rootfs.sh
 ```
 
 The build refuses modified **and untracked** files because the manifest must
@@ -66,7 +66,7 @@ headless simulator can run. It deletes the container when complete.
 
 ```bash
 bash platform/runtime/smoke-image.sh \
-  dronedream/runtime:0.1.0 \
+  dronedream/runtime:0.1.1 \
   platform/runtime/out/smoke-report.json
 ```
 
@@ -77,9 +77,9 @@ used to export a publishable rootfs.
 
 ```bash
 bash platform/runtime/export-rootfs.sh \
-  dronedream/runtime:0.1.0 \
+  dronedream/runtime:0.1.1 \
   platform/runtime/out/smoke-report.json \
-  platform/runtime/out/DroneDreamRuntime-0.1.0-amd64.tar
+  platform/runtime/out/DroneDreamRuntime-0.1.1-amd64.tar
 ```
 
 Successful export also produces a SHA-256 sidecar and the promoted manifest.
@@ -94,7 +94,7 @@ Choose a new empty install directory and distribution name:
 
 ```powershell
 wsl.exe --import DroneDreamRuntime D:\WSL\DroneDreamRuntime `
-  .\DroneDreamRuntime-0.1.0-amd64.tar --version 2
+  .\DroneDreamRuntime-0.1.1-amd64.tar --version 2
 wsl.exe -d DroneDreamRuntime -u root -- systemctl is-active `
   dronedream-api.service dronedream-worker.service valkey.service
 Invoke-WebRequest http://127.0.0.1:8000/health/ready

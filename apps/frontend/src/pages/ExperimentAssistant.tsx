@@ -652,7 +652,9 @@ export function ExperimentAssistant() {
   const [voiceConsentIntent, setVoiceConsentIntent] = useState<"toggle" | "hold" | null>(null);
   const [voiceConsentGranted, setVoiceConsentGranted] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
-  const [selectedTaskType, setSelectedTaskType] = useState<AssistantTaskType | null>("control_tuning");
+  const [selectedTaskType, setSelectedTaskType] = useState<AssistantTaskType | null>(() =>
+    editionTheme.id === "autonomy" ? "mission_autonomy" : "control_tuning",
+  );
   const [referenceFiles, setReferenceFiles] = useState<AssistantReferenceFile[]>(
     [],
   );
