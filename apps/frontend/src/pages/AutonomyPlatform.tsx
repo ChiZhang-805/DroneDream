@@ -66,7 +66,7 @@ import {
   clarificationOtherAnswer,
   presentAutonomyClarification,
 } from "../features/autonomy/clarificationPresentation";
-import { RepositoryAsset3DView } from "../features/autonomy/RepositoryAsset3DView";
+import { RepositoryAsset3DView, type CatalogBuildingSelection } from "../features/autonomy/RepositoryAsset3DView";
 import {
   catalogAssetDefinitions,
   catalogAssetKey,
@@ -2863,6 +2863,7 @@ function RepositoryDetailsDialog({
   details: RepositoryDetails;
   onClose: () => void;
 }) {
+  const [selectedBuilding, setSelectedBuilding] = useState<CatalogBuildingSelection | null>(null);
   return (
     <div className="autonomy-repository-dialog-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
@@ -2873,8 +2874,25 @@ function RepositoryDetailsDialog({
           <div className="autonomy-repository-dialog-copy">
             {details.description ? <p>{details.description}</p> : null}
             <dl>{details.rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+            {details.kind === "map" && selectedBuilding ? <aside
+              className="autonomy-repository-building-card"
+              aria-live="polite"
+              data-building-number={selectedBuilding.number}
+            >
+              <dl>
+                <div><dt>{chinese ? "编号" : "No."}</dt><dd>{selectedBuilding.number}</dd></div>
+                <div><dt>{chinese ? "名称" : "Name"}</dt><dd>{chinese ? selectedBuilding.name_zh : selectedBuilding.name}</dd></div>
+                <div><dt>{chinese ? "功能" : "Function"}</dt><dd>{chinese ? selectedBuilding.function_zh : selectedBuilding.function}</dd></div>
+              </dl>
+            </aside> : null}
           </div>
-          <RepositoryAsset3DView kind={details.kind} previewKey={details.previewKey} name={details.title} chinese={chinese} />
+          <RepositoryAsset3DView
+            kind={details.kind}
+            previewKey={details.previewKey}
+            name={details.title}
+            chinese={chinese}
+            onBuildingSelect={details.kind === "map" ? setSelectedBuilding : undefined}
+          />
         </div>
       </section>
     </div>
