@@ -9,7 +9,8 @@ param(
     [string]$AgentCoreRepository,
     [switch]$AllowUnsignedUpdater,
     [switch]$ReuseCargoTarget,
-    [switch]$PreserveCargoTarget
+    [switch]$PreserveCargoTarget,
+    [switch]$UseHardLinkHandoff
 )
 
 $ErrorActionPreference = "Stop"
@@ -651,7 +652,11 @@ try {
         # Preserve the canonical bundle name so the copied sha256 sidecar and
         # updater manifest continue to name the exact installer they attest.
         $handoffInstaller = Join-Path $editionOutput ([IO.Path]::GetFileName($builtInstaller))
-        [IO.File]::Copy($builtInstaller, $handoffInstaller, $false)
+        if ($UseHardLinkHandoff) {
+            New-Item -ItemType HardLink -Path $handoffInstaller -Target $builtInstaller | Out-Null
+        } else {
+            [IO.File]::Copy($builtInstaller, $handoffInstaller, $false)
+        }
         [IO.File]::Copy($builtChecksum, "$handoffInstaller.sha256", $false)
         if (-not $AllowUnsignedUpdater) {
             [IO.File]::Copy($builtSignature, "$handoffInstaller.sig", $false)
@@ -690,6 +695,7 @@ try {
                 bytes = (Get-Item -LiteralPath $handoffInstaller).Length
                 sha256 = $installerHash
                 updaterSignature = -not $AllowUnsignedUpdater
+                handoffMode = if ($UseHardLinkHandoff) { "hard-link" } else { "copy" }
             }
             application = [ordered]@{
                 fileName = [IO.Path]::GetFileName($builtApplication)
