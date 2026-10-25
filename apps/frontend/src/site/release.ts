@@ -14,13 +14,13 @@ declare const __DRONEDREAM_RELEASE__: WebsiteRelease;
 
 const developmentFallbackRelease: WebsiteRelease = {
   edition: "universal",
-  buildNumber: 2108,
+  buildNumber: 2110,
   version: "1.0.0",
   fileName: "DroneDream-Universal_1.0.0_x64-setup.exe",
-  downloadUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.0-build-2108/DroneDream-Universal_1.0.0_x64-setup.exe",
-  checksumUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.0-build-2108/DroneDream-Universal_1.0.0_x64-setup.exe.sha256",
-  sha256: "a608214976f6c8f3501e840c64d10dc56680793cb05a4de79b3625e5c6621a88",
-  sizeBytes: 217_922_272,
+  downloadUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.0-build-2110/DroneDream-Universal_1.0.0_x64-setup.exe",
+  checksumUrl: "https://github.com/ChiZhang-805/DroneDream/releases/download/five-edition-v1.0.0-build-2110/DroneDream-Universal_1.0.0_x64-setup.exe.sha256",
+  sha256: "a1b4ca5db0b69db46edfda61437be38a84e65254771cec41ce5e64e60fdb3083",
+  sizeBytes: 217_064_862,
   publishedAt: "2026-10-25",
 };
 
