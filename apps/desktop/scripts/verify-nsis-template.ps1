@@ -331,8 +331,9 @@ foreach ($required in @(
 
 foreach ($required in @(
     '!macro DRONEDREAM_SET_CURRENT_USER_INSTALL_ROOT',
-    'ReadRegExpandStr $R9 HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders" "Local AppData"',
-    'ExpandEnvStrings $R9 "%USERPROFILE%\AppData\Local"',
+    'ReadRegStr $R9 HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders" "Local AppData"',
+    'StrCpy $R9 "%USERPROFILE%\AppData\Local"',
+    'ExpandEnvStrings $R9 $R9',
     'StrCpy $INSTDIR "$R9\${PRODUCTNAME}"'
 )) {
     if (-not $editionIdentity.Contains($required)) {

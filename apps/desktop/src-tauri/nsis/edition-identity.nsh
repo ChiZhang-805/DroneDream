@@ -34,10 +34,11 @@
 ; Packaged launchers can redirect NSIS's $LOCALAPPDATA into their private
 ; LocalCache. Resolve the user's physical Windows Local AppData directory.
 !macro DRONEDREAM_SET_CURRENT_USER_INSTALL_ROOT
-  ReadRegExpandStr $R9 HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders" "Local AppData"
+  ReadRegStr $R9 HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders" "Local AppData"
   ${If} $R9 == ""
-    ExpandEnvStrings $R9 "%USERPROFILE%\AppData\Local"
+    StrCpy $R9 "%USERPROFILE%\AppData\Local"
   ${EndIf}
+  ExpandEnvStrings $R9 $R9
   StrCpy $INSTDIR "$R9\${PRODUCTNAME}"
 !macroend
 
