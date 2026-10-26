@@ -1170,8 +1170,8 @@ export function DroneLaunchSceneCore({
     renderer.domElement.addEventListener("webglcontextrestored", onContextRestored);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf8f7fb);
-    scene.fog = new THREE.FogExp2(0xf1edf5, 0.022);
+    scene.background = new THREE.Color(sceneTheme.darkSurface);
+    scene.fog = new THREE.FogExp2(sceneTheme.fog, 0.022);
     const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100);
     camera.position.set(5.3, 3.35, 7.5);
     camera.lookAt(0, 0.05, 0);
