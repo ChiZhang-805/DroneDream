@@ -50,8 +50,11 @@ commands under `apps/frontend/` continue to work unchanged.
 The desktop program and simulation runtime are deliberately separate:
 
 - The current-user NSIS package installs the desktop program to
-  `%LOCALAPPDATA%\DroneDream` by default. Its ordinary directory page may be
-  used to choose another desktop-program folder.
+  `%LOCALAPPDATA%\DroneDream-<edition>` by default. Its ordinary directory
+  page may be used to choose another desktop-program folder. The installer
+  reads the physical Windows Local AppData known-folder value, so launching it
+  from a packaged app cannot redirect the destination into that app's private
+  cache.
 - `DroneDreamRuntime` is a separate signed WSL2 image. Its location is always
   the fixed safe path `X:\DroneDream` on the selected local fixed NTFS drive;
   custom mode selects only `X:`, never an arbitrary directory. Resumable
