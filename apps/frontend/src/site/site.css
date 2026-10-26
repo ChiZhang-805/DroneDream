@@ -122,7 +122,15 @@
   background: linear-gradient(180deg, rgba(7, 9, 19, 0.72), transparent);
 }
 
-.site-classic-home { min-height: 100dvh; }
+.site-classic-home {
+  min-height: 100dvh;
+  background: #070913;
+}
+
+.site-classic-home .drone-launch-scene {
+  color-scheme: dark;
+  background: #070913;
+}
 .site-classic-home .site-hero-copy { margin-top: clamp(2.2rem, 7vh, 5.2rem); }
 
 @media (max-width: 900px) {
