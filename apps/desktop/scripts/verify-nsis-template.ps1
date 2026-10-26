@@ -147,6 +147,18 @@ if (([regex]::Matches($upstream, [regex]::Escape($initAnchor))).Count -ne 1) {
     throw "DroneDream NSIS init anchor is missing or duplicated"
 }
 $upstream = $upstream.Replace($initAnchor, "`n")
+$installRootAnchor = "      !ifmacrodef DRONEDREAM_SET_CURRENT_USER_INSTALL_ROOT`n" +
+    "        !insertmacro DRONEDREAM_SET_CURRENT_USER_INSTALL_ROOT`n" +
+    "      !else`n" +
+    "        StrCpy `$INSTDIR `"`$LOCALAPPDATA\`${PRODUCTNAME}`"`n" +
+    "      !endif`n"
+if (([regex]::Matches($upstream, [regex]::Escape($installRootAnchor))).Count -ne 1) {
+    throw "DroneDream physical Local AppData anchor is missing or duplicated"
+}
+$upstream = $upstream.Replace(
+    $installRootAnchor,
+    "      StrCpy `$INSTDIR `"`$LOCALAPPDATA\`${PRODUCTNAME}`"`n"
+)
 $runGuardAnchor = "  !ifmacrodef DRONEDREAM_BEFORE_RUN_MAIN_BINARY`n" +
     "    !insertmacro DRONEDREAM_BEFORE_RUN_MAIN_BINARY`n" +
     "  !endif`n"
@@ -315,6 +327,21 @@ foreach ($required in @(
     if (-not $editionIdentity.Contains($required)) {
         throw "Edition identity contract is missing: $required"
     }
+}
+
+foreach ($required in @(
+    '!macro DRONEDREAM_SET_CURRENT_USER_INSTALL_ROOT',
+    'ReadRegStr $R9 HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders" "Local AppData"',
+    'StrCpy $R9 "%USERPROFILE%\AppData\Local"',
+    'ExpandEnvStrings $R9 $R9',
+    'StrCpy $INSTDIR "$R9\${PRODUCTNAME}"'
+)) {
+    if (-not $editionIdentity.Contains($required)) {
+        throw "The installer must resolve the physical Windows Local AppData path: $required"
+    }
+}
+if (-not $template.Contains('!insertmacro DRONEDREAM_SET_CURRENT_USER_INSTALL_ROOT')) {
+    throw "The installer must use the physical Local AppData macro"
 }
 if ($editionIdentity.Contains('dronedream_desktop_done:') -or
     $editionIdentity.Contains('dronedream_startmenu_done:')) {

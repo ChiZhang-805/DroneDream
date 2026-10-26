@@ -220,7 +220,14 @@ def test_nsis_keeps_internal_ownership_but_uses_display_shortcuts() -> None:
         '\\${PRODUCTNAME}"'
     )
     assert uninstall_key in template
-    assert 'StrCpy $INSTDIR "$LOCALAPPDATA\\${PRODUCTNAME}"' in template
+    assert "!insertmacro DRONEDREAM_SET_CURRENT_USER_INSTALL_ROOT" in template
+    assert "!macro DRONEDREAM_SET_CURRENT_USER_INSTALL_ROOT" in identity
+    assert (
+        'ReadRegStr $R9 HKCU "Software\\Microsoft\\Windows\\CurrentVersion'
+        '\\Explorer\\User Shell Folders" "Local AppData"'
+    ) in identity
+    assert 'ExpandEnvStrings $R9 $R9' in identity
+    assert 'StrCpy $INSTDIR "$R9\\${PRODUCTNAME}"' in identity
     assert 'RmDir /r "$LOCALAPPDATA\\${BUNDLEID}"' in template
     assert 'WriteRegStr SHCTX "${UNINSTKEY}" "DisplayName" "${DRONEDREAM_DISPLAYNAME}"' in template
     assert 'WriteRegStr SHCTX "${UNINSTKEY}" "DisplayVersion" "${VERSION}"' in template

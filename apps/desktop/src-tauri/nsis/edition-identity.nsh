@@ -31,6 +31,17 @@
 
 !define DRONEDREAM_SHORTCUTNAME "${DRONEDREAM_DISPLAYNAME}"
 
+; Packaged launchers can redirect NSIS's $LOCALAPPDATA into their private
+; LocalCache. Resolve the user's physical Windows Local AppData directory.
+!macro DRONEDREAM_SET_CURRENT_USER_INSTALL_ROOT
+  ReadRegStr $R9 HKCU "Software\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders" "Local AppData"
+  ${If} $R9 == ""
+    StrCpy $R9 "%USERPROFILE%\AppData\Local"
+  ${EndIf}
+  ExpandEnvStrings $R9 $R9
+  StrCpy $INSTDIR "$R9\${PRODUCTNAME}"
+!macroend
+
 ; Create or refresh a shortcut only when the path is empty or already belongs
 ; to this exact installation.  A legacy or cross-edition collision is retained
 ; byte-for-byte and blocks shortcut creation instead of being overwritten.

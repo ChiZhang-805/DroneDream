@@ -543,7 +543,11 @@ Function .onInit
         StrCpy $INSTDIR "$PROGRAMFILES\${PRODUCTNAME}"
       ${EndIf}
     !else if "${INSTALLMODE}" == "currentUser"
-      StrCpy $INSTDIR "$LOCALAPPDATA\${PRODUCTNAME}"
+      !ifmacrodef DRONEDREAM_SET_CURRENT_USER_INSTALL_ROOT
+        !insertmacro DRONEDREAM_SET_CURRENT_USER_INSTALL_ROOT
+      !else
+        StrCpy $INSTDIR "$LOCALAPPDATA\${PRODUCTNAME}"
+      !endif
     !endif
 
     Call RestorePreviousInstallLocation
