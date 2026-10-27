@@ -6,5 +6,11 @@ import "../site/site.css";
 export function OrganizationAdminPage() {
   const auth = useAuth();
   const { locale } = useI18n();
-  return <OrganizationPage locale={locale} accountId={auth.account?.id ?? null} />;
+  return (
+    <OrganizationPage
+      locale={locale}
+      accountId={auth.account?.id ?? null}
+      accountAvatarUrl={auth.account?.avatarUrl ?? null}
+    />
+  );
 }

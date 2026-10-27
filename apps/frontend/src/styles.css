@@ -22721,29 +22721,48 @@ body {
 }
 
 .settings-workspace-content .settings-language-card .launcher-language-options {
-  min-height: 2.65rem;
+  width: 100%;
+  min-height: 3.1rem;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   grid-template-rows: auto !important;
-  gap: 0.5rem;
+  gap: 0.75rem;
 }
 
 .settings-workspace-content .settings-language-card .launcher-language-options button {
-  min-height: 2.65rem;
-  padding: 0.38rem 0.55rem;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
-  background: transparent;
+  min-width: 0;
+  min-height: 3.1rem;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.72rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--border) 92%, transparent);
+  border-radius: 0.78rem;
+  background: color-mix(in srgb, var(--panel) 96%, transparent);
   box-shadow: none;
-  color: var(--text-dim);
+  color: var(--text);
+  text-align: left;
 }
 
 .settings-workspace-content .settings-language-card .launcher-language-options button.selected {
-  border-bottom-color: var(--dd-brand-start);
-  background: color-mix(in srgb, var(--dd-brand-start) 7%, transparent);
-  box-shadow: none;
+  border-color: color-mix(in srgb, var(--dd-brand-start) 72%, var(--border));
+  background: color-mix(in srgb, var(--dd-brand-start) 10%, var(--panel));
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--dd-brand-start) 10%, transparent);
   color: var(--text);
+}
+
+.settings-workspace-content .settings-language-card .launcher-language-options button:hover,
+.settings-workspace-content .settings-language-card .launcher-language-options button:focus-visible {
+  border-color: color-mix(in srgb, var(--dd-brand-start) 58%, var(--border));
+}
+
+.settings-workspace-content .settings-language-card .launcher-language-options button strong {
+  overflow: hidden;
+  font-size: 0.96rem;
+  font-weight: 680;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-workspace-content .launcher-language-icon,
@@ -24313,7 +24332,7 @@ body {
 .settings-workspace-content .settings-model-panel-byok > .custom-model-settings {
   height: 100%;
   min-height: 0;
-  grid-template-rows: auto minmax(10rem, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .settings-workspace-content .settings-model-panel-byok .custom-model-library-section {
@@ -24323,7 +24342,7 @@ body {
 
 .settings-workspace-content .settings-model-panel-byok .custom-model-empty-state {
   height: 100%;
-  min-height: 8rem;
+  min-height: 0;
   box-sizing: border-box;
 }
 
@@ -25461,11 +25480,59 @@ body {
 }
 
 .app-shell .settings-workspace-content .settings-model-panel:not(.settings-model-panel-byok) {
-  height: auto;
+  height: 100%;
   min-height: 0;
-  grid-template-rows: auto auto;
-  align-content: start;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
   gap: 0.85rem;
+}
+
+.app-shell .settings-workspace-content .settings-model-panel-byok {
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
+  gap: 0.85rem;
+}
+
+.settings-workspace-content .settings-reset-card-menu {
+  top: calc(100% + 0.35rem);
+  bottom: auto;
+}
+
+.settings-workspace-content .settings-card-heading {
+  min-height: 3.1rem;
+  align-items: center;
+}
+
+.settings-workspace-content .settings-card-heading > span {
+  min-width: 0;
+  font-size: 1rem;
+  font-weight: 760;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.settings-workspace-content .settings-appearance-options strong,
+.settings-workspace-content .settings-notification-card .settings-toggle-row > span {
+  font-size: 0.96rem;
+  font-weight: 680;
+  line-height: 1.2;
+}
+
+.settings-workspace-content .settings-appearance-options strong {
+  white-space: nowrap;
+}
+
+.settings-workspace-content .settings-notification-card .settings-card-heading {
+  grid-row: 1;
+  align-self: stretch;
+}
+
+.settings-workspace-content .settings-notification-card .settings-toggle-row > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app-shell .settings-workspace-content .settings-model-section.settings-model-mode-row {

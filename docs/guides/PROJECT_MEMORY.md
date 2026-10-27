@@ -71,6 +71,7 @@
 - 逐款核查无人机的实际资源、运行支持、传感器差异和任务适用范围，简明报告哪些已验证可用、哪些仍未验证或不支持。预览可显示、模型可加载、配对兼容不能替代真实任务可用性的证明；不能默认所有展示机型均已通过验收。
 - Import map 与 Import aircraft 都必须明确导入契约：支持格式、各类文件数量、必要依赖及可省略内容；完整包不重复索取已有文件。按项提供合适的系统文件筛选和接收状态，前端维持简洁，不增加说明段落。
 - Settings / Usage history：年度热力图每格改成正方形；模块适当增高，利用底部剩余空间。按可读性适度放大文字，7 天和 30 天柱状图也增加高度，整体单屏完整排布，减少大块无意义留白。
+- 2026-10-27 Settings 与账户补充：General 的 English / 简体中文必须与 Dark / Light 使用一致的圆角矩形选项；Language、Interface、Notifications 分组标题统一字号、略放大且保持单行，具体选项统一字号，Notifications 与第一行 Allow notifications 在同一水平中线。Default Models 的 Usage history 和图表填满单屏剩余高度；Custom / BYOK 的 Model access 保持与默认模式同高，腾出的空间用于增高 Custom models。五个桌面版本共用 Supabase 账户头像，重装或更换 WebView 后仍须从共享头像存储恢复；组织成员列表中当前账号使用同一头像，不能因本地缓存缺失退化为姓名首字母。
 - Settings / Runtime：保持单屏、对齐的模块布局；现有高度下 Environment check 再补充约两项真实且有用的检测，Software updates 也整理为多条真实组件、版本或更新状态，避免大模块只放一行状态。不能为了填空增加虚构检测或重复说明文字；合理调整行高、字号与间距。
 - 默认地图范围再次纠正：当前产品只正式保留 Kumpula Campus。机场、竞技场、campus、诊所、酒店、office、triple-h 是旧 Open-RMF 演示资产；不能因为历史数据库仍标记 qualified、存在三维几何或生成了截图，就重新列为当前可用地图。Maps 与 Select Map 必须遵循当前资产目录和实际配对能力；清理旧演示版本的卡片，保留用户实际上传的地图。普通上传已收到仍应展示，但不得因此宣称已具备当前自然语言无人机任务能力。
 - Run History 等表格的着色表头用方角贴边填满，不能在单元格边缘留下圆角缺口。

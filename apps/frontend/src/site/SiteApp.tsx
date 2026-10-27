@@ -1402,7 +1402,11 @@ export function SiteApp() {
             organizationHref={experienceHref("/organization/")}
           />
         ) : sitePage === "organization" ? (
-          <OrganizationPage locale={locale} accountId={auth.account?.id ?? null} />
+          <OrganizationPage
+            locale={locale}
+            accountId={auth.account?.id ?? null}
+            accountAvatarUrl={auth.account?.avatarUrl ?? null}
+          />
         ) : sitePage === "community" ? (
           <CommunityPage
             locale={locale}

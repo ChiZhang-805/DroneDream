@@ -228,9 +228,11 @@ function OrganizationAvatar({ member, large = false }: {
 export function OrganizationPage({
   locale,
   accountId,
+  accountAvatarUrl = null,
 }: {
   locale: SiteLocale;
   accountId: string | null;
+  accountAvatarUrl?: string | null;
 }) {
   const copy = content[locale];
   const requestedPlan = (() => {
@@ -476,6 +478,11 @@ export function OrganizationPage({
     snapshot?.actor.role === "owner" || member.role === "member"
   );
 
+  const memberForDisplay = (member: OrganizationMember): OrganizationMember =>
+    member.id === accountId && accountAvatarUrl
+      ? { ...member, avatar_url: accountAvatarUrl }
+      : member;
+
   const removeMemberFromRow = async (member: OrganizationMember) => {
     if (!canRemove(member) || busy) return;
     setBusy(true);
@@ -585,7 +592,7 @@ export function OrganizationPage({
             <tbody>
               {snapshot.members.map((member) => (
                 <tr key={member.id}>
-                  <td><OrganizationAvatar member={member} /><span><strong>{member.display_name}</strong><small>{member.email}</small></span></td>
+                  <td><OrganizationAvatar member={memberForDisplay(member)} /><span><strong>{member.display_name}</strong><small>{member.email}</small></span></td>
                   <td><span className={`organization-role is-${member.role}`}>{roleLabel(member.role, copy)}</span></td>
                   <td><strong>{member.plan.toUpperCase()}</strong></td>
                   <td><EditionLicenseStrip licenses={member.licenses} locale={locale} mode="used" /></td>
@@ -622,7 +629,7 @@ export function OrganizationPage({
           if (event.target === event.currentTarget) setSelected(null);
         }}>
           <section ref={dialogRef} className="organization-member-dialog" role="dialog" aria-modal="true" aria-labelledby="organization-member-title" tabIndex={-1}>
-            <header><div><OrganizationAvatar member={selected} large /><div><h2 id="organization-member-title">{selected.display_name}</h2><span>{selected.email}</span></div></div><button ref={closeRef} type="button" aria-label={copy.close} onClick={() => setSelected(null)}><X aria-hidden="true" /></button></header>
+            <header><div><OrganizationAvatar member={memberForDisplay(selected)} large /><div><h2 id="organization-member-title">{selected.display_name}</h2><span>{selected.email}</span></div></div><button ref={closeRef} type="button" aria-label={copy.close} onClick={() => setSelected(null)}><X aria-hidden="true" /></button></header>
             <div className="organization-member-profile">
               <dl>
                 <div><dt>{copy.role}</dt><dd>{roleLabel(selected.role, copy)}</dd></div>

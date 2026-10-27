@@ -898,12 +898,14 @@ describe("AuthContext account profile", () => {
         "The profile photo could not be uploaded. Check your connection and try again.",
       );
     });
-    expect(screen.getByLabelText("avatar")).toHaveTextContent("");
+    const sharedAvatar =
+      "https://accounts.example.test/storage/v1/object/public/profile-avatars/user-1/avatar.jpg";
+    expect(screen.getByLabelText("avatar")).toHaveTextContent(sharedAvatar);
     expect(window.localStorage.getItem("drone-dream:account-avatar:user-1"))
-      .toBeNull();
+      .toContain(sharedAvatar);
   });
 
-  it("adopts an authenticated account when optional avatar storage is unavailable", async () => {
+  it("reconstructs the shared avatar URL when optional WebView storage is unavailable", async () => {
     const getItem = vi.spyOn(Storage.prototype, "getItem")
       .mockImplementation(() => {
         throw new DOMException("storage disabled", "SecurityError");
@@ -919,7 +921,9 @@ describe("AuthContext account profile", () => {
       .toHaveTextContent("pilot.name");
     expect(screen.getByLabelText("email"))
       .toHaveTextContent("pilot.name@example.com");
-    expect(screen.getByLabelText("avatar")).toHaveTextContent("");
+    expect(screen.getByLabelText("avatar")).toHaveTextContent(
+      "https://accounts.example.test/storage/v1/object/public/profile-avatars/user-1/avatar.jpg",
+    );
     getItem.mockRestore();
   });
 

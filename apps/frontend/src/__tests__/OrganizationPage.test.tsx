@@ -125,6 +125,22 @@ describe("OrganizationPage", () => {
     expect(container.querySelector(".organization-member-table")).toBeVisible();
   });
 
+  it("uses the authenticated account avatar when the organization snapshot lacks it", async () => {
+    const accountId = "22222222-2222-4222-8222-222222222222";
+    render(
+      <OrganizationPage
+        locale="en"
+        accountId={accountId}
+        accountAvatarUrl="https://accounts.example.test/current-avatar.jpg"
+      />,
+    );
+
+    const adminRow = (await screen.findByText("admin@example.test")).closest("tr");
+    expect(adminRow).not.toBeNull();
+    expect(adminRow!.querySelector(".organization-avatar img"))
+      .toHaveAttribute("src", "https://accounts.example.test/current-avatar.jpg");
+  });
+
   it("adds an existing account with an owner-selected delegated role", async () => {
     render(<OrganizationPage locale="en" accountId="user-owner" />);
     await screen.findByRole("heading", { name: "Aerial Systems Lab" });

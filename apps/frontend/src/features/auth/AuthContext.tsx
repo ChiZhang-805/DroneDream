@@ -226,7 +226,18 @@ function resolvedAvatarForUser(user: User): string | null {
     cacheAvatarForUser(user.id, metadata);
     return metadata;
   }
-  return cached;
+  if (cached) return cached;
+
+  // An installed edition may have a fresh WebView profile even though the
+  // account already owns an avatar in the shared public bucket.  Reconstruct
+  // that stable account path instead of treating missing local presentation
+  // metadata as proof that the photo does not exist.
+  if (configuration) {
+    const canonical = avatarPublicUrl(configuration.supabaseUrl, user.id);
+    cacheAvatarForUser(user.id, canonical);
+    return canonical;
+  }
+  return null;
 }
 
 function accountFromUser(user: User | null): DroneDreamAccount | null {
