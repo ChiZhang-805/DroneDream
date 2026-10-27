@@ -337,9 +337,9 @@ def verify(asset_root: Path, license_manifest_path: Path) -> dict[str, Any]:
     if index.get("schema_version") != "dronedream.bundled-assets.v3":
         raise AssetVerificationError("default asset index must use bundled-assets.v3")
     pairs = _array(index.get("qualified_pairs"), "qualified_pairs")
-    if len(pairs) != 1 or index.get("qualified_pair") != pairs[0]:
-        raise AssetVerificationError("exactly one identical active qualified pair is allowed")
-    pair = _object(pairs[0], "qualified pair")
+    pair = _object(index.get("qualified_pair"), "qualified pair")
+    if not pairs or pair not in pairs:
+        raise AssetVerificationError("the active qualified pair must be present in the catalog")
     packages = [
         _object(value, "qualified pair package")
         for value in _array(pair.get("packages"), "pair packages")
