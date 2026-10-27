@@ -876,6 +876,50 @@ pub(crate) fn registered_runtime_target() -> Result<Option<String>, String> {
     normalize_windows_target(base).map(Some)
 }
 
+#[cfg(target_os = "windows")]
+pub(crate) fn repair_runtime_registration_after_partial_move(
+    expected_old_root: &str,
+    target_root: &str,
+) -> Result<(), String> {
+    const SCRIPT: &str = r#"
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+function Normalize-Path([string]$value) {
+  [IO.Path]::GetFullPath($value).TrimEnd([char[]]@('\', '/'))
+}
+$matches = @(Get-ChildItem -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss' | Where-Object {
+  [string](Get-ItemProperty -LiteralPath $_.PSPath).DistributionName -eq $env:DRONEDREAM_RUNTIME_NAME
+})
+if ($matches.Count -ne 1) {
+  throw "Expected exactly one DroneDream Runtime registration."
+}
+$key = $matches[0]
+$current = Normalize-Path ([string](Get-ItemProperty -LiteralPath $key.PSPath).BasePath)
+$expected = Normalize-Path $env:DRONEDREAM_EXPECTED_OLD_ROOT
+$target = Normalize-Path $env:DRONEDREAM_TARGET_ROOT
+if (-not $current.Equals($expected, [StringComparison]::OrdinalIgnoreCase)) {
+  throw "Runtime registration no longer points to the expected old location."
+}
+Set-ItemProperty -LiteralPath $key.PSPath -Name BasePath -Value $target
+$updated = Normalize-Path ([string](Get-ItemProperty -LiteralPath $key.PSPath).BasePath)
+($updated.Equals($target, [StringComparison]::OrdinalIgnoreCase)) | ConvertTo-Json -Compress
+"#;
+
+    let repaired: bool = run_powershell_json(
+        SCRIPT,
+        &[
+            ("DRONEDREAM_RUNTIME_NAME", RUNTIME_NAME),
+            ("DRONEDREAM_EXPECTED_OLD_ROOT", expected_old_root),
+            ("DRONEDREAM_TARGET_ROOT", target_root),
+        ],
+        "Runtime registration repair",
+    )?;
+    if !repaired || !runtime_registration_matches_target(target_root)? {
+        return Err("WSL did not accept the repaired Runtime location.".to_string());
+    }
+    Ok(())
+}
+
 #[cfg(not(target_os = "windows"))]
 pub(crate) fn registered_runtime_target() -> Result<Option<String>, String> {
     Err("The runtime installer supports Windows only.".to_string())

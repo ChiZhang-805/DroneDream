@@ -1024,8 +1024,11 @@ pub(crate) fn consolidate_runtime_storage() -> Result<(), String> {
         let target = PathBuf::from(target);
         let old_cache = crate::runtime_cache::validate_managed_cache(&old)?;
         let new_cache = crate::runtime_cache::runtime_download_cache_root(target.to_str().ok_or("Invalid Runtime path")?);
+        let partial_move = runtime_disk_moved_to_target(&old, &target);
         for destination in [&target, &new_cache] {
-            if destination.exists() { return Err(format!("Destination already exists: {}", destination.display())); }
+            if destination.exists() && !(destination == &target && partial_move) {
+                return Err(format!("Destination already exists: {}", destination.display()));
+            }
             for parent in destination.ancestors().skip(1) {
                 if let Ok(metadata) = fs::symlink_metadata(parent) {
                     if !metadata.is_dir() || crate::runtime_cache::is_link_like(&metadata) {
@@ -1035,16 +1038,34 @@ pub(crate) fn consolidate_runtime_storage() -> Result<(), String> {
             }
         }
         ProductionWslExecutor.terminate().map_err(|error| error.message)?;
-        let before = storage_inventory(&old)?;
+        let before = if partial_move {
+            combined_storage_inventory(&old, &target)?
+        } else {
+            storage_inventory(&old)?
+        };
         let cache_before = storage_inventory(&old_cache)?;
         println!("Runtime: {} files, {} bytes; cache: {} files, {} bytes", before.len(), before.values().map(|v| v.0).sum::<u64>(), cache_before.len(), cache_before.values().map(|v| v.0).sum::<u64>());
         fs::create_dir_all(target.parent().ok_or("Missing workspace parent")?).map_err(|error| error.to_string())?;
         fs::create_dir_all(new_cache.parent().ok_or("Missing cache parent")?).map_err(|error| error.to_string())?;
-        let mut command = windows_command("wsl.exe");
-        command.args(["--manage", "DroneDreamRuntime", "--move", target.to_str().ok_or("Invalid Runtime target")?]);
-        let output = command_output(command, Duration::from_secs(300), "Runtime storage move")?;
-        if !output.status.success() {
-            return Err(format!("WSL could not move Runtime storage (exit {:?}); existing data was preserved.", output.status.code()));
+        if partial_move {
+            crate::runtime::repair_runtime_registration_after_partial_move(
+                old.to_str().ok_or("Invalid legacy Runtime path")?,
+                target.to_str().ok_or("Invalid Runtime target")?,
+            )?;
+        } else {
+            let mut command = windows_command("wsl.exe");
+            command.args(["--manage", "DroneDreamRuntime", "--move", target.to_str().ok_or("Invalid Runtime target")?]);
+            let output = command_output(command, Duration::from_secs(300), "Runtime storage move")?;
+            if !output.status.success() {
+                if runtime_disk_moved_to_target(&old, &target) {
+                    crate::runtime::repair_runtime_registration_after_partial_move(
+                        old.to_str().ok_or("Invalid legacy Runtime path")?,
+                        target.to_str().ok_or("Invalid Runtime target")?,
+                    )?;
+                } else {
+                    return Err(format!("WSL could not move Runtime storage (exit {:?}); existing data was preserved.", output.status.code()));
+                }
+            }
         }
         // WSL versions may leave the product marker beside the old VHDX location.
         if old.exists() {
@@ -1070,6 +1091,28 @@ pub(crate) fn consolidate_runtime_storage() -> Result<(), String> {
         if old.exists() { fs::remove_dir(&old).map_err(|error| error.to_string())?; }
         Ok(())
     })
+}
+
+#[cfg(target_os = "windows")]
+fn runtime_disk_moved_to_target(old: &Path, target: &Path) -> bool {
+    !old.join("ext4.vhdx").exists() && target.join("ext4.vhdx").is_file()
+}
+
+#[cfg(target_os = "windows")]
+fn combined_storage_inventory(
+    old: &Path,
+    target: &Path,
+) -> Result<std::collections::BTreeMap<PathBuf, (u64, String)>, String> {
+    let mut inventory = storage_inventory(old)?;
+    for (path, value) in storage_inventory(target)? {
+        if inventory.insert(path.clone(), value).is_some() {
+            return Err(format!(
+                "Runtime storage exists in both locations: {}",
+                path.display()
+            ));
+        }
+    }
+    Ok(inventory)
 }
 
 #[cfg(not(target_os = "windows"))]
