@@ -22,6 +22,10 @@ const recoverablePasswordMigrationUrl = new URL(
   "../../migrations/20261020031000_encrypt_recoverable_organization_join_secret.sql",
   import.meta.url,
 );
+const avatarMigrationUrl = new URL(
+  "../../migrations/20261028010000_separate_custom_profile_avatar.sql",
+  import.meta.url,
+);
 
 const migration = (
   await Promise.all([
@@ -30,6 +34,7 @@ const migration = (
     Deno.readTextFile(hierarchyMigrationUrl),
     Deno.readTextFile(passwordMigrationUrl),
     Deno.readTextFile(recoverablePasswordMigrationUrl),
+    Deno.readTextFile(avatarMigrationUrl),
   ])
 ).join("\n");
 
@@ -124,6 +129,21 @@ Deno.test("edition licenses stay explicit and compact for all five applications"
   assert(
     migration.includes("primary key (user_id, edition)"),
     "a user must have one authoritative state per edition",
+  );
+});
+
+Deno.test("custom avatars remain separate from provider metadata", () => {
+  assert(
+    migration.includes("'{dronedream_avatar_url}'"),
+    "stored profile avatars must have a dedicated metadata key",
+  );
+  assert(
+    migration.includes("raw_user_meta_data ->> 'dronedream_avatar_url'"),
+    "community avatars must prefer the dedicated custom photo",
+  );
+  assert(
+    migration.includes("raw_user_meta_data ->> 'picture'"),
+    "provider photos must remain available as fallback",
   );
 });
 

@@ -15,6 +15,13 @@ const authMock = vi.hoisted(() => ({
   updateAvatar: vi.fn(async () => undefined),
   updateDisplayName: vi.fn(async () => undefined),
   signOut: vi.fn(async () => undefined),
+  account: {
+    id: "user-1",
+    email: "pilot@example.com",
+    displayName: "pilot",
+    avatarUrl: null as string | null,
+    avatarFallbackUrl: null as string | null,
+  },
 }));
 
 vi.mock("../features/auth/AuthContext", () => ({
@@ -22,12 +29,7 @@ vi.mock("../features/auth/AuthContext", () => ({
   useAuth: () => ({
     configured: true,
     loading: false,
-    account: {
-      id: "user-1",
-      email: "pilot@example.com",
-      displayName: "pilot",
-      avatarUrl: null,
-    },
+    account: authMock.account,
     googleEnabled: false,
     githubEnabled: false,
     slackEnabled: false,
@@ -105,6 +107,8 @@ describe("workspace profile photo editor", () => {
     authMock.updateAvatar.mockClear();
     authMock.updateDisplayName.mockClear();
     authMock.signOut.mockClear();
+    authMock.account.avatarUrl = null;
+    authMock.account.avatarFallbackUrl = null;
     vi.restoreAllMocks();
     window.localStorage.clear();
     Object.defineProperty(navigator, "mediaDevices", {
@@ -154,6 +158,8 @@ describe("workspace profile photo editor", () => {
     expect(getUserMedia).not.toHaveBeenCalled();
     const dialog = openAccountDialog();
     expect(within(dialog).queryByText("DroneDream account")).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "Edit profile" })).toBeVisible();
+    expect(dialog.querySelector(".account-dialog-brand")).toBeNull();
 
     expect(within(dialog).getByText("Profile photo")).toBeVisible();
     expect(
@@ -170,6 +176,26 @@ describe("workspace profile photo editor", () => {
       within(dialog).getByRole("button", { name: "Close account" }),
     );
     await waitFor(() => expect(stop).toHaveBeenCalledTimes(1));
+
+    router.dispose();
+  });
+
+  it("uses the provider avatar when the custom Supabase object cannot load", async () => {
+    authMock.account.avatarUrl = "https://accounts.example.test/missing-avatar.jpg";
+    authMock.account.avatarFallbackUrl = "https://identity.example.test/pilot.jpg";
+    window.localStorage.setItem("drone-dream:locale", "en");
+    const { router } = renderWorkspace();
+
+    const accountButton = screen.getByRole("button", { name: "Account" });
+    const image = accountButton.querySelector<HTMLImageElement>("img");
+    expect(image).toHaveAttribute("src", authMock.account.avatarUrl);
+    fireEvent.error(image!);
+    await waitFor(() => {
+      expect(accountButton.querySelector("img")).toHaveAttribute(
+        "src",
+        authMock.account.avatarFallbackUrl,
+      );
+    });
 
     router.dispose();
   });

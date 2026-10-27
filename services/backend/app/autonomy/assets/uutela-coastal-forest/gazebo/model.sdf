@@ -1,0 +1,260 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <model name="uutela-coastal-forest">
+    <static>true</static>
+    <link name="ground">
+      <collision name="ground-collision">
+        <pose>0 0 -0.1 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>800 800 0.2</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name="orthophoto-ground">
+        <geometry>
+          <mesh>
+            <uri>meshes/uutela-coastal-forest-ground.obj</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <pbr>
+            <metal>
+              <albedo_map>materials/textures/uutela-coastal-forest-orthophoto.jpg</albedo_map>
+              <roughness>1.0</roughness>
+            </metal>
+          </pbr>
+        </material>
+      </visual>
+    </link>
+    <link name="building-visuals">
+      <visual name="registered-building-visuals">
+        <geometry>
+          <mesh>
+            <uri>meshes/uutela-coastal-forest-buildings.obj</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+    <link name="building-collision-0000">
+      <collision name="1023840133-0-collision">
+        <pose>285.0478 -294.9869 3.4 0 0 -0.94596997</pose>
+        <geometry>
+          <box>
+            <size>16.8479 16.3017 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0001">
+      <collision name="1023840144-0-collision">
+        <pose>288.0782 -243.1139 3.4 0 0 -1.16869724</pose>
+        <geometry>
+          <box>
+            <size>9.6289 4.9083 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0002">
+      <collision name="1023840155-0-collision">
+        <pose>242.5501 -274.3209 2.0 0 0 2.0924937</pose>
+        <geometry>
+          <box>
+            <size>7.091 5.4999 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0003">
+      <collision name="1023840166-0-collision">
+        <pose>321.9979 -265.6169 2.0 0 0 -3.08920124</pose>
+        <geometry>
+          <box>
+            <size>10.5371 6.1769 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0004">
+      <collision name="1023840188-0-collision">
+        <pose>233.9919 -283.1704 2.0 0 0 -1.04243532</pose>
+        <geometry>
+          <box>
+            <size>7.7156 4.9996 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0005">
+      <collision name="1023840454-0-collision">
+        <pose>198.2513 -385.647 3.4 0 0 -2.93157857</pose>
+        <geometry>
+          <box>
+            <size>13.4054 9.9936 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0006">
+      <collision name="1023840465-0-collision">
+        <pose>135.7215 -347.5867 3.4 0 0 1.8329081</pose>
+        <geometry>
+          <box>
+            <size>7.7778 6.7729 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0007">
+      <collision name="103797699V-0-collision">
+        <pose>270.0577 -349.5031 2.0 0 0 -1.77775277</pose>
+        <geometry>
+          <box>
+            <size>11.0184 6.221 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0008">
+      <collision name="835592-0-collision">
+        <pose>152.048 -381.9593 3.4 0 0 1.67947241</pose>
+        <geometry>
+          <box>
+            <size>5.3757 4.0707 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0009">
+      <collision name="835593-0-collision">
+        <pose>303.9122 -223.5946 3.4 0 0 0.42069506</pose>
+        <geometry>
+          <box>
+            <size>4.1935 3.9993 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0010">
+      <collision name="835597-0-collision">
+        <pose>190.9661 -359.1256 3.4 0 0 -1.55136224</pose>
+        <geometry>
+          <box>
+            <size>4.8283 2.9831 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0011">
+      <collision name="835598-0-collision">
+        <pose>-2.4859 -393.8806 3.4 0 0 1.40483463</pose>
+        <geometry>
+          <box>
+            <size>5.7774 3.4616 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0012">
+      <collision name="835612-0-collision">
+        <pose>102.1861 -258.513 3.4 0 0 -0.5298301</pose>
+        <geometry>
+          <box>
+            <size>3.7883 3.2904 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0013">
+      <collision name="835617-0-collision">
+        <pose>182.0163 -364.9815 3.4 0 0 -3.11200392</pose>
+        <geometry>
+          <box>
+            <size>5.9316 3.8375 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0014">
+      <collision name="835618-0-collision">
+        <pose>59.3609 -398.8765 3.4 0 0 -0.30167594</pose>
+        <geometry>
+          <box>
+            <size>6.2542 4.2995 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0015">
+      <collision name="835621-0-collision">
+        <pose>394.2303 -373.1234 3.4 0 0 -1.20830724</pose>
+        <geometry>
+          <box>
+            <size>5.5704 5.0567 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0016">
+      <collision name="835626-0-collision">
+        <pose>269.3703 -160.9697 3.4 0 0 -2.12130447</pose>
+        <geometry>
+          <box>
+            <size>8.8765 5.4204 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0017">
+      <collision name="835632-0-collision">
+        <pose>176.7619 -235.3857 3.4 0 0 2.77724082</pose>
+        <geometry>
+          <box>
+            <size>7.7694 4.0763 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0018">
+      <collision name="836997-0-collision">
+        <pose>350.0353 251.1571 3.4 0 0 -1.01114532</pose>
+        <geometry>
+          <box>
+            <size>4.721 3.9578 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0019">
+      <collision name="837002-0-collision">
+        <pose>107.5985 89.9073 3.4 0 0 2.82763162</pose>
+        <geometry>
+          <box>
+            <size>4.2415 3.6592 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0020">
+      <collision name="837011-0-collision">
+        <pose>145.2624 51.6375 3.4 0 0 -0.20563278</pose>
+        <geometry>
+          <box>
+            <size>11.6569 5.5829 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0021">
+      <collision name="875511-0-collision">
+        <pose>242.8696 -235.3042 3.4 0 0 2.18936382</pose>
+        <geometry>
+          <box>
+            <size>7.2457 4.1873 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

@@ -28,10 +28,10 @@ function external(id: string, name: string, kind: "map" | "vehicle" = "map"): Au
 }
 
 describe("asset card presentation", () => {
-  it("ships one verified real default map and one admitted aircraft before the runtime responds", () => {
-    expect(catalogAssetDefinitions("map")).toHaveLength(1);
+  it("ships six verified real default maps and one admitted aircraft before the runtime responds", () => {
+    expect(catalogAssetDefinitions("map")).toHaveLength(6);
     expect(catalogAssetDefinitions("vehicle")).toHaveLength(1);
-    expect(new Set(catalogAssetDefinitions("map").map((item) => item.key)).size).toBe(1);
+    expect(new Set(catalogAssetDefinitions("map").map((item) => item.key)).size).toBe(6);
     expect(new Set(catalogAssetDefinitions("vehicle").map((item) => item.key)).size).toBe(1);
   });
 
@@ -72,7 +72,7 @@ describe("asset card presentation", () => {
   it("ships every reviewed preview referenced by the presentation catalog", () => {
     const manifestPath = join(process.cwd(), "public", "asset-previews", "manifest.json");
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { files: Array<{ path: string }> };
-    expect(manifest.files).toHaveLength(15);
+    expect(manifest.files).toHaveLength(25);
     for (const entry of manifest.files) {
       expect(existsSync(join(process.cwd(), "public", "asset-previews", entry.path))).toBe(true);
     }

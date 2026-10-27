@@ -14,6 +14,26 @@ const MAPS: Array<{ resourceId: string; name: LocalizedName }> = [
     resourceId: "dronedream-school-map",
     name: { "zh-CN": "赫尔辛基大学昆普拉校区", "en-US": "Kumpula Campus" },
   },
+  {
+    resourceId: "dronedream-meilahti-hospital-map",
+    name: { "zh-CN": "梅拉赫蒂医院园区", "en-US": "Meilahti Hospital Campus" },
+  },
+  {
+    resourceId: "dronedream-kalasatama-waterfront-map",
+    name: { "zh-CN": "卡拉萨塔马滨水区", "en-US": "Kalasatama Waterfront" },
+  },
+  {
+    resourceId: "dronedream-vuosaari-harbour-map",
+    name: { "zh-CN": "沃萨里港", "en-US": "Vuosaari Harbour" },
+  },
+  {
+    resourceId: "dronedream-suomenlinna-map",
+    name: { "zh-CN": "芬兰堡海上要塞", "en-US": "Suomenlinna Sea Fortress" },
+  },
+  {
+    resourceId: "dronedream-uutela-coastal-forest-map",
+    name: { "zh-CN": "乌特拉海岸森林", "en-US": "Uutela Coastal Forest" },
+  },
 ];
 
 const VEHICLES: Array<{ resourceId: string; name: LocalizedName; vehicleClass: "multicopter" | "vtol" }> = [
@@ -21,14 +41,24 @@ const VEHICLES: Array<{ resourceId: string; name: LocalizedName; vehicleClass: "
 
 ];
 
-const OUTDOOR_VTOL_MAPS = new Set(["dronedream-school-map"]);
+const OUTDOOR_VTOL_MAPS = new Set(MAPS.map((map) => map.resourceId));
 
 const QUALIFIED_MAP_ASSET_IDS: Record<string, string> = {
   "dronedream-school-map": "dronedream.school-map.v1",
+  "dronedream-meilahti-hospital-map": "dronedream.meilahti-hospital-map.v1",
+  "dronedream-kalasatama-waterfront-map": "dronedream.kalasatama-waterfront-map.v1",
+  "dronedream-vuosaari-harbour-map": "dronedream.vuosaari-harbour-map.v1",
+  "dronedream-suomenlinna-map": "dronedream.suomenlinna-map.v1",
+  "dronedream-uutela-coastal-forest-map": "dronedream.uutela-coastal-forest-map.v1",
 };
 
 const QUALIFICATION_IDS: Record<string, string> = {
-  "dronedream-school-map": "asset-qualification-57aa3819b5591401b2a92387",
+  "dronedream-school-map": "asset-qualification-e6b4e5d8d596851ee549d46a",
+  "dronedream-meilahti-hospital-map": "asset-qualification-6fb9cd6b77569fecb298c000",
+  "dronedream-kalasatama-waterfront-map": "asset-qualification-d2fb2947d03555333fc64ac4",
+  "dronedream-vuosaari-harbour-map": "asset-qualification-94994abb257e999e2f0805f6",
+  "dronedream-suomenlinna-map": "asset-qualification-49de1e9af06907248637e4be",
+  "dronedream-uutela-coastal-forest-map": "asset-qualification-23d9556be930ad2c8f3a4ce0",
 };
 
 function fallbackPair(map: (typeof MAPS)[number], vehicle: (typeof VEHICLES)[number]): AgentCoreAssetPairCatalogEntry {
@@ -61,7 +91,7 @@ const FALLBACK_PAIRS = MAPS.flatMap((map) => VEHICLES.map((vehicle) => fallbackP
 
 export const FALLBACK_ASSET_PAIR_CATALOG: AgentCoreAssetPairCatalog = {
   schema_version: "dronedream.asset-pair-catalog.v1",
-  catalog_revision: "frontend-fallback-2026-10-13.1",
+  catalog_revision: "frontend-fallback-2026-10-27.1",
   map_count: MAPS.length,
   vehicle_count: VEHICLES.length,
   pair_count: FALLBACK_PAIRS.length,

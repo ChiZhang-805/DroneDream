@@ -15,10 +15,10 @@ describe("asset pair selection", () => {
     expect(selectedPair(olderCatalog, "dronedream-school-map", "px4-x500-flow")).toBeNull();
   });
   it("shows all assets while both selections are empty", () => {
-    expect(compatibleMapChoices(FALLBACK_ASSET_PAIR_CATALOG, null)).toHaveLength(1);
+    expect(compatibleMapChoices(FALLBACK_ASSET_PAIR_CATALOG, null)).toHaveLength(6);
     expect(compatibleAircraftChoices(FALLBACK_ASSET_PAIR_CATALOG, null)).toHaveLength(1);
-    expect(FALLBACK_ASSET_PAIR_CATALOG.pair_count).toBe(1);
-    expect(FALLBACK_ASSET_PAIR_CATALOG.counts).toEqual({ qualified_builtin: 1, compatible_requires_qualification: 0, incompatible: 0 });
+    expect(FALLBACK_ASSET_PAIR_CATALOG.pair_count).toBe(6);
+    expect(FALLBACK_ASSET_PAIR_CATALOG.counts).toEqual({ qualified_builtin: 6, compatible_requires_qualification: 0, incompatible: 0 });
   });
 
   it("only lists the admitted aircraft for the outdoor campus", () => {
@@ -36,6 +36,19 @@ describe("asset pair selection", () => {
   it("reports the default qualified map and aircraft pair", () => {
     const pair = selectedPair(FALLBACK_ASSET_PAIR_CATALOG, "dronedream-school-map", "px4-x500-depth");
     expect(pair?.status).toBe("qualified_builtin");
-    expect(pair?.qualification_id).toBe("asset-qualification-57aa3819b5591401b2a92387");
+    expect(pair?.qualification_id).toBe("asset-qualification-e6b4e5d8d596851ee549d46a");
+  });
+
+  it("keeps every Helsinki map bound to its exact qualified package", () => {
+    const choices = compatibleMapChoices(FALLBACK_ASSET_PAIR_CATALOG, "px4-x500-depth");
+    expect(choices.map((choice) => choice.resourceId)).toEqual([
+      "dronedream-school-map",
+      "dronedream-meilahti-hospital-map",
+      "dronedream-kalasatama-waterfront-map",
+      "dronedream-vuosaari-harbour-map",
+      "dronedream-suomenlinna-map",
+      "dronedream-uutela-coastal-forest-map",
+    ]);
+    expect(choices.every((choice) => choice.qualifiedPairCount === 1)).toBe(true);
   });
 });

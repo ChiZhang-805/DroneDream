@@ -1272,7 +1272,10 @@ def _prepare_isolated_px4_rootfs(px4_root: Path, run_dir: Path) -> tuple[Path, P
     # The executable resolves the default etc/init.d-posix/rcS relative to the
     # rootfs argument, so an isolated run must copy the pinned build's ``etc``
     # tree as well as the clean mutable state directory.
-    shutil.copytree(source_etc, trial_rootfs / "etc", symlinks=False)
+    # Newer PX4 builds also place an ``etc`` directory inside rootfs.  Merge
+    # the generated startup tree into the clean Trial copy instead of failing
+    # merely because that parent already exists.
+    shutil.copytree(source_etc, trial_rootfs / "etc", symlinks=False, dirs_exist_ok=True)
     _write_json(
         run_dir / "px4_state_policy.json",
         {

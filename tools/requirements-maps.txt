@@ -1,0 +1,4 @@
+Pillow>=11,<13
+pyproj>=3.7,<4
+requests>=2.32,<3
+shapely>=2.1,<3

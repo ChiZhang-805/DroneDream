@@ -1,93 +1,143 @@
 {
-  "schema_version": "dronedream.resource-card-previews.v1",
-  "generator": "scripts/build-kumpula-campus-map.py",
-  "sources": {
-    "maps": {
-      "project": "City of Helsinki Open Data / OpenStreetMap contributors",
-      "retrieved_at": "2026-10-10",
-      "license": "CC-BY-4.0 AND ODbL-1.0"
-    },
-    "vehicles": {
-      "project": "PX4/PX4-gazebo-models",
-      "commit": "5577035667afb4b63fe1f966fb1a58bbb05d905b",
-      "license": "BSD-3-Clause"
-    }
-  },
   "files": [
     {
-      "path": "maps/kumpula-campus.webp",
-      "bytes": 128706,
-      "sha256": "281ac64bc67c69ed1379f943f8e0eefef499c135aee19f20f245146c12efba02"
+      "bytes": 759399,
+      "path": "maps/kalasatama-waterfront-source.jpg",
+      "sha256": "f238ec7938709ae1ff68bfde9e2c5ebaa997afae0ee9112618bc1ec085f87f22"
     },
     {
-      "path": "maps/kumpula-campus-source.jpg",
+      "bytes": 141680,
+      "path": "maps/kalasatama-waterfront.webp",
+      "sha256": "ffde4a8edd61f03b97e04565f842c21b66d304ef6106984af0e09d43065e6ed8"
+    },
+    {
       "bytes": 991877,
+      "path": "maps/kumpula-campus-source.jpg",
       "sha256": "fd0b265197509350ab423a3f199e2079f302b2dbf98b220478b61bccd5d5db7b"
     },
     {
-      "path": "vehicles/quadtailsitter.webp",
+      "bytes": 128706,
+      "path": "maps/kumpula-campus.webp",
+      "sha256": "281ac64bc67c69ed1379f943f8e0eefef499c135aee19f20f245146c12efba02"
+    },
+    {
+      "bytes": 975823,
+      "path": "maps/meilahti-hospital-campus-source.jpg",
+      "sha256": "51dea11c4329ff73d4dadc6e2fd6ec524b3aa1a7f99182655bd2897cb481d401"
+    },
+    {
+      "bytes": 156844,
+      "path": "maps/meilahti-hospital-campus.webp",
+      "sha256": "7df5b0bdeaa5dc60897528b4a37f150174a78fe4659e14536710e54884d21abf"
+    },
+    {
+      "bytes": 771756,
+      "path": "maps/suomenlinna-sea-fortress-source.jpg",
+      "sha256": "26fa385660207d7a41747261bd67f293950361f697bc63f0527d1902354bdb8a"
+    },
+    {
+      "bytes": 133904,
+      "path": "maps/suomenlinna-sea-fortress.webp",
+      "sha256": "f1d2d5be3ac9b78147107d947cc4c5b49f79e6459a7629f2429868e61278bfc9"
+    },
+    {
+      "bytes": 704639,
+      "path": "maps/uutela-coastal-forest-source.jpg",
+      "sha256": "9941ca06e11c368e69a69b8751c1f80696102331f184ae546705b743ee5a284d"
+    },
+    {
+      "bytes": 114662,
+      "path": "maps/uutela-coastal-forest.webp",
+      "sha256": "3435498fdcbbad71bf64dd3280ec059094be2aa1a2d00380986603c3a92e1f0d"
+    },
+    {
+      "bytes": 889155,
+      "path": "maps/vuosaari-harbour-source.jpg",
+      "sha256": "e908f5f97efca6f79393a1f691740929e177418581d2f6158c8b37d54b3d826a"
+    },
+    {
+      "bytes": 137914,
+      "path": "maps/vuosaari-harbour.webp",
+      "sha256": "30ab50685b9859bb3b509d3b1f8a8c32f98e57a6d605aaa20fa4488d3cebc3f1"
+    },
+    {
       "bytes": 3762,
+      "path": "vehicles/quadtailsitter.webp",
       "sha256": "b16dfffcb58f112ab84d44a2107eba964843de934c45b3145e83c047555d5cc0"
     },
     {
-      "path": "vehicles/standard-vtol.webp",
       "bytes": 6030,
+      "path": "vehicles/standard-vtol.webp",
       "sha256": "78ad19fa6554b128da7f6525b072cd15e9749bd157d1e642bfd9c6ccf6c52bd9"
     },
     {
-      "path": "vehicles/tiltrotor.webp",
       "bytes": 5458,
+      "path": "vehicles/tiltrotor.webp",
       "sha256": "bef1fefcb234e55de50a44c44857c8e82d00762658294531ec396fc91f0f40eb"
     },
     {
-      "path": "vehicles/x500-depth.webp",
       "bytes": 6830,
+      "path": "vehicles/x500-depth.webp",
       "sha256": "ae19f8f81b492901a1670d259966866bff45ca90b0a9aaa744035ae9199eba02"
     },
     {
-      "path": "vehicles/x500-flow.webp",
       "bytes": 6974,
+      "path": "vehicles/x500-flow.webp",
       "sha256": "fc88263a5733d362c35c8aa96ee62b9a662c28f3b2f2b2b173dc1169b1417f6d"
     },
     {
-      "path": "vehicles/x500-gimbal.webp",
       "bytes": 7216,
+      "path": "vehicles/x500-gimbal.webp",
       "sha256": "96c0ac0ee5384f3034f40b2215bc5fb1c1f3eee23e6942f601ae2fca311548c7"
     },
     {
-      "path": "vehicles/x500-lidar-2d.webp",
       "bytes": 6916,
+      "path": "vehicles/x500-lidar-2d.webp",
       "sha256": "dcc3b94ea200c92652644548d48d450e5f57fb48295f794824d79ba89667a215"
     },
     {
-      "path": "vehicles/x500-lidar-down.webp",
       "bytes": 6896,
+      "path": "vehicles/x500-lidar-down.webp",
       "sha256": "8b47a7a4f69924f3eefdfd8a977d4d090f4ca0bd459a8f7af53fd18e521f2512"
     },
     {
-      "path": "vehicles/x500-lidar-front.webp",
       "bytes": 6834,
+      "path": "vehicles/x500-lidar-front.webp",
       "sha256": "d1490c467f7e6e579aa85808764d7cd6a661d3c5a71d20f4d33567b04a725004"
     },
     {
-      "path": "vehicles/x500-mono-down.webp",
       "bytes": 7042,
+      "path": "vehicles/x500-mono-down.webp",
       "sha256": "f30116c16fd352c50ff3ac1ce226e0f8b6ca05676b3a01efe56ea8a02d186c7f"
     },
     {
-      "path": "vehicles/x500-mono-front.webp",
       "bytes": 6900,
+      "path": "vehicles/x500-mono-front.webp",
       "sha256": "3634c3c639d8ce43d0aa056c569aa2ed851246d5ef95402c714ed8473ad11384"
     },
     {
-      "path": "vehicles/x500-vision.webp",
       "bytes": 6878,
+      "path": "vehicles/x500-vision.webp",
       "sha256": "3f5aad2c9092633d5acb7aca3433706f2feeeb9289f44ade90927a9bcee9ef15"
     },
     {
-      "path": "vehicles/x500.webp",
       "bytes": 6878,
+      "path": "vehicles/x500.webp",
       "sha256": "3f5aad2c9092633d5acb7aca3433706f2feeeb9289f44ade90927a9bcee9ef15"
     }
-  ]
+  ],
+  "generator": "tools/build-helsinki-maps.py",
+  "schema_version": "dronedream.resource-card-previews.v1",
+  "sources": {
+    "maps": {
+      "license": "CC-BY-4.0",
+      "project": "City of Helsinki Open Data",
+      "retrieved_at": "2026-10-27"
+    },
+    "vehicles": {
+      "commit": "5577035667afb4b63fe1f966fb1a58bbb05d905b",
+      "license": "BSD-3-Clause",
+      "project": "PX4/PX4-gazebo-models"
+    }
+  }
 }

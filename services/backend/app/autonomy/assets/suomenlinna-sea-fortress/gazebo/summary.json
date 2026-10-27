@@ -1,0 +1,48 @@
+{
+  "asset_id": "dronedream.suomenlinna-map.v1",
+  "bounds_m": {
+    "x": 700,
+    "y": 700,
+    "z": 45
+  },
+  "building_count": 135,
+  "building_handoff_count": 135,
+  "collision_primitive_count": 304,
+  "fidelity": {
+    "building_collisions": "conservative-oriented-boxes",
+    "building_visuals": "city-register-footprint-extrusions",
+    "forest_restrictions": "city-ecological-network-polygons",
+    "interior_geometry": false,
+    "qualified_routes": 0,
+    "scope": "outdoor-exterior-only",
+    "terrain": "registered-orthophoto-plane",
+    "tree_collisions": "city-tree-register-canopy-cylinders"
+  },
+  "forest_region_count": 0,
+  "name": "Suomenlinna Sea Fortress",
+  "resolution_m": 0.34,
+  "road_edge_count": 661,
+  "road_node_count": 670,
+  "schema_version": "dronedream.helsinki-map-summary.v1",
+  "source_kind": "real-geospatial-data",
+  "sources": {
+    "building_register_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wfs",
+    "buildings_sha256": "ad5a2b432f20739bc934e0556a53487e1659bedf6f10e68a2deb8ed76fc3ff05",
+    "city_data_license": "CC-BY-4.0",
+    "city_data_owner": "City of Helsinki",
+    "ecological_network_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wfs",
+    "forest_sha256": "592a048408d2ff8900094e146825f1feb33aee6e6928439ce618fe6bcf600df8",
+    "orthophoto_layer": "avoindata:Ortoilmakuva_2026_5cm",
+    "orthophoto_sha256": "63c8b870d749f8d7e7f588b06fc04bfa7e8e00e52b77c86e7a2732b0050a9ba4",
+    "orthophoto_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wms",
+    "retrieved_at": "2026-10-27",
+    "road_register_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wfs",
+    "roads_sha256": "51286ad44425211623f7ad474df4b18232f3471eb180357d2ff4b99fe1f5c16c",
+    "subject_source_page": "https://suomenlinna.fi/en/area-and-buildings/",
+    "tree_register_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wfs",
+    "trees_sha256": "2438acd69fc260ce048055cea631886cd236f870a7b931dec79438cecf0800f4"
+  },
+  "tree_collision_count": 168,
+  "tree_source_count": 168,
+  "visual_primitive_count": 136
+}

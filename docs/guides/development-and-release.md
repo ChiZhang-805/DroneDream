@@ -93,7 +93,17 @@ Go to the building where the computer science labs are and collect the package.
 - 核心收据：`TestRuns/Natural-Language-E2E-20261013/installed-agent-build1956-english-chemistry-full-pass-r17.json`。
 - 五版本安装收据：`TestRuns/Natural-Language-E2E-20261013/five-edition-installed-build1956.json`。
 
-此外，X500 Depth 已通过 Kumpula 建筑间长距离低空通道往返；内置资产现行资格包回执为 `asset-qualification-daa2b60cd02725d65b803eba`。
+此外，X500 Depth 已通过 Kumpula 建筑间长距离低空通道往返；内置 Kumpula 配对的现行资格包回执为 `asset-qualification-e6b4e5d8d596851ee549d46a`。
+
+2026-10-27 新增五张赫尔辛基地图均使用真实 Gazebo Harmonic 8.15.0、PX4 SITL 和 X500 Depth 完成一条代表性室外往返路线，全部返航、落地且危险碰撞为 0：
+
+- Meilahti Hospital Campus：39 个航路点、387.701 米、16,204 个位姿样本；回执 `asset-qualification-6fb9cd6b77569fecb298c000`。
+- Kalasatama Waterfront：37 个航路点、648.567 米、19,221 个位姿样本；回执 `asset-qualification-d2fb2947d03555333fc64ac4`。
+- Vuosaari Harbour：9 个航路点、373.380 米、8,763 个位姿样本；回执 `asset-qualification-94994abb257e999e2f0805f6`。
+- Suomenlinna Sea Fortress：75 个航路点、404.470 米、23,382 个位姿样本；回执 `asset-qualification-49de1e9af06907248637e4be`。
+- Uutela Coastal Forest：97 个航路点、432.524 米、26,869 个位姿样本；回执 `asset-qualification-23d9556be930ad2c8f3a4ce0`。
+
+这五条资格证明的是各自正式地图包、X500 Depth 精确包和对应代表性路线的物理可执行性，不等于 411 个建筑交接点、任意自然语言任务或全部动态障碍条件均已逐点飞行验证。
 
 这些证据支持当前 Kumpula 室外地图、X500 Depth、指定取送往返和已验证语言流程。它们不证明任意地图、室内走廊、动态人群、真实载荷、持续模型短时驾驶、硬件在环或真机已经通用可用。
 

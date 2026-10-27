@@ -92,7 +92,9 @@ describe("FieldRoot", () => {
     expect(container.querySelector(".launcher-chrome")).toHaveAttribute("aria-hidden", "true");
     expect(container.querySelector(".launcher-main")).toHaveAttribute("aria-hidden", "true");
     expect((container.querySelector(".launcher-main") as HTMLElement).inert).toBe(true);
-    fireEvent.click(screen.getByRole("button", { name: "All settings" }));
+    expect(screen.queryByRole("button", { name: "All settings" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Runtime/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Models/ }));
     const settingsWorkspace = screen.getByRole("region", { name: "Settings" });
     expect(settingsWorkspace).toHaveAttribute("data-settings-consumer", "field");
     expect(screen.getByRole("tablist", { name: "Settings" }))

@@ -38,6 +38,7 @@ export interface DroneDreamAccount {
   email: string | null;
   displayName: string;
   avatarUrl: string | null;
+  avatarFallbackUrl?: string | null;
 }
 
 interface AuthContextValue {
@@ -114,6 +115,7 @@ const AVATAR_STORAGE_PREFIX = "drone-dream:account-avatar:";
 const MAX_AVATAR_DATA_URL_LENGTH = 600_000;
 const PROFILE_AVATAR_BUCKET = "profile-avatars";
 const PROFILE_AVATAR_FILE = "avatar.jpg";
+const PROFILE_AVATAR_METADATA_KEY = "dronedream_avatar_url";
 
 function shouldDeferDesktopAuth(): boolean {
   // Tauri uses a hash router and initially mounts the provider at `/` before
@@ -193,18 +195,30 @@ function localAvatarForUser(userId: string): string | null {
   }
 }
 
-function metadataAvatar(user: User): string | null {
-  // Limit display schemes while preserving provider-supplied profile pictures.
-  const candidate = user.user_metadata.avatar_url ?? user.user_metadata.picture;
+function validAvatarUrl(candidate: unknown): string | null {
   return typeof candidate === "string" &&
     (candidate.startsWith("https://") || candidate.startsWith("data:image/"))
     ? candidate
     : null;
 }
 
+function metadataAvatar(user: User): string | null {
+  // Keep the user-selected DroneDream photo separate from identity-provider
+  // metadata. OAuth providers commonly refresh `avatar_url` and `picture`.
+  return validAvatarUrl(user.user_metadata[PROFILE_AVATAR_METADATA_KEY]);
+}
+
+function providerAvatar(user: User): string | null {
+  // Providers do not agree on one field name, so both provider-owned fields
+  // remain valid fallbacks without duplicating the DroneDream custom value.
+  return validAvatarUrl(user.user_metadata.picture) ??
+    validAvatarUrl(user.user_metadata.avatar_url);
+}
+
 function resolvedAvatarForUser(user: User): string | null {
   // Prefer current cloud metadata over a possibly stale WebView cache.
   const metadata = metadataAvatar(user);
+  const provider = providerAvatar(user);
   const cached = localAvatarForUser(user.id);
   const configuration = browserAuthConfiguration();
 
@@ -225,6 +239,10 @@ function resolvedAvatarForUser(user: User): string | null {
   if (metadata) {
     cacheAvatarForUser(user.id, metadata);
     return metadata;
+  }
+  if (provider) {
+    cacheAvatarForUser(user.id, provider);
+    return provider;
   }
   if (cached) return cached;
 
@@ -257,6 +275,7 @@ function accountFromUser(user: User | null): DroneDreamAccount | null {
     email: user.email ?? null,
     displayName,
     avatarUrl: resolvedAvatarForUser(user),
+    avatarFallbackUrl: providerAvatar(user),
   };
 }
 
@@ -748,7 +767,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               Authorization: `Bearer ${accessToken}`,
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ data: { avatar_url: nextAvatarUrl } }),
+            body: JSON.stringify({
+              data: { [PROFILE_AVATAR_METADATA_KEY]: nextAvatarUrl },
+            }),
           },
         );
       } catch {
@@ -779,7 +800,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       assertProfileOwner(currentAccount.id, generation);
       const { data, error } = await client.auth.updateUser({
-        data: { avatar_url: nextAvatarUrl },
+        data: { [PROFILE_AVATAR_METADATA_KEY]: nextAvatarUrl },
       });
       if (error) throw error;
       assertProfileOwner(currentAccount.id, generation);

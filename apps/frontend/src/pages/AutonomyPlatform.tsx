@@ -178,6 +178,7 @@ type WorkspaceContext = {
   persist: (next: AutonomyWorkspaceState) => void;
   selectAircraft: (aircraftId: string) => void;
   selectMap: (mapId: string) => void;
+  selectCatalogMap: (resourceId: string) => Promise<boolean>;
   registerExternalAsset: (
     version: AgentCoreAssetVersion,
     qualificationId?: string | null,
@@ -1318,6 +1319,23 @@ export function AutonomyPlatform() {
     }));
   }, [assetLibrary.maps, persist, workspace]);
 
+  const selectCatalogMap = useCallback(async (resourceId: string) => {
+    try {
+      const catalog = await getAgentCoreAssetPairCatalog();
+      const pair = catalog.pairs.find((candidate) => (
+        candidate.map_resource_id === resourceId
+        && candidate.vehicle_resource_id === "px4-x500-depth"
+        && candidate.status === "qualified_builtin"
+      ));
+      if (!pair) return false;
+      const next = await bindCatalogAssetPair(workspace, assetLibrary, pair);
+      persist(next);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [assetLibrary, persist, workspace]);
+
   const removeAsset = useCallback((
     kind: "aircraft" | "map" | "external",
     id: string,
@@ -1447,6 +1465,7 @@ export function AutonomyPlatform() {
           persist,
           selectAircraft,
           selectMap,
+          selectCatalogMap,
           registerExternalAsset,
           bindQualifiedAssetPair,
           agentCorePlugins,
@@ -2764,13 +2783,16 @@ export function AutonomyMaps() {
     removeAsset,
     assetLibrary,
     selectMap,
+    selectCatalogMap,
   } = useAutonomyWorkspace();
   const [details, setDetails] = useState<RepositoryDetails | null>(null);
   const [selectedRepositoryMapId, setSelectedRepositoryMapId] = useState<string | null>(null);
   const [defaultResources, setDefaultResources] = useState<AgentCoreMapResource[]>([]);
-  const catalogDefinitions = catalogAssetDefinitions("map").filter(
-    (definition) => definition.key === "kumpula-campus" && !(assetLibrary.removedMapIds ?? []).includes("dronedream.school-map.v1"),
-  );
+  const removedMapIds = assetLibrary.removedMapIds ?? [];
+  const catalogDefinitions = catalogAssetDefinitions("map").filter((definition) => (
+    !removedMapIds.includes(definition.resourceId)
+    && !(definition.assetId && removedMapIds.includes(definition.assetId))
+  ));
   const openMapDetails = useCallback((
     mapPack: AutonomyMapPack,
     resource: AgentCoreMapResource | undefined,
@@ -2785,7 +2807,7 @@ export function AutonomyMaps() {
       [chinese ? "分辨率" : "Resolution", `${mapPack.resolutionM} m`],
       [chinese ? "建筑" : "Buildings", String(resource?.analysis.building_count ?? resource?.analysis.model_count ?? "—")],
       [chinese ? "范围" : "Size", `${mapPack.boundsM.x} × ${mapPack.boundsM.y} × ${mapPack.boundsM.z} m`],
-      [chinese ? "来源" : "Source", resource?.source.source_type === "bundled_ddpkg" ? "Helsinki · OpenStreetMap" : resource?.source.source_type ?? "DroneDream"],
+      [chinese ? "来源" : "Source", resource?.analysis.source_page ?? (resource?.source.source_type === "bundled_ddpkg" ? "City of Helsinki open data" : resource?.source.source_type ?? "DroneDream")],
     ],
   }), [chinese]);
 
@@ -2806,7 +2828,9 @@ export function AutonomyMaps() {
     rows: [
       [chinese ? "建筑" : "Buildings", String(resource.analysis.building_count ?? resource.analysis.model_count ?? 0)],
       [chinese ? "坐标系" : "Coordinates", resource.analysis.coordinate_frame ?? "—"],
-      [chinese ? "来源" : "Source", resource.source.source_type === "bundled_ddpkg" ? "Helsinki · OpenStreetMap" : resource.source.source_type],
+      [chinese ? "分辨率" : "Resolution", typeof resource.analysis.resolution_m === "number" ? `${resource.analysis.resolution_m} m` : "—"],
+      [chinese ? "范围" : "Size", resource.analysis.bounds_m ? `${resource.analysis.bounds_m.x} × ${resource.analysis.bounds_m.y} × ${resource.analysis.bounds_m.z} m` : "—"],
+      [chinese ? "来源" : "Source", resource.analysis.source_page ?? (resource.source.source_type === "bundled_ddpkg" ? "City of Helsinki open data" : resource.source.source_type)],
       [chinese ? "许可" : "License", resource.license.spdx_id],
     ],
   });
@@ -2836,7 +2860,7 @@ export function AutonomyMaps() {
           return <article
             key={definition.key}
             data-catalog-resource="true"
-            data-selected={Boolean(mapPack && selectedRepositoryMapId === mapPack.id)}
+            data-selected={selectedRepositoryMapId === (mapPack?.id ?? definition.resourceId)}
           >
             <button
               type="button"
@@ -2845,6 +2869,10 @@ export function AutonomyMaps() {
                 if (mapPack) {
                   setSelectedRepositoryMapId(mapPack.id);
                   selectMap(mapPack.id);
+                } else {
+                  void selectCatalogMap(definition.resourceId).then((selected) => {
+                    if (selected) setSelectedRepositoryMapId(definition.resourceId);
+                  });
                 }
               }}
               onDoubleClick={() => {
@@ -2856,7 +2884,7 @@ export function AutonomyMaps() {
               <RepositoryAssetPreview kind="map" previewUrl={presentation.previewUrl} previewKey={presentation.key} name={presentation.name} />
               <span className="autonomy-repository-copy"><strong title={presentation.name}>{presentation.name}</strong></span>
             </button>
-            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? "删除地图" : "Delete map"} onClick={() => removeAsset("map", mapPack?.agentCoreAssetId || "dronedream.school-map.v1")}><Trash2 aria-hidden="true" /></button>
+            <button type="button" className="autonomy-repository-delete" aria-label={chinese ? "删除地图" : "Delete map"} onClick={() => removeAsset("map", mapPack?.agentCoreAssetId || definition.assetId || definition.resourceId)}><Trash2 aria-hidden="true" /></button>
           </article>;
         })}
         {unrepresentedExternalAssets("map", catalogDefinitions.map((item) => ({ id: item.resourceId, name: item.en })), assetLibrary.externalAssets).map((asset) => {

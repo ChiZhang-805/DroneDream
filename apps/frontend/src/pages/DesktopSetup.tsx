@@ -439,6 +439,7 @@ export function DesktopSetup() {
     runtimeFresh: state.runtimeFresh,
     runtime: state.runtime,
     runtimeAccessStatus: runtimeAccess.status,
+    servicesReady: !desktopAvailable || coreStartup === "ready",
     complete: localChecksReady && !updaterBlocksWorkspace,
     blocked: Boolean(
       runtimeSessionFailure ||
@@ -1377,6 +1378,7 @@ export function DesktopSetup() {
           ready={workspaceReady}
           checking={environmentChecking}
           starting={runtimeAccess.status === "starting"}
+          coreStarting={desktopAvailable && coreStartup === "checking"}
           installationRequired={showInstallPlanner}
           gateBlocked={
             environmentBlocked ||
@@ -2521,6 +2523,7 @@ function RuntimeLauncherHero({
   ready,
   checking,
   starting,
+  coreStarting,
   installationRequired,
   gateBlocked,
   accountRequired,
@@ -2536,6 +2539,7 @@ function RuntimeLauncherHero({
   ready: boolean;
   checking: boolean;
   starting: boolean;
+  coreStarting: boolean;
   installationRequired: boolean;
   gateBlocked: boolean;
   accountRequired: boolean;
@@ -2562,6 +2566,8 @@ function RuntimeLauncherHero({
         ? t("launcher.status.blocked")
       : accountRequired
         ? t("launcher.status.signIn")
+      : coreStarting
+        ? t("launcher.status.starting")
       : localReady && environmentProgress < 100
         ? t("launcher.status.checking")
       : starting && !active

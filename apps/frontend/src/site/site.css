@@ -1475,6 +1475,13 @@ html[lang="zh-CN"] .site-hero h1 {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.organization-member-table tbody tr { height: 55px; }
+.organization-member-table .organization-member-placeholder td {
+  display: table-cell;
+  height: 55px;
+  padding: 0;
+  background: rgba(249, 247, 252, 0.34);
+}
 .organization-member-table th:nth-child(1) { width: 25%; }
 .organization-member-table th:nth-child(2) { width: 9%; }
 .organization-member-table th:nth-child(3) { width: 8%; }
@@ -1616,6 +1623,7 @@ html[lang="zh-CN"] .site-hero h1 {
   .organization-member-table table,
   .organization-member-table tbody { display: block; }
   .organization-member-table thead { display: none; }
+  .organization-member-table .organization-member-placeholder { display: none; }
   .organization-member-table tr {
     display: grid;
     grid-template-columns: 1fr auto;

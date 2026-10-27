@@ -68,10 +68,12 @@ try {
   await openProductPage(page, "/console/autonomy/maps", ".autonomy-repository-page");
   const schoolMap = page.locator(".autonomy-repository-grid article").filter({ hasText: "Kumpula Campus" });
   if (await schoolMap.count() !== 1) throw new Error("Map repository must expose exactly one Kumpula Campus card.");
-  if (await page.locator(".autonomy-repository-grid article").count() !== 6) throw new Error("Map repository must reserve exactly six visible cards.");
+  if (await page.locator(".autonomy-repository-grid article").count() !== 6) throw new Error("Map repository must expose exactly six qualified maps.");
   const pendingMaps = page.locator(".autonomy-repository-grid article.autonomy-repository-pending");
-  if (await pendingMaps.count() !== 5) throw new Error("Map repository must expose five disabled pending cards.");
-  if (await pendingMaps.locator(".autonomy-repository-delete:disabled").count() !== 5) throw new Error("Pending map delete controls must remain visible and disabled.");
+  if (await pendingMaps.count() !== 0) throw new Error("Qualified maps must replace every pending map card.");
+  if (await page.locator(".autonomy-repository-grid article[data-catalog-resource='true']").count() !== 6) {
+    throw new Error("Every visible map card must resolve to a real catalog resource.");
+  }
   if (await schoolMap.getAttribute("data-selected") !== "false") throw new Error("Map repository must begin without a selected map.");
   if (await page.locator(".autonomy-asset-toolbar button").count() !== 0) throw new Error("Map repository must not expose an in-product map creator.");
   if (await page.getByRole("button", { name: "Import map", exact: true }).count() !== 1) throw new Error("The map repository must expose the upload checklist.");
@@ -118,6 +120,31 @@ try {
   const mapDetailScreenshot = path.join(outputRoot, `${screenshotPrefix}kumpula-campus-3d-detail-1600x1000.png`);
   await page.screenshot({ path: mapDetailScreenshot, fullPage: false });
   await mapDialog.getByRole("button", { name: "Close", exact: true }).click();
+
+  const generatedMaps = [
+    ["Meilahti Hospital Campus", "meilahti-hospital-campus", 87],
+    ["Kalasatama Waterfront", "kalasatama-waterfront", 105],
+    ["Vuosaari Harbour", "vuosaari-harbour", 62],
+    ["Suomenlinna Sea Fortress", "suomenlinna-sea-fortress", 135],
+    ["Uutela Coastal Forest", "uutela-coastal-forest", 22],
+  ];
+  for (const [mapName, geometryKey, buildingCount] of generatedMaps) {
+    const card = page.locator(".autonomy-repository-grid article").filter({ hasText: mapName });
+    await card.locator(".autonomy-repository-card-surface").dblclick();
+    const dialog = page.getByRole("dialog", { name: mapName });
+    await dialog.waitFor({ state: "visible" });
+    await dialog.locator(".autonomy-repository-3d-view canvas").waitFor({ state: "visible" });
+    if (await dialog.getByText("No verified 3D geometry is available", { exact: false }).count()) {
+      throw new Error(`${mapName} failed to load its generated 3D geometry.`);
+    }
+    const response = await page.request.get(`${origin}/console/asset-geometry/maps/${geometryKey}.json`);
+    if (!response.ok()) throw new Error(`${mapName} geometry request failed.`);
+    const generatedGeometry = await response.json();
+    if (generatedGeometry.building_footprints?.length !== buildingCount) {
+      throw new Error(`${mapName} must expose all ${buildingCount} registered building footprints.`);
+    }
+    await dialog.getByRole("button", { name: "Close", exact: true }).click();
+  }
 
   await openProductPage(page, "/console/autonomy/aircraft", ".autonomy-repository-page");
   if (await page.locator(".autonomy-repository-grid article").count() !== 6) {
@@ -167,8 +194,21 @@ try {
   await selectMap.hover();
   const mapSubmenu = contextPopover.locator(".autonomy-context-submenu");
   await mapSubmenu.waitFor({ state: "visible" });
-  if (await mapSubmenu.getByRole("menuitemradio", { name: "Kumpula Campus", exact: true }).count() !== 1) {
-    throw new Error("Map submenu must expose the sole Kumpula Campus selection.");
+  const expectedMapNames = [
+    "Kumpula Campus",
+    "Meilahti Hospital Campus",
+    "Kalasatama Waterfront",
+    "Vuosaari Harbour",
+    "Suomenlinna Sea Fortress",
+    "Uutela Coastal Forest",
+  ];
+  for (const mapName of expectedMapNames) {
+    if (await mapSubmenu.getByRole("menuitemradio", { name: mapName, exact: true }).count() !== 1) {
+      throw new Error(`Map submenu is missing the qualified ${mapName} selection.`);
+    }
+  }
+  if (await mapSubmenu.locator(".autonomy-context-choice:not(.is-clear)").count() !== expectedMapNames.length) {
+    throw new Error("Map submenu must expose exactly the six qualified maps.");
   }
   const [mapRowBox, submenuBox] = await Promise.all([selectMap.boundingBox(), mapSubmenu.boundingBox()]);
   if (!mapRowBox || !submenuBox) throw new Error("Map submenu geometry could not be measured.");
@@ -182,7 +222,6 @@ try {
       scrollbarWidth: style.scrollbarWidth,
     };
   });
-  if (submenuMetrics.scrollHeight > submenuMetrics.clientHeight) throw new Error("A one-map submenu must not create unnecessary scrolling.");
   if (submenuMetrics.scrollbarWidth !== "none") throw new Error("Map submenu scrollbar must remain visually hidden.");
   const contextScreenshot = path.join(outputRoot, `${screenshotPrefix}autonomy-mission-context-1600x1000.png`);
   await page.screenshot({ path: contextScreenshot, fullPage: false });

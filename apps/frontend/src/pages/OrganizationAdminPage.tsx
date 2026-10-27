@@ -11,6 +11,7 @@ export function OrganizationAdminPage() {
       locale={locale}
       accountId={auth.account?.id ?? null}
       accountAvatarUrl={auth.account?.avatarUrl ?? null}
+      accountAvatarFallbackUrl={auth.account?.avatarFallbackUrl ?? null}
     />
   );
 }

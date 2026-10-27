@@ -1,0 +1,48 @@
+{
+  "asset_id": "dronedream.uutela-coastal-forest-map.v1",
+  "bounds_m": {
+    "x": 800,
+    "y": 800,
+    "z": 45
+  },
+  "building_count": 22,
+  "building_handoff_count": 22,
+  "collision_primitive_count": 23,
+  "fidelity": {
+    "building_collisions": "conservative-oriented-boxes",
+    "building_visuals": "city-register-footprint-extrusions",
+    "forest_restrictions": "city-ecological-network-polygons",
+    "interior_geometry": false,
+    "qualified_routes": 0,
+    "scope": "outdoor-exterior-only",
+    "terrain": "registered-orthophoto-plane",
+    "tree_collisions": "city-tree-register-canopy-cylinders"
+  },
+  "forest_region_count": 6,
+  "name": "Uutela Coastal Forest",
+  "resolution_m": 0.39,
+  "road_edge_count": 428,
+  "road_node_count": 428,
+  "schema_version": "dronedream.helsinki-map-summary.v1",
+  "source_kind": "real-geospatial-data",
+  "sources": {
+    "building_register_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wfs",
+    "buildings_sha256": "2f6517fcff177e0136840c2a19e4fd5cb852338de6b9e159f70fadc5fe5afebf",
+    "city_data_license": "CC-BY-4.0",
+    "city_data_owner": "City of Helsinki",
+    "ecological_network_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wfs",
+    "forest_sha256": "4a587e9fe19780dd251a34da5d16e7002bafb7e4eb62053cf682d7a02066db81",
+    "orthophoto_layer": "avoindata:Ortoilmakuva_2026_5cm",
+    "orthophoto_sha256": "04d0e37ceb88f6fbd026684b4f5d9a71dffc7a681f6eef8c5243cf1c996e0a58",
+    "orthophoto_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wms",
+    "retrieved_at": "2026-10-27",
+    "road_register_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wfs",
+    "roads_sha256": "69dff412c094262646a629fc5f07cf6e031a3adf477f281948634ee3bf54bb37",
+    "subject_source_page": "https://www.hel.fi/en/culture-and-leisure/outdoor-activities-parks-and-nature-destinations/outdoor-recreation-areas/uutela-outdoor-recreation-area",
+    "tree_register_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wfs",
+    "trees_sha256": "d848748ce99d5e6e360efdf330c2497c61ce7ba5d0b102cf11d12f74769b21a0"
+  },
+  "tree_collision_count": 0,
+  "tree_source_count": 0,
+  "visual_primitive_count": 23
+}

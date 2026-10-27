@@ -1,0 +1,7006 @@
+{
+  "asset_id": "dronedream.vuosaari-harbour-map.v1",
+  "coordinate_frame": "map_enu",
+  "edges": [
+    {
+      "bidirectional": true,
+      "distance_m": 17.274,
+      "edge_id": "road-edge-00000",
+      "from_node": "road-00000",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00001"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 8.165,
+      "edge_id": "road-edge-00001",
+      "from_node": "road-00001",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00002"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 10.179,
+      "edge_id": "road-edge-00002",
+      "from_node": "road-00002",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00003"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 16.215,
+      "edge_id": "road-edge-00003",
+      "from_node": "road-00003",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00004"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 78.325,
+      "edge_id": "road-edge-00004",
+      "from_node": "road-00004",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00005"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 90.982,
+      "edge_id": "road-edge-00005",
+      "from_node": "road-00006",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00007"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 28.623,
+      "edge_id": "road-edge-00006",
+      "from_node": "road-00008",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00009"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 43.16,
+      "edge_id": "road-edge-00007",
+      "from_node": "road-00009",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00010"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 13.62,
+      "edge_id": "road-edge-00008",
+      "from_node": "road-00010",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00011"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 52.073,
+      "edge_id": "road-edge-00009",
+      "from_node": "road-00012",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00013"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 110.314,
+      "edge_id": "road-edge-00010",
+      "from_node": "road-00014",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00015"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 15.552,
+      "edge_id": "road-edge-00011",
+      "from_node": "road-00015",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00016"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 26.833,
+      "edge_id": "road-edge-00012",
+      "from_node": "road-00017",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00018"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 9.25,
+      "edge_id": "road-edge-00013",
+      "from_node": "road-00018",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00019"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 0.428,
+      "edge_id": "road-edge-00014",
+      "from_node": "road-00020",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00021"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 0.665,
+      "edge_id": "road-edge-00015",
+      "from_node": "road-00022",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00023"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.43,
+      "edge_id": "road-edge-00016",
+      "from_node": "road-00023",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00024"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.706,
+      "edge_id": "road-edge-00017",
+      "from_node": "road-00024",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00025"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.448,
+      "edge_id": "road-edge-00018",
+      "from_node": "road-00025",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00026"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 12.351,
+      "edge_id": "road-edge-00019",
+      "from_node": "road-00027",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00028"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.773,
+      "edge_id": "road-edge-00020",
+      "from_node": "road-00028",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00029"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.352,
+      "edge_id": "road-edge-00021",
+      "from_node": "road-00029",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00030"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 7.181,
+      "edge_id": "road-edge-00022",
+      "from_node": "road-00030",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00031"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.01,
+      "edge_id": "road-edge-00023",
+      "from_node": "road-00031",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00032"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.156,
+      "edge_id": "road-edge-00024",
+      "from_node": "road-00032",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00033"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.988,
+      "edge_id": "road-edge-00025",
+      "from_node": "road-00033",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00034"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 32.794,
+      "edge_id": "road-edge-00026",
+      "from_node": "road-00034",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00035"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 31.888,
+      "edge_id": "road-edge-00027",
+      "from_node": "road-00035",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00036"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.892,
+      "edge_id": "road-edge-00028",
+      "from_node": "road-00036",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00037"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.474,
+      "edge_id": "road-edge-00029",
+      "from_node": "road-00037",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00038"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.028,
+      "edge_id": "road-edge-00030",
+      "from_node": "road-00038",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00039"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.628,
+      "edge_id": "road-edge-00031",
+      "from_node": "road-00039",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00040"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.536,
+      "edge_id": "road-edge-00032",
+      "from_node": "road-00040",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00041"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.642,
+      "edge_id": "road-edge-00033",
+      "from_node": "road-00041",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00042"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.554,
+      "edge_id": "road-edge-00034",
+      "from_node": "road-00042",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00043"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.579,
+      "edge_id": "road-edge-00035",
+      "from_node": "road-00043",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00044"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.788,
+      "edge_id": "road-edge-00036",
+      "from_node": "road-00044",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00045"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.24,
+      "edge_id": "road-edge-00037",
+      "from_node": "road-00045",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00046"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.23,
+      "edge_id": "road-edge-00038",
+      "from_node": "road-00046",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00047"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 7.099,
+      "edge_id": "road-edge-00039",
+      "from_node": "road-00047",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00048"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 23.95,
+      "edge_id": "road-edge-00040",
+      "from_node": "road-00048",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00049"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 51.917,
+      "edge_id": "road-edge-00041",
+      "from_node": "road-00049",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00050"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 27.682,
+      "edge_id": "road-edge-00042",
+      "from_node": "road-00050",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00051"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 26.935,
+      "edge_id": "road-edge-00043",
+      "from_node": "road-00051",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00052"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 35.401,
+      "edge_id": "road-edge-00044",
+      "from_node": "road-00052",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00053"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 0.87,
+      "edge_id": "road-edge-00045",
+      "from_node": "road-00054",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00055"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 8.722,
+      "edge_id": "road-edge-00046",
+      "from_node": "road-00056",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00057"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 34.023,
+      "edge_id": "road-edge-00047",
+      "from_node": "road-00058",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00059"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 187.263,
+      "edge_id": "road-edge-00048",
+      "from_node": "road-00059",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00060"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.902,
+      "edge_id": "road-edge-00049",
+      "from_node": "road-00061",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00062"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.238,
+      "edge_id": "road-edge-00050",
+      "from_node": "road-00063",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00064"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.605,
+      "edge_id": "road-edge-00051",
+      "from_node": "road-00064",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00065"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.678,
+      "edge_id": "road-edge-00052",
+      "from_node": "road-00065",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00066"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.088,
+      "edge_id": "road-edge-00053",
+      "from_node": "road-00066",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00067"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.227,
+      "edge_id": "road-edge-00054",
+      "from_node": "road-00067",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00068"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.298,
+      "edge_id": "road-edge-00055",
+      "from_node": "road-00068",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00069"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.388,
+      "edge_id": "road-edge-00056",
+      "from_node": "road-00069",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00070"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.631,
+      "edge_id": "road-edge-00057",
+      "from_node": "road-00070",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00071"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.774,
+      "edge_id": "road-edge-00058",
+      "from_node": "road-00071",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00072"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 46.059,
+      "edge_id": "road-edge-00059",
+      "from_node": "road-00072",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00073"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.791,
+      "edge_id": "road-edge-00060",
+      "from_node": "road-00074",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00075"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.216,
+      "edge_id": "road-edge-00061",
+      "from_node": "road-00075",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00076"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.087,
+      "edge_id": "road-edge-00062",
+      "from_node": "road-00077",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00078"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.192,
+      "edge_id": "road-edge-00063",
+      "from_node": "road-00078",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00079"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 11.505,
+      "edge_id": "road-edge-00064",
+      "from_node": "road-00057",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00080"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 9.513,
+      "edge_id": "road-edge-00065",
+      "from_node": "road-00081",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00082"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 14.922,
+      "edge_id": "road-edge-00066",
+      "from_node": "road-00082",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00083"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 33.893,
+      "edge_id": "road-edge-00067",
+      "from_node": "road-00083",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00084"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 12.675,
+      "edge_id": "road-edge-00068",
+      "from_node": "road-00084",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00085"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.109,
+      "edge_id": "road-edge-00069",
+      "from_node": "road-00079",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00086"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 25.55,
+      "edge_id": "road-edge-00070",
+      "from_node": "road-00086",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00087"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 10.096,
+      "edge_id": "road-edge-00071",
+      "from_node": "road-00087",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00088"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 7.577,
+      "edge_id": "road-edge-00072",
+      "from_node": "road-00088",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00089"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 9.808,
+      "edge_id": "road-edge-00073",
+      "from_node": "road-00090",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00091"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 7.774,
+      "edge_id": "road-edge-00074",
+      "from_node": "road-00092",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00020"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 23.893,
+      "edge_id": "road-edge-00075",
+      "from_node": "road-00060",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00093"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 10.473,
+      "edge_id": "road-edge-00076",
+      "from_node": "road-00093",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00094"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.678,
+      "edge_id": "road-edge-00077",
+      "from_node": "road-00094",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00095"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 7.017,
+      "edge_id": "road-edge-00078",
+      "from_node": "road-00095",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00096"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.573,
+      "edge_id": "road-edge-00079",
+      "from_node": "road-00096",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00097"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.615,
+      "edge_id": "road-edge-00080",
+      "from_node": "road-00097",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00098"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.854,
+      "edge_id": "road-edge-00081",
+      "from_node": "road-00098",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00099"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.503,
+      "edge_id": "road-edge-00082",
+      "from_node": "road-00099",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00100"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.431,
+      "edge_id": "road-edge-00083",
+      "from_node": "road-00100",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00101"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.627,
+      "edge_id": "road-edge-00084",
+      "from_node": "road-00101",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00102"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.015,
+      "edge_id": "road-edge-00085",
+      "from_node": "road-00102",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00103"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 8.903,
+      "edge_id": "road-edge-00086",
+      "from_node": "road-00089",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00104"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 23.173,
+      "edge_id": "road-edge-00087",
+      "from_node": "road-00091",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00092"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 25.111,
+      "edge_id": "road-edge-00088",
+      "from_node": "road-00105",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00106"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.09,
+      "edge_id": "road-edge-00089",
+      "from_node": "road-00107",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00108"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.932,
+      "edge_id": "road-edge-00090",
+      "from_node": "road-00108",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00109"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.756,
+      "edge_id": "road-edge-00091",
+      "from_node": "road-00109",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00110"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.855,
+      "edge_id": "road-edge-00092",
+      "from_node": "road-00110",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00106"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 32.417,
+      "edge_id": "road-edge-00093",
+      "from_node": "road-00103",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00111"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 22.932,
+      "edge_id": "road-edge-00094",
+      "from_node": "road-00111",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00112"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 31.061,
+      "edge_id": "road-edge-00095",
+      "from_node": "road-00112",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00113"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 18.38,
+      "edge_id": "road-edge-00096",
+      "from_node": "road-00113",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00114"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 40.596,
+      "edge_id": "road-edge-00097",
+      "from_node": "road-00114",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00115"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.109,
+      "edge_id": "road-edge-00098",
+      "from_node": "road-00104",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00116"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 8.104,
+      "edge_id": "road-edge-00099",
+      "from_node": "road-00116",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00117"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.113,
+      "edge_id": "road-edge-00100",
+      "from_node": "road-00118",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00119"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 10.147,
+      "edge_id": "road-edge-00101",
+      "from_node": "road-00120",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00121"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 8.931,
+      "edge_id": "road-edge-00102",
+      "from_node": "road-00122",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00054"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.518,
+      "edge_id": "road-edge-00103",
+      "from_node": "road-00123",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00124"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.415,
+      "edge_id": "road-edge-00104",
+      "from_node": "road-00124",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00074"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.348,
+      "edge_id": "road-edge-00105",
+      "from_node": "road-00125",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00126"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.694,
+      "edge_id": "road-edge-00106",
+      "from_node": "road-00126",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00127"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 0.422,
+      "edge_id": "road-edge-00107",
+      "from_node": "road-00127",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00128"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 7.578,
+      "edge_id": "road-edge-00108",
+      "from_node": "road-00129",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00081"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 8.696,
+      "edge_id": "road-edge-00109",
+      "from_node": "road-00056",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00130"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 124.096,
+      "edge_id": "road-edge-00110",
+      "from_node": "road-00130",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00131"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 10.064,
+      "edge_id": "road-edge-00111",
+      "from_node": "road-00055",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00132"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.829,
+      "edge_id": "road-edge-00112",
+      "from_node": "road-00132",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00133"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.556,
+      "edge_id": "road-edge-00113",
+      "from_node": "road-00074",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00134"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 7.348,
+      "edge_id": "road-edge-00114",
+      "from_node": "road-00134",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00135"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.485,
+      "edge_id": "road-edge-00115",
+      "from_node": "road-00135",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00136"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.515,
+      "edge_id": "road-edge-00116",
+      "from_node": "road-00136",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00137"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.674,
+      "edge_id": "road-edge-00117",
+      "from_node": "road-00137",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00138"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 12.827,
+      "edge_id": "road-edge-00118",
+      "from_node": "road-00139",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00140"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.723,
+      "edge_id": "road-edge-00119",
+      "from_node": "road-00140",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00141"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.272,
+      "edge_id": "road-edge-00120",
+      "from_node": "road-00142",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00143"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.9,
+      "edge_id": "road-edge-00121",
+      "from_node": "road-00143",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00144"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.551,
+      "edge_id": "road-edge-00122",
+      "from_node": "road-00144",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00145"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.59,
+      "edge_id": "road-edge-00123",
+      "from_node": "road-00145",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00105"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 23.931,
+      "edge_id": "road-edge-00124",
+      "from_node": "road-00146",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00147"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.737,
+      "edge_id": "road-edge-00125",
+      "from_node": "road-00147",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00148"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.208,
+      "edge_id": "road-edge-00126",
+      "from_node": "road-00148",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00149"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 7.371,
+      "edge_id": "road-edge-00127",
+      "from_node": "road-00149",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00150"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 63.092,
+      "edge_id": "road-edge-00128",
+      "from_node": "road-00150",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00151"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 49.786,
+      "edge_id": "road-edge-00129",
+      "from_node": "road-00151",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00152"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 15.878,
+      "edge_id": "road-edge-00130",
+      "from_node": "road-00152",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00153"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 8.913,
+      "edge_id": "road-edge-00131",
+      "from_node": "road-00153",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00154"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 83.152,
+      "edge_id": "road-edge-00132",
+      "from_node": "road-00154",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00155"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 148.338,
+      "edge_id": "road-edge-00133",
+      "from_node": "road-00053",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00156"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.394,
+      "edge_id": "road-edge-00134",
+      "from_node": "road-00156",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00157"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 18.892,
+      "edge_id": "road-edge-00135",
+      "from_node": "road-00157",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00158"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 17.508,
+      "edge_id": "road-edge-00136",
+      "from_node": "road-00158",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00159"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 14.614,
+      "edge_id": "road-edge-00137",
+      "from_node": "road-00159",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00160"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 16.125,
+      "edge_id": "road-edge-00138",
+      "from_node": "road-00160",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00161"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.171,
+      "edge_id": "road-edge-00139",
+      "from_node": "road-00162",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00163"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 29.369,
+      "edge_id": "road-edge-00140",
+      "from_node": "road-00163",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00164"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 10.932,
+      "edge_id": "road-edge-00141",
+      "from_node": "road-00165",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00166"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 48.05,
+      "edge_id": "road-edge-00142",
+      "from_node": "road-00166",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00164"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 11.911,
+      "edge_id": "road-edge-00143",
+      "from_node": "road-00164",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00167"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 9.967,
+      "edge_id": "road-edge-00144",
+      "from_node": "road-00118",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00168"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.475,
+      "edge_id": "road-edge-00145",
+      "from_node": "road-00169",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00170"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.503,
+      "edge_id": "road-edge-00146",
+      "from_node": "road-00170",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00171"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.582,
+      "edge_id": "road-edge-00147",
+      "from_node": "road-00171",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00172"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 0.596,
+      "edge_id": "road-edge-00148",
+      "from_node": "road-00172",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00173"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 0.611,
+      "edge_id": "road-edge-00149",
+      "from_node": "road-00173",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00174"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.711,
+      "edge_id": "road-edge-00150",
+      "from_node": "road-00174",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00175"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.512,
+      "edge_id": "road-edge-00151",
+      "from_node": "road-00175",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00176"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.293,
+      "edge_id": "road-edge-00152",
+      "from_node": "road-00176",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00177"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.266,
+      "edge_id": "road-edge-00153",
+      "from_node": "road-00177",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00125"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 0.573,
+      "edge_id": "road-edge-00154",
+      "from_node": "road-00178",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00022"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.23,
+      "edge_id": "road-edge-00155",
+      "from_node": "road-00179",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00180"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.659,
+      "edge_id": "road-edge-00156",
+      "from_node": "road-00180",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00181"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.372,
+      "edge_id": "road-edge-00157",
+      "from_node": "road-00181",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00182"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.426,
+      "edge_id": "road-edge-00158",
+      "from_node": "road-00182",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00183"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.536,
+      "edge_id": "road-edge-00159",
+      "from_node": "road-00183",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00184"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.245,
+      "edge_id": "road-edge-00160",
+      "from_node": "road-00185",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00186"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.78,
+      "edge_id": "road-edge-00161",
+      "from_node": "road-00186",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00187"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.891,
+      "edge_id": "road-edge-00162",
+      "from_node": "road-00187",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00188"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 0.98,
+      "edge_id": "road-edge-00163",
+      "from_node": "road-00188",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00189"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.378,
+      "edge_id": "road-edge-00164",
+      "from_node": "road-00190",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00191"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.699,
+      "edge_id": "road-edge-00165",
+      "from_node": "road-00191",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00192"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.034,
+      "edge_id": "road-edge-00166",
+      "from_node": "road-00192",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00193"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.553,
+      "edge_id": "road-edge-00167",
+      "from_node": "road-00193",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00194"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 0.661,
+      "edge_id": "road-edge-00168",
+      "from_node": "road-00194",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00195"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 0.585,
+      "edge_id": "road-edge-00169",
+      "from_node": "road-00195",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00196"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.448,
+      "edge_id": "road-edge-00170",
+      "from_node": "road-00196",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00197"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.481,
+      "edge_id": "road-edge-00171",
+      "from_node": "road-00197",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00198"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.614,
+      "edge_id": "road-edge-00172",
+      "from_node": "road-00198",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00199"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.145,
+      "edge_id": "road-edge-00173",
+      "from_node": "road-00199",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00200"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 8.85,
+      "edge_id": "road-edge-00174",
+      "from_node": "road-00081",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00201"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.184,
+      "edge_id": "road-edge-00175",
+      "from_node": "road-00201",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00202"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.967,
+      "edge_id": "road-edge-00176",
+      "from_node": "road-00202",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00203"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.971,
+      "edge_id": "road-edge-00177",
+      "from_node": "road-00017",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00204"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.04,
+      "edge_id": "road-edge-00178",
+      "from_node": "road-00204",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00205"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.589,
+      "edge_id": "road-edge-00179",
+      "from_node": "road-00205",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00206"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 7.383,
+      "edge_id": "road-edge-00180",
+      "from_node": "road-00206",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00011"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 16.013,
+      "edge_id": "road-edge-00181",
+      "from_node": "road-00008",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00207"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.634,
+      "edge_id": "road-edge-00182",
+      "from_node": "road-00207",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00208"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.919,
+      "edge_id": "road-edge-00183",
+      "from_node": "road-00208",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00209"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.653,
+      "edge_id": "road-edge-00184",
+      "from_node": "road-00209",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00012"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.66,
+      "edge_id": "road-edge-00185",
+      "from_node": "road-00013",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00210"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.708,
+      "edge_id": "road-edge-00186",
+      "from_node": "road-00210",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00211"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.756,
+      "edge_id": "road-edge-00187",
+      "from_node": "road-00211",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00212"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.588,
+      "edge_id": "road-edge-00188",
+      "from_node": "road-00212",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00014"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.3,
+      "edge_id": "road-edge-00189",
+      "from_node": "road-00063",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00213"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.227,
+      "edge_id": "road-edge-00190",
+      "from_node": "road-00213",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00214"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.972,
+      "edge_id": "road-edge-00191",
+      "from_node": "road-00115",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00211"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.294,
+      "edge_id": "road-edge-00192",
+      "from_node": "road-00214",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00215"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.57,
+      "edge_id": "road-edge-00193",
+      "from_node": "road-00215",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00016"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 8.997,
+      "edge_id": "road-edge-00194",
+      "from_node": "road-00005",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00216"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 8.453,
+      "edge_id": "road-edge-00195",
+      "from_node": "road-00216",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00217"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.082,
+      "edge_id": "road-edge-00196",
+      "from_node": "road-00173",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00218"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.753,
+      "edge_id": "road-edge-00197",
+      "from_node": "road-00218",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00219"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.768,
+      "edge_id": "road-edge-00198",
+      "from_node": "road-00219",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00220"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 10.664,
+      "edge_id": "road-edge-00199",
+      "from_node": "road-00220",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00000"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 8.901,
+      "edge_id": "road-edge-00200",
+      "from_node": "road-00007",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00221"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.23,
+      "edge_id": "road-edge-00201",
+      "from_node": "road-00221",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00222"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 7.522,
+      "edge_id": "road-edge-00202",
+      "from_node": "road-00222",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00223"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.302,
+      "edge_id": "road-edge-00203",
+      "from_node": "road-00223",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00184"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.545,
+      "edge_id": "road-edge-00204",
+      "from_node": "road-00224",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00123"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.249,
+      "edge_id": "road-edge-00205",
+      "from_node": "road-00133",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00224"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.389,
+      "edge_id": "road-edge-00206",
+      "from_node": "road-00225",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00224"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.633,
+      "edge_id": "road-edge-00207",
+      "from_node": "road-00224",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00226"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.333,
+      "edge_id": "road-edge-00208",
+      "from_node": "road-00226",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00195"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.608,
+      "edge_id": "road-edge-00209",
+      "from_node": "road-00227",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00228"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.672,
+      "edge_id": "road-edge-00210",
+      "from_node": "road-00228",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00229"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.315,
+      "edge_id": "road-edge-00211",
+      "from_node": "road-00062",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00230"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.722,
+      "edge_id": "road-edge-00212",
+      "from_node": "road-00231",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00232"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.796,
+      "edge_id": "road-edge-00213",
+      "from_node": "road-00006",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00233"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.88,
+      "edge_id": "road-edge-00214",
+      "from_node": "road-00233",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00234"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 0.773,
+      "edge_id": "road-edge-00215",
+      "from_node": "road-00234",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00235"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.017,
+      "edge_id": "road-edge-00216",
+      "from_node": "road-00235",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00236"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.614,
+      "edge_id": "road-edge-00217",
+      "from_node": "road-00236",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00237"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.053,
+      "edge_id": "road-edge-00218",
+      "from_node": "road-00237",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00238"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.915,
+      "edge_id": "road-edge-00219",
+      "from_node": "road-00238",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00239"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 7.275,
+      "edge_id": "road-edge-00220",
+      "from_node": "road-00239",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00240"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.055,
+      "edge_id": "road-edge-00221",
+      "from_node": "road-00240",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00241"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.583,
+      "edge_id": "road-edge-00222",
+      "from_node": "road-00241",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00242"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.435,
+      "edge_id": "road-edge-00223",
+      "from_node": "road-00242",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00243"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.351,
+      "edge_id": "road-edge-00224",
+      "from_node": "road-00243",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00244"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.956,
+      "edge_id": "road-edge-00225",
+      "from_node": "road-00244",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00245"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.842,
+      "edge_id": "road-edge-00226",
+      "from_node": "road-00245",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00246"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.171,
+      "edge_id": "road-edge-00227",
+      "from_node": "road-00246",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00247"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.026,
+      "edge_id": "road-edge-00228",
+      "from_node": "road-00247",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00248"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.012,
+      "edge_id": "road-edge-00229",
+      "from_node": "road-00248",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00249"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.201,
+      "edge_id": "road-edge-00230",
+      "from_node": "road-00249",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00250"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.05,
+      "edge_id": "road-edge-00231",
+      "from_node": "road-00250",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00251"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.848,
+      "edge_id": "road-edge-00232",
+      "from_node": "road-00251",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00252"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.734,
+      "edge_id": "road-edge-00233",
+      "from_node": "road-00252",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00253"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.418,
+      "edge_id": "road-edge-00234",
+      "from_node": "road-00253",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00254"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.673,
+      "edge_id": "road-edge-00235",
+      "from_node": "road-00254",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00255"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.902,
+      "edge_id": "road-edge-00236",
+      "from_node": "road-00255",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00256"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.298,
+      "edge_id": "road-edge-00237",
+      "from_node": "road-00256",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00257"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.542,
+      "edge_id": "road-edge-00238",
+      "from_node": "road-00257",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00258"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.053,
+      "edge_id": "road-edge-00239",
+      "from_node": "road-00258",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00259"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 9.957,
+      "edge_id": "road-edge-00240",
+      "from_node": "road-00259",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00260"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.951,
+      "edge_id": "road-edge-00241",
+      "from_node": "road-00260",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00261"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.992,
+      "edge_id": "road-edge-00242",
+      "from_node": "road-00261",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00262"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.687,
+      "edge_id": "road-edge-00243",
+      "from_node": "road-00262",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00263"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.652,
+      "edge_id": "road-edge-00244",
+      "from_node": "road-00263",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00264"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.745,
+      "edge_id": "road-edge-00245",
+      "from_node": "road-00264",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00265"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.124,
+      "edge_id": "road-edge-00246",
+      "from_node": "road-00265",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00266"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.582,
+      "edge_id": "road-edge-00247",
+      "from_node": "road-00266",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00267"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.595,
+      "edge_id": "road-edge-00248",
+      "from_node": "road-00268",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00269"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.843,
+      "edge_id": "road-edge-00249",
+      "from_node": "road-00269",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00270"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.736,
+      "edge_id": "road-edge-00250",
+      "from_node": "road-00270",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00169"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.748,
+      "edge_id": "road-edge-00251",
+      "from_node": "road-00271",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00272"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 9.552,
+      "edge_id": "road-edge-00252",
+      "from_node": "road-00008",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00155"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 9.535,
+      "edge_id": "road-edge-00253",
+      "from_node": "road-00008",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00056"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 9.31,
+      "edge_id": "road-edge-00254",
+      "from_node": "road-00229",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00155"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.046,
+      "edge_id": "road-edge-00255",
+      "from_node": "road-00106",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00273"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.535,
+      "edge_id": "road-edge-00256",
+      "from_node": "road-00273",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00274"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.927,
+      "edge_id": "road-edge-00257",
+      "from_node": "road-00274",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00275"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.951,
+      "edge_id": "road-edge-00258",
+      "from_node": "road-00275",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00276"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 9.011,
+      "edge_id": "road-edge-00259",
+      "from_node": "road-00277",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00278"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 33.814,
+      "edge_id": "road-edge-00260",
+      "from_node": "road-00278",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00279"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 51.261,
+      "edge_id": "road-edge-00261",
+      "from_node": "road-00279",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00280"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 19.585,
+      "edge_id": "road-edge-00262",
+      "from_node": "road-00280",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00281"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 7.275,
+      "edge_id": "road-edge-00263",
+      "from_node": "road-00281",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00282"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.616,
+      "edge_id": "road-edge-00264",
+      "from_node": "road-00282",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00027"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.234,
+      "edge_id": "road-edge-00265",
+      "from_node": "road-00277",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00283"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 73.192,
+      "edge_id": "road-edge-00266",
+      "from_node": "road-00284",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00285"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 26.597,
+      "edge_id": "road-edge-00267",
+      "from_node": "road-00285",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00286"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 14.712,
+      "edge_id": "road-edge-00268",
+      "from_node": "road-00085",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00287"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 15.696,
+      "edge_id": "road-edge-00269",
+      "from_node": "road-00287",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00288"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 13.642,
+      "edge_id": "road-edge-00270",
+      "from_node": "road-00288",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00289"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 17.653,
+      "edge_id": "road-edge-00271",
+      "from_node": "road-00289",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00290"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 14.439,
+      "edge_id": "road-edge-00272",
+      "from_node": "road-00290",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00291"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.058,
+      "edge_id": "road-edge-00273",
+      "from_node": "road-00291",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00292"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.515,
+      "edge_id": "road-edge-00274",
+      "from_node": "road-00292",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00293"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.611,
+      "edge_id": "road-edge-00275",
+      "from_node": "road-00293",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00294"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.43,
+      "edge_id": "road-edge-00276",
+      "from_node": "road-00295",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00296"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.211,
+      "edge_id": "road-edge-00277",
+      "from_node": "road-00296",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00297"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.534,
+      "edge_id": "road-edge-00278",
+      "from_node": "road-00297",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00298"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 15.065,
+      "edge_id": "road-edge-00279",
+      "from_node": "road-00298",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00299"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 22.327,
+      "edge_id": "road-edge-00280",
+      "from_node": "road-00299",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00300"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 18.374,
+      "edge_id": "road-edge-00281",
+      "from_node": "road-00300",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00301"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 17.724,
+      "edge_id": "road-edge-00282",
+      "from_node": "road-00301",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00302"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.425,
+      "edge_id": "road-edge-00283",
+      "from_node": "road-00104",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00303"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 16.214,
+      "edge_id": "road-edge-00284",
+      "from_node": "road-00303",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00304"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.595,
+      "edge_id": "road-edge-00285",
+      "from_node": "road-00304",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00305"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.086,
+      "edge_id": "road-edge-00286",
+      "from_node": "road-00305",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00306"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.247,
+      "edge_id": "road-edge-00287",
+      "from_node": "road-00306",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00307"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 1.722,
+      "edge_id": "road-edge-00288",
+      "from_node": "road-00307",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00308"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 10.039,
+      "edge_id": "road-edge-00289",
+      "from_node": "road-00309",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00310"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.12,
+      "edge_id": "road-edge-00290",
+      "from_node": "road-00308",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00309"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 13.36,
+      "edge_id": "road-edge-00291",
+      "from_node": "road-00311",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00312"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.541,
+      "edge_id": "road-edge-00292",
+      "from_node": "road-00312",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00313"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 10.733,
+      "edge_id": "road-edge-00293",
+      "from_node": "road-00313",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00314"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.733,
+      "edge_id": "road-edge-00294",
+      "from_node": "road-00314",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00315"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.251,
+      "edge_id": "road-edge-00295",
+      "from_node": "road-00315",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00316"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.247,
+      "edge_id": "road-edge-00296",
+      "from_node": "road-00317",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00318"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 9.158,
+      "edge_id": "road-edge-00297",
+      "from_node": "road-00319",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00295"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 13.532,
+      "edge_id": "road-edge-00298",
+      "from_node": "road-00019",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00320"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 9.95,
+      "edge_id": "road-edge-00299",
+      "from_node": "road-00320",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00201"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 50.833,
+      "edge_id": "road-edge-00300",
+      "from_node": "road-00073",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00321"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 103.344,
+      "edge_id": "road-edge-00301",
+      "from_node": "road-00321",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00322"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 69.192,
+      "edge_id": "road-edge-00302",
+      "from_node": "road-00322",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00323"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 10.467,
+      "edge_id": "road-edge-00303",
+      "from_node": "road-00155",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00294"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 25.881,
+      "edge_id": "road-edge-00304",
+      "from_node": "road-00324",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00325"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 14.519,
+      "edge_id": "road-edge-00305",
+      "from_node": "road-00325",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00326"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 11.106,
+      "edge_id": "road-edge-00306",
+      "from_node": "road-00326",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00327"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.905,
+      "edge_id": "road-edge-00307",
+      "from_node": "road-00327",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00328"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.307,
+      "edge_id": "road-edge-00308",
+      "from_node": "road-00328",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00329"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.63,
+      "edge_id": "road-edge-00309",
+      "from_node": "road-00329",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00330"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.86,
+      "edge_id": "road-edge-00310",
+      "from_node": "road-00330",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00331"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.844,
+      "edge_id": "road-edge-00311",
+      "from_node": "road-00331",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00332"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 2.879,
+      "edge_id": "road-edge-00312",
+      "from_node": "road-00332",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00333"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.653,
+      "edge_id": "road-edge-00313",
+      "from_node": "road-00333",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00334"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.009,
+      "edge_id": "road-edge-00314",
+      "from_node": "road-00334",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00335"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.291,
+      "edge_id": "road-edge-00315",
+      "from_node": "road-00335",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00336"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 3.863,
+      "edge_id": "road-edge-00316",
+      "from_node": "road-00336",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00337"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.134,
+      "edge_id": "road-edge-00317",
+      "from_node": "road-00337",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00338"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 4.414,
+      "edge_id": "road-edge-00318",
+      "from_node": "road-00338",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00339"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 12.774,
+      "edge_id": "road-edge-00319",
+      "from_node": "road-00339",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00276"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.561,
+      "edge_id": "road-edge-00320",
+      "from_node": "road-00324",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00073"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 7.074,
+      "edge_id": "road-edge-00321",
+      "from_node": "road-00085",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00205"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 7.26,
+      "edge_id": "road-edge-00322",
+      "from_node": "road-00227",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00208"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 10.137,
+      "edge_id": "road-edge-00323",
+      "from_node": "road-00211",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00021"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 7.134,
+      "edge_id": "road-edge-00324",
+      "from_node": "road-00103",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00214"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 10.879,
+      "edge_id": "road-edge-00325",
+      "from_node": "road-00214",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00276"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 14.206,
+      "edge_id": "road-edge-00326",
+      "from_node": "road-00055",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00219"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 8.671,
+      "edge_id": "road-edge-00327",
+      "from_node": "road-00219",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00340"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 13.493,
+      "edge_id": "road-edge-00328",
+      "from_node": "road-00222",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00277"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.084,
+      "edge_id": "road-edge-00329",
+      "from_node": "road-00138",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00222"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 44.209,
+      "edge_id": "road-edge-00330",
+      "from_node": "road-00115",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00341"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 26.815,
+      "edge_id": "road-edge-00331",
+      "from_node": "road-00341",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00227"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 15.227,
+      "edge_id": "road-edge-00332",
+      "from_node": "road-00342",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00062"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 13.523,
+      "edge_id": "road-edge-00333",
+      "from_node": "road-00053",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00343"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 10.492,
+      "edge_id": "road-edge-00334",
+      "from_node": "road-00295",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00056"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 47.809,
+      "edge_id": "road-edge-00335",
+      "from_node": "road-00310",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00344"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 12.592,
+      "edge_id": "road-edge-00336",
+      "from_node": "road-00201",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00079"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 8.639,
+      "edge_id": "road-edge-00337",
+      "from_node": "road-00073",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00060"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 10.882,
+      "edge_id": "road-edge-00338",
+      "from_node": "road-00205",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00311"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 10.133,
+      "edge_id": "road-edge-00339",
+      "from_node": "road-00208",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00080"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 7.978,
+      "edge_id": "road-edge-00340",
+      "from_node": "road-00345",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00346"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 5.62,
+      "edge_id": "road-edge-00341",
+      "from_node": "road-00347",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00348"
+    },
+    {
+      "bidirectional": true,
+      "distance_m": 6.538,
+      "edge_id": "road-edge-00342",
+      "from_node": "road-00349",
+      "minimum_clearance_m": 0.8,
+      "qualification": "geometry-derived",
+      "speed_limit_mps": 5.0,
+      "to_node": "road-00118"
+    }
+  ],
+  "name": "Vuosaari Harbour",
+  "named_entities": {
+    "building-1001253909-0-outdoor-handoff": "road-00329",
+    "building-100125393C-0-outdoor-handoff": "road-00323",
+    "building-100125394D-0-outdoor-handoff": "road-00322",
+    "building-100125395E-0-outdoor-handoff": "road-00302",
+    "building-100125397H-0-outdoor-handoff": "road-00310",
+    "building-100125398J-0-outdoor-handoff": "road-00310",
+    "building-100125399K-0-outdoor-handoff": "road-00299",
+    "building-100125430K-0-outdoor-handoff": "road-00107",
+    "building-100125432M-0-outdoor-handoff": "road-00131",
+    "building-100125434P-0-outdoor-handoff": "road-00107",
+    "building-100125435R-0-outdoor-handoff": "road-00131",
+    "building-100125436S-0-outdoor-handoff": "road-00131",
+    "building-100125438U-0-outdoor-handoff": "road-00107",
+    "building-100125439V-0-outdoor-handoff": "road-00131",
+    "building-100125440W-0-outdoor-handoff": "road-00330",
+    "building-100125441X-0-outdoor-handoff": "road-00330",
+    "building-1001254452-0-outdoor-handoff": "road-00329",
+    "building-1021576203-0-outdoor-handoff": "road-00329",
+    "building-102328599J-0-outdoor-handoff": "road-00332",
+    "building-102328600K-0-outdoor-handoff": "road-00328",
+    "building-102328601L-0-outdoor-handoff": "road-00321",
+    "building-102328604P-0-outdoor-handoff": "road-00324",
+    "building-102328608U-0-outdoor-handoff": "road-00322",
+    "building-102328609V-0-outdoor-handoff": "road-00060",
+    "building-102328610W-0-outdoor-handoff": "road-00322",
+    "building-102328611X-0-outdoor-handoff": "road-00321",
+    "building-102328612Y-0-outdoor-handoff": "road-00059",
+    "building-1023286130-0-outdoor-handoff": "road-00151",
+    "building-1023286174-0-outdoor-handoff": "road-00114",
+    "building-1023286185-0-outdoor-handoff": "road-00059",
+    "building-1023286185-1-outdoor-handoff": "road-00149",
+    "building-102328628F-0-outdoor-handoff": "road-00150",
+    "building-102328629H-0-outdoor-handoff": "road-00085",
+    "building-102328631K-0-outdoor-handoff": "road-00150",
+    "building-102328632L-0-outdoor-handoff": "road-00151",
+    "building-102328634N-0-outdoor-handoff": "road-00129",
+    "building-102328634N-1-outdoor-handoff": "road-00129",
+    "building-1035130654-0-outdoor-handoff": "road-00107",
+    "building-103565602V-0-outdoor-handoff": "road-00336",
+    "building-1037285187-0-outdoor-handoff": "road-00131",
+    "building-1037929367-0-outdoor-handoff": "road-00300",
+    "building-103812051U-0-outdoor-handoff": "road-00142",
+    "building-103843419P-0-outdoor-handoff": "road-00058",
+    "building-103887006R-0-outdoor-handoff": "road-00330",
+    "building-1042129557-0-outdoor-handoff": "road-00328",
+    "building-104218821E-0-outdoor-handoff": "road-00287",
+    "building-791791-0-outdoor-handoff": "road-00150",
+    "building-840811-0-outdoor-handoff": "road-00152",
+    "building-840814-0-outdoor-handoff": "road-00150",
+    "building-840815-0-outdoor-handoff": "road-00131",
+    "building-840818-0-outdoor-handoff": "road-00131",
+    "building-840825-0-outdoor-handoff": "road-00131",
+    "building-840829-0-outdoor-handoff": "road-00131",
+    "building-840830-0-outdoor-handoff": "road-00131",
+    "building-840832-0-outdoor-handoff": "road-00333",
+    "building-840834-0-outdoor-handoff": "road-00131",
+    "building-840835-0-outdoor-handoff": "road-00131",
+    "building-840841-0-outdoor-handoff": "road-00131",
+    "building-840842-0-outdoor-handoff": "road-00131",
+    "building-840843-0-outdoor-handoff": "road-00335",
+    "building-840844-0-outdoor-handoff": "road-00131",
+    "building-873989-0-outdoor-handoff": "road-00131",
+    "launch": "road-00322",
+    "outdoor_handoff": "road-00093"
+  },
+  "nodes": [
+    {
+      "label": "Official road network",
+      "node_id": "road-00000",
+      "position_m": {
+        "x": -469.7,
+        "y": -590.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00001",
+      "position_m": {
+        "x": -486.5,
+        "y": -586.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00002",
+      "position_m": {
+        "x": -494.3,
+        "y": -583.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00003",
+      "position_m": {
+        "x": -503.8,
+        "y": -579.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00004",
+      "position_m": {
+        "x": -518.4,
+        "y": -572.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00005",
+      "position_m": {
+        "x": -585.1,
+        "y": -531.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00006",
+      "position_m": {
+        "x": -302.8,
+        "y": -564.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00007",
+      "position_m": {
+        "x": -391.9,
+        "y": -583.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00008",
+      "position_m": {
+        "x": -362.4,
+        "y": 430.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00009",
+      "position_m": {
+        "x": -367.7,
+        "y": 458.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00010",
+      "position_m": {
+        "x": -375.2,
+        "y": 501.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00011",
+      "position_m": {
+        "x": -378.7,
+        "y": 514.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00012",
+      "position_m": {
+        "x": -357.4,
+        "y": 399.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00013",
+      "position_m": {
+        "x": -348.0,
+        "y": 348.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00014",
+      "position_m": {
+        "x": -344.6,
+        "y": 331.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00015",
+      "position_m": {
+        "x": -323.7,
+        "y": 222.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00016",
+      "position_m": {
+        "x": -320.6,
+        "y": 207.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00017",
+      "position_m": {
+        "x": -383.7,
+        "y": 536.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00018",
+      "position_m": {
+        "x": -392.5,
+        "y": 561.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00019",
+      "position_m": {
+        "x": -394.7,
+        "y": 570.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00020",
+      "position_m": {
+        "x": -336.2,
+        "y": 342.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00021",
+      "position_m": {
+        "x": -336.1,
+        "y": 342.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00022",
+      "position_m": {
+        "x": -423.0,
+        "y": -599.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00023",
+      "position_m": {
+        "x": -422.5,
+        "y": -599.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00024",
+      "position_m": {
+        "x": -421.5,
+        "y": -598.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00025",
+      "position_m": {
+        "x": -420.5,
+        "y": -596.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00026",
+      "position_m": {
+        "x": -419.8,
+        "y": -595.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00027",
+      "position_m": {
+        "x": -281.3,
+        "y": -575.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00028",
+      "position_m": {
+        "x": -269.4,
+        "y": -572.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00029",
+      "position_m": {
+        "x": -267.0,
+        "y": -571.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00030",
+      "position_m": {
+        "x": -262.7,
+        "y": -566.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00031",
+      "position_m": {
+        "x": -258.5,
+        "y": -560.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00032",
+      "position_m": {
+        "x": -258.2,
+        "y": -559.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00033",
+      "position_m": {
+        "x": -258.2,
+        "y": -558.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00034",
+      "position_m": {
+        "x": -258.4,
+        "y": -556.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00035",
+      "position_m": {
+        "x": -264.8,
+        "y": -524.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00036",
+      "position_m": {
+        "x": -270.9,
+        "y": -493.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00037",
+      "position_m": {
+        "x": -271.5,
+        "y": -490.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00038",
+      "position_m": {
+        "x": -271.7,
+        "y": -486.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00039",
+      "position_m": {
+        "x": -271.5,
+        "y": -484.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00040",
+      "position_m": {
+        "x": -271.1,
+        "y": -483.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00041",
+      "position_m": {
+        "x": -269.6,
+        "y": -478.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00042",
+      "position_m": {
+        "x": -268.2,
+        "y": -475.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00043",
+      "position_m": {
+        "x": -265.9,
+        "y": -472.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00044",
+      "position_m": {
+        "x": -263.9,
+        "y": -471.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00045",
+      "position_m": {
+        "x": -261.6,
+        "y": -469.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00046",
+      "position_m": {
+        "x": -259.7,
+        "y": -468.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00047",
+      "position_m": {
+        "x": -256.6,
+        "y": -467.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00048",
+      "position_m": {
+        "x": -249.8,
+        "y": -465.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00049",
+      "position_m": {
+        "x": -226.2,
+        "y": -461.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00050",
+      "position_m": {
+        "x": -175.2,
+        "y": -451.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00051",
+      "position_m": {
+        "x": -148.0,
+        "y": -446.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00052",
+      "position_m": {
+        "x": -121.5,
+        "y": -441.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00053",
+      "position_m": {
+        "x": -86.8,
+        "y": -434.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00054",
+      "position_m": {
+        "x": -454.5,
+        "y": -577.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00055",
+      "position_m": {
+        "x": -453.8,
+        "y": -577.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00056",
+      "position_m": {
+        "x": -353.0,
+        "y": 431.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00057",
+      "position_m": {
+        "x": -351.4,
+        "y": 423.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00058",
+      "position_m": {
+        "x": -600.0,
+        "y": 121.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00059",
+      "position_m": {
+        "x": -566.6,
+        "y": 127.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00060",
+      "position_m": {
+        "x": -382.4,
+        "y": 161.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00061",
+      "position_m": {
+        "x": -482.0,
+        "y": -600.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00062",
+      "position_m": {
+        "x": -481.6,
+        "y": -598.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00063",
+      "position_m": {
+        "x": -317.6,
+        "y": 188.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00064",
+      "position_m": {
+        "x": -317.4,
+        "y": 185.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00065",
+      "position_m": {
+        "x": -317.7,
+        "y": 180.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00066",
+      "position_m": {
+        "x": -318.8,
+        "y": 175.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00067",
+      "position_m": {
+        "x": -320.1,
+        "y": 173.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00068",
+      "position_m": {
+        "x": -322.0,
+        "y": 170.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00069",
+      "position_m": {
+        "x": -324.3,
+        "y": 168.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00070",
+      "position_m": {
+        "x": -326.9,
+        "y": 166.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00071",
+      "position_m": {
+        "x": -331.0,
+        "y": 163.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00072",
+      "position_m": {
+        "x": -335.3,
+        "y": 161.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00073",
+      "position_m": {
+        "x": -380.6,
+        "y": 153.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00074",
+      "position_m": {
+        "x": -421.8,
+        "y": -566.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00075",
+      "position_m": {
+        "x": -421.8,
+        "y": -563.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00076",
+      "position_m": {
+        "x": -422.3,
+        "y": -560.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00077",
+      "position_m": {
+        "x": -386.4,
+        "y": 600.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00078",
+      "position_m": {
+        "x": -386.9,
+        "y": 597.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00079",
+      "position_m": {
+        "x": -386.9,
+        "y": 595.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00080",
+      "position_m": {
+        "x": -349.3,
+        "y": 412.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00081",
+      "position_m": {
+        "x": -408.1,
+        "y": 592.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00082",
+      "position_m": {
+        "x": -405.8,
+        "y": 583.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00083",
+      "position_m": {
+        "x": -401.8,
+        "y": 568.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00084",
+      "position_m": {
+        "x": -391.2,
+        "y": 536.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00085",
+      "position_m": {
+        "x": -388.0,
+        "y": 524.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00086",
+      "position_m": {
+        "x": -385.7,
+        "y": 590.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00087",
+      "position_m": {
+        "x": -380.6,
+        "y": 565.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00088",
+      "position_m": {
+        "x": -378.9,
+        "y": 555.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00089",
+      "position_m": {
+        "x": -376.7,
+        "y": 548.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00090",
+      "position_m": {
+        "x": -343.5,
+        "y": 382.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00091",
+      "position_m": {
+        "x": -341.0,
+        "y": 373.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00092",
+      "position_m": {
+        "x": -336.6,
+        "y": 350.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Vuosaari Harbour outdoor handoff point",
+      "node_id": "road-00093",
+      "position_m": {
+        "x": -358.8,
+        "y": 165.7,
+        "z": 8.0
+      },
+      "semantic": "delivery"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00094",
+      "position_m": {
+        "x": -348.5,
+        "y": 167.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00095",
+      "position_m": {
+        "x": -343.1,
+        "y": 169.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00096",
+      "position_m": {
+        "x": -336.4,
+        "y": 171.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00097",
+      "position_m": {
+        "x": -331.4,
+        "y": 173.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00098",
+      "position_m": {
+        "x": -328.3,
+        "y": 177.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00099",
+      "position_m": {
+        "x": -326.4,
+        "y": 181.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00100",
+      "position_m": {
+        "x": -325.5,
+        "y": 185.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00101",
+      "position_m": {
+        "x": -325.2,
+        "y": 189.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00102",
+      "position_m": {
+        "x": -325.6,
+        "y": 193.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00103",
+      "position_m": {
+        "x": -326.1,
+        "y": 196.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00104",
+      "position_m": {
+        "x": -374.1,
+        "y": 540.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00105",
+      "position_m": {
+        "x": -311.5,
+        "y": 237.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00106",
+      "position_m": {
+        "x": -307.3,
+        "y": 213.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00107",
+      "position_m": {
+        "x": -294.0,
+        "y": 218.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00108",
+      "position_m": {
+        "x": -300.0,
+        "y": 216.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00109",
+      "position_m": {
+        "x": -302.8,
+        "y": 216.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00110",
+      "position_m": {
+        "x": -305.3,
+        "y": 215.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00111",
+      "position_m": {
+        "x": -332.4,
+        "y": 227.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00112",
+      "position_m": {
+        "x": -336.5,
+        "y": 250.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00113",
+      "position_m": {
+        "x": -342.1,
+        "y": 280.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00114",
+      "position_m": {
+        "x": -345.6,
+        "y": 298.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00115",
+      "position_m": {
+        "x": -352.9,
+        "y": 338.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00116",
+      "position_m": {
+        "x": -372.9,
+        "y": 536.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00117",
+      "position_m": {
+        "x": -370.5,
+        "y": 528.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00118",
+      "position_m": {
+        "x": -593.7,
+        "y": -514.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00119",
+      "position_m": {
+        "x": -588.9,
+        "y": -518.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00120",
+      "position_m": {
+        "x": -490.0,
+        "y": -571.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00121",
+      "position_m": {
+        "x": -480.1,
+        "y": -573.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00122",
+      "position_m": {
+        "x": -463.5,
+        "y": -577.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00123",
+      "position_m": {
+        "x": -428.7,
+        "y": -567.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00124",
+      "position_m": {
+        "x": -424.2,
+        "y": -566.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00125",
+      "position_m": {
+        "x": -439.5,
+        "y": -597.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00126",
+      "position_m": {
+        "x": -438.7,
+        "y": -598.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00127",
+      "position_m": {
+        "x": -437.5,
+        "y": -599.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00128",
+      "position_m": {
+        "x": -437.1,
+        "y": -600.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00129",
+      "position_m": {
+        "x": -409.5,
+        "y": 600.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00130",
+      "position_m": {
+        "x": -344.4,
+        "y": 433.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00131",
+      "position_m": {
+        "x": -222.5,
+        "y": 456.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00132",
+      "position_m": {
+        "x": -445.8,
+        "y": -571.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00133",
+      "position_m": {
+        "x": -440.2,
+        "y": -569.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00134",
+      "position_m": {
+        "x": -416.2,
+        "y": -569.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00135",
+      "position_m": {
+        "x": -409.9,
+        "y": -573.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00136",
+      "position_m": {
+        "x": -407.9,
+        "y": -575.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00137",
+      "position_m": {
+        "x": -407.3,
+        "y": -576.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00138",
+      "position_m": {
+        "x": -406.6,
+        "y": -580.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00139",
+      "position_m": {
+        "x": -333.2,
+        "y": 326.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00140",
+      "position_m": {
+        "x": -330.8,
+        "y": 314.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00141",
+      "position_m": {
+        "x": -329.5,
+        "y": 307.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00142",
+      "position_m": {
+        "x": -318.4,
+        "y": 251.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00143",
+      "position_m": {
+        "x": -316.8,
+        "y": 247.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00144",
+      "position_m": {
+        "x": -315.1,
+        "y": 243.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00145",
+      "position_m": {
+        "x": -312.6,
+        "y": 240.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00146",
+      "position_m": {
+        "x": -600.0,
+        "y": 397.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00147",
+      "position_m": {
+        "x": -595.9,
+        "y": 374.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00148",
+      "position_m": {
+        "x": -593.9,
+        "y": 367.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00149",
+      "position_m": {
+        "x": -588.3,
+        "y": 365.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00150",
+      "position_m": {
+        "x": -581.1,
+        "y": 366.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00151",
+      "position_m": {
+        "x": -526.0,
+        "y": 397.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00152",
+      "position_m": {
+        "x": -478.2,
+        "y": 411.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00153",
+      "position_m": {
+        "x": -462.4,
+        "y": 412.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00154",
+      "position_m": {
+        "x": -453.5,
+        "y": 413.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00155",
+      "position_m": {
+        "x": -371.9,
+        "y": 429.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00156",
+      "position_m": {
+        "x": 59.1,
+        "y": -407.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00157",
+      "position_m": {
+        "x": 64.4,
+        "y": -408.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00158",
+      "position_m": {
+        "x": 81.4,
+        "y": -416.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00159",
+      "position_m": {
+        "x": 98.7,
+        "y": -414.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00160",
+      "position_m": {
+        "x": 110.8,
+        "y": -405.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00161",
+      "position_m": {
+        "x": 114.6,
+        "y": -390.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00162",
+      "position_m": {
+        "x": 143.7,
+        "y": -600.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00163",
+      "position_m": {
+        "x": 145.5,
+        "y": -598.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00164",
+      "position_m": {
+        "x": 139.5,
+        "y": -570.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00165",
+      "position_m": {
+        "x": 184.1,
+        "y": -549.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00166",
+      "position_m": {
+        "x": 186.5,
+        "y": -560.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00167",
+      "position_m": {
+        "x": 137.0,
+        "y": -558.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00168",
+      "position_m": {
+        "x": -600.0,
+        "y": -522.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00169",
+      "position_m": {
+        "x": -440.5,
+        "y": -586.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00170",
+      "position_m": {
+        "x": -441.0,
+        "y": -587.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00171",
+      "position_m": {
+        "x": -441.4,
+        "y": -589.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00172",
+      "position_m": {
+        "x": -441.5,
+        "y": -590.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00173",
+      "position_m": {
+        "x": -441.5,
+        "y": -591.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00174",
+      "position_m": {
+        "x": -441.5,
+        "y": -592.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00175",
+      "position_m": {
+        "x": -441.2,
+        "y": -593.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00176",
+      "position_m": {
+        "x": -440.7,
+        "y": -595.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00177",
+      "position_m": {
+        "x": -440.2,
+        "y": -596.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00178",
+      "position_m": {
+        "x": -423.4,
+        "y": -600.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00179",
+      "position_m": {
+        "x": -419.7,
+        "y": -595.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00180",
+      "position_m": {
+        "x": -419.3,
+        "y": -594.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00181",
+      "position_m": {
+        "x": -419.0,
+        "y": -592.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00182",
+      "position_m": {
+        "x": -419.0,
+        "y": -591.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00183",
+      "position_m": {
+        "x": -419.1,
+        "y": -589.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00184",
+      "position_m": {
+        "x": -419.4,
+        "y": -588.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00185",
+      "position_m": {
+        "x": -419.5,
+        "y": -587.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00186",
+      "position_m": {
+        "x": -419.9,
+        "y": -586.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00187",
+      "position_m": {
+        "x": -420.7,
+        "y": -585.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00188",
+      "position_m": {
+        "x": -421.9,
+        "y": -583.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00189",
+      "position_m": {
+        "x": -422.6,
+        "y": -582.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00190",
+      "position_m": {
+        "x": -424.4,
+        "y": -581.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00191",
+      "position_m": {
+        "x": -425.7,
+        "y": -580.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00192",
+      "position_m": {
+        "x": -427.3,
+        "y": -580.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00193",
+      "position_m": {
+        "x": -429.3,
+        "y": -579.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00194",
+      "position_m": {
+        "x": -430.8,
+        "y": -579.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00195",
+      "position_m": {
+        "x": -431.5,
+        "y": -579.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00196",
+      "position_m": {
+        "x": -432.1,
+        "y": -580.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00197",
+      "position_m": {
+        "x": -433.5,
+        "y": -580.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00198",
+      "position_m": {
+        "x": -434.9,
+        "y": -580.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00199",
+      "position_m": {
+        "x": -436.3,
+        "y": -581.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00200",
+      "position_m": {
+        "x": -437.2,
+        "y": -582.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00201",
+      "position_m": {
+        "x": -399.3,
+        "y": 593.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00202",
+      "position_m": {
+        "x": -399.9,
+        "y": 598.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00203",
+      "position_m": {
+        "x": -399.5,
+        "y": 600.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00204",
+      "position_m": {
+        "x": -382.1,
+        "y": 530.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00205",
+      "position_m": {
+        "x": -381.1,
+        "y": 525.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00206",
+      "position_m": {
+        "x": -380.2,
+        "y": 521.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00207",
+      "position_m": {
+        "x": -360.0,
+        "y": 414.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00208",
+      "position_m": {
+        "x": -359.2,
+        "y": 410.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00209",
+      "position_m": {
+        "x": -358.4,
+        "y": 406.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00210",
+      "position_m": {
+        "x": -347.0,
+        "y": 344.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00211",
+      "position_m": {
+        "x": -346.1,
+        "y": 340.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00212",
+      "position_m": {
+        "x": -345.4,
+        "y": 336.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00213",
+      "position_m": {
+        "x": -318.4,
+        "y": 193.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00214",
+      "position_m": {
+        "x": -319.2,
+        "y": 197.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00215",
+      "position_m": {
+        "x": -320.0,
+        "y": 202.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00216",
+      "position_m": {
+        "x": -592.9,
+        "y": -527.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00217",
+      "position_m": {
+        "x": -600.0,
+        "y": -522.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00218",
+      "position_m": {
+        "x": -447.6,
+        "y": -591.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00219",
+      "position_m": {
+        "x": -454.3,
+        "y": -591.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00220",
+      "position_m": {
+        "x": -459.1,
+        "y": -591.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00221",
+      "position_m": {
+        "x": -400.6,
+        "y": -585.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00222",
+      "position_m": {
+        "x": -405.8,
+        "y": -586.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00223",
+      "position_m": {
+        "x": -413.1,
+        "y": -587.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00224",
+      "position_m": {
+        "x": -434.1,
+        "y": -568.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00225",
+      "position_m": {
+        "x": -435.8,
+        "y": -563.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00226",
+      "position_m": {
+        "x": -432.4,
+        "y": -573.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00227",
+      "position_m": {
+        "x": -366.3,
+        "y": 408.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00228",
+      "position_m": {
+        "x": -367.5,
+        "y": 414.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00229",
+      "position_m": {
+        "x": -370.3,
+        "y": 420.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00230",
+      "position_m": {
+        "x": -477.4,
+        "y": -598.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00231",
+      "position_m": {
+        "x": 594.7,
+        "y": 600.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00232",
+      "position_m": {
+        "x": 600.0,
+        "y": 597.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00233",
+      "position_m": {
+        "x": -301.7,
+        "y": -566.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00234",
+      "position_m": {
+        "x": -300.0,
+        "y": -567.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00235",
+      "position_m": {
+        "x": -299.3,
+        "y": -567.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00236",
+      "position_m": {
+        "x": -298.3,
+        "y": -567.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00237",
+      "position_m": {
+        "x": -296.7,
+        "y": -567.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00238",
+      "position_m": {
+        "x": -291.8,
+        "y": -566.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00239",
+      "position_m": {
+        "x": -285.9,
+        "y": -565.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00240",
+      "position_m": {
+        "x": -278.8,
+        "y": -564.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00241",
+      "position_m": {
+        "x": -276.9,
+        "y": -563.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00242",
+      "position_m": {
+        "x": -274.9,
+        "y": -561.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00243",
+      "position_m": {
+        "x": -273.1,
+        "y": -560.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00244",
+      "position_m": {
+        "x": -271.5,
+        "y": -558.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00245",
+      "position_m": {
+        "x": -270.4,
+        "y": -556.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00246",
+      "position_m": {
+        "x": -269.2,
+        "y": -554.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00247",
+      "position_m": {
+        "x": -269.0,
+        "y": -550.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00248",
+      "position_m": {
+        "x": -269.4,
+        "y": -548.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00249",
+      "position_m": {
+        "x": -270.1,
+        "y": -546.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00250",
+      "position_m": {
+        "x": -270.9,
+        "y": -543.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00251",
+      "position_m": {
+        "x": -272.2,
+        "y": -542.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00252",
+      "position_m": {
+        "x": -273.6,
+        "y": -541.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00253",
+      "position_m": {
+        "x": -275.1,
+        "y": -540.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00254",
+      "position_m": {
+        "x": -276.5,
+        "y": -540.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00255",
+      "position_m": {
+        "x": -278.2,
+        "y": -539.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00256",
+      "position_m": {
+        "x": -280.1,
+        "y": -539.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00257",
+      "position_m": {
+        "x": -282.3,
+        "y": -540.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00258",
+      "position_m": {
+        "x": -284.3,
+        "y": -541.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00259",
+      "position_m": {
+        "x": -287.4,
+        "y": -544.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00260",
+      "position_m": {
+        "x": -295.1,
+        "y": -550.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00261",
+      "position_m": {
+        "x": -300.4,
+        "y": -555.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00262",
+      "position_m": {
+        "x": -302.0,
+        "y": -556.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00263",
+      "position_m": {
+        "x": -302.9,
+        "y": -558.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00264",
+      "position_m": {
+        "x": -303.6,
+        "y": -559.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00265",
+      "position_m": {
+        "x": -303.9,
+        "y": -561.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00266",
+      "position_m": {
+        "x": -303.5,
+        "y": -563.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00267",
+      "position_m": {
+        "x": -302.9,
+        "y": -564.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00268",
+      "position_m": {
+        "x": -437.4,
+        "y": -582.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00269",
+      "position_m": {
+        "x": -438.6,
+        "y": -583.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00270",
+      "position_m": {
+        "x": -439.7,
+        "y": -584.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00271",
+      "position_m": {
+        "x": -422.8,
+        "y": -582.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00272",
+      "position_m": {
+        "x": -424.3,
+        "y": -581.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00273",
+      "position_m": {
+        "x": -308.6,
+        "y": 210.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00274",
+      "position_m": {
+        "x": -309.3,
+        "y": 206.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00275",
+      "position_m": {
+        "x": -309.3,
+        "y": 203.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00276",
+      "position_m": {
+        "x": -308.5,
+        "y": 200.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00277",
+      "position_m": {
+        "x": -402.6,
+        "y": -599.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00278",
+      "position_m": {
+        "x": -393.7,
+        "y": -598.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00279",
+      "position_m": {
+        "x": -360.5,
+        "y": -591.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00280",
+      "position_m": {
+        "x": -310.2,
+        "y": -581.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00281",
+      "position_m": {
+        "x": -291.0,
+        "y": -577.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00282",
+      "position_m": {
+        "x": -283.9,
+        "y": -576.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00283",
+      "position_m": {
+        "x": -405.7,
+        "y": -600.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00284",
+      "position_m": {
+        "x": -520.0,
+        "y": -600.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00285",
+      "position_m": {
+        "x": -578.6,
+        "y": -556.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00286",
+      "position_m": {
+        "x": -600.0,
+        "y": -540.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00287",
+      "position_m": {
+        "x": -385.2,
+        "y": 510.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00288",
+      "position_m": {
+        "x": -382.3,
+        "y": 494.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00289",
+      "position_m": {
+        "x": -379.6,
+        "y": 481.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00290",
+      "position_m": {
+        "x": -376.5,
+        "y": 463.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00291",
+      "position_m": {
+        "x": -373.9,
+        "y": 449.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00292",
+      "position_m": {
+        "x": -372.9,
+        "y": 444.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00293",
+      "position_m": {
+        "x": -373.1,
+        "y": 442.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00294",
+      "position_m": {
+        "x": -373.6,
+        "y": 439.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00295",
+      "position_m": {
+        "x": -355.2,
+        "y": 442.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00296",
+      "position_m": {
+        "x": -350.9,
+        "y": 441.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00297",
+      "position_m": {
+        "x": -346.7,
+        "y": 440.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00298",
+      "position_m": {
+        "x": -343.2,
+        "y": 440.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00299",
+      "position_m": {
+        "x": -328.4,
+        "y": 443.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00300",
+      "position_m": {
+        "x": -306.5,
+        "y": 447.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00301",
+      "position_m": {
+        "x": -288.4,
+        "y": 451.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00302",
+      "position_m": {
+        "x": -271.0,
+        "y": 454.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00303",
+      "position_m": {
+        "x": -370.8,
+        "y": 540.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00304",
+      "position_m": {
+        "x": -354.8,
+        "y": 543.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00305",
+      "position_m": {
+        "x": -352.2,
+        "y": 543.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00306",
+      "position_m": {
+        "x": -349.1,
+        "y": 543.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00307",
+      "position_m": {
+        "x": -345.9,
+        "y": 542.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00308",
+      "position_m": {
+        "x": -345.5,
+        "y": 544.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00309",
+      "position_m": {
+        "x": -343.2,
+        "y": 550.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00310",
+      "position_m": {
+        "x": -336.8,
+        "y": 558.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00311",
+      "position_m": {
+        "x": -370.4,
+        "y": 528.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00312",
+      "position_m": {
+        "x": -366.5,
+        "y": 515.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00313",
+      "position_m": {
+        "x": -364.7,
+        "y": 510.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00314",
+      "position_m": {
+        "x": -362.0,
+        "y": 499.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00315",
+      "position_m": {
+        "x": -361.6,
+        "y": 497.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00316",
+      "position_m": {
+        "x": -361.6,
+        "y": 493.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00317",
+      "position_m": {
+        "x": -361.4,
+        "y": 480.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00318",
+      "position_m": {
+        "x": -360.9,
+        "y": 474.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00319",
+      "position_m": {
+        "x": -357.2,
+        "y": 451.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00320",
+      "position_m": {
+        "x": -397.3,
+        "y": 584.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00321",
+      "position_m": {
+        "x": -430.4,
+        "y": 143.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Vuosaari Harbour launch point",
+      "node_id": "road-00322",
+      "position_m": {
+        "x": -532.0,
+        "y": 124.3,
+        "z": 8.0
+      },
+      "semantic": "launch"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00323",
+      "position_m": {
+        "x": -600.0,
+        "y": 111.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00324",
+      "position_m": {
+        "x": -379.2,
+        "y": 147.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00325",
+      "position_m": {
+        "x": -353.8,
+        "y": 151.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00326",
+      "position_m": {
+        "x": -339.6,
+        "y": 154.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00327",
+      "position_m": {
+        "x": -328.6,
+        "y": 156.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00328",
+      "position_m": {
+        "x": -321.9,
+        "y": 158.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00329",
+      "position_m": {
+        "x": -318.8,
+        "y": 159.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00330",
+      "position_m": {
+        "x": -316.4,
+        "y": 160.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00331",
+      "position_m": {
+        "x": -314.2,
+        "y": 162.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00332",
+      "position_m": {
+        "x": -312.0,
+        "y": 164.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00333",
+      "position_m": {
+        "x": -310.0,
+        "y": 166.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00334",
+      "position_m": {
+        "x": -308.1,
+        "y": 169.2,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00335",
+      "position_m": {
+        "x": -306.8,
+        "y": 171.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00336",
+      "position_m": {
+        "x": -305.9,
+        "y": 175.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00337",
+      "position_m": {
+        "x": -305.5,
+        "y": 178.9,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00338",
+      "position_m": {
+        "x": -305.8,
+        "y": 183.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00339",
+      "position_m": {
+        "x": -306.5,
+        "y": 187.4,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00340",
+      "position_m": {
+        "x": -454.5,
+        "y": -600.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00341",
+      "position_m": {
+        "x": -361.2,
+        "y": 382.3,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00342",
+      "position_m": {
+        "x": -496.2,
+        "y": -593.7,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00343",
+      "position_m": {
+        "x": -89.2,
+        "y": -421.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00344",
+      "position_m": {
+        "x": -314.0,
+        "y": 600.0,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00345",
+      "position_m": {
+        "x": -600.0,
+        "y": -484.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00346",
+      "position_m": {
+        "x": -595.8,
+        "y": -491.6,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00347",
+      "position_m": {
+        "x": -593.5,
+        "y": -496.5,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00348",
+      "position_m": {
+        "x": -593.1,
+        "y": -502.1,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    },
+    {
+      "label": "Official road network",
+      "node_id": "road-00349",
+      "position_m": {
+        "x": -593.5,
+        "y": -507.8,
+        "z": 8.0
+      },
+      "semantic": "outdoor"
+    }
+  ],
+  "schema_version": "dronedream.map-graph.v1"
+}

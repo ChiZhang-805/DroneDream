@@ -114,6 +114,7 @@ describe("OrganizationPage", () => {
     expect(await screen.findByRole("heading", { name: "Aerial Systems Lab" })).toBeVisible();
     expect(screen.getByText("1 / 3")).toBeVisible();
     expect(screen.getAllByRole("row")).toHaveLength(4);
+    expect(container.querySelectorAll(".organization-member-placeholder")).toHaveLength(5);
     const ownerRow = screen.getByText("owner@example.test").closest("tr");
     expect(ownerRow).not.toBeNull();
     expect(within(ownerRow!).getAllByLabelText(
@@ -139,6 +140,27 @@ describe("OrganizationPage", () => {
     expect(adminRow).not.toBeNull();
     expect(adminRow!.querySelector(".organization-avatar img"))
       .toHaveAttribute("src", "https://accounts.example.test/current-avatar.jpg");
+  });
+
+  it("falls back to the authenticated provider avatar in the organization table", async () => {
+    const accountId = "22222222-2222-4222-8222-222222222222";
+    render(
+      <OrganizationPage
+        locale="en"
+        accountId={accountId}
+        accountAvatarUrl="https://accounts.example.test/missing-avatar.jpg"
+        accountAvatarFallbackUrl="https://identity.example.test/current-avatar.jpg"
+      />,
+    );
+
+    const adminRow = (await screen.findByText("admin@example.test")).closest("tr");
+    const image = adminRow!.querySelector<HTMLImageElement>(".organization-avatar img");
+    expect(image).toHaveAttribute("src", "https://accounts.example.test/missing-avatar.jpg");
+    fireEvent.error(image!);
+    await waitFor(() => {
+      expect(adminRow!.querySelector(".organization-avatar img"))
+        .toHaveAttribute("src", "https://identity.example.test/current-avatar.jpg");
+    });
   });
 
   it("adds an existing account with an owner-selected delegated role", async () => {

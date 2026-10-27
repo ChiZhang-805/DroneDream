@@ -7,12 +7,15 @@ use std::{
     path::{Component, Path, PathBuf},
     sync::{
         atomic::{AtomicBool, Ordering},
-        Mutex,
+        Arc, Mutex,
     },
     time::Duration,
 };
 use tauri::{App, AppHandle, Manager};
-use tauri_plugin_shell::{process::CommandChild, ShellExt};
+use tauri_plugin_shell::{
+    process::{CommandChild, CommandEvent},
+    ShellExt,
+};
 use uuid::Uuid;
 
 const MAX_REQUEST_BYTES: usize = 256 * 1024 * 1024;
@@ -222,7 +225,7 @@ fn reserve_loopback_port() -> Result<u16, String> {
         .map_err(|error| format!("Unable to read the AGENT Core port: {error}"))
 }
 
-fn wait_until_ready(port: u16) -> Result<(), String> {
+fn wait_until_ready(port: u16, terminated: &AtomicBool) -> Result<(), String> {
     let client = reqwest::blocking::Client::builder()
         .no_proxy()
         .connect_timeout(Duration::from_millis(100))
@@ -232,6 +235,9 @@ fn wait_until_ready(port: u16) -> Result<(), String> {
         .map_err(|error| format!("Unable to create the AGENT Core health client: {error}"))?;
     let health_url = format!("http://127.0.0.1:{port}/health");
     for _ in 0..STARTUP_HEALTH_ATTEMPTS {
+        if terminated.load(Ordering::Acquire) {
+            return Err("AGENT Core exited before its health endpoint became ready.".to_owned());
+        }
         if let Ok(response) = client.get(&health_url).send() {
             if response.status().is_success() {
                 if let Ok(body) = response.text() {
@@ -289,8 +295,17 @@ fn launch(app: &AppHandle) -> Result<(AgentCoreInfo, CommandChild), String> {
     let (mut receiver, child) = sidecar
         .spawn()
         .map_err(|error| format!("Unable to start the AGENT Core sidecar: {error}"))?;
-    tauri::async_runtime::spawn(async move { while receiver.recv().await.is_some() {} });
-    if let Err(error) = wait_until_ready(port) {
+    let terminated = Arc::new(AtomicBool::new(false));
+    let receiver_terminated = Arc::clone(&terminated);
+    tauri::async_runtime::spawn(async move {
+        while let Some(event) = receiver.recv().await {
+            if matches!(event, CommandEvent::Terminated(_)) {
+                receiver_terminated.store(true, Ordering::Release);
+                break;
+            }
+        }
+    });
+    if let Err(error) = wait_until_ready(port, &terminated) {
         let _ = child.kill();
         return Err(error);
     }
@@ -820,6 +835,15 @@ fn core_request_timeout(method: &str, path: &str) -> Duration {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn core_health_wait_stops_immediately_after_sidecar_exit() {
+        let terminated = AtomicBool::new(true);
+        assert_eq!(
+            wait_until_ready(9, &terminated).unwrap_err(),
+            "AGENT Core exited before its health endpoint became ready."
+        );
+    }
 
     #[test]
     fn multi_call_planning_does_not_use_a_single_call_timeout() {

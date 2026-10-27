@@ -1,0 +1,1639 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <model name="vuosaari-harbour">
+    <static>true</static>
+    <link name="ground">
+      <collision name="ground-collision">
+        <pose>0 0 -0.1 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>1200 1200 0.2</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name="orthophoto-ground">
+        <geometry>
+          <mesh>
+            <uri>meshes/vuosaari-harbour-ground.obj</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <pbr>
+            <metal>
+              <albedo_map>materials/textures/vuosaari-harbour-orthophoto.jpg</albedo_map>
+              <roughness>1.0</roughness>
+            </metal>
+          </pbr>
+        </material>
+      </visual>
+    </link>
+    <link name="building-visuals">
+      <visual name="registered-building-visuals">
+        <geometry>
+          <mesh>
+            <uri>meshes/vuosaari-harbour-buildings.obj</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+    <link name="building-collision-0000">
+      <collision name="1001253909-0-collision">
+        <pose>76.2199 -597.673 3.4 0 0 3.14159265</pose>
+        <geometry>
+          <box>
+            <size>24.554 4.6541 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0001">
+      <collision name="100125393C-0-collision">
+        <pose>-480.4865 -410.49 8.5 0 0 0.77289278</pose>
+        <geometry>
+          <box>
+            <size>258.0154 136.0083 17.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0002">
+      <collision name="100125394D-0-collision">
+        <pose>-383.7288 -496.0896 2.0 0 0 2.5469503</pose>
+        <geometry>
+          <box>
+            <size>27.1623 6.7959 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0003">
+      <collision name="100125395E-0-collision">
+        <pose>-276.1927 482.3601 2.0 0 0 2.08463922</pose>
+        <geometry>
+          <box>
+            <size>43.7982 9.2831 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0004">
+      <collision name="100125397H-0-collision">
+        <pose>-327.567 564.3682 2.0 0 0 1.07613452</pose>
+        <geometry>
+          <box>
+            <size>12.7663 4.8002 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0005">
+      <collision name="100125398J-0-collision">
+        <pose>-288.3418 540.8592 20.4 0 0 -0.49507472</pose>
+        <geometry>
+          <box>
+            <size>86.3562 44.2029 40.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0006">
+      <collision name="100125399K-0-collision">
+        <pose>-319.624 467.4549 2.0 0 0 0.52466763</pose>
+        <geometry>
+          <box>
+            <size>69.2781 16.4495 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0007">
+      <collision name="100125430K-0-collision">
+        <pose>265.1557 43.912 2.0 0 0 0.19437399</pose>
+        <geometry>
+          <box>
+            <size>19.58 15.3805 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0008">
+      <collision name="100125432M-0-collision">
+        <pose>383.8464 228.1148 2.0 0 0 0.70584918</pose>
+        <geometry>
+          <box>
+            <size>52.2799 26.7006 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0009">
+      <collision name="100125434P-0-collision">
+        <pose>597.4127 76.9348 6.8 0 0 -2.43574775</pose>
+        <geometry>
+          <box>
+            <size>20.7525 16.3706 13.6</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0010">
+      <collision name="100125435R-0-collision">
+        <pose>492.0648 562.9736 2.0 0 0 2.73733297</pose>
+        <geometry>
+          <box>
+            <size>263.2204 84.7585 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0011">
+      <collision name="100125436S-0-collision">
+        <pose>-63.6307 573.5869 2.0 0 0 0.95577368</pose>
+        <geometry>
+          <box>
+            <size>40.6335 24.8343 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0012">
+      <collision name="100125438U-0-collision">
+        <pose>-79.4456 142.3645 2.0 0 0 1.75749262</pose>
+        <geometry>
+          <box>
+            <size>396.5958 50.5995 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0013">
+      <collision name="100125439V-0-collision">
+        <pose>254.8565 556.6963 2.0 0 0 2.56604299</pose>
+        <geometry>
+          <box>
+            <size>269.8656 71.8559 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0014">
+      <collision name="100125440W-0-collision">
+        <pose>144.8114 -435.4031 6.8 0 0 2.16595462</pose>
+        <geometry>
+          <box>
+            <size>47.2481 18.1143 13.6</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0015">
+      <collision name="100125441X-0-collision">
+        <pose>107.8673 -444.7404 5.1 0 0 2.16597332</pose>
+        <geometry>
+          <box>
+            <size>42.3991 36.55 10.2</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0016">
+      <collision name="1001254452-0-collision">
+        <pose>-5.9807 -439.6323 3.4 0 0 0.18671694</pose>
+        <geometry>
+          <box>
+            <size>75.0493 20.6501 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0017">
+      <collision name="1021576203-0-collision">
+        <pose>-149.5019 -283.8513 5.1 0 0 1.75761153</pose>
+        <geometry>
+          <box>
+            <size>282.4957 263.2773 10.2</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0018">
+      <collision name="102328599J-0-collision">
+        <pose>-178.716 24.8985 2.0 0 0 -1.28718086</pose>
+        <geometry>
+          <box>
+            <size>261.5812 87.2459 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0019">
+      <collision name="102328600K-0-collision">
+        <pose>-289.8493 3.9058 2.0 0 0 1.66057718</pose>
+        <geometry>
+          <box>
+            <size>261.581 87.2462 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0020">
+      <collision name="102328601L-0-collision">
+        <pose>-400.9828 -17.0867 2.0 0 0 1.85440986</pose>
+        <geometry>
+          <box>
+            <size>261.5812 87.2459 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0021">
+      <collision name="102328604P-0-collision">
+        <pose>-246.0909 -508.5619 3.4 0 0 1.7651855</pose>
+        <geometry>
+          <box>
+            <size>59.9985 25.2996 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0022">
+      <collision name="102328608U-0-collision">
+        <pose>-504.3054 236.5415 5.1 0 0 -2.95771602</pose>
+        <geometry>
+          <box>
+            <size>108.9821 81.443 10.2</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0023">
+      <collision name="102328609V-0-collision">
+        <pose>-396.7868 184.691 2.0 0 0 0.1797179</pose>
+        <geometry>
+          <box>
+            <size>20.453 7.2416 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0024">
+      <collision name="102328610W-0-collision">
+        <pose>-522.5321 176.3799 2.0 0 0 1.75625899</pose>
+        <geometry>
+          <box>
+            <size>18.6741 11.3512 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0025">
+      <collision name="102328611X-0-collision">
+        <pose>-477.3313 184.9135 2.0 0 0 -2.95587507</pose>
+        <geometry>
+          <box>
+            <size>22.3559 18.3581 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0026">
+      <collision name="102328612Y-0-collision">
+        <pose>-561.8434 160.6375 2.0 0 0 -1.37252265</pose>
+        <geometry>
+          <box>
+            <size>9.3128 7.784 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0027">
+      <collision name="1023286130-0-collision">
+        <pose>-475.8985 312.5559 5.1 0 0 -2.95490567</pose>
+        <geometry>
+          <box>
+            <size>24.6403 14.6401 10.2</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0028">
+      <collision name="1023286174-0-collision">
+        <pose>-437.8564 293.2977 3.4 0 0 -1.38272448</pose>
+        <geometry>
+          <box>
+            <size>7.8982 6.029 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0029">
+      <collision name="1023286185-0-collision">
+        <pose>-587.3445 230.3478 5.1 0 0 1.75749837</pose>
+        <geometry>
+          <box>
+            <size>72.3098 34.5177 10.2</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0030">
+      <collision name="1023286185-1-collision">
+        <pose>-579.1441 288.0687 5.1 0 0 0.18532363</pose>
+        <geometry>
+          <box>
+            <size>46.9587 24.1114 10.2</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0031">
+      <collision name="102328628F-0-collision">
+        <pose>-531.0343 260.4047 2.0 0 0 1.75687303</pose>
+        <geometry>
+          <box>
+            <size>24.1652 7.6 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0032">
+      <collision name="102328629H-0-collision">
+        <pose>-397.9721 520.4893 2.0 0 0 -2.42936191</pose>
+        <geometry>
+          <box>
+            <size>7.4376 5.5736 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0033">
+      <collision name="102328631K-0-collision">
+        <pose>-557.5073 359.6963 2.0 0 0 0.49926041</pose>
+        <geometry>
+          <box>
+            <size>50.6826 20.6434 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0034">
+      <collision name="102328632L-0-collision">
+        <pose>-520.0774 388.1577 2.0 0 0 -2.94929833</pose>
+        <geometry>
+          <box>
+            <size>13.217 6.1911 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0035">
+      <collision name="102328634N-0-collision">
+        <pose>-551.9369 586.3669 3.4 0 0 -2.08583174</pose>
+        <geometry>
+          <box>
+            <size>54.082 40.1978 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0036">
+      <collision name="102328634N-1-collision">
+        <pose>-487.9586 590.9628 3.4 0 0 0.0</pose>
+        <geometry>
+          <box>
+            <size>42.1715 18.0745 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0037">
+      <collision name="1035130654-0-collision">
+        <pose>38.8934 194.6259 2.0 0 0 -1.5244253</pose>
+        <geometry>
+          <box>
+            <size>99.9935 40.0771 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0038">
+      <collision name="103565602V-0-collision">
+        <pose>145.103 68.4474 3.4 0 0 1.61788671</pose>
+        <geometry>
+          <box>
+            <size>428.0098 71.678 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0039">
+      <collision name="1037285187-0-collision">
+        <pose>3.4574 307.7076 2.0 0 0 1.68910011</pose>
+        <geometry>
+          <box>
+            <size>110.3821 40.0066 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0040">
+      <collision name="1037929367-0-collision">
+        <pose>-309.2234 408.3679 5.1 0 0 -2.95489359</pose>
+        <geometry>
+          <box>
+            <size>55.6357 42.3358 10.2</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0041">
+      <collision name="103812051U-0-collision">
+        <pose>-292.9127 281.503 2.0 0 0 -1.38379495</pose>
+        <geometry>
+          <box>
+            <size>72.3393 30.0622 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0042">
+      <collision name="103843419P-0-collision">
+        <pose>-598.7861 161.2389 3.4 0 0 1.57079633</pose>
+        <geometry>
+          <box>
+            <size>13.4049 2.4278 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0043">
+      <collision name="103887006R-0-collision">
+        <pose>132.8439 -538.0356 2.0 0 0 1.75583254</pose>
+        <geometry>
+          <box>
+            <size>21.3243 11.9718 4.0</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0044">
+      <collision name="1042129557-0-collision">
+        <pose>-184.996 -324.363 3.4 0 0 1.76654767</pose>
+        <geometry>
+          <box>
+            <size>22.8709 12.6349 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0045">
+      <collision name="104218821E-0-collision">
+        <pose>-441.4754 506.5045 3.4 0 0 0.18629329</pose>
+        <geometry>
+          <box>
+            <size>22.643 17.8663 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0046">
+      <collision name="791791-0-collision">
+        <pose>-535.0082 305.4888 3.4 0 0 0.18633601</pose>
+        <geometry>
+          <box>
+            <size>4.0671 3.9098 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0047">
+      <collision name="840811-0-collision">
+        <pose>-479.3766 374.7337 3.4 0 0 -1.4129065</pose>
+        <geometry>
+          <box>
+            <size>5.9381 3.0271 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0048">
+      <collision name="840814-0-collision">
+        <pose>-530.4142 306.3023 3.4 0 0 -1.38374502</pose>
+        <geometry>
+          <box>
+            <size>6.5997 3.784 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0049">
+      <collision name="840815-0-collision">
+        <pose>-231.5978 419.2625 3.4 0 0 -1.38410194</pose>
+        <geometry>
+          <box>
+            <size>56.6649 16.6704 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0050">
+      <collision name="840818-0-collision">
+        <pose>-183.4153 462.8954 3.4 0 0 -2.94717954</pose>
+        <geometry>
+          <box>
+            <size>6.2153 3.4706 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0051">
+      <collision name="840825-0-collision">
+        <pose>-53.4417 546.3685 3.4 0 0 0.95342396</pose>
+        <geometry>
+          <box>
+            <size>9.9995 5.0002 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0052">
+      <collision name="840829-0-collision">
+        <pose>251.6791 236.8403 3.4 0 0 -1.53900762</pose>
+        <geometry>
+          <box>
+            <size>7.1704 3.0965 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0053">
+      <collision name="840830-0-collision">
+        <pose>94.4999 456.4909 3.4 0 0 -0.25811141</pose>
+        <geometry>
+          <box>
+            <size>6.3545 4.0235 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0054">
+      <collision name="840832-0-collision">
+        <pose>209.6126 -253.8533 3.4 0 0 -2.43204184</pose>
+        <geometry>
+          <box>
+            <size>25.3169 14.0491 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0055">
+      <collision name="840834-0-collision">
+        <pose>402.3872 170.5199 3.4 0 0 -2.44586177</pose>
+        <geometry>
+          <box>
+            <size>9.5271 2.7413 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0056">
+      <collision name="840835-0-collision">
+        <pose>380.1011 507.3031 3.4 0 0 1.16462966</pose>
+        <geometry>
+          <box>
+            <size>17.3596 11.9692 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0057">
+      <collision name="840841-0-collision">
+        <pose>158.3969 305.6198 3.4 0 0 -2.43202223</pose>
+        <geometry>
+          <box>
+            <size>22.8809 11.9551 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0058">
+      <collision name="840842-0-collision">
+        <pose>510.2061 363.7261 3.4 0 0 0.71318756</pose>
+        <geometry>
+          <box>
+            <size>7.76 3.3933 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0059">
+      <collision name="840843-0-collision">
+        <pose>394.4444 -94.6039 3.4 0 0 -2.4357713</pose>
+        <geometry>
+          <box>
+            <size>11.1803 7.76 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0060">
+      <collision name="840844-0-collision">
+        <pose>482.6506 217.8715 3.4 0 0 -2.43030872</pose>
+        <geometry>
+          <box>
+            <size>10.581 2.6776 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="building-collision-0061">
+      <collision name="873989-0-collision">
+        <pose>25.3174 374.8664 3.4 0 0 -3.0219079</pose>
+        <geometry>
+          <box>
+            <size>7.5972 6.3864 6.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0000">
+      <collision name="tree-canopy-0000">
+        <pose>164.167 -561.086 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0001">
+      <collision name="tree-canopy-0001">
+        <pose>169.001 -560.266 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0002">
+      <collision name="tree-canopy-0002">
+        <pose>178.898 -553.103 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0003">
+      <collision name="tree-canopy-0003">
+        <pose>-523.616 -562.339 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0004">
+      <collision name="tree-canopy-0004">
+        <pose>-515.918 -566.887 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0005">
+      <collision name="tree-canopy-0005">
+        <pose>-507.415 -570.711 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0006">
+      <collision name="tree-canopy-0006">
+        <pose>-498.721 -572.529 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0007">
+      <collision name="tree-canopy-0007">
+        <pose>-470.325 -579.118 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0008">
+      <collision name="tree-canopy-0008">
+        <pose>-461.795 -581.654 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0009">
+      <collision name="tree-canopy-0009">
+        <pose>-397.939 -575.434 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0010">
+      <collision name="tree-canopy-0010">
+        <pose>-388.828 -573.831 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0011">
+      <collision name="tree-canopy-0011">
+        <pose>-380.496 -571.814 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0012">
+      <collision name="tree-canopy-0012">
+        <pose>-372.507 -570.559 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0013">
+      <collision name="tree-canopy-0013">
+        <pose>-364.320 484.249 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0014">
+      <collision name="tree-canopy-0014">
+        <pose>-363.279 470.596 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0015">
+      <collision name="tree-canopy-0015">
+        <pose>-360.617 456.208 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0016">
+      <collision name="tree-canopy-0016">
+        <pose>-351.254 405.941 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0017">
+      <collision name="tree-canopy-0017">
+        <pose>-349.082 395.318 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0018">
+      <collision name="tree-canopy-0018">
+        <pose>-347.001 384.327 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0019">
+      <collision name="tree-canopy-0019">
+        <pose>-337.729 334.795 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0020">
+      <collision name="tree-canopy-0020">
+        <pose>-330.998 299.344 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0021">
+      <collision name="tree-canopy-0021">
+        <pose>-328.642 287.406 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0022">
+      <collision name="tree-canopy-0022">
+        <pose>-552.883 -558.971 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0023">
+      <collision name="tree-canopy-0023">
+        <pose>-593.377 -538.688 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0024">
+      <collision name="tree-canopy-0024">
+        <pose>-599.550 -533.583 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0025">
+      <collision name="tree-canopy-0025">
+        <pose>-326.653 275.956 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0026">
+      <collision name="tree-canopy-0026">
+        <pose>-324.266 263.956 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0027">
+      <collision name="tree-canopy-0027">
+        <pose>-321.971 252.292 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0028">
+      <collision name="tree-canopy-0028">
+        <pose>-363.546 -568.805 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0029">
+      <collision name="tree-canopy-0029">
+        <pose>-354.746 -567.164 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0030">
+      <collision name="tree-canopy-0030">
+        <pose>-596.951 -496.861 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0031">
+      <collision name="tree-canopy-0031">
+        <pose>-596.653 -505.878 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0032">
+      <collision name="tree-canopy-0032">
+        <pose>-588.586 -521.763 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0033">
+      <collision name="tree-canopy-0033">
+        <pose>-582.827 -525.309 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0034">
+      <collision name="tree-canopy-0034">
+        <pose>-577.015 -528.917 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0035">
+      <collision name="tree-canopy-0035">
+        <pose>-569.300 -533.537 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0036">
+      <collision name="tree-canopy-0036">
+        <pose>-561.756 -538.385 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0037">
+      <collision name="tree-canopy-0037">
+        <pose>-554.202 -543.119 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0038">
+      <collision name="tree-canopy-0038">
+        <pose>-546.551 -547.941 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0039">
+      <collision name="tree-canopy-0039">
+        <pose>-538.821 -552.783 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0040">
+      <collision name="tree-canopy-0040">
+        <pose>-531.142 -557.562 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0041">
+      <collision name="tree-canopy-0041">
+        <pose>-346.378 -565.139 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0042">
+      <collision name="tree-canopy-0042">
+        <pose>-337.196 -563.519 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0043">
+      <collision name="tree-canopy-0043">
+        <pose>-281.918 -569.973 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0044">
+      <collision name="tree-canopy-0044">
+        <pose>-290.985 -571.603 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0045">
+      <collision name="tree-canopy-0045">
+        <pose>-299.937 -573.242 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0046">
+      <collision name="tree-canopy-0046">
+        <pose>-308.364 -574.868 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0047">
+      <collision name="tree-canopy-0047">
+        <pose>-316.055 -576.730 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0048">
+      <collision name="tree-canopy-0048">
+        <pose>-324.818 -578.210 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0049">
+      <collision name="tree-canopy-0049">
+        <pose>-333.958 -580.008 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0050">
+      <collision name="tree-canopy-0050">
+        <pose>-342.464 -581.615 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0051">
+      <collision name="tree-canopy-0051">
+        <pose>-351.239 -583.361 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0052">
+      <collision name="tree-canopy-0052">
+        <pose>-359.749 -585.422 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0053">
+      <collision name="tree-canopy-0053">
+        <pose>-368.788 -586.856 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0054">
+      <collision name="tree-canopy-0054">
+        <pose>-377.191 -588.890 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0055">
+      <collision name="tree-canopy-0055">
+        <pose>-385.981 -590.264 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0056">
+      <collision name="tree-canopy-0056">
+        <pose>-394.728 -591.967 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0057">
+      <collision name="tree-canopy-0057">
+        <pose>-463.313 -599.519 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0058">
+      <collision name="tree-canopy-0058">
+        <pose>-472.183 -599.782 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0059">
+      <collision name="tree-canopy-0059">
+        <pose>-499.675 -591.561 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0060">
+      <collision name="tree-canopy-0060">
+        <pose>-507.070 -586.356 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0061">
+      <collision name="tree-canopy-0061">
+        <pose>-514.643 -582.052 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0062">
+      <collision name="tree-canopy-0062">
+        <pose>-522.383 -577.326 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0063">
+      <collision name="tree-canopy-0063">
+        <pose>-529.905 -572.416 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0064">
+      <collision name="tree-canopy-0064">
+        <pose>-537.351 -567.816 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0065">
+      <collision name="tree-canopy-0065">
+        <pose>-545.324 -562.948 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0066">
+      <collision name="tree-canopy-0066">
+        <pose>-262.493 -510.137 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0067">
+      <collision name="tree-canopy-0067">
+        <pose>-265.404 -495.664 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0068">
+      <collision name="tree-canopy-0068">
+        <pose>-262.447 -510.143 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0069">
+      <collision name="tree-canopy-0069">
+        <pose>-297.537 -449.877 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0070">
+      <collision name="tree-canopy-0070">
+        <pose>-296.279 -455.839 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0071">
+      <collision name="tree-canopy-0071">
+        <pose>-294.875 -462.767 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0072">
+      <collision name="tree-canopy-0072">
+        <pose>-293.170 -470.312 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0073">
+      <collision name="tree-canopy-0073">
+        <pose>-291.826 -477.499 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0074">
+      <collision name="tree-canopy-0074">
+        <pose>-290.505 -485.150 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0075">
+      <collision name="tree-canopy-0075">
+        <pose>-289.022 -492.129 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0076">
+      <collision name="tree-canopy-0076">
+        <pose>-287.353 -500.197 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0077">
+      <collision name="tree-canopy-0077">
+        <pose>-286.264 -506.898 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0078">
+      <collision name="tree-canopy-0078">
+        <pose>-285.105 -512.739 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0079">
+      <collision name="tree-canopy-0079">
+        <pose>-283.668 -520.136 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0080">
+      <collision name="tree-canopy-0080">
+        <pose>-282.300 -526.581 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0081">
+      <collision name="tree-canopy-0081">
+        <pose>-257.465 -536.308 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0082">
+      <collision name="tree-canopy-0082">
+        <pose>-258.743 -529.421 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0083">
+      <collision name="tree-canopy-0083">
+        <pose>-259.807 -524.593 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0084">
+      <collision name="tree-canopy-0084">
+        <pose>-260.659 -520.261 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0085">
+      <collision name="tree-canopy-0085">
+        <pose>-261.724 -514.936 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0086">
+      <collision name="tree-canopy-0086">
+        <pose>-263.569 -505.067 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0087">
+      <collision name="tree-canopy-0087">
+        <pose>-264.492 -500.167 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+    <link name="tree-0088">
+      <collision name="tree-canopy-0088">
+        <pose>-266.337 -490.440 3.750 0 0 0</pose>
+        <geometry>
+          <cylinder>
+            <radius>2.500</radius>
+            <length>7.500</length>
+          </cylinder>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

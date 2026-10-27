@@ -1741,7 +1741,10 @@ function SettingsDialog({
                 />
               </div>
               <div className="quick-settings-item quick-settings-model">
-                <span>{quickCopy.model}</span>
+                <span className="quick-settings-leading-label">
+                  <BotMessageSquare aria-hidden="true" />
+                  <span>{quickCopy.model}</span>
+                </span>
                 <AssistantModelPicker
                   ariaLabel={quickCopy.model}
                   chooseModelLabel={quickCopy.model}
@@ -1766,40 +1769,34 @@ function SettingsDialog({
             </>
           ) : null}
           {access.desktopRuntime ? (
-            <button
-              type="button"
+            <div
               className="quick-settings-item quick-settings-runtime"
-              onClick={async () => {
-                await flushPendingPreferenceSaveForNavigation();
-                onOpenAllSettings?.(
-                  "runtime",
-                  preferenceHydratedRef.current ? experiencePreferenceDraft : undefined,
-                );
-              }}
+              aria-label={`${quickCopy.runtime}: ${statusLabel}`}
             >
               <MonitorCog aria-hidden="true" />
               <span>{quickCopy.runtime}</span>
               <strong data-health={level}>{statusLabel}</strong>
-              <ChevronRight aria-hidden="true" />
-            </button>
+            </div>
           ) : null}
         </div>
-        <footer className="quick-settings-footer">
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={async () => {
-              await flushPendingPreferenceSaveForNavigation();
-              onOpenAllSettings?.(
-                "general",
-                preferenceHydratedRef.current ? experiencePreferenceDraft : undefined,
-              );
-            }}
-          >
-            <Settings aria-hidden="true" />
-            {quickCopy.allSettings}
-          </button>
-        </footer>
+        {onOpenAllSettings ? (
+          <footer className="quick-settings-footer">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={async () => {
+                await flushPendingPreferenceSaveForNavigation();
+                onOpenAllSettings(
+                  "general",
+                  preferenceHydratedRef.current ? experiencePreferenceDraft : undefined,
+                );
+              }}
+            >
+              <Settings aria-hidden="true" />
+              {quickCopy.allSettings}
+            </button>
+          </footer>
+        ) : null}
       </section>
     );
   }
@@ -2805,17 +2802,29 @@ function AccountAvatar({
   account: ReturnType<typeof useAuth>["account"];
   className: string;
 }) {
-  const avatarUrl = account?.avatarUrl ?? null;
-  const [avatarFailed, setAvatarFailed] = useState(false);
+  const primaryAvatarUrl = account?.avatarUrl ?? null;
+  const fallbackAvatarUrl = account?.avatarFallbackUrl ?? null;
+  const avatarUrls = [primaryAvatarUrl, fallbackAvatarUrl].filter(
+    (candidate, index, values): candidate is string =>
+      Boolean(candidate) && values.indexOf(candidate) === index,
+  );
+  const [avatarIndex, setAvatarIndex] = useState(0);
 
   useEffect(() => {
-    setAvatarFailed(false);
-  }, [avatarUrl]);
+    setAvatarIndex(0);
+  }, [primaryAvatarUrl, fallbackAvatarUrl]);
+
+  const avatarUrl = avatarUrls[avatarIndex] ?? null;
 
   return (
     <span className={className} aria-hidden="true">
-      {avatarUrl && !avatarFailed ? (
-        <img src={avatarUrl} alt="" onError={() => setAvatarFailed(true)} />
+      {avatarUrl ? (
+        <img
+          key={avatarUrl}
+          src={avatarUrl}
+          alt=""
+          onError={() => setAvatarIndex((current) => current + 1)}
+        />
       ) : account ? (
         account.displayName.slice(0, 1).toUpperCase()
       ) : (
@@ -3237,14 +3246,21 @@ export function AccountDialog({
 
   return (
     <section
-      className={`account-dialog${auth.configured && !auth.account ? " is-auth-entry" : ""}`}
+      className={`account-dialog${auth.configured && !auth.account ? " is-auth-entry" : ""}${auth.account ? " is-profile" : ""}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby={auth.account ? undefined : "account-dialog-title"}
       aria-label={auth.account ? copy.title : undefined}
     >
       <header>
-        <BrandLockup edition="universal" className="account-dialog-brand" />
+        {auth.account ? (
+          <div className="account-dialog-title">
+            <CircleUserRound aria-hidden="true" strokeWidth={1.8} />
+            <h2>{copy.editProfile}</h2>
+          </div>
+        ) : (
+          <BrandLockup edition="universal" className="account-dialog-brand" />
+        )}
         <div className="account-dialog-header-actions">
           {auth.configured && !auth.account && !desktopRuntime ? (
             <button
@@ -4425,7 +4441,6 @@ function AppShellContent() {
               edition={activeThemeEdition}
               initialTab={settingsInitialTab}
               onClose={closeSettings}
-              onOpenAllSettings={openAllSettings}
               onOpenExternal={openExternalNavigation}
               presentation="quick"
               preferenceSaveQueueRef={settingsPreferenceSaveQueueRef}

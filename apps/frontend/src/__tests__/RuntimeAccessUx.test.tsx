@@ -75,6 +75,7 @@ import { AppShell } from "../AppShell";
 import { I18nProvider } from "../i18n/I18nProvider";
 import { DesktopSetup } from "../pages/DesktopSetup";
 import { resetDesktopReadinessSession } from "../desktop/readiness";
+import { openAppSettings } from "../appSettings";
 
 const missingRuntime = {
   runtimeName: "DroneDreamRuntime",
@@ -141,9 +142,7 @@ const prerequisites = {
 };
 
 async function openSettingsWorkspace() {
-  fireEvent.click(screen.getByRole("button", { name: /Settings|设置/ }));
-  const quickSettings = screen.getByRole("dialog", { name: /Settings|设置/ });
-  fireEvent.click(within(quickSettings).getByRole("button", { name: /All settings|全部设置/ }));
+  openAppSettings("general");
   return screen.findByRole("region", { name: /Settings|设置/ });
 }
 

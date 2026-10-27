@@ -608,6 +608,12 @@ describe("DesktopSetup", () => {
     renderPage();
     await waitFor(() => expect(coreStartupMock.check).toHaveBeenCalled());
     expect(screen.getByTestId("current-route")).toHaveTextContent("/");
+    expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
+      .toHaveAttribute("aria-valuenow", "85");
+    expect(screen.getByText("85%")).toBeInTheDocument();
+    expect(screen.getByText("Starting services")).toBeInTheDocument();
+    expect(screen.getByText("Connect services").closest("li"))
+      .toHaveAttribute("aria-current", "step");
     expect(screen.queryByRole("link", { name: "Open DroneDream workspace" })).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });

@@ -5,6 +5,7 @@ export type CatalogAssetKind = "map" | "vehicle";
 export type CatalogAssetDefinition = {
   key: string;
   resourceId: string;
+  assetId?: string;
   zh: string;
   en: string;
   aliases: string[];
@@ -20,6 +21,7 @@ const MAPS: CatalogAssetDefinition[] = [
   {
     key: "kumpula-campus",
     resourceId: "dronedream-school-map",
+    assetId: "dronedream.school-map.v1",
     zh: "赫尔辛基大学昆普拉校区",
     en: "Kumpula Campus",
     aliases: [
@@ -33,6 +35,46 @@ const MAPS: CatalogAssetDefinition[] = [
       "昆普拉科学园区",
       "赫尔辛基大学昆普拉校区",
     ],
+  },
+  {
+    key: "meilahti-hospital-campus",
+    resourceId: "dronedream-meilahti-hospital-map",
+    assetId: "dronedream.meilahti-hospital-map.v1",
+    zh: "梅拉赫蒂医院园区",
+    en: "Meilahti Hospital Campus",
+    aliases: ["meilahti hospital campus", "meilahti hospital", "梅拉赫蒂医院园区", "梅拉赫蒂医院"],
+  },
+  {
+    key: "kalasatama-waterfront",
+    resourceId: "dronedream-kalasatama-waterfront-map",
+    assetId: "dronedream.kalasatama-waterfront-map.v1",
+    zh: "卡拉萨塔马滨水区",
+    en: "Kalasatama Waterfront",
+    aliases: ["kalasatama waterfront", "kalasatama", "卡拉萨塔马滨水区", "卡拉萨塔马"],
+  },
+  {
+    key: "vuosaari-harbour",
+    resourceId: "dronedream-vuosaari-harbour-map",
+    assetId: "dronedream.vuosaari-harbour-map.v1",
+    zh: "沃萨里港",
+    en: "Vuosaari Harbour",
+    aliases: ["vuosaari harbour", "vuosaari harbor", "vuosaari", "沃萨里港"],
+  },
+  {
+    key: "suomenlinna-sea-fortress",
+    resourceId: "dronedream-suomenlinna-map",
+    assetId: "dronedream.suomenlinna-map.v1",
+    zh: "芬兰堡海上要塞",
+    en: "Suomenlinna Sea Fortress",
+    aliases: ["suomenlinna sea fortress", "suomenlinna", "芬兰堡海上要塞", "芬兰堡"],
+  },
+  {
+    key: "uutela-coastal-forest",
+    resourceId: "dronedream-uutela-coastal-forest-map",
+    assetId: "dronedream.uutela-coastal-forest-map.v1",
+    zh: "乌特拉海岸森林",
+    en: "Uutela Coastal Forest",
+    aliases: ["uutela coastal forest", "uutela", "乌特拉海岸森林", "乌特拉"],
   },
 ];
 

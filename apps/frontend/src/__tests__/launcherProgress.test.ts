@@ -30,6 +30,7 @@ describe("launcher progress contract", () => {
       runtimeFresh: true,
       runtime: null,
       runtimeAccessStatus: "blocked",
+      servicesReady: false,
       complete: false,
     })).toBe(0);
     expect(launcherProgressFromEvidence({
@@ -39,6 +40,7 @@ describe("launcher progress contract", () => {
       runtimeFresh: true,
       runtime: runtime(["ready"]),
       runtimeAccessStatus: "ready",
+      servicesReady: true,
       complete: false,
     })).toBe(0);
   });
@@ -51,6 +53,7 @@ describe("launcher progress contract", () => {
       runtimeFresh: true,
       runtime: partial,
       runtimeAccessStatus: "checking",
+      servicesReady: false,
       complete: false,
     })).toBeGreaterThan(LAUNCHER_PROGRESS_CHECKPOINTS.runtimeRunning);
     expect(launcherProgressFromEvidence({
@@ -59,8 +62,18 @@ describe("launcher progress contract", () => {
       runtimeFresh: true,
       runtime: runtime(["ready", "ready"]),
       runtimeAccessStatus: "ready",
+      servicesReady: false,
       complete: false,
     })).toBe(LAUNCHER_PROGRESS_CHECKPOINTS.runtimeAccess);
+    expect(launcherProgressFromEvidence({
+      enabled: true,
+      prerequisitesFresh: true,
+      runtimeFresh: true,
+      runtime: runtime(["ready", "ready"]),
+      runtimeAccessStatus: "ready",
+      servicesReady: true,
+      complete: false,
+    })).toBe(LAUNCHER_PROGRESS_CHECKPOINTS.servicesReady);
   });
 
   it("reserves 100 percent for the complete local readiness contract", () => {
@@ -70,6 +83,7 @@ describe("launcher progress contract", () => {
       runtimeFresh: true,
       runtime: runtime(["ready"]),
       runtimeAccessStatus: "ready",
+      servicesReady: true,
       complete: true,
     })).toBe(100);
   });
@@ -77,18 +91,18 @@ describe("launcher progress contract", () => {
   it("does not reuse stale Runtime or account readiness to advance progress", () => {
     expect(launcherProgressFromEvidence({
       enabled: true, prerequisitesFresh: true, runtimeFresh: false,
-      runtime: runtime(["ready"]), runtimeAccessStatus: "ready", complete: true,
+      runtime: runtime(["ready"]), runtimeAccessStatus: "ready", servicesReady: true, complete: true,
     })).toBe(LAUNCHER_PROGRESS_CHECKPOINTS.prerequisites);
     expect(launcherProgressFromEvidence({
       enabled: true, prerequisitesFresh: false, runtimeFresh: false,
-      runtime: runtime(["ready"]), runtimeAccessStatus: "ready", complete: false,
+      runtime: runtime(["ready"]), runtimeAccessStatus: "ready", servicesReady: false, complete: false,
     })).toBe(0);
   });
 
   it("allows completed fresh local checks in a view without a native access provider", () => {
     expect(launcherProgressFromEvidence({
       enabled: true, prerequisitesFresh: true, runtimeFresh: true,
-      runtime: runtime(["ready"]), runtimeAccessStatus: "browser", complete: true,
+      runtime: runtime(["ready"]), runtimeAccessStatus: "browser", servicesReady: true, complete: true,
     })).toBe(100);
   });
 });

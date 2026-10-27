@@ -1,0 +1,48 @@
+{
+  "asset_id": "dronedream.kalasatama-waterfront-map.v1",
+  "bounds_m": {
+    "x": 650,
+    "y": 650,
+    "z": 95
+  },
+  "building_count": 105,
+  "building_handoff_count": 105,
+  "collision_primitive_count": 452,
+  "fidelity": {
+    "building_collisions": "conservative-oriented-boxes",
+    "building_visuals": "city-register-footprint-extrusions",
+    "forest_restrictions": "city-ecological-network-polygons",
+    "interior_geometry": false,
+    "qualified_routes": 0,
+    "scope": "outdoor-exterior-only",
+    "terrain": "registered-orthophoto-plane",
+    "tree_collisions": "city-tree-register-canopy-cylinders"
+  },
+  "forest_region_count": 0,
+  "name": "Kalasatama Waterfront",
+  "resolution_m": 0.32,
+  "road_edge_count": 1097,
+  "road_node_count": 983,
+  "schema_version": "dronedream.helsinki-map-summary.v1",
+  "source_kind": "real-geospatial-data",
+  "sources": {
+    "building_register_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wfs",
+    "buildings_sha256": "0e2b3554a8921596a6315392775f2f29dfcf11eb7c468850dca19eb44f3e8440",
+    "city_data_license": "CC-BY-4.0",
+    "city_data_owner": "City of Helsinki",
+    "ecological_network_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wfs",
+    "forest_sha256": "fed49ed5a06062e3c8a4efb6bc8918f9f31a89b860f1869c121ae732df09ee19",
+    "orthophoto_layer": "avoindata:Ortoilmakuva_2026_5cm",
+    "orthophoto_sha256": "400b44e8bd74dc86b4c2c7a4aba7b4db6d0f716f3b84104e7749a2b92a794d9a",
+    "orthophoto_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wms",
+    "retrieved_at": "2026-10-27",
+    "road_register_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wfs",
+    "roads_sha256": "55ef3ad972dc0b3e98d1e4304cd21d6ef69b5b77c6ef4525e1e0eeea63c57f12",
+    "subject_source_page": "https://hri.fi/data/en_GB/dataset/helsingin-3d-kaupunkimalli/resource/cd7ed6e8-fd77-4319-bc67-692f7dfc43de",
+    "tree_register_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wfs",
+    "trees_sha256": "74ad06c1c101fdaeca4a6004339ff36cab6e503d355d7a3ba8558f591fbbc5ed"
+  },
+  "tree_collision_count": 346,
+  "tree_source_count": 346,
+  "visual_primitive_count": 106
+}

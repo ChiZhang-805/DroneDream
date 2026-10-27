@@ -1,0 +1,2545 @@
+{
+  "aliases": [
+    "Uutela Coastal Forest",
+    "乌特拉海岸森林"
+  ],
+  "asset_id": "dronedream.uutela-coastal-forest-map.v1",
+  "bounds_m": {
+    "x": 800,
+    "y": 800,
+    "z": 45
+  },
+  "collision_primitives": [
+    {
+      "center_x": 0.0,
+      "center_y": 0.0,
+      "center_z": -0.1,
+      "name": "terrain-ground",
+      "semantic": "terrain",
+      "size_x": 800.0,
+      "size_y": 800.0,
+      "size_z": 0.2,
+      "yaw_rad": 0.0
+    },
+    {
+      "center_x": 285.0478,
+      "center_y": -294.9869,
+      "center_z": 3.4,
+      "name": "1023840133-0-collision",
+      "semantic": "building",
+      "size_x": 16.8479,
+      "size_y": 16.3017,
+      "size_z": 6.8,
+      "yaw_rad": -0.94596997
+    },
+    {
+      "center_x": 288.0782,
+      "center_y": -243.1139,
+      "center_z": 3.4,
+      "name": "1023840144-0-collision",
+      "semantic": "building",
+      "size_x": 9.6289,
+      "size_y": 4.9083,
+      "size_z": 6.8,
+      "yaw_rad": -1.16869724
+    },
+    {
+      "center_x": 242.5501,
+      "center_y": -274.3209,
+      "center_z": 2.0,
+      "name": "1023840155-0-collision",
+      "semantic": "building",
+      "size_x": 7.091,
+      "size_y": 5.4999,
+      "size_z": 4.0,
+      "yaw_rad": 2.0924937
+    },
+    {
+      "center_x": 321.9979,
+      "center_y": -265.6169,
+      "center_z": 2.0,
+      "name": "1023840166-0-collision",
+      "semantic": "building",
+      "size_x": 10.5371,
+      "size_y": 6.1769,
+      "size_z": 4.0,
+      "yaw_rad": -3.08920124
+    },
+    {
+      "center_x": 233.9919,
+      "center_y": -283.1704,
+      "center_z": 2.0,
+      "name": "1023840188-0-collision",
+      "semantic": "building",
+      "size_x": 7.7156,
+      "size_y": 4.9996,
+      "size_z": 4.0,
+      "yaw_rad": -1.04243532
+    },
+    {
+      "center_x": 198.2513,
+      "center_y": -385.647,
+      "center_z": 3.4,
+      "name": "1023840454-0-collision",
+      "semantic": "building",
+      "size_x": 13.4054,
+      "size_y": 9.9936,
+      "size_z": 6.8,
+      "yaw_rad": -2.93157857
+    },
+    {
+      "center_x": 135.7215,
+      "center_y": -347.5867,
+      "center_z": 3.4,
+      "name": "1023840465-0-collision",
+      "semantic": "building",
+      "size_x": 7.7778,
+      "size_y": 6.7729,
+      "size_z": 6.8,
+      "yaw_rad": 1.8329081
+    },
+    {
+      "center_x": 270.0577,
+      "center_y": -349.5031,
+      "center_z": 2.0,
+      "name": "103797699V-0-collision",
+      "semantic": "building",
+      "size_x": 11.0184,
+      "size_y": 6.221,
+      "size_z": 4.0,
+      "yaw_rad": -1.77775277
+    },
+    {
+      "center_x": 152.048,
+      "center_y": -381.9593,
+      "center_z": 3.4,
+      "name": "835592-0-collision",
+      "semantic": "building",
+      "size_x": 5.3757,
+      "size_y": 4.0707,
+      "size_z": 6.8,
+      "yaw_rad": 1.67947241
+    },
+    {
+      "center_x": 303.9122,
+      "center_y": -223.5946,
+      "center_z": 3.4,
+      "name": "835593-0-collision",
+      "semantic": "building",
+      "size_x": 4.1935,
+      "size_y": 3.9993,
+      "size_z": 6.8,
+      "yaw_rad": 0.42069506
+    },
+    {
+      "center_x": 190.9661,
+      "center_y": -359.1256,
+      "center_z": 3.4,
+      "name": "835597-0-collision",
+      "semantic": "building",
+      "size_x": 4.8283,
+      "size_y": 2.9831,
+      "size_z": 6.8,
+      "yaw_rad": -1.55136224
+    },
+    {
+      "center_x": -2.4859,
+      "center_y": -393.8806,
+      "center_z": 3.4,
+      "name": "835598-0-collision",
+      "semantic": "building",
+      "size_x": 5.7774,
+      "size_y": 3.4616,
+      "size_z": 6.8,
+      "yaw_rad": 1.40483463
+    },
+    {
+      "center_x": 102.1861,
+      "center_y": -258.513,
+      "center_z": 3.4,
+      "name": "835612-0-collision",
+      "semantic": "building",
+      "size_x": 3.7883,
+      "size_y": 3.2904,
+      "size_z": 6.8,
+      "yaw_rad": -0.5298301
+    },
+    {
+      "center_x": 182.0163,
+      "center_y": -364.9815,
+      "center_z": 3.4,
+      "name": "835617-0-collision",
+      "semantic": "building",
+      "size_x": 5.9316,
+      "size_y": 3.8375,
+      "size_z": 6.8,
+      "yaw_rad": -3.11200392
+    },
+    {
+      "center_x": 59.3609,
+      "center_y": -398.8765,
+      "center_z": 3.4,
+      "name": "835618-0-collision",
+      "semantic": "building",
+      "size_x": 6.2542,
+      "size_y": 4.2995,
+      "size_z": 6.8,
+      "yaw_rad": -0.30167594
+    },
+    {
+      "center_x": 394.2303,
+      "center_y": -373.1234,
+      "center_z": 3.4,
+      "name": "835621-0-collision",
+      "semantic": "building",
+      "size_x": 5.5704,
+      "size_y": 5.0567,
+      "size_z": 6.8,
+      "yaw_rad": -1.20830724
+    },
+    {
+      "center_x": 269.3703,
+      "center_y": -160.9697,
+      "center_z": 3.4,
+      "name": "835626-0-collision",
+      "semantic": "building",
+      "size_x": 8.8765,
+      "size_y": 5.4204,
+      "size_z": 6.8,
+      "yaw_rad": -2.12130447
+    },
+    {
+      "center_x": 176.7619,
+      "center_y": -235.3857,
+      "center_z": 3.4,
+      "name": "835632-0-collision",
+      "semantic": "building",
+      "size_x": 7.7694,
+      "size_y": 4.0763,
+      "size_z": 6.8,
+      "yaw_rad": 2.77724082
+    },
+    {
+      "center_x": 350.0353,
+      "center_y": 251.1571,
+      "center_z": 3.4,
+      "name": "836997-0-collision",
+      "semantic": "building",
+      "size_x": 4.721,
+      "size_y": 3.9578,
+      "size_z": 6.8,
+      "yaw_rad": -1.01114532
+    },
+    {
+      "center_x": 107.5985,
+      "center_y": 89.9073,
+      "center_z": 3.4,
+      "name": "837002-0-collision",
+      "semantic": "building",
+      "size_x": 4.2415,
+      "size_y": 3.6592,
+      "size_z": 6.8,
+      "yaw_rad": 2.82763162
+    },
+    {
+      "center_x": 145.2624,
+      "center_y": 51.6375,
+      "center_z": 3.4,
+      "name": "837011-0-collision",
+      "semantic": "building",
+      "size_x": 11.6569,
+      "size_y": 5.5829,
+      "size_z": 6.8,
+      "yaw_rad": -0.20563278
+    },
+    {
+      "center_x": 242.8696,
+      "center_y": -235.3042,
+      "center_z": 3.4,
+      "name": "875511-0-collision",
+      "semantic": "building",
+      "size_x": 7.2457,
+      "size_y": 4.1873,
+      "size_z": 6.8,
+      "yaw_rad": 2.18936382
+    }
+  ],
+  "coordinate_frame": "ENU",
+  "display_name": {
+    "en-US": "Uutela Coastal Forest",
+    "zh-CN": "乌特拉海岸森林"
+  },
+  "entities": [
+    {
+      "address": "Hallkullanniemi 8",
+      "aliases": [
+        "Hallkullanniemi 8"
+      ],
+      "entity_id": "building-1023840133-0",
+      "floors": 2,
+      "footprint_m": [
+        [
+          285.24,
+          -305.074
+        ],
+        [
+          284.154,
+          -303.516
+        ],
+        [
+          282.191,
+          -304.96
+        ],
+        [
+          275.549,
+          -295.751
+        ],
+        [
+          280.085,
+          -292.533
+        ],
+        [
+          277.965,
+          -289.709
+        ],
+        [
+          282.323,
+          -286.568
+        ],
+        [
+          284.367,
+          -289.469
+        ],
+        [
+          287.661,
+          -287.132
+        ],
+        [
+          293.28,
+          -294.985
+        ],
+        [
+          294.72,
+          -294.865
+        ],
+        [
+          295.368,
+          -295.363
+        ],
+        [
+          295.68,
+          -296.116
+        ],
+        [
+          295.483,
+          -297.112
+        ],
+        [
+          294.905,
+          -297.689
+        ],
+        [
+          293.708,
+          -297.846
+        ],
+        [
+          292.857,
+          -297.272
+        ],
+        [
+          289.461,
+          -299.509
+        ],
+        [
+          290.738,
+          -301.269
+        ]
+      ],
+      "function": "Asuinrakennus",
+      "kind": "building",
+      "name": "Hallkullanniemi 8",
+      "name_zh": "Hallkullanniemi 8",
+      "outdoor_handoff_entity_id": "building-1023840133-0-outdoor-handoff",
+      "position_m": {
+        "x": 284.949,
+        "y": -295.845,
+        "z": 3.4
+      },
+      "registry_id": "1023840133",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Hallkullanniemi 8 handoff",
+        "Hallkullanniemi 8 handoff"
+      ],
+      "building_entity_id": "building-1023840133-0",
+      "distance_to_building_m": 97.808,
+      "entity_id": "building-1023840133-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Hallkullanniemi 8 outdoor handoff",
+      "name_zh": "Hallkullanniemi 8室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 204.1,
+        "y": -240.8,
+        "z": 8.0
+      },
+      "route_node_id": "road-00215",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": "Hallkullanniemi 8",
+      "aliases": [
+        "Hallkullanniemi 8"
+      ],
+      "entity_id": "building-1023840144-0",
+      "floors": 2,
+      "footprint_m": [
+        [
+          292.212,
+          -246.564
+        ],
+        [
+          287.704,
+          -248.505
+        ],
+        [
+          283.936,
+          -239.644
+        ],
+        [
+          288.201,
+          -237.853
+        ]
+      ],
+      "function": "Asuinrakennus",
+      "kind": "building",
+      "name": "Hallkullanniemi 8",
+      "name_zh": "Hallkullanniemi 8",
+      "outdoor_handoff_entity_id": "building-1023840144-0-outdoor-handoff",
+      "position_m": {
+        "x": 288.031,
+        "y": -243.186,
+        "z": 3.4
+      },
+      "registry_id": "1023840144",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Hallkullanniemi 8 handoff",
+        "Hallkullanniemi 8 handoff"
+      ],
+      "building_entity_id": "building-1023840144-0",
+      "distance_to_building_m": 79.461,
+      "entity_id": "building-1023840144-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Hallkullanniemi 8 outdoor handoff",
+      "name_zh": "Hallkullanniemi 8室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 212.6,
+        "y": -218.2,
+        "z": 8.0
+      },
+      "route_node_id": "road-00217",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": "Hallkullanniemi 8",
+      "aliases": [
+        "Hallkullanniemi 8"
+      ],
+      "entity_id": "building-1023840155-0",
+      "floors": 1,
+      "footprint_m": [
+        [
+          243.965,
+          -271.264
+        ],
+        [
+          243.141,
+          -271.737
+        ],
+        [
+          245.105,
+          -275.154
+        ],
+        [
+          245.929,
+          -274.68
+        ],
+        [
+          246.701,
+          -276.024
+        ],
+        [
+          242.282,
+          -278.565
+        ],
+        [
+          241.1,
+          -276.51
+        ],
+        [
+          240.752,
+          -276.71
+        ],
+        [
+          239.82,
+          -275.09
+        ],
+        [
+          240.155,
+          -274.901
+        ],
+        [
+          238.755,
+          -272.413
+        ],
+        [
+          243.19,
+          -269.918
+        ]
+      ],
+      "function": "Talousrakennus",
+      "kind": "building",
+      "name": "Hallkullanniemi 8",
+      "name_zh": "Hallkullanniemi 8",
+      "outdoor_handoff_entity_id": "building-1023840155-0-outdoor-handoff",
+      "position_m": {
+        "x": 242.471,
+        "y": -274.384,
+        "z": 2.0
+      },
+      "registry_id": "1023840155",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Hallkullanniemi 8 handoff",
+        "Hallkullanniemi 8 handoff"
+      ],
+      "building_entity_id": "building-1023840155-0",
+      "distance_to_building_m": 50.598,
+      "entity_id": "building-1023840155-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Hallkullanniemi 8 outdoor handoff",
+      "name_zh": "Hallkullanniemi 8室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 198.7,
+        "y": -249.0,
+        "z": 8.0
+      },
+      "route_node_id": "road-00214",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": "Hallkullanniemi 8",
+      "aliases": [
+        "Hallkullanniemi 8"
+      ],
+      "entity_id": "building-1023840166-0",
+      "floors": 1,
+      "footprint_m": [
+        [
+          327.024,
+          -262.348
+        ],
+        [
+          327.421,
+          -268.425
+        ],
+        [
+          316.946,
+          -268.974
+        ],
+        [
+          316.575,
+          -262.809
+        ]
+      ],
+      "function": "Varastorakennus",
+      "kind": "building",
+      "name": "Hallkullanniemi 8",
+      "name_zh": "Hallkullanniemi 8",
+      "outdoor_handoff_entity_id": "building-1023840166-0-outdoor-handoff",
+      "position_m": {
+        "x": 321.979,
+        "y": -265.641,
+        "z": 2.0
+      },
+      "registry_id": "1023840166",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Hallkullanniemi 8 handoff",
+        "Hallkullanniemi 8 handoff"
+      ],
+      "building_entity_id": "building-1023840166-0",
+      "distance_to_building_m": 118.303,
+      "entity_id": "building-1023840166-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Hallkullanniemi 8 outdoor handoff",
+      "name_zh": "Hallkullanniemi 8室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 209.3,
+        "y": -229.6,
+        "z": 8.0
+      },
+      "route_node_id": "road-00216",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": "Hallkullanniemi 8",
+      "aliases": [
+        "Hallkullanniemi 8"
+      ],
+      "entity_id": "building-1023840188-0",
+      "floors": 1,
+      "footprint_m": [
+        [
+          233.413,
+          -279.042
+        ],
+        [
+          234.333,
+          -280.602
+        ],
+        [
+          235.101,
+          -280.149
+        ],
+        [
+          237.216,
+          -283.736
+        ],
+        [
+          236.423,
+          -284.199
+        ],
+        [
+          237.301,
+          -285.705
+        ],
+        [
+          233.778,
+          -287.762
+        ],
+        [
+          229.888,
+          -281.099
+        ]
+      ],
+      "function": "Talousrakennus",
+      "kind": "building",
+      "name": "Hallkullanniemi 8",
+      "name_zh": "Hallkullanniemi 8",
+      "outdoor_handoff_entity_id": "building-1023840188-0-outdoor-handoff",
+      "position_m": {
+        "x": 233.829,
+        "y": -283.27,
+        "z": 2.0
+      },
+      "registry_id": "1023840188",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Hallkullanniemi 8 handoff",
+        "Hallkullanniemi 8 handoff"
+      ],
+      "building_entity_id": "building-1023840188-0",
+      "distance_to_building_m": 49.076,
+      "entity_id": "building-1023840188-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Hallkullanniemi 8 outdoor handoff",
+      "name_zh": "Hallkullanniemi 8室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 198.7,
+        "y": -249.0,
+        "z": 8.0
+      },
+      "route_node_id": "road-00214",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": "Hallkullanniemi 10",
+      "aliases": [
+        "Hallkullanniemi 10"
+      ],
+      "entity_id": "building-1023840454-0",
+      "floors": 2,
+      "footprint_m": [
+        [
+          200.013,
+          -387.895
+        ],
+        [
+          192.376,
+          -389.656
+        ],
+        [
+          190.654,
+          -382.157
+        ],
+        [
+          203.71,
+          -379.374
+        ],
+        [
+          205.826,
+          -389.03
+        ],
+        [
+          200.599,
+          -390.256
+        ]
+      ],
+      "function": "Asuinrakennus",
+      "kind": "building",
+      "name": "Hallkullanniemi 10",
+      "name_zh": "Hallkullanniemi 10",
+      "outdoor_handoff_entity_id": "building-1023840454-0-outdoor-handoff",
+      "position_m": {
+        "x": 198.548,
+        "y": -384.927,
+        "z": 3.4
+      },
+      "registry_id": "1023840454",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Hallkullanniemi 10 handoff",
+        "Hallkullanniemi 10 handoff"
+      ],
+      "building_entity_id": "building-1023840454-0",
+      "distance_to_building_m": 111.914,
+      "entity_id": "building-1023840454-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Hallkullanniemi 10 outdoor handoff",
+      "name_zh": "Hallkullanniemi 10室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 161.0,
+        "y": -279.5,
+        "z": 8.0
+      },
+      "route_node_id": "road-00198",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": "Hallkullanniemi 10",
+      "aliases": [
+        "Hallkullanniemi 10"
+      ],
+      "entity_id": "building-1023840465-0",
+      "floors": 2,
+      "footprint_m": [
+        [
+          137.985,
+          -342.953
+        ],
+        [
+          139.975,
+          -350.374
+        ],
+        [
+          133.458,
+          -352.22
+        ],
+        [
+          131.509,
+          -344.831
+        ]
+      ],
+      "function": "Asuinrakennus",
+      "kind": "building",
+      "name": "Hallkullanniemi 10",
+      "name_zh": "Hallkullanniemi 10",
+      "outdoor_handoff_entity_id": "building-1023840465-0-outdoor-handoff",
+      "position_m": {
+        "x": 135.736,
+        "y": -347.597,
+        "z": 3.4
+      },
+      "registry_id": "1023840465",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Hallkullanniemi 10 handoff",
+        "Hallkullanniemi 10 handoff"
+      ],
+      "building_entity_id": "building-1023840465-0",
+      "distance_to_building_m": 62.041,
+      "entity_id": "building-1023840465-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Hallkullanniemi 10 outdoor handoff",
+      "name_zh": "Hallkullanniemi 10室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 111.0,
+        "y": -290.7,
+        "z": 8.0
+      },
+      "route_node_id": "road-00203",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": "Hallkullanniemi 8",
+      "aliases": [
+        "Hallkullanniemi 8"
+      ],
+      "entity_id": "building-103797699V-0",
+      "floors": 1,
+      "footprint_m": [
+        [
+          274.234,
+          -344.751
+        ],
+        [
+          271.97,
+          -355.534
+        ],
+        [
+          265.9,
+          -354.166
+        ],
+        [
+          268.138,
+          -343.522
+        ]
+      ],
+      "function": "Sauna",
+      "kind": "building",
+      "name": "Hallkullanniemi 8",
+      "name_zh": "Hallkullanniemi 8",
+      "outdoor_handoff_entity_id": "building-103797699V-0-outdoor-handoff",
+      "position_m": {
+        "x": 270.067,
+        "y": -349.495,
+        "z": 2.0
+      },
+      "registry_id": "103797699V",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Hallkullanniemi 8 handoff",
+        "Hallkullanniemi 8 handoff"
+      ],
+      "building_entity_id": "building-103797699V-0",
+      "distance_to_building_m": 121.167,
+      "entity_id": "building-103797699V-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Hallkullanniemi 8 outdoor handoff",
+      "name_zh": "Hallkullanniemi 8室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 181.6,
+        "y": -266.7,
+        "z": 8.0
+      },
+      "route_node_id": "road-00222",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": null,
+      "aliases": [
+        "Building 835592"
+      ],
+      "entity_id": "building-835592-0",
+      "floors": 2,
+      "footprint_m": [
+        [
+          149.733,
+          -379.508
+        ],
+        [
+          153.781,
+          -379.076
+        ],
+        [
+          154.363,
+          -384.411
+        ],
+        [
+          150.416,
+          -384.797
+        ]
+      ],
+      "function": "Vaja",
+      "kind": "building",
+      "name": "Building 835592",
+      "name_zh": "Building 835592",
+      "outdoor_handoff_entity_id": "building-835592-0-outdoor-handoff",
+      "position_m": {
+        "x": 152.074,
+        "y": -381.936,
+        "z": 3.4
+      },
+      "registry_id": "835592",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Building 835592 handoff",
+        "building-835592-0-outdoor-handoff"
+      ],
+      "building_entity_id": "building-835592-0",
+      "distance_to_building_m": 95.274,
+      "entity_id": "building-835592-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Building 835592 outdoor handoff",
+      "name_zh": "Building 835592室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 56.8,
+        "y": -381.7,
+        "z": 8.0
+      },
+      "route_node_id": "road-00211",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": null,
+      "aliases": [
+        "Building 835593"
+      ],
+      "entity_id": "building-835593-0",
+      "floors": 2,
+      "footprint_m": [
+        [
+          301.213,
+          -222.612
+        ],
+        [
+          305.017,
+          -220.937
+        ],
+        [
+          306.643,
+          -224.564
+        ],
+        [
+          302.815,
+          -226.276
+        ]
+      ],
+      "function": "Vaja",
+      "kind": "building",
+      "name": "Building 835593",
+      "name_zh": "Building 835593",
+      "outdoor_handoff_entity_id": "building-835593-0-outdoor-handoff",
+      "position_m": {
+        "x": 303.921,
+        "y": -223.601,
+        "z": 3.4
+      },
+      "registry_id": "835593",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Building 835593 handoff",
+        "building-835593-0-outdoor-handoff"
+      ],
+      "building_entity_id": "building-835593-0",
+      "distance_to_building_m": 91.481,
+      "entity_id": "building-835593-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Building 835593 outdoor handoff",
+      "name_zh": "Building 835593室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 212.6,
+        "y": -218.2,
+        "z": 8.0
+      },
+      "route_node_id": "road-00217",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": null,
+      "aliases": [
+        "Building 835597"
+      ],
+      "entity_id": "building-835597-0",
+      "floors": 2,
+      "footprint_m": [
+        [
+          189.428,
+          -356.741
+        ],
+        [
+          192.41,
+          -356.683
+        ],
+        [
+          192.504,
+          -361.51
+        ],
+        [
+          189.522,
+          -361.568
+        ]
+      ],
+      "function": "Vaja",
+      "kind": "building",
+      "name": "Building 835597",
+      "name_zh": "Building 835597",
+      "outdoor_handoff_entity_id": "building-835597-0-outdoor-handoff",
+      "position_m": {
+        "x": 190.966,
+        "y": -359.126,
+        "z": 3.4
+      },
+      "registry_id": "835597",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Building 835597 handoff",
+        "building-835597-0-outdoor-handoff"
+      ],
+      "building_entity_id": "building-835597-0",
+      "distance_to_building_m": 85.078,
+      "entity_id": "building-835597-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Building 835597 outdoor handoff",
+      "name_zh": "Building 835597室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 161.0,
+        "y": -279.5,
+        "z": 8.0
+      },
+      "route_node_id": "road-00198",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": null,
+      "aliases": [
+        "Building 835598"
+      ],
+      "entity_id": "building-835598-0",
+      "floors": 2,
+      "footprint_m": [
+        [
+          -1.256,
+          -397.016
+        ],
+        [
+          -4.665,
+          -396.415
+        ],
+        [
+          -3.723,
+          -390.794
+        ],
+        [
+          -0.302,
+          -391.318
+        ]
+      ],
+      "function": "Sauna",
+      "kind": "building",
+      "name": "Building 835598",
+      "name_zh": "Building 835598",
+      "outdoor_handoff_entity_id": "building-835598-0-outdoor-handoff",
+      "position_m": {
+        "x": -2.483,
+        "y": -393.886,
+        "z": 3.4
+      },
+      "registry_id": "835598",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Building 835598 handoff",
+        "building-835598-0-outdoor-handoff"
+      ],
+      "building_entity_id": "building-835598-0",
+      "distance_to_building_m": 35.71,
+      "entity_id": "building-835598-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Building 835598 outdoor handoff",
+      "name_zh": "Building 835598室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 32.7,
+        "y": -400.0,
+        "z": 8.0
+      },
+      "route_node_id": "road-00213",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": null,
+      "aliases": [
+        "Building 835612"
+      ],
+      "entity_id": "building-835612-0",
+      "floors": 2,
+      "footprint_m": [
+        [
+          104.652,
+          -258.051
+        ],
+        [
+          102.945,
+          -260.864
+        ],
+        [
+          99.726,
+          -258.975
+        ],
+        [
+          101.383,
+          -256.136
+        ]
+      ],
+      "function": "Vaja",
+      "kind": "building",
+      "name": "Building 835612",
+      "name_zh": "Building 835612",
+      "outdoor_handoff_entity_id": "building-835612-0-outdoor-handoff",
+      "position_m": {
+        "x": 102.179,
+        "y": -258.503,
+        "z": 3.4
+      },
+      "registry_id": "835612",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Building 835612 handoff",
+        "building-835612-0-outdoor-handoff"
+      ],
+      "building_entity_id": "building-835612-0",
+      "distance_to_building_m": 19.35,
+      "entity_id": "building-835612-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Building 835612 outdoor handoff",
+      "name_zh": "Building 835612室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 115.1,
+        "y": -244.1,
+        "z": 8.0
+      },
+      "route_node_id": "road-00318",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": null,
+      "aliases": [
+        "Building 835617"
+      ],
+      "entity_id": "building-835617-0",
+      "floors": 2,
+      "footprint_m": [
+        [
+          184.927,
+          -363.078
+        ],
+        [
+          185.018,
+          -366.812
+        ],
+        [
+          179.111,
+          -366.987
+        ],
+        [
+          178.995,
+          -363.151
+        ]
+      ],
+      "function": "Vaja",
+      "kind": "building",
+      "name": "Building 835617",
+      "name_zh": "Building 835617",
+      "outdoor_handoff_entity_id": "building-835617-0-outdoor-handoff",
+      "position_m": {
+        "x": 181.999,
+        "y": -365.006,
+        "z": 3.4
+      },
+      "registry_id": "835617",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Building 835617 handoff",
+        "building-835617-0-outdoor-handoff"
+      ],
+      "building_entity_id": "building-835617-0",
+      "distance_to_building_m": 88.047,
+      "entity_id": "building-835617-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Building 835617 outdoor handoff",
+      "name_zh": "Building 835617室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 161.0,
+        "y": -279.5,
+        "z": 8.0
+      },
+      "route_node_id": "road-00198",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": null,
+      "aliases": [
+        "Building 835618"
+      ],
+      "entity_id": "building-835618-0",
+      "floors": 2,
+      "footprint_m": [
+        [
+          57.014,
+          -395.895
+        ],
+        [
+          62.935,
+          -397.776
+        ],
+        [
+          62.286,
+          -400.0
+        ],
+        [
+          55.736,
+          -400.0
+        ]
+      ],
+      "function": "Autotalli",
+      "kind": "building",
+      "name": "Building 835618",
+      "name_zh": "Building 835618",
+      "outdoor_handoff_entity_id": "building-835618-0-outdoor-handoff",
+      "position_m": {
+        "x": 59.182,
+        "y": -398.373,
+        "z": 3.4
+      },
+      "registry_id": "835618",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Building 835618 handoff",
+        "building-835618-0-outdoor-handoff"
+      ],
+      "building_entity_id": "building-835618-0",
+      "distance_to_building_m": 16.842,
+      "entity_id": "building-835618-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Building 835618 outdoor handoff",
+      "name_zh": "Building 835618室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 56.8,
+        "y": -381.7,
+        "z": 8.0
+      },
+      "route_node_id": "road-00211",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": null,
+      "aliases": [
+        "Building 835621"
+      ],
+      "entity_id": "building-835621-0",
+      "floors": 2,
+      "footprint_m": [
+        [
+          397.531,
+          -374.845
+        ],
+        [
+          394.311,
+          -376.072
+        ],
+        [
+          393.538,
+          -374.17
+        ],
+        [
+          392.156,
+          -374.725
+        ],
+        [
+          390.879,
+          -371.416
+        ],
+        [
+          395.607,
+          -369.623
+        ]
+      ],
+      "function": "Sauna",
+      "kind": "building",
+      "name": "Building 835621",
+      "name_zh": "Building 835621",
+      "outdoor_handoff_entity_id": "building-835621-0-outdoor-handoff",
+      "position_m": {
+        "x": 394.345,
+        "y": -372.835,
+        "z": 3.4
+      },
+      "registry_id": "835621",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Building 835621 handoff",
+        "building-835621-0-outdoor-handoff"
+      ],
+      "building_entity_id": "building-835621-0",
+      "distance_to_building_m": 231.543,
+      "entity_id": "building-835621-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Building 835621 outdoor handoff",
+      "name_zh": "Building 835621室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 198.7,
+        "y": -249.0,
+        "z": 8.0
+      },
+      "route_node_id": "road-00214",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": null,
+      "aliases": [
+        "Building 835626"
+      ],
+      "entity_id": "building-835626-0",
+      "floors": 2,
+      "footprint_m": [
+        [
+          273.985,
+          -158.632
+        ],
+        [
+          269.372,
+          -166.148
+        ],
+        [
+          264.869,
+          -163.414
+        ],
+        [
+          269.382,
+          -155.769
+        ]
+      ],
+      "function": "Talousrakennus",
+      "kind": "building",
+      "name": "Building 835626",
+      "name_zh": "Building 835626",
+      "outdoor_handoff_entity_id": "building-835626-0-outdoor-handoff",
+      "position_m": {
+        "x": 269.411,
+        "y": -160.971,
+        "z": 3.4
+      },
+      "registry_id": "835626",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Building 835626 handoff",
+        "building-835626-0-outdoor-handoff"
+      ],
+      "building_entity_id": "building-835626-0",
+      "distance_to_building_m": 66.671,
+      "entity_id": "building-835626-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Building 835626 outdoor handoff",
+      "name_zh": "Building 835626室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 202.9,
+        "y": -165.6,
+        "z": 8.0
+      },
+      "route_node_id": "road-00367",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": null,
+      "aliases": [
+        "Building 835632"
+      ],
+      "entity_id": "building-835632-0",
+      "floors": 2,
+      "footprint_m": [
+        [
+          172.406,
+          -235.906
+        ],
+        [
+          174.056,
+          -232.172
+        ],
+        [
+          180.982,
+          -234.896
+        ],
+        [
+          179.665,
+          -238.674
+        ]
+      ],
+      "function": "Varastorakennus",
+      "kind": "building",
+      "name": "Building 835632",
+      "name_zh": "Building 835632",
+      "outdoor_handoff_entity_id": "building-835632-0-outdoor-handoff",
+      "position_m": {
+        "x": 176.76,
+        "y": -235.421,
+        "z": 3.4
+      },
+      "registry_id": "835632",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Building 835632 handoff",
+        "building-835632-0-outdoor-handoff"
+      ],
+      "building_entity_id": "building-835632-0",
+      "distance_to_building_m": 11.661,
+      "entity_id": "building-835632-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Building 835632 outdoor handoff",
+      "name_zh": "Building 835632室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 184.2,
+        "y": -244.4,
+        "z": 8.0
+      },
+      "route_node_id": "road-00225",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": null,
+      "aliases": [
+        "Building 836997"
+      ],
+      "entity_id": "building-836997-0",
+      "floors": 2,
+      "footprint_m": [
+        [
+          347.105,
+          252.107
+        ],
+        [
+          350.556,
+          254.054
+        ],
+        [
+          352.965,
+          250.207
+        ],
+        [
+          349.678,
+          248.223
+        ]
+      ],
+      "function": "Varastorakennus",
+      "kind": "building",
+      "name": "Building 836997",
+      "name_zh": "Building 836997",
+      "outdoor_handoff_entity_id": "building-836997-0-outdoor-handoff",
+      "position_m": {
+        "x": 350.063,
+        "y": 251.153,
+        "z": 3.4
+      },
+      "registry_id": "836997",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Building 836997 handoff",
+        "building-836997-0-outdoor-handoff"
+      ],
+      "building_entity_id": "building-836997-0",
+      "distance_to_building_m": 18.324,
+      "entity_id": "building-836997-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Building 836997 outdoor handoff",
+      "name_zh": "Building 836997室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 359.6,
+        "y": 266.8,
+        "z": 8.0
+      },
+      "route_node_id": "road-00410",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": null,
+      "aliases": [
+        "Building 837002"
+      ],
+      "entity_id": "building-837002-0",
+      "floors": 2,
+      "footprint_m": [
+        [
+          110.181,
+          90.993
+        ],
+        [
+          109.037,
+          87.517
+        ],
+        [
+          105.016,
+          88.822
+        ],
+        [
+          106.161,
+          92.229
+        ]
+      ],
+      "function": "Vapaa-ajan rakennus",
+      "kind": "building",
+      "name": "Building 837002",
+      "name_zh": "Building 837002",
+      "outdoor_handoff_entity_id": "building-837002-0-outdoor-handoff",
+      "position_m": {
+        "x": 107.604,
+        "y": 89.887,
+        "z": 3.4
+      },
+      "registry_id": "837002",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Building 837002 handoff",
+        "building-837002-0-outdoor-handoff"
+      ],
+      "building_entity_id": "building-837002-0",
+      "distance_to_building_m": 14.704,
+      "entity_id": "building-837002-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Building 837002 outdoor handoff",
+      "name_zh": "Building 837002室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 93.1,
+        "y": 92.3,
+        "z": 8.0
+      },
+      "route_node_id": "road-00257",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": null,
+      "aliases": [
+        "Building 837011"
+      ],
+      "entity_id": "building-837011-0",
+      "floors": 2,
+      "footprint_m": [
+        [
+          145.352,
+          52.402
+        ],
+        [
+          151.125,
+          51.199
+        ],
+        [
+          150.263,
+          47.743
+        ],
+        [
+          139.016,
+          50.089
+        ],
+        [
+          140.125,
+          55.55
+        ],
+        [
+          145.698,
+          54.398
+        ]
+      ],
+      "function": "Vapaa-ajan rakennus",
+      "kind": "building",
+      "name": "Building 837011",
+      "name_zh": "Building 837011",
+      "outdoor_handoff_entity_id": "building-837011-0-outdoor-handoff",
+      "position_m": {
+        "x": 144.528,
+        "y": 51.384,
+        "z": 3.4
+      },
+      "registry_id": "837011",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Building 837011 handoff",
+        "building-837011-0-outdoor-handoff"
+      ],
+      "building_entity_id": "building-837011-0",
+      "distance_to_building_m": 50.45,
+      "entity_id": "building-837011-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Building 837011 outdoor handoff",
+      "name_zh": "Building 837011室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 188.3,
+        "y": 26.3,
+        "z": 8.0
+      },
+      "route_node_id": "road-00333",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "address": null,
+      "aliases": [
+        "Building 875511"
+      ],
+      "entity_id": "building-875511-0",
+      "floors": 2,
+      "footprint_m": [
+        [
+          242.475,
+          -231.139
+        ],
+        [
+          246.676,
+          -237.042
+        ],
+        [
+          243.307,
+          -239.439
+        ],
+        [
+          239.063,
+          -233.567
+        ]
+      ],
+      "function": "Talousrakennus",
+      "kind": "building",
+      "name": "Building 875511",
+      "name_zh": "Building 875511",
+      "outdoor_handoff_entity_id": "building-875511-0-outdoor-handoff",
+      "position_m": {
+        "x": 242.876,
+        "y": -235.291,
+        "z": 3.4
+      },
+      "registry_id": "875511",
+      "semantic": "building",
+      "source": "City of Helsinki building register"
+    },
+    {
+      "aliases": [
+        "Building 875511 handoff",
+        "building-875511-0-outdoor-handoff"
+      ],
+      "building_entity_id": "building-875511-0",
+      "distance_to_building_m": 34.055,
+      "entity_id": "building-875511-0-outdoor-handoff",
+      "kind": "delivery",
+      "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+      "name": "Building 875511 outdoor handoff",
+      "name_zh": "Building 875511室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": 209.3,
+        "y": -229.6,
+        "z": 8.0
+      },
+      "route_node_id": "road-00216",
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    },
+    {
+      "aliases": [
+        "Uutela Coastal Forest launch point",
+        "launch point"
+      ],
+      "entity_id": "uutela-coastal-forest-launch",
+      "kind": "launch",
+      "name": "Uutela Coastal Forest launch point",
+      "name_zh": "乌特拉海岸森林起降点",
+      "operation": "outdoor-launch-land",
+      "position_m": {
+        "x": -301.3,
+        "y": -48.1,
+        "z": 8.0
+      },
+      "route_source": "official-road-network",
+      "semantic": "launch"
+    },
+    {
+      "aliases": [
+        "Uutela Coastal Forest outdoor handoff point",
+        "outdoor handoff point"
+      ],
+      "entity_id": "uutela-coastal-forest-delivery",
+      "kind": "delivery",
+      "name": "Uutela Coastal Forest outdoor handoff point",
+      "name_zh": "乌特拉海岸森林室外交接点",
+      "operation": "outdoor-hover-handoff",
+      "position_m": {
+        "x": -366.3,
+        "y": 115.5,
+        "z": 8.0
+      },
+      "route_source": "official-road-network",
+      "semantic": "delivery"
+    }
+  ],
+  "fidelity": {
+    "building_collisions": "conservative-oriented-boxes",
+    "building_visuals": "city-register-footprint-extrusions",
+    "forest_restrictions": "city-ecological-network-polygons",
+    "interior_geometry": false,
+    "qualified_routes": 0,
+    "scope": "outdoor-exterior-only",
+    "terrain": "registered-orthophoto-plane",
+    "tree_collisions": "city-tree-register-canopy-cylinders"
+  },
+  "name": "Uutela Coastal Forest",
+  "origin": {
+    "easting_m": 25509429.252673235,
+    "elevation_m": 0.0,
+    "northing_m": 6676144.923562403
+  },
+  "real_world_crs": "EPSG:3879",
+  "restricted_regions": [
+    {
+      "polygon_m": [
+        [
+          386.915,
+          -235.986
+        ],
+        [
+          384.515,
+          -195.958
+        ],
+        [
+          383.45,
+          -133.966
+        ],
+        [
+          391.312,
+          -77.094
+        ],
+        [
+          354.529,
+          -62.562
+        ],
+        [
+          336.488,
+          -104.03
+        ],
+        [
+          328.263,
+          -146.148
+        ],
+        [
+          322.341,
+          -207.05
+        ],
+        [
+          263.433,
+          -148.088
+        ],
+        [
+          220.843,
+          -151.358
+        ],
+        [
+          206.737,
+          -107.851
+        ],
+        [
+          189.728,
+          -17.042
+        ],
+        [
+          202.382,
+          42.089
+        ],
+        [
+          222.658,
+          105.281
+        ],
+        [
+          255.457,
+          166.273
+        ],
+        [
+          287.645,
+          178.095
+        ],
+        [
+          349.019,
+          147.41
+        ],
+        [
+          353.357,
+          49.32
+        ],
+        [
+          367.555,
+          -3.91
+        ],
+        [
+          400.0,
+          -4.104
+        ],
+        [
+          400.0,
+          -233.531
+        ]
+      ],
+      "region_id": "forest-0000",
+      "semantic": "protected-forest"
+    },
+    {
+      "polygon_m": [
+        [
+          250.622,
+          394.538
+        ],
+        [
+          202.316,
+          388.068
+        ],
+        [
+          174.294,
+          399.199
+        ],
+        [
+          167.372,
+          389.367
+        ],
+        [
+          148.861,
+          345.118
+        ],
+        [
+          144.778,
+          323.704
+        ],
+        [
+          121.524,
+          320.543
+        ],
+        [
+          109.505,
+          322.614
+        ],
+        [
+          97.486,
+          327.655
+        ],
+        [
+          70.651,
+          344.678
+        ],
+        [
+          40.459,
+          360.151
+        ],
+        [
+          -8.864,
+          400.0
+        ],
+        [
+          254.465,
+          400.0
+        ]
+      ],
+      "region_id": "forest-0001",
+      "semantic": "protected-forest"
+    },
+    {
+      "polygon_m": [
+        [
+          394.331,
+          388.988
+        ],
+        [
+          386.645,
+          400.0
+        ],
+        [
+          400.0,
+          400.0
+        ],
+        [
+          400.0,
+          389.84
+        ]
+      ],
+      "region_id": "forest-0002",
+      "semantic": "protected-forest"
+    },
+    {
+      "polygon_m": [
+        [
+          394.438,
+          -140.866
+        ],
+        [
+          396.063,
+          -156.7
+        ],
+        [
+          400.0,
+          -167.018
+        ],
+        [
+          400.0,
+          -400.0
+        ],
+        [
+          391.078,
+          -400.0
+        ],
+        [
+          391.403,
+          -385.234
+        ],
+        [
+          385.356,
+          -315.072
+        ],
+        [
+          386.717,
+          -294.496
+        ],
+        [
+          384.589,
+          -283.745
+        ],
+        [
+          386.858,
+          -259.731
+        ],
+        [
+          385.224,
+          -236.766
+        ],
+        [
+          379.095,
+          -235.326
+        ],
+        [
+          385.793,
+          -224.824
+        ],
+        [
+          379.771,
+          -179.804
+        ],
+        [
+          383.698,
+          -137.736
+        ],
+        [
+          370.434,
+          -102.419
+        ],
+        [
+          377.701,
+          -91.587
+        ],
+        [
+          368.198,
+          -81.116
+        ],
+        [
+          354.24,
+          -81.095
+        ],
+        [
+          343.5,
+          -101.95
+        ],
+        [
+          328.561,
+          -145.218
+        ],
+        [
+          328.808,
+          -175.884
+        ],
+        [
+          322.481,
+          -184.875
+        ],
+        [
+          321.887,
+          -208.47
+        ],
+        [
+          325.138,
+          -233.966
+        ],
+        [
+          294.591,
+          -226.364
+        ],
+        [
+          254.995,
+          -273.893
+        ],
+        [
+          254.525,
+          -280.555
+        ],
+        [
+          246.639,
+          -275.373
+        ],
+        [
+          208.576,
+          -220.592
+        ],
+        [
+          203.966,
+          -154.84
+        ],
+        [
+          189.596,
+          -43.097
+        ],
+        [
+          189.414,
+          3.311
+        ],
+        [
+          234.554,
+          127.445
+        ],
+        [
+          251.316,
+          161.242
+        ],
+        [
+          270.693,
+          175.865
+        ],
+        [
+          323.487,
+          182.206
+        ],
+        [
+          385.521,
+          216.613
+        ],
+        [
+          400.0,
+          210.49
+        ],
+        [
+          400.0,
+          207.703
+        ],
+        [
+          398.646,
+          206.391
+        ],
+        [
+          366.779,
+          -9.04
+        ],
+        [
+          369.74,
+          -19.542
+        ],
+        [
+          400.0,
+          -18.066
+        ],
+        [
+          400.0,
+          -124.555
+        ]
+      ],
+      "region_id": "forest-0003",
+      "semantic": "protected-forest"
+    },
+    {
+      "polygon_m": [
+        [
+          -391.942,
+          400.0
+        ],
+        [
+          -91.967,
+          400.0
+        ],
+        [
+          -98.968,
+          353.491
+        ],
+        [
+          -98.324,
+          332.326
+        ],
+        [
+          -92.715,
+          321.904
+        ],
+        [
+          -74.278,
+          325.115
+        ],
+        [
+          -53.433,
+          336.337
+        ],
+        [
+          -32.191,
+          334.336
+        ],
+        [
+          -8.021,
+          323.154
+        ],
+        [
+          25.083,
+          279.145
+        ],
+        [
+          49.493,
+          260.023
+        ],
+        [
+          64.283,
+          252.53
+        ],
+        [
+          74.71,
+          258.142
+        ],
+        [
+          79.437,
+          276.815
+        ],
+        [
+          65.331,
+          305.51
+        ],
+        [
+          42.324,
+          322.024
+        ],
+        [
+          18.269,
+          329.245
+        ],
+        [
+          1.837,
+          347.279
+        ],
+        [
+          0.17,
+          379.326
+        ],
+        [
+          9.706,
+          371.393
+        ],
+        [
+          37.481,
+          354.94
+        ],
+        [
+          67.83,
+          339.377
+        ],
+        [
+          94.582,
+          322.385
+        ],
+        [
+          107.97,
+          316.793
+        ],
+        [
+          121.722,
+          314.532
+        ],
+        [
+          139.87,
+          316.384
+        ],
+        [
+          163.561,
+          322.354
+        ],
+        [
+          179.762,
+          324.034
+        ],
+        [
+          200.08,
+          324.524
+        ],
+        [
+          224.275,
+          320.964
+        ],
+        [
+          190.544,
+          192.809
+        ],
+        [
+          118.397,
+          214.453
+        ],
+        [
+          85.326,
+          82.388
+        ],
+        [
+          85.648,
+          71.805
+        ],
+        [
+          146.048,
+          44.51
+        ],
+        [
+          150.297,
+          35.367
+        ],
+        [
+          100.719,
+          -207.079
+        ],
+        [
+          101.041,
+          -217.662
+        ],
+        [
+          108.012,
+          -229.365
+        ],
+        [
+          160.946,
+          -273.073
+        ],
+        [
+          148.87,
+          -283.855
+        ],
+        [
+          110.057,
+          -292.197
+        ],
+        [
+          79.981,
+          -304.229
+        ],
+        [
+          62.946,
+          -332.165
+        ],
+        [
+          59.449,
+          -355.618
+        ],
+        [
+          59.012,
+          -376.374
+        ],
+        [
+          40.828,
+          -400.0
+        ],
+        [
+          -22.117,
+          -400.0
+        ],
+        [
+          -24.189,
+          -331.755
+        ],
+        [
+          -23.183,
+          -321.133
+        ],
+        [
+          -47.757,
+          -296.728
+        ],
+        [
+          -99.182,
+          -303.579
+        ],
+        [
+          -129.638,
+          -346.868
+        ],
+        [
+          -144.272,
+          -344.667
+        ],
+        [
+          -165.67,
+          -337.365
+        ],
+        [
+          -186.079,
+          -319.452
+        ],
+        [
+          -207.519,
+          -267.152
+        ],
+        [
+          -203.831,
+          -257.77
+        ],
+        [
+          -195.977,
+          -254.88
+        ],
+        [
+          -178.869,
+          -254.36
+        ],
+        [
+          -182.003,
+          -151.559
+        ],
+        [
+          -233.627,
+          -109.071
+        ],
+        [
+          -257.302,
+          -109.791
+        ],
+        [
+          -270.847,
+          -99.608
+        ],
+        [
+          -299.546,
+          -70.033
+        ],
+        [
+          -345.32,
+          -44.938
+        ],
+        [
+          -365.678,
+          -28.345
+        ],
+        [
+          -393.578,
+          -25.215
+        ],
+        [
+          -400.0,
+          -32.901
+        ],
+        [
+          -400.0,
+          390.187
+        ]
+      ],
+      "region_id": "forest-0004",
+      "semantic": "protected-forest"
+    },
+    {
+      "polygon_m": [
+        [
+          64.365,
+          -379.253
+        ],
+        [
+          65.429,
+          -356.18
+        ],
+        [
+          68.746,
+          -333.895
+        ],
+        [
+          84.196,
+          -308.719
+        ],
+        [
+          111.79,
+          -297.958
+        ],
+        [
+          152.029,
+          -289.056
+        ],
+        [
+          193.168,
+          -252.429
+        ],
+        [
+          206.036,
+          -227.443
+        ],
+        [
+          242.184,
+          -279.464
+        ],
+        [
+          254.071,
+          -287.436
+        ],
+        [
+          253.469,
+          -354.698
+        ],
+        [
+          292.875,
+          -378.134
+        ],
+        [
+          288.553,
+          -386.125
+        ],
+        [
+          288.973,
+          -400.0
+        ],
+        [
+          48.398,
+          -400.0
+        ]
+      ],
+      "region_id": "forest-0005",
+      "semantic": "protected-forest"
+    }
+  ],
+  "runtime_bindings": {
+    "coordinate_frame": "ENU",
+    "mission_launch_waypoint": {
+      "x": -301.3,
+      "y": -48.1,
+      "z": 8.0
+    },
+    "schema_version": "dronedream.map-runtime-bindings.v1",
+    "simulator": "gazebo-harmonic",
+    "vehicle_spawn": {
+      "x": -301.3,
+      "y": -48.1,
+      "z": 0.067
+    }
+  },
+  "scene_id": "uutela-coastal-forest",
+  "schema_version": "dronedream.map-semantic.v1",
+  "sources": {
+    "building_register_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wfs",
+    "buildings_sha256": "2f6517fcff177e0136840c2a19e4fd5cb852338de6b9e159f70fadc5fe5afebf",
+    "city_data_license": "CC-BY-4.0",
+    "city_data_owner": "City of Helsinki",
+    "ecological_network_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wfs",
+    "forest_sha256": "4a587e9fe19780dd251a34da5d16e7002bafb7e4eb62053cf682d7a02066db81",
+    "orthophoto_layer": "avoindata:Ortoilmakuva_2026_5cm",
+    "orthophoto_sha256": "04d0e37ceb88f6fbd026684b4f5d9a71dffc7a681f6eef8c5243cf1c996e0a58",
+    "orthophoto_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wms",
+    "retrieved_at": "2026-10-27",
+    "road_register_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wfs",
+    "roads_sha256": "69dff412c094262646a629fc5f07cf6e031a3adf477f281948634ee3bf54bb37",
+    "subject_source_page": "https://www.hel.fi/en/culture-and-leisure/outdoor-activities-parks-and-nature-destinations/outdoor-recreation-areas/uutela-outdoor-recreation-area",
+    "tree_register_url": "https://kartta.hel.fi/ws/geoserver/avoindata/wfs",
+    "trees_sha256": "d848748ce99d5e6e360efdf330c2497c61ce7ba5d0b102cf11d12f74769b21a0"
+  }
+}

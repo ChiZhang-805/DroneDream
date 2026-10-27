@@ -532,24 +532,33 @@ function AccountIcon() {
 
 function SiteAccountAvatar({
   avatarUrl,
+  avatarFallbackUrl = null,
   className,
 }: {
   avatarUrl: string | null;
+  avatarFallbackUrl?: string | null;
   className: string;
 }) {
-  const [avatarFailed, setAvatarFailed] = useState(false);
+  const avatarUrls = [avatarUrl, avatarFallbackUrl].filter(
+    (candidate, index, values): candidate is string =>
+      Boolean(candidate) && values.indexOf(candidate) === index,
+  );
+  const [avatarIndex, setAvatarIndex] = useState(0);
 
   useEffect(() => {
-    setAvatarFailed(false);
-  }, [avatarUrl]);
+    setAvatarIndex(0);
+  }, [avatarUrl, avatarFallbackUrl]);
+
+  const activeAvatarUrl = avatarUrls[avatarIndex] ?? null;
 
   return (
     <span className={className} aria-hidden="true">
-      {avatarUrl && !avatarFailed ? (
+      {activeAvatarUrl ? (
         <img
-          src={avatarUrl}
+          key={activeAvatarUrl}
+          src={activeAvatarUrl}
           alt=""
-          onError={() => setAvatarFailed(true)}
+          onError={() => setAvatarIndex((current) => current + 1)}
         />
       ) : (
         <AccountIcon />
@@ -1298,6 +1307,7 @@ export function SiteApp() {
               <SiteAccountAvatar
                 className="site-account-avatar"
                 avatarUrl={auth.account?.avatarUrl ?? null}
+                avatarFallbackUrl={auth.account?.avatarFallbackUrl ?? null}
               />
               <span>{auth.account ? accountName : copy.signIn}</span>
             </button>
@@ -1406,6 +1416,7 @@ export function SiteApp() {
             locale={locale}
             accountId={auth.account?.id ?? null}
             accountAvatarUrl={auth.account?.avatarUrl ?? null}
+            accountAvatarFallbackUrl={auth.account?.avatarFallbackUrl ?? null}
           />
         ) : sitePage === "community" ? (
           <CommunityPage
@@ -1543,6 +1554,7 @@ export function SiteApp() {
                 <SiteAccountAvatar
                   className="site-auth-account-avatar"
                   avatarUrl={auth.account.avatarUrl}
+                  avatarFallbackUrl={auth.account.avatarFallbackUrl ?? null}
                 />
                 <strong>{auth.account.displayName}</strong>
                 <span className="site-auth-plan">

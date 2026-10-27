@@ -1,0 +1,257 @@
+{
+  "primitives": [
+    {
+      "center_x": 0.0,
+      "center_y": 0.0,
+      "center_z": -0.1,
+      "name": "terrain-ground",
+      "semantic": "terrain",
+      "size_x": 800.0,
+      "size_y": 800.0,
+      "size_z": 0.2,
+      "yaw_rad": 0.0
+    },
+    {
+      "center_x": 285.0478,
+      "center_y": -294.9869,
+      "center_z": 3.4,
+      "name": "1023840133-0-collision",
+      "semantic": "building",
+      "size_x": 16.8479,
+      "size_y": 16.3017,
+      "size_z": 6.8,
+      "yaw_rad": -0.94596997
+    },
+    {
+      "center_x": 288.0782,
+      "center_y": -243.1139,
+      "center_z": 3.4,
+      "name": "1023840144-0-collision",
+      "semantic": "building",
+      "size_x": 9.6289,
+      "size_y": 4.9083,
+      "size_z": 6.8,
+      "yaw_rad": -1.16869724
+    },
+    {
+      "center_x": 242.5501,
+      "center_y": -274.3209,
+      "center_z": 2.0,
+      "name": "1023840155-0-collision",
+      "semantic": "building",
+      "size_x": 7.091,
+      "size_y": 5.4999,
+      "size_z": 4.0,
+      "yaw_rad": 2.0924937
+    },
+    {
+      "center_x": 321.9979,
+      "center_y": -265.6169,
+      "center_z": 2.0,
+      "name": "1023840166-0-collision",
+      "semantic": "building",
+      "size_x": 10.5371,
+      "size_y": 6.1769,
+      "size_z": 4.0,
+      "yaw_rad": -3.08920124
+    },
+    {
+      "center_x": 233.9919,
+      "center_y": -283.1704,
+      "center_z": 2.0,
+      "name": "1023840188-0-collision",
+      "semantic": "building",
+      "size_x": 7.7156,
+      "size_y": 4.9996,
+      "size_z": 4.0,
+      "yaw_rad": -1.04243532
+    },
+    {
+      "center_x": 198.2513,
+      "center_y": -385.647,
+      "center_z": 3.4,
+      "name": "1023840454-0-collision",
+      "semantic": "building",
+      "size_x": 13.4054,
+      "size_y": 9.9936,
+      "size_z": 6.8,
+      "yaw_rad": -2.93157857
+    },
+    {
+      "center_x": 135.7215,
+      "center_y": -347.5867,
+      "center_z": 3.4,
+      "name": "1023840465-0-collision",
+      "semantic": "building",
+      "size_x": 7.7778,
+      "size_y": 6.7729,
+      "size_z": 6.8,
+      "yaw_rad": 1.8329081
+    },
+    {
+      "center_x": 270.0577,
+      "center_y": -349.5031,
+      "center_z": 2.0,
+      "name": "103797699V-0-collision",
+      "semantic": "building",
+      "size_x": 11.0184,
+      "size_y": 6.221,
+      "size_z": 4.0,
+      "yaw_rad": -1.77775277
+    },
+    {
+      "center_x": 152.048,
+      "center_y": -381.9593,
+      "center_z": 3.4,
+      "name": "835592-0-collision",
+      "semantic": "building",
+      "size_x": 5.3757,
+      "size_y": 4.0707,
+      "size_z": 6.8,
+      "yaw_rad": 1.67947241
+    },
+    {
+      "center_x": 303.9122,
+      "center_y": -223.5946,
+      "center_z": 3.4,
+      "name": "835593-0-collision",
+      "semantic": "building",
+      "size_x": 4.1935,
+      "size_y": 3.9993,
+      "size_z": 6.8,
+      "yaw_rad": 0.42069506
+    },
+    {
+      "center_x": 190.9661,
+      "center_y": -359.1256,
+      "center_z": 3.4,
+      "name": "835597-0-collision",
+      "semantic": "building",
+      "size_x": 4.8283,
+      "size_y": 2.9831,
+      "size_z": 6.8,
+      "yaw_rad": -1.55136224
+    },
+    {
+      "center_x": -2.4859,
+      "center_y": -393.8806,
+      "center_z": 3.4,
+      "name": "835598-0-collision",
+      "semantic": "building",
+      "size_x": 5.7774,
+      "size_y": 3.4616,
+      "size_z": 6.8,
+      "yaw_rad": 1.40483463
+    },
+    {
+      "center_x": 102.1861,
+      "center_y": -258.513,
+      "center_z": 3.4,
+      "name": "835612-0-collision",
+      "semantic": "building",
+      "size_x": 3.7883,
+      "size_y": 3.2904,
+      "size_z": 6.8,
+      "yaw_rad": -0.5298301
+    },
+    {
+      "center_x": 182.0163,
+      "center_y": -364.9815,
+      "center_z": 3.4,
+      "name": "835617-0-collision",
+      "semantic": "building",
+      "size_x": 5.9316,
+      "size_y": 3.8375,
+      "size_z": 6.8,
+      "yaw_rad": -3.11200392
+    },
+    {
+      "center_x": 59.3609,
+      "center_y": -398.8765,
+      "center_z": 3.4,
+      "name": "835618-0-collision",
+      "semantic": "building",
+      "size_x": 6.2542,
+      "size_y": 4.2995,
+      "size_z": 6.8,
+      "yaw_rad": -0.30167594
+    },
+    {
+      "center_x": 394.2303,
+      "center_y": -373.1234,
+      "center_z": 3.4,
+      "name": "835621-0-collision",
+      "semantic": "building",
+      "size_x": 5.5704,
+      "size_y": 5.0567,
+      "size_z": 6.8,
+      "yaw_rad": -1.20830724
+    },
+    {
+      "center_x": 269.3703,
+      "center_y": -160.9697,
+      "center_z": 3.4,
+      "name": "835626-0-collision",
+      "semantic": "building",
+      "size_x": 8.8765,
+      "size_y": 5.4204,
+      "size_z": 6.8,
+      "yaw_rad": -2.12130447
+    },
+    {
+      "center_x": 176.7619,
+      "center_y": -235.3857,
+      "center_z": 3.4,
+      "name": "835632-0-collision",
+      "semantic": "building",
+      "size_x": 7.7694,
+      "size_y": 4.0763,
+      "size_z": 6.8,
+      "yaw_rad": 2.77724082
+    },
+    {
+      "center_x": 350.0353,
+      "center_y": 251.1571,
+      "center_z": 3.4,
+      "name": "836997-0-collision",
+      "semantic": "building",
+      "size_x": 4.721,
+      "size_y": 3.9578,
+      "size_z": 6.8,
+      "yaw_rad": -1.01114532
+    },
+    {
+      "center_x": 107.5985,
+      "center_y": 89.9073,
+      "center_z": 3.4,
+      "name": "837002-0-collision",
+      "semantic": "building",
+      "size_x": 4.2415,
+      "size_y": 3.6592,
+      "size_z": 6.8,
+      "yaw_rad": 2.82763162
+    },
+    {
+      "center_x": 145.2624,
+      "center_y": 51.6375,
+      "center_z": 3.4,
+      "name": "837011-0-collision",
+      "semantic": "building",
+      "size_x": 11.6569,
+      "size_y": 5.5829,
+      "size_z": 6.8,
+      "yaw_rad": -0.20563278
+    },
+    {
+      "center_x": 242.8696,
+      "center_y": -235.3042,
+      "center_z": 3.4,
+      "name": "875511-0-collision",
+      "semantic": "building",
+      "size_x": 7.2457,
+      "size_y": 4.1873,
+      "size_z": 6.8,
+      "yaw_rad": 2.18936382
+    }
+  ]
+}

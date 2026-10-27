@@ -40,6 +40,8 @@ import {
 } from "../features/organization/organizationConsole";
 import { useModalFocus } from "../hooks/useModalFocus";
 
+const RESERVED_MEMBER_ROW_COUNT = 8;
+
 type SiteLocale = "en" | "zh-CN";
 
 const content = {
@@ -202,21 +204,28 @@ function roleLabel(
   return role === "owner" ? copy.owner : role === "admin" ? copy.admin : copy.member;
 }
 
-function OrganizationAvatar({ member, large = false }: {
+function OrganizationAvatar({ member, fallbackUrl = null, large = false }: {
   member: Pick<OrganizationMember, "avatar_url" | "display_name">;
+  fallbackUrl?: string | null;
   large?: boolean;
 }) {
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const imageAvailable = Boolean(member.avatar_url && failedUrl !== member.avatar_url);
+  const avatarUrls = [member.avatar_url, fallbackUrl].filter(
+    (candidate, index, values): candidate is string =>
+      Boolean(candidate) && values.indexOf(candidate) === index,
+  );
+  const [avatarIndex, setAvatarIndex] = useState(0);
+  useEffect(() => setAvatarIndex(0), [member.avatar_url, fallbackUrl]);
+  const avatarUrl = avatarUrls[avatarIndex] ?? null;
   return (
     <span className={`organization-avatar${large ? " is-large" : ""}`}>
-      {imageAvailable ? (
+      {avatarUrl ? (
         <img
-          src={member.avatar_url ?? undefined}
+          key={avatarUrl}
+          src={avatarUrl}
           alt=""
           loading="lazy"
           referrerPolicy="no-referrer"
-          onError={() => setFailedUrl(member.avatar_url)}
+          onError={() => setAvatarIndex((current) => current + 1)}
         />
       ) : (
         <CircleUserRound aria-hidden="true" />
@@ -229,10 +238,12 @@ export function OrganizationPage({
   locale,
   accountId,
   accountAvatarUrl = null,
+  accountAvatarFallbackUrl = null,
 }: {
   locale: SiteLocale;
   accountId: string | null;
   accountAvatarUrl?: string | null;
+  accountAvatarFallbackUrl?: string | null;
 }) {
   const copy = content[locale];
   const requestedPlan = (() => {
@@ -592,13 +603,24 @@ export function OrganizationPage({
             <tbody>
               {snapshot.members.map((member) => (
                 <tr key={member.id}>
-                  <td><OrganizationAvatar member={memberForDisplay(member)} /><span><strong>{member.display_name}</strong><small>{member.email}</small></span></td>
+                  <td><OrganizationAvatar member={memberForDisplay(member)} fallbackUrl={member.id === accountId ? accountAvatarFallbackUrl : null} /><span><strong>{member.display_name}</strong><small>{member.email}</small></span></td>
                   <td><span className={`organization-role is-${member.role}`}>{roleLabel(member.role, copy)}</span></td>
                   <td><strong>{member.plan.toUpperCase()}</strong></td>
                   <td><EditionLicenseStrip licenses={member.licenses} locale={locale} mode="used" /></td>
                   <td>{date.format(new Date(member.created_at))}</td>
                   <td>{member.last_sign_in_at ? date.format(new Date(member.last_sign_in_at)) : copy.noSignIn}</td>
                   <td><div className="organization-row-actions"><button type="button" className="organization-details-button" onClick={() => openDetails(member)}><Eye aria-hidden="true" /><span>{copy.details}</span></button><button type="button" className="organization-row-delete" aria-label={`${copy.deleteMember}: ${member.display_name}`} title={copy.deleteMember} disabled={busy || !canRemove(member)} onClick={() => void removeMemberFromRow(member)}><Trash2 aria-hidden="true" /></button></div></td>
+                </tr>
+              ))}
+              {Array.from({
+                length: Math.max(0, RESERVED_MEMBER_ROW_COUNT - snapshot.members.length),
+              }, (_, index) => (
+                <tr
+                  key={`reserved-member-row-${index}`}
+                  className="organization-member-placeholder"
+                  aria-hidden="true"
+                >
+                  <td colSpan={7} />
                 </tr>
               ))}
             </tbody>
@@ -629,7 +651,7 @@ export function OrganizationPage({
           if (event.target === event.currentTarget) setSelected(null);
         }}>
           <section ref={dialogRef} className="organization-member-dialog" role="dialog" aria-modal="true" aria-labelledby="organization-member-title" tabIndex={-1}>
-            <header><div><OrganizationAvatar member={memberForDisplay(selected)} large /><div><h2 id="organization-member-title">{selected.display_name}</h2><span>{selected.email}</span></div></div><button ref={closeRef} type="button" aria-label={copy.close} onClick={() => setSelected(null)}><X aria-hidden="true" /></button></header>
+            <header><div><OrganizationAvatar member={memberForDisplay(selected)} fallbackUrl={selected.id === accountId ? accountAvatarFallbackUrl : null} large /><div><h2 id="organization-member-title">{selected.display_name}</h2><span>{selected.email}</span></div></div><button ref={closeRef} type="button" aria-label={copy.close} onClick={() => setSelected(null)}><X aria-hidden="true" /></button></header>
             <div className="organization-member-profile">
               <dl>
                 <div><dt>{copy.role}</dt><dd>{roleLabel(selected.role, copy)}</dd></div>

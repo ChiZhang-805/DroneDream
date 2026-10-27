@@ -372,7 +372,7 @@ export interface AgentCoreMapResource {
   display_name: Record<"zh-CN" | "en-US", string>;
   aliases?: Record<"zh-CN" | "en-US", string[]>;
   description: Record<"zh-CN" | "en-US", string>;
-  category: "indoor_and_site_map" | "real_outdoor_3d_campus";
+  category: string;
   default_resource: true;
   install_mode: "on_demand" | "bundled";
   review: {
@@ -404,7 +404,8 @@ export interface AgentCoreMapResource {
     real_world_crs?: string;
   };
   analysis: {
-    status: "preparsed" | "qualified";
+    status: "preparsed" | "physics_ready" | "qualified";
+    asset_id?: string;
     parser: string;
     source_commit?: string;
     level_names?: string[];
@@ -422,7 +423,15 @@ export interface AgentCoreMapResource {
     named_buildings?: string[];
     named_buildings_zh?: string[];
     coordinate_frame?: string;
-    notes: string[];
+    bounds_m?: { x: number; y: number; z: number };
+    resolution_m?: number;
+    origin?: { latitude: number; longitude: number; altitude_m: number };
+    source_page?: string;
+    road_node_count?: number;
+    road_edge_count?: number;
+    tree_collision_count?: number;
+    forest_region_count?: number;
+    notes?: string[];
   };
   readiness: {
     catalog: "ready";
@@ -493,8 +502,8 @@ export interface AgentCoreVehicleResource {
   readiness: {
     catalog: "ready";
     planning: "preparsed";
-    simulation: "dependency_resolution_required" | "ready";
-    flight: "unqualified" | "qualified";
+    simulation: "dependency_resolution_required" | "pending-runtime-validation" | "ready";
+    flight: "unqualified" | "pending-qualification" | "qualified";
     required_inputs: string[];
   };
 }

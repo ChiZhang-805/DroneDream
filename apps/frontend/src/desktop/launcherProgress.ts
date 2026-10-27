@@ -12,7 +12,8 @@ export const LAUNCHER_PROGRESS_CHECKPOINTS = {
   runtimeInstalled: 45,
   runtimeRunning: 55,
   runtimeComponents: 85,
-  runtimeAccess: 95,
+  runtimeAccess: 90,
+  servicesReady: 95,
   complete: 100,
 } as const;
 
@@ -23,6 +24,7 @@ export interface LauncherProgressEvidence {
   runtimeFresh: boolean;
   runtime: RuntimeStatusReport | null;
   runtimeAccessStatus: DesktopRuntimeAccessStatus;
+  servicesReady: boolean;
   complete: boolean;
 }
 
@@ -49,12 +51,13 @@ export function launcherProgressFromEvidence({
   runtimeFresh,
   runtime,
   runtimeAccessStatus,
+  servicesReady,
   complete,
 }: LauncherProgressEvidence): number {
   if (!enabled || blocked) return 0;
   // A cached ready report or caller's stale completion flag cannot provide fresh
   // evidence after a restart. The native access gate still owns launch permission.
-  if (complete && prerequisitesFresh && runtimeFresh && runtime?.installed &&
+  if (complete && servicesReady && prerequisitesFresh && runtimeFresh && runtime?.installed &&
       runtime.running && runtime.ready &&
       (runtimeAccessStatus === "ready" || runtimeAccessStatus === "browser") &&
       runtime.components.every((component) => !component.required || component.status === "ready")) {
@@ -80,7 +83,10 @@ export function launcherProgressFromEvidence({
   if (prerequisitesFresh && runtimeFresh && runtime?.installed && runtime.running &&
       runtime.ready && runtimeAccessStatus === "ready") {
     progress = Math.max(progress, LAUNCHER_PROGRESS_CHECKPOINTS.runtimeAccess);
+    if (servicesReady) {
+      progress = Math.max(progress, LAUNCHER_PROGRESS_CHECKPOINTS.servicesReady);
+    }
   }
 
-  return Math.min(progress, LAUNCHER_PROGRESS_CHECKPOINTS.runtimeAccess);
+  return Math.min(progress, LAUNCHER_PROGRESS_CHECKPOINTS.servicesReady);
 }

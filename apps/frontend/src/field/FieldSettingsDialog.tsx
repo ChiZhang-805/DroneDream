@@ -11,7 +11,6 @@ import {
   ShieldCheck,
   SlidersHorizontal,
   Sparkles,
-  Settings,
   Workflow,
   X,
 } from "lucide-react";
@@ -108,7 +107,6 @@ const COPY = {
     quickTitle: "Settings",
     close: "Close settings",
     back: "Back to app",
-    allSettings: "All settings",
     tabs: ["General", "Memory", "Models", "Runtime"] as const,
     language: "Language",
     notifications: "Notifications",
@@ -170,7 +168,6 @@ const COPY = {
     quickTitle: "设置",
     close: "关闭设置",
     back: "返回应用",
-    allSettings: "全部设置",
     tabs: ["常规", "记忆", "模型", "Runtime"] as const,
     language: "语言",
     notifications: "通知",
@@ -523,27 +520,15 @@ export function FieldSettingsDialog({
             <strong>{modelSummary || copy.modelEntry}</strong>
             <ChevronRight aria-hidden="true" />
           </button>
-          <button
-            type="button"
+          <div
             className="quick-settings-item quick-settings-runtime"
-            onClick={() => onOpenWorkspace?.("runtime")}
+            aria-label={`${copy.runtimeEntry}: ${isDesktopRuntime() ? copy.desktopRuntime : copy.browserRuntime}`}
           >
             <MonitorCog aria-hidden="true" />
             <span>{copy.runtimeEntry}</span>
             <strong>{isDesktopRuntime() ? copy.desktopRuntime : copy.browserRuntime}</strong>
-            <ChevronRight aria-hidden="true" />
-          </button>
+          </div>
         </div>
-        <footer className="quick-settings-footer">
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => onOpenWorkspace?.("general")}
-          >
-            <Settings aria-hidden="true" />
-            {copy.allSettings}
-          </button>
-        </footer>
       </section>
     );
   }

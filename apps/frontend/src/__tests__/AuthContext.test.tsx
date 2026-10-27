@@ -122,6 +122,7 @@ function AccountProbe() {
       <output aria-label="username">{auth.account?.displayName ?? ""}</output>
       <output aria-label="email">{auth.account?.email ?? ""}</output>
       <output aria-label="avatar">{auth.account?.avatarUrl ?? ""}</output>
+      <output aria-label="avatar-fallback">{auth.account?.avatarFallbackUrl ?? ""}</output>
       <output aria-label="avatar-error">{avatarError}</output>
       <output aria-label="registration-error">{registrationError}</output>
       <output aria-label="recovery-error">{recoveryError}</output>
@@ -405,11 +406,30 @@ describe("AuthContext account profile", () => {
       },
     );
     expect(authMock.updateUser).toHaveBeenCalledWith({
-      data: { avatar_url: remoteAvatar },
+      data: { dronedream_avatar_url: remoteAvatar },
     });
     expect(
       window.localStorage.getItem("drone-dream:account-avatar:user-1"),
     ).toBe(remoteAvatar);
+  });
+
+  it("keeps the provider photo available when a saved custom avatar is stale", async () => {
+    authMock.state.user = {
+      ...authMock.state.user,
+      user_metadata: {
+        dronedream_avatar_url: "https://accounts.example.test/storage/v1/object/public/profile-avatars/user-1/avatar.jpg",
+        picture: "https://identity.example.test/pilot.jpg",
+      },
+    };
+
+    render(<AuthProvider><AccountProbe /></AuthProvider>);
+
+    expect(await screen.findByLabelText("avatar")).toHaveTextContent(
+      "https://accounts.example.test/storage/v1/object/public/profile-avatars/user-1/avatar.jpg",
+    );
+    expect(screen.getByLabelText("avatar-fallback")).toHaveTextContent(
+      "https://identity.example.test/pilot.jpg",
+    );
   });
 
   it("keeps docs-preview avatar changes local and never contacts cloud storage", async () => {
@@ -867,7 +887,7 @@ describe("AuthContext account profile", () => {
       "https://accounts.example.test/auth/v1/user",
       expect.objectContaining({
         method: "PUT",
-        body: JSON.stringify({ data: { avatar_url: remoteAvatar } }),
+        body: JSON.stringify({ data: { dronedream_avatar_url: remoteAvatar } }),
       }),
     );
     expect(authMock.updateUser).not.toHaveBeenCalled();

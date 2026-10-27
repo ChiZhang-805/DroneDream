@@ -269,7 +269,8 @@ function displayName(user: User): string {
 }
 
 function avatarUrl(user: User): string | null {
-  const candidate = user.user_metadata.avatar_url ?? user.user_metadata.picture;
+  const candidate = user.user_metadata.dronedream_avatar_url ??
+    user.user_metadata.picture ?? user.user_metadata.avatar_url;
   return typeof candidate === "string" &&
     (candidate.startsWith("https://") || candidate.startsWith("data:image/"))
     ? candidate

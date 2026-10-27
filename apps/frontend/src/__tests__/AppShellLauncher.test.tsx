@@ -44,6 +44,7 @@ import { AppShell } from "../AppShell";
 import { apiClient } from "../api/client";
 import { I18nProvider } from "../i18n/I18nProvider";
 import { resetDesktopReadinessSession } from "../desktop/readiness";
+import { openAppSettings } from "../appSettings";
 
 const requiredComponentIds = [
   "wsl-runtime",
@@ -117,9 +118,7 @@ function renderLauncher() {
 }
 
 async function openSettingsWorkspace() {
-  fireEvent.click(screen.getByRole("button", { name: /Settings|设置/ }));
-  const quickSettings = await screen.findByRole("dialog", { name: /Settings|设置/ });
-  fireEvent.click(within(quickSettings).getByRole("button", { name: /All settings|全部设置/ }));
+  openAppSettings("general");
   return screen.findByRole("region", { name: /Settings|设置/ });
 }
 
@@ -244,7 +243,7 @@ describe("desktop launcher chrome", () => {
     router.dispose();
   });
 
-  it("opens quick settings from the header gear and reaches the complete workspace from All settings", async () => {
+  it("keeps launcher quick settings concise while the app settings event still opens the workspace", async () => {
     launcherAuthState.current = {
       configured: true,
       loading: false,
@@ -282,7 +281,13 @@ describe("desktop launcher chrome", () => {
     expect(settings).toHaveAttribute("aria-expanded", "true");
     const quickSettings = await screen.findByRole("dialog", { name: "Settings" });
     expect(within(quickSettings).getByRole("group", { name: "Appearance" })).toBeVisible();
-    fireEvent.click(within(quickSettings).getByRole("button", { name: "All settings" }));
+    expect(within(quickSettings).queryByRole("button", { name: "All settings" }))
+      .not.toBeInTheDocument();
+    expect(quickSettings.querySelector(".quick-settings-leading-label > svg"))
+      .toBeInTheDocument();
+    expect(within(quickSettings).queryByRole("button", { name: /Runtime/ }))
+      .not.toBeInTheDocument();
+    openAppSettings("general");
     const workspace = await screen.findByRole("region", { name: "Settings" });
     expect(screen.queryByRole("dialog", { name: "Settings" })).not.toBeInTheDocument();
     expect(within(workspace).getByRole("button", { name: "English" })).toHaveAttribute(
@@ -358,7 +363,9 @@ describe("desktop launcher chrome", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Settings" }));
     const quickSettings = await screen.findByRole("dialog", { name: "Settings" });
-    fireEvent.click(within(quickSettings).getByRole("button", { name: "All settings" }));
+    expect(within(quickSettings).queryByRole("button", { name: "All settings" }))
+      .not.toBeInTheDocument();
+    openAppSettings("general");
     const workspace = await screen.findByRole("region", { name: "Settings" });
     const selectedTab = within(workspace).getByRole("tab", { name: "General" });
     await waitFor(() => expect(selectedTab).toHaveFocus());

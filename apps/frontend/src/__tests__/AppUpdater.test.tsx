@@ -4,6 +4,7 @@ import { RouterProvider, createMemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "../AppShell";
+import { openAppSettings } from "../appSettings";
 import { I18nProvider } from "../i18n/I18nProvider";
 import { resetDesktopReadinessSession } from "../desktop/readiness";
 
@@ -25,9 +26,32 @@ const updaterState = vi.hoisted(() => ({
   },
 }));
 
+const readyStartupGate = vi.hoisted(() => ({
+  status: "ready" as const,
+  accountId: null,
+  checkedAt: 1,
+  error: null,
+  failureCode: null,
+}));
+
 vi.mock("../desktop/updaterContext", () => ({
   AppUpdaterProvider: ({ children }: { children: ReactNode }) => children,
   useAppUpdaterState: () => updaterState.current,
+}));
+
+vi.mock("../desktop/agentCoreStartup", () => ({
+  checkAgentCoreStartup: vi.fn(async () => undefined),
+  getAgentCoreStartupState: () => "ready",
+  subscribeAgentCoreStartup: () => () => undefined,
+}));
+
+vi.mock("../desktop/startupGate", () => ({
+  approveDesktopStartupGateForAccount: vi.fn(),
+  approveDesktopStartupGateWithoutCloudAuth: vi.fn(),
+  getDesktopStartupGateSession: () => readyStartupGate,
+  resetDesktopStartupGateSession: vi.fn(),
+  setDesktopStartupGateState: vi.fn(),
+  subscribeDesktopStartupGate: () => () => undefined,
 }));
 
 const componentIds = [
@@ -124,15 +148,7 @@ function renderUniversalAssistant() {
 }
 
 async function openRuntimeSettings(locale: "en" | "zh-CN" = "en") {
-  fireEvent.click(screen.getByRole("button", {
-    name: locale === "zh-CN" ? "设置" : "Settings",
-  }));
-  const quickSettings = screen.getByRole("dialog", {
-    name: locale === "zh-CN" ? "设置" : "Settings",
-  });
-  fireEvent.click(within(quickSettings).getByRole("button", {
-    name: /Runtime/,
-  }));
+  openAppSettings("runtime");
   return screen.findByRole("region", {
     name: locale === "zh-CN" ? "设置" : "Settings",
   });
