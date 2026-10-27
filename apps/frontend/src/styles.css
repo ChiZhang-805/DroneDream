@@ -15814,16 +15814,17 @@ a {
 }
 
 .launcher-error-dialog {
-  width: min(520px, 100%);
-  max-height: min(620px, calc(100vh - 2.5rem));
+  box-sizing: border-box;
+  width: min(600px, 100%);
+  max-height: calc(100dvh - 2.5rem);
   overflow-y: auto;
-  padding: 1.55rem;
+  padding: clamp(1.25rem, 3vw, 2rem);
   border: 1px solid rgba(255, 191, 98, 0.3);
   border-radius: 18px;
   color: #f8f3ff;
   background: rgba(15, 5, 28, 0.97);
   box-shadow: 0 30px 100px rgba(0, 0, 0, 0.66);
-  text-align: center;
+  text-align: left;
 }
 
 .launcher-error-symbol {
@@ -15831,7 +15832,7 @@ a {
   place-items: center;
   width: 42px;
   height: 42px;
-  margin: 0 auto 0.85rem;
+  margin: 0 0 1rem;
   border: 1px solid rgba(255, 194, 105, 0.55);
   border-radius: 50%;
   color: #ffd28a;
@@ -15843,6 +15844,7 @@ a {
 .launcher-error-dialog h2 {
   margin: 0;
   font-size: 1.28rem;
+  line-height: 1.35;
 }
 
 .launcher-error-dialog > p {
@@ -15909,7 +15911,7 @@ a {
   border-radius: 10px;
   color: #d8cfe2;
   background: rgba(4, 1, 10, 0.62);
-  font-size: 0.72rem;
+  font-size: 0.85rem;
   line-height: 1.5;
   text-align: left;
   white-space: pre-wrap;
@@ -15919,14 +15921,37 @@ a {
 .launcher-error-actions {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
   flex-wrap: wrap;
   gap: 0.55rem;
 }
 
 .launcher-error-actions .btn {
-  min-height: 38px;
-  padding: 0.48rem 0.8rem;
+  min-height: 44px;
+  padding: 0.65rem 1rem;
+  border: 1px solid rgba(207, 171, 255, 0.28);
+  background: rgba(207, 171, 255, 0.08);
+  color: #f8f3ff;
+  font: inherit;
+}
+
+.launcher-error-actions .btn-primary {
+  background: #bd73f5;
+  border-color: #bd73f5;
+  color: #1d092c;
+  font-weight: 600;
+}
+
+.launcher-error-actions .btn:focus-visible {
+  outline: 2px solid #f8f3ff;
+  outline-offset: 3px;
+}
+
+@media (max-width: 560px) {
+  .launcher-error-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
 }
 
 .drone-launch-fallback {

@@ -220,6 +220,7 @@ fn reserve_loopback_port() -> Result<u16, String> {
 
 fn wait_until_ready(port: u16) -> Result<(), String> {
     let client = reqwest::blocking::Client::builder()
+        .no_proxy()
         .connect_timeout(Duration::from_millis(100))
         .timeout(Duration::from_millis(300))
         .redirect(reqwest::redirect::Policy::none())
@@ -298,30 +299,30 @@ fn launch(app: &AppHandle) -> Result<(AgentCoreInfo, CommandChild), String> {
     ))
 }
 
-/// Start the private AGENT Core without making the entire desktop product
-/// depend on a successful sidecar boot. AGENT actions remain fail-closed via
-/// `connection`, while SIM/LAB/FIELD and settings can still open and explain
-/// or repair the failed component.
+/// Render the launcher while Core starts; the frontend gate waits for readiness.
 pub(crate) fn start(app: &mut App) {
-    match launch(app.handle()) {
-        Ok((info, child)) => {
-            app.manage(AgentCoreState {
-                info: Mutex::new(Some(info)),
-                startup_issue: Mutex::new(None),
-                child: Mutex::new(Some(child)),
-                restarting: AtomicBool::new(false),
-            });
+    app.manage(AgentCoreState {
+        info: Mutex::new(None),
+        startup_issue: Mutex::new(None),
+        child: Mutex::new(None),
+        restarting: AtomicBool::new(true),
+    });
+    let app = app.handle().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let result = launch(&app);
+        let state = app.state::<AgentCoreState>();
+        match result {
+            Ok((info, child)) => {
+                *state.info.lock().unwrap() = Some(info);
+                *state.child.lock().unwrap() = Some(child);
+            }
+            Err(error) => {
+                eprintln!("AGENT Core startup failed: {error}");
+                *state.startup_issue.lock().unwrap() = Some("agent-core-startup-failed");
+            }
         }
-        Err(error) => {
-            eprintln!("AGENT Core startup failed: {error}");
-            app.manage(AgentCoreState {
-                info: Mutex::new(None),
-                startup_issue: Mutex::new(Some("agent-core-startup-failed")),
-                child: Mutex::new(None),
-                restarting: AtomicBool::new(false),
-            });
-        }
-    }
+        state.restarting.store(false, Ordering::Release);
+    });
 }
 
 fn validate_request(request: &AgentCoreRequest) -> Result<reqwest::Method, String> {
@@ -365,11 +366,26 @@ fn validate_identity_header(value: Option<&str>) -> Result<(), String> {
 pub(crate) async fn agent_core_status(
     state: tauri::State<'_, AgentCoreState>,
 ) -> Result<AgentCoreStatus, String> {
-    let available = state
+    let info = state
         .info
         .lock()
         .map_err(|_| "agent-core-state-poisoned".to_owned())?
-        .is_some();
+        .clone();
+    let available = tauri::async_runtime::spawn_blocking(move || {
+        let Some(info) = info else { return false; };
+        reqwest::blocking::Client::builder()
+            .no_proxy()
+            .timeout(Duration::from_secs(2))
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .ok()
+            .and_then(|client| client.get(format!("{}/health", info.base_url)).send().ok())
+            .filter(|response| response.status().is_success())
+            .and_then(|response| response.text().ok())
+            .filter(|body| body.len() <= 4096)
+            .and_then(|body| serde_json::from_str::<serde_json::Value>(&body).ok())
+            .is_some_and(|value| value.get("status").and_then(|v| v.as_str()) == Some("ready"))
+    }).await.map_err(|_| "agent-core-health-check-failed".to_owned())?;
     let startup_issue = *state
         .startup_issue
         .lock()
@@ -388,6 +404,7 @@ fn shutdown_state(state: &AgentCoreState) {
     let info = state.info.lock().ok().and_then(|mut value| value.take());
     if let Some(info) = info {
         let client = reqwest::blocking::Client::builder()
+            .no_proxy()
             .connect_timeout(Duration::from_millis(300))
             .timeout(Duration::from_millis(900))
             .redirect(reqwest::redirect::Policy::none())

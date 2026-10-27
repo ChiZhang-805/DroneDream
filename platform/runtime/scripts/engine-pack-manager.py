@@ -10,7 +10,9 @@ import importlib.util
 import json
 import os
 import shutil
+import shlex
 import sqlite3
+import stat
 import subprocess
 import sys
 import tarfile
@@ -311,27 +313,54 @@ def backup_sqlite(database: Path, backup_root: Path) -> Path | None:
 def restore_sqlite(backup: Path | None, database: Path) -> None:
     if backup is None:
         return
+    metadata = database.stat()
     temporary = database.with_name(f".{database.name}.{uuid.uuid4().hex}.restore")
     shutil.copyfile(backup, temporary)
-    temporary.chmod(0o600)
+    if os.name == "posix":
+        os.chown(temporary, metadata.st_uid, metadata.st_gid)
+    temporary.chmod(stat.S_IMODE(metadata.st_mode))
     os.replace(temporary, database)
+
+
+def repair_database_access() -> None:
+    """Repair the service-owned database left inaccessible by legacy rollback."""
+    import pwd
+
+    metadata = DEFAULT_DATABASE.lstat()
+    if not stat.S_ISREG(metadata.st_mode):
+        raise EnginePackInstallError("Runtime database must be a regular file")
+    account = pwd.getpwnam("dronedream")
+    ensure_no_active_experiments(DEFAULT_DATABASE)
+    run_systemctl("stop", ENGINE_SERVICES)
+    os.chown(DEFAULT_DATABASE, account.pw_uid, account.pw_gid)
+    DEFAULT_DATABASE.chmod(0o640)
+    run_systemctl("start", tuple(reversed(ENGINE_SERVICES)))
+    wait_healthy()
 
 
 def migrate_database(release: Path) -> None:
     if not ALEMBIC.is_file():
         raise EnginePackInstallError("Engine Pack migration tool is unavailable")
     environment = os.environ.copy()
-    environment["PYTHONPATH"] = f"{release / 'backend'}:{release / 'worker'}"
+    for line in Path("/etc/dronedream/runtime.env").read_text().splitlines():
+        fields = shlex.split(line, comments=True)
+        if fields:
+            key, value = fields[0].split("=", 1)
+            environment[key] = value
+    backend = release / "services" / "backend"
+    environment["PYTHONPATH"] = f"{backend}:{release / 'services' / 'worker'}"
     result = subprocess.run(  # noqa: S603 - fixed executable and verified release paths.
         [
             str(ALEMBIC),
             "-c",
-            str(release / "backend" / "alembic.ini"),
+            str(backend / "alembic.ini"),
             "upgrade",
             "head",
         ],
-        cwd=release / "backend",
+        cwd=backend,
         env=environment,
+        user="dronedream",
+        group="dronedream",
         check=False,
         capture_output=True,
         text=True,
@@ -489,8 +518,15 @@ def main() -> int:
     parser.add_argument("--no-services", action="store_true")
     parser.add_argument("--check-idle", action="store_true")
     parser.add_argument("--capabilities", action="store_true")
+    parser.add_argument("--repair-database-access", action="store_true")
     args = parser.parse_args()
     try:
+        if args.repair_database_access:
+            if args.descriptor or args.archive or args.no_services or args.check_idle or args.capabilities:
+                raise EnginePackInstallError("database repair does not accept installation arguments")
+            repair_database_access()
+            print(json.dumps({"databaseAccessRepaired": True}))
+            return 0
         if args.capabilities:
             if (
                 args.descriptor is not None

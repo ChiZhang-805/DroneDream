@@ -955,7 +955,7 @@ pub(crate) fn validate_installed_runtime_ownership() -> Result<(String, String),
         || !root
             .file_name()
             .and_then(|value| value.to_str())
-            .is_some_and(|value| value.eq_ignore_ascii_case("DroneDream"))
+            .is_some_and(|value| value.eq_ignore_ascii_case("DroneDream") || value.eq_ignore_ascii_case("Runtime"))
     {
         return Err("DroneDreamRuntime is not stored in a dedicated DroneDream root.".to_string());
     }
@@ -2308,17 +2308,21 @@ fn probe_target_directory_access(target_root: &str, target_exists: bool) -> Resu
         || !target
             .file_name()
             .and_then(|value| value.to_str())
-            .is_some_and(|value| value.eq_ignore_ascii_case("DroneDream"))
+            .is_some_and(|value| value.eq_ignore_ascii_case("DroneDream") || value.eq_ignore_ascii_case("Runtime"))
     {
         return Err("the runtime target is not an absolute DroneDream directory".to_string());
     }
-    let directory = if target_exists {
+    let mut directory = if target_exists {
         target
     } else {
         target
             .parent()
             .ok_or_else(|| "the runtime target has no parent drive root".to_string())?
     };
+    // A fresh install may also need to create the containing workspace.
+    while !directory.exists() {
+        directory = directory.parent().ok_or_else(|| "the runtime target has no existing parent".to_string())?;
+    }
     let metadata = std::fs::symlink_metadata(directory)
         .map_err(|error| format!("unable to inspect {}: {error}", directory.display()))?;
     use std::os::windows::fs::MetadataExt;
@@ -2402,15 +2406,17 @@ pub(crate) fn normalize_windows_target(value: &str) -> Result<String, String> {
     } else {
         trimmed[3..].trim_matches('\\')
     };
-    if !suffix.is_empty() && !suffix.eq_ignore_ascii_case("DroneDream") {
+    let legacy = suffix.eq_ignore_ascii_case("DroneDream");
+    if !suffix.is_empty() && !legacy && !suffix.eq_ignore_ascii_case(r"DroneDream-Workspace\Runtime") {
         return Err(
-            "Choose a drive only; DroneDream uses the isolated X:\\DroneDream folder.".to_string(),
+            "Choose a drive; DroneDream uses X:\\DroneDream-Workspace\\Runtime.".to_string(),
         );
     }
 
     Ok(format!(
-        "{}:\\DroneDream",
-        trimmed[..1].to_ascii_uppercase()
+        "{}:\\{}",
+        trimmed[..1].to_ascii_uppercase(),
+        if legacy { "DroneDream" } else { r"DroneDream-Workspace\Runtime" }
     ))
 }
 
@@ -2671,7 +2677,7 @@ mod tests {
             normalize_windows_target(" e:/DroneDream/ ").unwrap(),
             "E:\\DroneDream"
         );
-        assert_eq!(normalize_windows_target("e:").unwrap(), "E:\\DroneDream");
+        assert_eq!(normalize_windows_target("e:").unwrap(), "E:\\DroneDream-Workspace\\Runtime");
     }
 
     #[test]
@@ -2734,7 +2740,7 @@ mod tests {
 
         assert_eq!(
             select_default_target(&drives, "c:", |_| true).as_deref(),
-            Some("E:\\DroneDream")
+            Some("E:\\DroneDream-Workspace\\Runtime")
         );
         assert!(select_default_target(&drives, "", |_| true).is_none());
     }
@@ -2764,7 +2770,7 @@ mod tests {
 
         assert_eq!(
             select_default_target(&drives, "C:", |_| true).as_deref(),
-            Some("E:\\DroneDream")
+            Some("E:\\DroneDream-Workspace\\Runtime")
         );
     }
 
@@ -2810,7 +2816,7 @@ mod tests {
             select_default_target_from_report(&report, "C:", |_| true, |_| 0)
                 .unwrap()
                 .as_deref(),
-            Some("E:\\DroneDream")
+            Some("E:\\DroneDream-Workspace\\Runtime")
         );
     }
 
@@ -2872,14 +2878,14 @@ mod tests {
                 &drives,
                 "C:",
                 |_| true,
-                |target| if target == "E:\\DroneDream" {
+                |target| if target == "E:\\DroneDream-Workspace\\Runtime" {
                     8 * gib
                 } else {
                     0
                 },
             )
             .as_deref(),
-            Some("E:\\DroneDream")
+            Some("E:\\DroneDream-Workspace\\Runtime")
         );
     }
 
@@ -2909,8 +2915,8 @@ mod tests {
             inspected.push(target.to_string());
             target.starts_with("C:")
         });
-        assert_eq!(selected.as_deref(), Some("C:\\DroneDream"));
-        assert_eq!(inspected, vec!["E:\\DroneDream", "C:\\DroneDream"]);
+        assert_eq!(selected.as_deref(), Some("C:\\DroneDream-Workspace\\Runtime"));
+        assert_eq!(inspected, vec!["E:\\DroneDream-Workspace\\Runtime", "C:\\DroneDream-Workspace\\Runtime"]);
     }
 
     #[cfg(target_os = "windows")]

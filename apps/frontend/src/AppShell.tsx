@@ -10,7 +10,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import type { ChangeEvent, MouseEvent, MutableRefObject, RefObject } from "react";
-import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   Apple,
   ArrowRight,
@@ -92,10 +92,13 @@ import {
 } from "./desktop/access";
 import type { DesktopRuntimeAccess } from "./desktop/access";
 import { MINIMUM_MEMORY_BYTES } from "./desktop/readiness";
+import { getAgentCoreStartupState, subscribeAgentCoreStartup } from "./desktop/agentCoreStartup";
 import {
   approveDesktopStartupGateForAccount,
   approveDesktopStartupGateWithoutCloudAuth,
   setDesktopStartupGateState,
+  getDesktopStartupGateSession,
+  subscribeDesktopStartupGate,
 } from "./desktop/startupGate";
 import {
   AppUpdaterProvider,
@@ -3819,6 +3822,8 @@ function AppShellContent() {
   const settingsPreferenceSaveQueueRef = useRef<Promise<boolean>>(Promise.resolve(true));
   const desktopWindowRef = useRef<DesktopWindowHandle | null>(null);
   const launcherMode = desktopRuntime && location.pathname === "/desktop/setup";
+  const coreStartup = useSyncExternalStore(subscribeAgentCoreStartup, getAgentCoreStartupState, getAgentCoreStartupState);
+  const startupGate = useSyncExternalStore(subscribeDesktopStartupGate, getDesktopStartupGateSession, getDesktopStartupGateSession);
   const experimentWizardMode = location.pathname === "/jobs/new";
   const activeThemeEdition: BrandEditionId = EDITION_IS_FIXED
     ? BUILD_EDITION
@@ -3913,6 +3918,10 @@ function AppShellContent() {
     // 100%. The workspace gate below therefore runs only after navigation away
     // from the launcher.
     if (!desktopRuntime || launcherMode) return;
+    if (coreStartup !== "ready") {
+      setDesktopStartupGateState(coreStartup === "checking" ? "checking" : "blocked");
+      return;
+    }
     if (
       updater.status === "checking" ||
       updater.status === "downloading" ||
@@ -3991,6 +4000,7 @@ function AppShellContent() {
     auth.account,
     auth.configured,
     auth.loading,
+    coreStartup,
     desktopRuntime,
     launcherMode,
     locale,
@@ -4358,6 +4368,11 @@ function AppShellContent() {
       />
     </div>
   ) : null;
+
+  if (desktopRuntime && !launcherMode && import.meta.env.VITE_DESKTOP_VISUAL_QA !== "true"
+      && (coreStartup !== "ready" || startupGate.status !== "ready")) {
+    return <Navigate to="/desktop/setup" replace />;
+  }
 
   if (launcherMode) {
     return (

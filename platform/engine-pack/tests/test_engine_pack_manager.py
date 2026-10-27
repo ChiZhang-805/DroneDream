@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import importlib.util
+from contextlib import closing
 import json
+import os
 import sqlite3
 import sys
 import tempfile
@@ -24,6 +26,42 @@ def load(name: str, path: Path) -> ModuleType:
 
 engine_pack = load("engine_pack_for_manager_tests", ROOT / "platform/engine-pack/tools/engine_pack.py")
 manager = load("engine_pack_manager", ROOT / "platform/runtime/scripts/engine-pack-manager.py")
+
+
+class DatabaseRecoveryTests(unittest.TestCase):
+    def test_migrations_use_the_service_identity_and_current_layout(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            alembic = root / "alembic"
+            alembic.touch()
+            with mock.patch.object(manager, "ALEMBIC", alembic), mock.patch.object(Path, "read_text", return_value="DATABASE_URL=sqlite:////var/lib/dronedream/dronedream.db\n"), mock.patch.object(manager.subprocess, "run", return_value=mock.Mock(returncode=0)) as run:
+                manager.migrate_database(root)
+            self.assertEqual(run.call_args.kwargs["cwd"], root / "services/backend")
+            self.assertEqual(run.call_args.kwargs["user"], "dronedream")
+            self.assertEqual(run.call_args.kwargs["group"], "dronedream")
+            self.assertEqual(run.call_args.kwargs["env"]["DATABASE_URL"], "sqlite:////var/lib/dronedream/dronedream.db")
+
+    def test_rollback_restores_contents_and_preserves_service_access(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            database = root / "runtime.db"
+            with closing(sqlite3.connect(database)) as connection:
+                connection.execute("CREATE TABLE evidence (value TEXT)")
+                connection.execute("INSERT INTO evidence VALUES ('original')")
+                connection.commit()
+            database.chmod(0o640)
+            before = database.stat()
+            backup = manager.backup_sqlite(database, root / "backups")
+            with closing(sqlite3.connect(database)) as connection:
+                connection.execute("DELETE FROM evidence")
+                connection.commit()
+            manager.restore_sqlite(backup, database)
+            with closing(sqlite3.connect(database)) as connection:
+                self.assertEqual(connection.execute("SELECT value FROM evidence").fetchall(), [("original",)])
+            self.assertEqual(database.stat().st_mode, before.st_mode)
+            if os.name == "posix":
+                self.assertEqual(database.stat().st_uid, before.st_uid)
+                self.assertEqual(database.stat().st_gid, before.st_gid)
 
 
 class EnginePackManagerTests(unittest.TestCase):

@@ -22,6 +22,7 @@ assert(
 );
 const desktopOnly = Boolean(args.get("--desktop-only"));
 const progressOnly = Boolean(args.get("--progress-only"));
+const errorOnly = Boolean(args.get("--error-only"));
 const label = String(args.get("--label") || "working-tree");
 const outputRoot = path.resolve(
   repoRoot,
@@ -235,6 +236,7 @@ async function installDesktopFixture(context, testCase) {
       core: {
         invoke: async (command) => {
           calls.push(command);
+          if (command === "agent_core_status") return { available: fixture.scenario !== "core-failed", restarting: false };
           if (command === "probe_system_prerequisites") return prerequisites;
           if (command === "probe_runtime_status") {
             return fixture.scenario === "starting" ? { ...fixture.ready, running: false, ready: false } : fixture.scenario === "missing" ? fixture.missing : fixture.ready;
@@ -271,7 +273,7 @@ async function installDesktopFixture(context, testCase) {
     };
   }, {
     locale: testCase.locale,
-    fixture: desktopFixture(progressOnly ? "starting" : testCase.scenario),
+    fixture: desktopFixture(errorOnly ? "core-failed" : progressOnly ? "starting" : testCase.scenario),
   });
 }
 
@@ -291,6 +293,19 @@ async function verifyCase(browser, testCase) {
     // nonexistent HTTP server to resolve an application route. Exercise the
     // same URL shape here instead of accidentally testing the hosted router.
     await page.goto(`${origin}/${edition === "field" ? "field.html" : ""}#/desktop/setup`, { waitUntil: "networkidle" });
+    if (errorOnly) {
+      const dialog = page.getByRole("dialog");
+      await dialog.waitFor();
+      await dialog.getByRole("button", { name: testCase.locale === "en" ? "View error information" : "查看报错信息" }).click();
+      const bounds = await dialog.boundingBox();
+      assert(bounds.x >= 0 && bounds.y >= 0);
+      assert(bounds.x + bounds.width <= testCase.viewport.width);
+      assert(bounds.y + bounds.height <= testCase.viewport.height);
+      assert.equal(await page.locator(".sidebar").count(), 0);
+      assert.equal(pageErrors.length, 0);
+      await page.screenshot({ path: path.join(outputRoot, `${testCase.id}-error.png`) });
+      return { case: testCase, status: "pass", bounds };
+    }
     if (progressOnly) {
       await page.goto(origin + (edition === 'field' ? '/field.html' : '/') + '?docsPreview=1#/desktop/setup', { waitUntil: 'networkidle' });
       await page.locator('.launcher-stage-list').waitFor();

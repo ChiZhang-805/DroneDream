@@ -19,6 +19,12 @@ const optionalAuthState = vi.hoisted(() => ({
   },
 }));
 const passwordSignIn = vi.hoisted(() => vi.fn(async () => undefined));
+const coreStartupMock = vi.hoisted(() => ({ state: "ready" as "ready" | "checking" | "failed", check: vi.fn(async () => undefined) }));
+vi.mock("../desktop/agentCoreStartup", () => ({
+  getAgentCoreStartupState: () => coreStartupMock.state,
+  subscribeAgentCoreStartup: () => () => undefined,
+  checkAgentCoreStartup: coreStartupMock.check,
+}));
 const updaterState = vi.hoisted(() => ({
   current: {
     status: "current" as
@@ -530,6 +536,8 @@ afterEach(() => {
 
 describe("DesktopSetup", () => {
   beforeEach(() => {
+    coreStartupMock.state = "ready";
+    coreStartupMock.check.mockClear();
     optionalAuthState.current = {
       configured: true,
       loading: false,
@@ -588,6 +596,25 @@ describe("DesktopSetup", () => {
     expect(container.querySelector('.launcher-stage-list [aria-current="step"]')).toBeNull();
     expect(invoke).toHaveBeenCalledTimes(2);
     expect(invoke).not.toHaveBeenCalledWith("get_runtime_install_plan", expect.anything());
+  });
+
+  it.each(["checking", "failed"] as const)("keeps a healthy Runtime on the launcher while Core is %s", async (state) => {
+    coreStartupMock.state = state;
+    window.__TAURI__ = { core: { invoke: vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return runtime;
+      throw new Error(`Unexpected command: ${command}`);
+    }) } };
+    renderPage();
+    await waitFor(() => expect(coreStartupMock.check).toHaveBeenCalled());
+    expect(screen.getByTestId("current-route")).toHaveTextContent("/");
+    expect(screen.queryByRole("link", { name: "Open DroneDream workspace" })).not.toBeInTheDocument();
+    if (state === "failed") {
+      await userEvent.click(await screen.findByRole("button", { name: "View error information" }));
+      expect(await screen.findByText(/Agent Core could not start/)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+      expect(coreStartupMock.check).toHaveBeenCalledWith(true);
+    }
   });
 
   it("offers direct sign-in without treating a loading account as authenticated", async () => {

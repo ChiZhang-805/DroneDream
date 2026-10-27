@@ -41,6 +41,7 @@ import type {
 } from "../desktop/bridge";
 import { formatBytes } from "../desktop/format";
 import { useDesktopRuntimeAccess } from "../desktop/access";
+import { checkAgentCoreStartup, getAgentCoreStartupState, subscribeAgentCoreStartup } from "../desktop/agentCoreStartup";
 import { useOptionalAuth } from "../features/auth/AuthContext";
 import { probeSystemPrerequisitesWithStartupGrace } from "../desktop/prerequisiteProbe";
 import {
@@ -188,7 +189,7 @@ function chooseRuntimeDrive(disks: DiskInfo[], currentDrive: string): string {
 
 function runtimeTargetRoot(drive: string): string | undefined {
   const normalized = drive.trim().toUpperCase();
-  return /^[A-Z]:$/.test(normalized) ? `${normalized}\\DroneDream` : undefined;
+  return /^[A-Z]:$/.test(normalized) ? `${normalized}\\DroneDream-Workspace\\Runtime` : undefined;
 }
 
 async function getSettledInstallPlan(
@@ -308,6 +309,10 @@ export function DesktopSetup() {
   const runtimeAccess = useDesktopRuntimeAccess();
   const { refresh: refreshRuntimeAccess } = runtimeAccess;
   const desktopAvailable = isDesktopRuntime();
+  const coreStartup = useSyncExternalStore(subscribeAgentCoreStartup, getAgentCoreStartupState, getAgentCoreStartupState);
+  useEffect(() => {
+    if (desktopAvailable) void checkAgentCoreStartup();
+  }, [desktopAvailable]);
   const requestId = useRef(0);
   const installerIntentPromise = useRef<Promise<InstallerRuntimeIntent> | null>(null);
   const installerAutoStartPromise = useRef<
@@ -341,6 +346,7 @@ export function DesktopSetup() {
     installState.snapshot?.phase === "failed" &&
     installState.snapshot.error?.code === "installer_receipt_cleanup_failed";
   const busy =
+    coreStartup === "checking" ||
     state.loading ||
     state.planLoading ||
     installerHandoffState.checking ||
@@ -400,6 +406,7 @@ export function DesktopSetup() {
     ].includes(updater.status) && updater.updateRequired) ||
     updater.status === "runtimeBaseRequired";
   const localChecksReady =
+    (!desktopAvailable || coreStartup === "ready") &&
     localRuntimeReady &&
     !state.loading &&
     !installerHandoffState.checking &&
@@ -412,6 +419,7 @@ export function DesktopSetup() {
     startupGateReady &&
     !updaterBlocksWorkspace;
   const environmentChecking =
+    (desktopAvailable && coreStartup === "checking") ||
     state.loading ||
     installerHandoffState.checking ||
     runtimeAccess.isChecking ||
@@ -450,6 +458,9 @@ export function DesktopSetup() {
       !installerHandoffState.discardResult.discarded),
   );
   const launcherErrorDetails = [
+    desktopAvailable && coreStartup === "failed"
+      ? (locale === "zh-CN" ? "Agent Core 未能启动。请重试；所有组件就绪后才能进入软件。" : "Agent Core could not start. Try again to finish startup before opening the workspace.")
+      : null,
     ...state.issues.map((issue) => `${issue.command}: ${localeSafeError(issue.message, locale, { zh: "环境检查失败。", en: "Environment check failed." })}`),
     installState.commandError ? localizedDesktopDiagnostic(installState.commandError, locale, { zh: "运行环境安装命令失败。", en: "Runtime installation command failed." }) : null,
     installState.snapshot?.error
@@ -485,6 +496,7 @@ export function DesktopSetup() {
     installState.snapshot?.phase === "completed" &&
       state.prerequisitesFresh &&
       state.runtimeFresh &&
+      !environmentChecking &&
       !localRuntimeReady
       ? t("desktop.installCompletionUnconfirmed")
       : null,
@@ -1593,7 +1605,7 @@ export function DesktopSetup() {
           ) : null}
         </div>
 
-        {signedInAccount && launcherErrorVisible ? (
+        {(signedInAccount || coreStartup === "failed") && launcherErrorVisible ? (
           <LauncherErrorDialog
             title={t(runtimeHealthCopy?.titleKey ?? "launcher.errorTitle")}
             hint={t(runtimeHealthCopy?.hintKey ?? "launcher.errorHint")}
@@ -1605,6 +1617,7 @@ export function DesktopSetup() {
             onRetry={() => {
               setLauncherErrorExpanded(false);
               setDismissedLauncherError("");
+              if (coreStartup === "failed") void checkAgentCoreStartup(true);
               if (installerHandoffNeedsAttention || automaticStartPending) {
                 retryInstallerHandoff();
               } else {

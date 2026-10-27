@@ -137,6 +137,7 @@ impl InstallerBootstrapResult {
 
 enum EarlyCommand {
     None,
+    ConsolidateStorage,
     Seal {
         mode: InstallerMode,
         target_root: Option<String>,
@@ -164,6 +165,10 @@ pub(crate) fn handle_early_command_line() -> Result<bool, String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match parse_early_command(&args)? {
         EarlyCommand::None => Ok(false),
+        EarlyCommand::ConsolidateStorage => {
+            crate::runtime_installer::consolidate_runtime_storage()?;
+            Ok(true)
+        }
         EarlyCommand::Clear => {
             crate::runtime_installer::with_runtime_operation_lease(clear_receipt)?;
             Ok(true)
@@ -209,6 +214,10 @@ fn parse_early_command(args: &[String]) -> Result<EarlyCommand, String> {
         return Ok(EarlyCommand::None);
     };
     match command {
+        "--consolidate-runtime-storage" => {
+            if args.len() != 1 { return Err("--consolidate-runtime-storage accepts no arguments.".to_string()); }
+            Ok(EarlyCommand::ConsolidateStorage)
+        }
         "--clear-installer-handoff" => {
             if args.len() != 1 {
                 return Err("--clear-installer-handoff accepts no arguments.".to_string());
@@ -1873,7 +1882,7 @@ mod tests {
             EarlyCommand::Seal {
                 mode: InstallerMode::Custom,
                 target_root: Some(ref target)
-            } if target == r"E:\DroneDream"
+            } if target == r"E:\DroneDream-Workspace\Runtime"
         ));
         assert!(parse_early_command(&[
             "--seal-installer-handoff".to_string(),

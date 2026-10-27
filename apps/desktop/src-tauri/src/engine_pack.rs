@@ -21,6 +21,8 @@ const ARCHIVE_FILENAME: &str = "DroneDreamEnginePack.tar.gz";
 const DESCRIPTOR_FILENAME: &str = "engine-pack-bundle.json";
 const MANIFEST_FILENAME: &str = "engine-pack-manifest.json";
 const RECONCILER_FILENAME: &str = "reconcile_engine_pack_runtime_env.py";
+const MANAGER_FILENAME: &str = "engine-pack-manager.py";
+const EMBEDDED_MANAGER: &[u8] = include_bytes!("../../../../platform/runtime/scripts/engine-pack-manager.py");
 const RUNTIME_ENVIRONMENT_PATH: &str = "/etc/dronedream/runtime.env";
 const RUNTIME_API_SERVICE_PATH: &str = "/etc/systemd/system/dronedream-api.service";
 const RUNTIME_WORKER_SERVICE_PATH: &str = "/etc/systemd/system/dronedream-worker.service";
@@ -718,13 +720,16 @@ pub(crate) async fn install_embedded_engine_pack(
             let descriptor_path = cache.join(DESCRIPTOR_FILENAME);
             let manifest_path = cache.join(MANIFEST_FILENAME);
             let reconciler_path = cache.join(RECONCILER_FILENAME);
+            let manager_path = cache.join(MANAGER_FILENAME);
             write_verified(&archive_path, EMBEDDED_ARCHIVE)?;
             write_verified(&descriptor_path, EMBEDDED_DESCRIPTOR)?;
             write_verified(&manifest_path, EMBEDDED_MANIFEST)?;
             write_verified(&reconciler_path, EMBEDDED_RECONCILER)?;
+            write_verified(&manager_path, EMBEDDED_MANAGER)?;
             let archive_wsl = windows_path_to_wsl(&archive_path)?;
             let descriptor_wsl = windows_path_to_wsl(&descriptor_path)?;
             let reconciler_wsl = windows_path_to_wsl(&reconciler_path)?;
+            let manager_wsl = windows_path_to_wsl(&manager_path)?;
             let execution_paths_need_reconciliation = !runtime_execution_paths_current();
             // The first Engine Pack on a migrated Runtime has no `current`
             // symlink yet. Publish the verified release before asking the
@@ -733,8 +738,9 @@ pub(crate) async fn install_embedded_engine_pack(
             // this one-time transition.
             if current.pack_update_required {
                 let output = wsl_output(
-                    MANAGER_PATH,
+                    "/usr/bin/python3",
                     &[
+                        manager_wsl.as_str(),
                         "--descriptor",
                         descriptor_wsl.as_str(),
                         "--archive",

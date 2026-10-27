@@ -86,6 +86,10 @@ pub(crate) fn runtime_download_cache_root(target_root: &str) -> PathBuf {
 
 /// Keep resumable downloads out of the WSL import directory, which must stay clean.
 fn runtime_download_cache_root_path(target_root: &Path) -> PathBuf {
+    if target_root.file_name().and_then(|name| name.to_str()).is_some_and(|name| name.eq_ignore_ascii_case("Runtime")) {
+        return target_root.parent().unwrap_or_else(|| Path::new(""))
+            .join("Caches").join("Runtime");
+    }
     target_root
         .parent()
         .unwrap_or_else(|| Path::new(""))
@@ -105,6 +109,7 @@ pub(crate) fn initialize_runtime_download_cache(
         .ok_or_else(|| "The runtime target has no local parent directory.".to_string())?;
     let cache_root = runtime_download_cache_root_path(runtime_target_root);
     reject_existing_link_like(cache_parent)?;
+    if let Some(parent) = cache_root.parent() { reject_existing_link_like(parent)?; }
     reject_existing_link_like(&cache_root)?;
 
     if !cache_root.exists() {
@@ -116,6 +121,7 @@ pub(crate) fn initialize_runtime_download_cache(
         })?;
     }
     ensure_real_directory(cache_parent, "runtime cache parent")?;
+    if let Some(parent) = cache_root.parent() { ensure_real_directory(parent, "runtime download cache parent")?; }
     ensure_real_directory(&cache_root, "runtime download cache")?;
 
     let marker_path = cache_root.join(CACHE_MARKER);
@@ -239,6 +245,7 @@ pub(crate) fn validate_managed_cache(runtime_target_root: &Path) -> Result<PathB
     let artifacts = cache_root.join(ARTIFACT_DIRECTORY);
 
     ensure_real_directory(cache_parent, "runtime cache parent")?;
+    if let Some(parent) = cache_root.parent() { ensure_real_directory(parent, "runtime download cache parent")?; }
     ensure_real_directory(&cache_root, "runtime download cache")?;
     ensure_real_directory(&artifacts, "runtime artifact cache")?;
     validate_cache_marker(&cache_root.join(CACHE_MARKER))?;
@@ -247,9 +254,8 @@ pub(crate) fn validate_managed_cache(runtime_target_root: &Path) -> Result<PathB
         .map_err(|error| format!("Unable to resolve the runtime target parent: {error}"))?;
     let canonical_cache = fs::canonicalize(&cache_root)
         .map_err(|error| format!("Unable to resolve the runtime download cache: {error}"))?;
-    if canonical_cache.parent() != Some(canonical_parent.as_path())
-        || canonical_cache.file_name() != Some(std::ffi::OsStr::new(CACHE_DIRECTORY))
-    {
+    let expected = runtime_download_cache_root_path(&canonical_parent.join(runtime_target_root.file_name().unwrap()));
+    if canonical_cache != expected {
         return Err(
             "The runtime download cache is not the expected same-drive sibling of the runtime target."
                 .to_string(),
@@ -386,7 +392,7 @@ fn require_absolute_runtime_root(runtime_target_root: &Path) -> Result<(), Strin
     if !runtime_target_root.is_absolute() {
         return Err("The managed runtime target must be an absolute path.".to_string());
     }
-    if runtime_target_root.file_name() != Some(std::ffi::OsStr::new("DroneDream")) {
+    if !runtime_target_root.file_name().and_then(|name| name.to_str()).is_some_and(|name| name.eq_ignore_ascii_case("DroneDream") || name.eq_ignore_ascii_case("Runtime")) {
         return Err(
             "The managed runtime target must end in the dedicated DroneDream folder.".to_string(),
         );
@@ -546,6 +552,26 @@ mod tests {
         fs::create_dir_all(path.parent().expect("artifact parent")).expect("create parent");
         fs::write(&path, body).expect("write artifact");
         path
+    }
+
+    #[test]
+    fn workspace_cache_stays_outside_the_runtime_import_directory() {
+        let sandbox = Sandbox::new();
+        let workspace = sandbox.0.join("DroneDream-Workspace");
+        let runtime = workspace.join("Runtime");
+        let cache = initialize_runtime_download_cache(&runtime).unwrap();
+        assert_eq!(cache, workspace.join("Caches").join("Runtime"));
+        assert!(!runtime.exists());
+        assert_eq!(validate_managed_cache(&runtime).unwrap(), cache);
+        let artifact = Path::new("artifacts/runtime.tar.zst");
+        let file = write_artifact(&runtime, artifact, b"verified runtime");
+        apply_runtime_import_outcome(
+            &runtime,
+            ImportOutcome::Succeeded,
+            &[DownloadArtifact::verified(artifact)],
+        ).unwrap();
+        assert!(!file.exists());
+        assert!(cache.join(CACHE_MARKER).exists());
     }
 
     #[test]

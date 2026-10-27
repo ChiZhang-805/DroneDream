@@ -1000,6 +1000,108 @@ pub async fn start_runtime(
     run_runtime_maintenance(installer.inner().clone(), keepalive.inner().clone(), false).await
 }
 
+/// Move only this product's owned legacy storage, using WSL's registration-aware move.
+#[cfg(target_os = "windows")]
+pub(crate) fn consolidate_runtime_storage() -> Result<(), String> {
+    with_runtime_operation_lease(|| {
+        let _sessions = crate::runtime_keepalive::claim_storage_maintenance()?;
+        crate::runtime::validate_installed_runtime_ownership()?;
+        if load_upgrade_pointer().map_err(|error| error.message)?.is_some() {
+            return Err("Finish the pending Runtime upgrade before moving storage.".to_string());
+        }
+        let old = crate::runtime::registered_runtime_target()?.ok_or("Runtime is not installed")?;
+        let target = crate::runtime::normalize_windows_target(&old[..2])?;
+        if old.eq_ignore_ascii_case(&target) {
+            if Path::new(&format!("{}\\DroneDream.download-cache", &old[..2])).exists() {
+                return Err("Runtime is already in the workspace, but its legacy cache still needs recovery.".to_string());
+            }
+            return Ok(());
+        }
+        if !old.eq_ignore_ascii_case(&format!("{}\\DroneDream", &old[..2])) {
+            return Err("Only the legacy product Runtime directory can be consolidated.".to_string());
+        }
+        let old = PathBuf::from(old);
+        let target = PathBuf::from(target);
+        let old_cache = crate::runtime_cache::validate_managed_cache(&old)?;
+        let new_cache = crate::runtime_cache::runtime_download_cache_root(target.to_str().ok_or("Invalid Runtime path")?);
+        for destination in [&target, &new_cache] {
+            if destination.exists() { return Err(format!("Destination already exists: {}", destination.display())); }
+            for parent in destination.ancestors().skip(1) {
+                if let Ok(metadata) = fs::symlink_metadata(parent) {
+                    if !metadata.is_dir() || crate::runtime_cache::is_link_like(&metadata) {
+                        return Err(format!("Storage parent is not a real directory: {}", parent.display()));
+                    }
+                }
+            }
+        }
+        ProductionWslExecutor.terminate().map_err(|error| error.message)?;
+        let before = storage_inventory(&old)?;
+        let cache_before = storage_inventory(&old_cache)?;
+        println!("Runtime: {} files, {} bytes; cache: {} files, {} bytes", before.len(), before.values().map(|v| v.0).sum::<u64>(), cache_before.len(), cache_before.values().map(|v| v.0).sum::<u64>());
+        fs::create_dir_all(target.parent().ok_or("Missing workspace parent")?).map_err(|error| error.to_string())?;
+        fs::create_dir_all(new_cache.parent().ok_or("Missing cache parent")?).map_err(|error| error.to_string())?;
+        let mut command = windows_command("wsl.exe");
+        command.args(["--manage", "DroneDreamRuntime", "--move", target.to_str().ok_or("Invalid Runtime target")?]);
+        let output = command_output(command, Duration::from_secs(300), "Runtime storage move")?;
+        if !output.status.success() {
+            return Err(format!("WSL could not move Runtime storage (exit {:?}); existing data was preserved.", output.status.code()));
+        }
+        // WSL versions may leave the product marker beside the old VHDX location.
+        if old.exists() {
+            for entry in fs::read_dir(&old).map_err(|error| error.to_string())? {
+                let entry = entry.map_err(|error| error.to_string())?;
+                let destination = target.join(entry.file_name());
+                if destination.exists() { return Err("Runtime move left conflicting metadata; both copies were preserved.".to_string()); }
+                fs::rename(entry.path(), destination).map_err(|error| error.to_string())?;
+            }
+        }
+        if storage_inventory(&target)? != before {
+            return Err("Runtime storage inventory changed during the move; inspect both locations before continuing.".to_string());
+        }
+        if !crate::runtime::runtime_registration_matches_target(target.to_str().unwrap())? {
+            return Err("WSL did not register the new Runtime location.".to_string());
+        }
+        crate::runtime::validate_installed_runtime_ownership()?;
+        fs::rename(&old_cache, &new_cache).map_err(|error| error.to_string())?;
+        if storage_inventory(&new_cache)? != cache_before {
+            return Err("Runtime cache inventory changed during the move.".to_string());
+        }
+        crate::runtime_cache::validate_managed_cache(&target)?;
+        if old.exists() { fs::remove_dir(&old).map_err(|error| error.to_string())?; }
+        Ok(())
+    })
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn consolidate_runtime_storage() -> Result<(), String> {
+    Err("Runtime storage management supports Windows only.".to_string())
+}
+
+#[cfg(target_os = "windows")]
+fn storage_inventory(root: &Path) -> Result<std::collections::BTreeMap<PathBuf, (u64, String)>, String> {
+    let mut inventory = std::collections::BTreeMap::new();
+    let mut directories = vec![root.to_path_buf()];
+    while let Some(directory) = directories.pop() {
+        for entry in fs::read_dir(&directory).map_err(|error| error.to_string())? {
+            let entry = entry.map_err(|error| error.to_string())?;
+            let metadata = fs::symlink_metadata(entry.path()).map_err(|error| error.to_string())?;
+            if crate::runtime_cache::is_link_like(&metadata) { return Err("Runtime storage contains a link; move was refused.".to_string()); }
+            if metadata.is_dir() { directories.push(entry.path()); continue; }
+            if !metadata.is_file() { return Err("Runtime storage contains an unsupported entry.".to_string()); }
+            let mut input = fs::File::open(entry.path()).map_err(|error| error.to_string())?;
+            let mut digest = Sha256::new();
+            let mut buffer = vec![0_u8; 64 * 1024];
+            loop {
+                let count = input.read(&mut buffer).map_err(|error| error.to_string())?;
+                if count == 0 { break; }
+                digest.update(&buffer[..count]);
+            }
+            inventory.insert(entry.path().strip_prefix(root).map_err(|error| error.to_string())?.to_path_buf(), (metadata.len(), hex::encode(digest.finalize())));
+        }
+    }
+    Ok(inventory)
+}
+
 #[tauri::command]
 pub async fn repair_runtime(
     installer: tauri::State<'_, RuntimeInstaller>,
