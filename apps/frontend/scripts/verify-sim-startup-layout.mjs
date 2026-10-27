@@ -292,7 +292,7 @@ async function verifyCase(browser, testCase) {
     // Packaged desktop builds use hash history so a WebView reload never asks a
     // nonexistent HTTP server to resolve an application route. Exercise the
     // same URL shape here instead of accidentally testing the hosted router.
-    await page.goto(`${origin}/${edition === "field" ? "field.html" : ""}#/desktop/setup`, { waitUntil: "networkidle" });
+    await page.goto(`${origin}/#/desktop/setup`, { waitUntil: "networkidle" });
     if (errorOnly) {
       const dialog = page.getByRole("dialog");
       await dialog.waitFor();
@@ -307,7 +307,7 @@ async function verifyCase(browser, testCase) {
       return { case: testCase, status: "pass", bounds };
     }
     if (progressOnly) {
-      await page.goto(origin + (edition === 'field' ? '/field.html' : '/') + '?docsPreview=1#/desktop/setup', { waitUntil: 'networkidle' });
+      await page.goto(origin + '/?docsPreview=1#/desktop/setup', { waitUntil: 'networkidle' });
       await page.locator('.launcher-stage-list').waitFor();
       assert.equal(await page.locator('.launcher-stage-list li').count(), 4);
       const marker = page.locator('.launcher-stage-list li[aria-current="step"] > span');
