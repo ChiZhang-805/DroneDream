@@ -215,7 +215,9 @@ fn parse_early_command(args: &[String]) -> Result<EarlyCommand, String> {
     };
     match command {
         "--consolidate-runtime-storage" => {
-            if args.len() != 1 { return Err("--consolidate-runtime-storage accepts no arguments.".to_string()); }
+            if args.len() != 1 {
+                return Err("--consolidate-runtime-storage accepts no arguments.".to_string());
+            }
             Ok(EarlyCommand::ConsolidateStorage)
         }
         "--clear-installer-handoff" => {

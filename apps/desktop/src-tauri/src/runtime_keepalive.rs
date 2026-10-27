@@ -59,7 +59,8 @@ fn claim_last_session_exit(path: &std::path::Path) -> Result<Option<std::fs::Fil
 pub(crate) fn claim_storage_maintenance() -> Result<std::fs::File, String> {
     let (lease, path) = acquire_session_lease()?;
     drop(lease);
-    claim_last_session_exit(&path)?.ok_or_else(|| "Close all DroneDream editions before moving Runtime storage.".to_string())
+    claim_last_session_exit(&path)?
+        .ok_or_else(|| "Close all DroneDream editions before moving Runtime storage.".to_string())
 }
 
 #[derive(Clone, Default)]

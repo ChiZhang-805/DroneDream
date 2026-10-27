@@ -43,7 +43,7 @@ function Get-ReleaseOrNull {
     $previousErrorActionPreference = $ErrorActionPreference
     try {
         $ErrorActionPreference = "SilentlyContinue"
-        $output = (& gh release view $Tag --repo $Repository --json tagName,assets,isDraft,isPrerelease 2>$null | Out-String).Trim()
+        $output = (& gh release view $Tag --repo $Repository --json tagName,targetCommitish,assets,isDraft,isPrerelease 2>$null | Out-String).Trim()
         $releaseViewExitCode = $LASTEXITCODE
     } finally {
         $ErrorActionPreference = $previousErrorActionPreference
@@ -188,6 +188,24 @@ try {
     $actualAssetNames = @($release.assets | ForEach-Object { [string]$_.name } | Sort-Object)
     if (($actualAssetNames -join "`n") -cne ($expectedAssetNames -join "`n")) {
         throw "Combined release assets differ from the exact 20-file five-edition set."
+    }
+    if ([string]$release.targetCommitish -cne $sourceCommit) {
+        throw "Combined release target differs from the five-edition source commit."
+    }
+    if ([bool]$release.isDraft) {
+        if ($PSCmdlet.ShouldProcess("$Repository release $releaseTag", "publish the verified signed draft")) {
+            Invoke-GitHubCli -Arguments @(
+                "release", "edit", $releaseTag,
+                "--repo", $Repository,
+                "--draft=false",
+                "--prerelease",
+                "--latest=false"
+            ) | Out-Null
+        }
+        $release = Get-ReleaseOrNull -Tag $releaseTag
+    }
+    if ($null -eq $release -or [bool]$release.isDraft) {
+        throw "Combined release was not published: $releaseTag"
     }
 
     foreach ($editionId in $editionIds) {

@@ -372,7 +372,9 @@ pub(crate) async fn agent_core_status(
         .map_err(|_| "agent-core-state-poisoned".to_owned())?
         .clone();
     let available = tauri::async_runtime::spawn_blocking(move || {
-        let Some(info) = info else { return false; };
+        let Some(info) = info else {
+            return false;
+        };
         reqwest::blocking::Client::builder()
             .no_proxy()
             .timeout(Duration::from_secs(2))
@@ -385,7 +387,9 @@ pub(crate) async fn agent_core_status(
             .filter(|body| body.len() <= 4096)
             .and_then(|body| serde_json::from_str::<serde_json::Value>(&body).ok())
             .is_some_and(|value| value.get("status").and_then(|v| v.as_str()) == Some("ready"))
-    }).await.map_err(|_| "agent-core-health-check-failed".to_owned())?;
+    })
+    .await
+    .map_err(|_| "agent-core-health-check-failed".to_owned())?;
     let startup_issue = *state
         .startup_issue
         .lock()

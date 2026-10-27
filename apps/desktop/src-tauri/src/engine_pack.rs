@@ -22,7 +22,8 @@ const DESCRIPTOR_FILENAME: &str = "engine-pack-bundle.json";
 const MANIFEST_FILENAME: &str = "engine-pack-manifest.json";
 const RECONCILER_FILENAME: &str = "reconcile_engine_pack_runtime_env.py";
 const MANAGER_FILENAME: &str = "engine-pack-manager.py";
-const EMBEDDED_MANAGER: &[u8] = include_bytes!("../../../../platform/runtime/scripts/engine-pack-manager.py");
+const EMBEDDED_MANAGER: &[u8] =
+    include_bytes!("../../../../platform/runtime/scripts/engine-pack-manager.py");
 const RUNTIME_ENVIRONMENT_PATH: &str = "/etc/dronedream/runtime.env";
 const RUNTIME_API_SERVICE_PATH: &str = "/etc/systemd/system/dronedream-api.service";
 const RUNTIME_WORKER_SERVICE_PATH: &str = "/etc/systemd/system/dronedream-worker.service";
