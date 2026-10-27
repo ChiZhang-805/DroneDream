@@ -458,9 +458,6 @@ export function DesktopSetup() {
       !installerHandoffState.discardResult.discarded),
   );
   const launcherErrorDetails = [
-    desktopAvailable && coreStartup === "failed"
-      ? (locale === "zh-CN" ? "Agent Core 未能启动。请重试；所有组件就绪后才能进入软件。" : "Agent Core could not start. Try again to finish startup before opening the workspace.")
-      : null,
     ...state.issues.map((issue) => `${issue.command}: ${localeSafeError(issue.message, locale, { zh: "环境检查失败。", en: "Environment check failed." })}`),
     installState.commandError ? localizedDesktopDiagnostic(installState.commandError, locale, { zh: "运行环境安装命令失败。", en: "Runtime installation command failed." }) : null,
     installState.snapshot?.error
@@ -1605,7 +1602,7 @@ export function DesktopSetup() {
           ) : null}
         </div>
 
-        {(signedInAccount || coreStartup === "failed") && launcherErrorVisible ? (
+        {signedInAccount && launcherErrorVisible ? (
           <LauncherErrorDialog
             title={t(runtimeHealthCopy?.titleKey ?? "launcher.errorTitle")}
             hint={t(runtimeHealthCopy?.hintKey ?? "launcher.errorHint")}
@@ -1617,7 +1614,6 @@ export function DesktopSetup() {
             onRetry={() => {
               setLauncherErrorExpanded(false);
               setDismissedLauncherError("");
-              if (coreStartup === "failed") void checkAgentCoreStartup(true);
               if (installerHandoffNeedsAttention || automaticStartPending) {
                 retryInstallerHandoff();
               } else {

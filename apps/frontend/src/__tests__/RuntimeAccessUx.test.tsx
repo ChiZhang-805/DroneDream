@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const coreState = vi.hoisted(() => ({ value: "ready" as "ready" | "checking" | "failed" }));
+const coreState = vi.hoisted(() => ({ value: "ready" as "ready" | "checking" }));
 vi.mock("../desktop/agentCoreStartup", () => ({
   getAgentCoreStartupState: () => coreState.value,
   subscribeAgentCoreStartup: () => () => undefined,
@@ -164,7 +164,7 @@ describe("desktop startup access", () => {
       if (command === "get_installer_locale") return "en";
       throw new Error(`Unexpected command: ${command}`);
     }) } };
-    coreState.value = "failed";
+    coreState.value = "checking";
     const mounted = vi.fn();
     function InternalPage() { mounted(); return <div>Internal workspace</div>; }
     const router = createMemoryRouter([{

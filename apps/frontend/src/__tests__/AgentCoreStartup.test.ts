@@ -28,22 +28,27 @@ describe("Agent Core startup", () => {
     expect(bridge.status).toHaveBeenCalledTimes(2);
   });
 
-  it("keeps a failed startup blocked until an explicit successful retry", async () => {
+  it("automatically retries an unavailable Core without leaving the launcher", async () => {
     bridge.status.mockResolvedValue({ restarting: false, available: false });
     bridge.restart.mockResolvedValue({ restarting: false, available: true });
     const startup = await import("../desktop/agentCoreStartup");
-    await startup.checkAgentCoreStartup();
-    expect(startup.getAgentCoreStartupState()).toBe("failed");
+    const check = startup.checkAgentCoreStartup();
+    expect(startup.getAgentCoreStartupState()).toBe("checking");
     expect(bridge.restart).not.toHaveBeenCalled();
-    await startup.checkAgentCoreStartup(true);
+    await vi.advanceTimersByTimeAsync(1_000);
+    await check;
     expect(startup.getAgentCoreStartupState()).toBe("ready");
     expect(bridge.restart).toHaveBeenCalledTimes(1);
   });
 
-  it("does not approve entry when the native bridge fails", async () => {
-    bridge.status.mockRejectedValue(new Error("Core process exited"));
+  it("recovers automatically when the first native bridge call fails", async () => {
+    bridge.status.mockRejectedValueOnce(new Error("Core process exited"));
+    bridge.restart.mockResolvedValue({ restarting: false, available: true });
     const startup = await import("../desktop/agentCoreStartup");
-    await startup.checkAgentCoreStartup();
-    expect(startup.getAgentCoreStartupState()).toBe("failed");
+    const check = startup.checkAgentCoreStartup();
+    await vi.advanceTimersByTimeAsync(1_000);
+    await check;
+    expect(startup.getAgentCoreStartupState()).toBe("ready");
+    expect(bridge.restart).toHaveBeenCalledTimes(1);
   });
 });

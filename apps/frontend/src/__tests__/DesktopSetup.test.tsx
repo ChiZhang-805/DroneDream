@@ -19,7 +19,7 @@ const optionalAuthState = vi.hoisted(() => ({
   },
 }));
 const passwordSignIn = vi.hoisted(() => vi.fn(async () => undefined));
-const coreStartupMock = vi.hoisted(() => ({ state: "ready" as "ready" | "checking" | "failed", check: vi.fn(async () => undefined) }));
+const coreStartupMock = vi.hoisted(() => ({ state: "ready" as "ready" | "checking", check: vi.fn(async () => undefined) }));
 vi.mock("../desktop/agentCoreStartup", () => ({
   getAgentCoreStartupState: () => coreStartupMock.state,
   subscribeAgentCoreStartup: () => () => undefined,
@@ -598,8 +598,8 @@ describe("DesktopSetup", () => {
     expect(invoke).not.toHaveBeenCalledWith("get_runtime_install_plan", expect.anything());
   });
 
-  it.each(["checking", "failed"] as const)("keeps a healthy Runtime on the launcher while Core is %s", async (state) => {
-    coreStartupMock.state = state;
+  it("keeps a healthy Runtime on the launcher without an error dialog while Core starts", async () => {
+    coreStartupMock.state = "checking";
     window.__TAURI__ = { core: { invoke: vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;
       if (command === "probe_runtime_status") return runtime;
@@ -609,12 +609,7 @@ describe("DesktopSetup", () => {
     await waitFor(() => expect(coreStartupMock.check).toHaveBeenCalled());
     expect(screen.getByTestId("current-route")).toHaveTextContent("/");
     expect(screen.queryByRole("link", { name: "Open DroneDream workspace" })).not.toBeInTheDocument();
-    if (state === "failed") {
-      await userEvent.click(await screen.findByRole("button", { name: "View error information" }));
-      expect(await screen.findByText(/Agent Core could not start/)).toBeInTheDocument();
-      await userEvent.click(screen.getByRole("button", { name: "Try again" }));
-      expect(coreStartupMock.check).toHaveBeenCalledWith(true);
-    }
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("offers direct sign-in without treating a loading account as authenticated", async () => {

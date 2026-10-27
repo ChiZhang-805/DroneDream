@@ -20,6 +20,10 @@ const MAX_RESPONSE_BYTES: usize = 256 * 1024 * 1024;
 const MAX_ASSET_SOURCE_BYTES: u64 = 8 * 1024 * 1024 * 1024;
 const MAX_ASSET_SOURCE_MEMBER_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const MAX_ASSET_SOURCE_MEMBERS: usize = 20_000;
+const STARTUP_HEALTH_ATTEMPTS: usize = 900;
+const STARTUP_HEALTH_INTERVAL: Duration = Duration::from_millis(100);
+const STARTUP_LAUNCH_ATTEMPTS: usize = 2;
+const STARTUP_RETRY_DELAY: Duration = Duration::from_millis(500);
 
 #[derive(Clone)]
 struct AgentCoreInfo {
@@ -227,7 +231,7 @@ fn wait_until_ready(port: u16) -> Result<(), String> {
         .build()
         .map_err(|error| format!("Unable to create the AGENT Core health client: {error}"))?;
     let health_url = format!("http://127.0.0.1:{port}/health");
-    for _ in 0..240 {
+    for _ in 0..STARTUP_HEALTH_ATTEMPTS {
         if let Ok(response) = client.get(&health_url).send() {
             if response.status().is_success() {
                 if let Ok(body) = response.text() {
@@ -243,9 +247,9 @@ fn wait_until_ready(port: u16) -> Result<(), String> {
                 }
             }
         }
-        std::thread::sleep(Duration::from_millis(100));
+        std::thread::sleep(STARTUP_HEALTH_INTERVAL);
     }
-    Err("AGENT Core did not become ready within 24 seconds.".to_owned())
+    Err("AGENT Core did not become ready within 90 seconds.".to_owned())
 }
 
 fn launch(app: &AppHandle) -> Result<(AgentCoreInfo, CommandChild), String> {
@@ -299,6 +303,23 @@ fn launch(app: &AppHandle) -> Result<(AgentCoreInfo, CommandChild), String> {
     ))
 }
 
+fn launch_with_retry(app: &AppHandle) -> Result<(AgentCoreInfo, CommandChild), String> {
+    let mut last_error = None;
+    for attempt in 1..=STARTUP_LAUNCH_ATTEMPTS {
+        match launch(app) {
+            Ok(result) => return Ok(result),
+            Err(error) => {
+                eprintln!("AGENT Core startup attempt {attempt} failed: {error}");
+                last_error = Some(error);
+            }
+        }
+        if attempt < STARTUP_LAUNCH_ATTEMPTS {
+            std::thread::sleep(STARTUP_RETRY_DELAY);
+        }
+    }
+    Err(last_error.unwrap_or_else(|| "AGENT Core could not start.".to_owned()))
+}
+
 /// Render the launcher while Core starts; the frontend gate waits for readiness.
 pub(crate) fn start(app: &mut App) {
     app.manage(AgentCoreState {
@@ -309,7 +330,7 @@ pub(crate) fn start(app: &mut App) {
     });
     let app = app.handle().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let result = launch(&app);
+        let result = launch_with_retry(&app);
         let state = app.state::<AgentCoreState>();
         match result {
             Ok((info, child)) => {
@@ -447,7 +468,7 @@ pub(crate) async fn agent_core_restart(
     }
     let _restart_guard = RestartGuard(&state.restarting);
     shutdown_state(&state);
-    let launch_result = tauri::async_runtime::spawn_blocking(move || launch(&app))
+    let launch_result = tauri::async_runtime::spawn_blocking(move || launch_with_retry(&app))
         .await
         .map_err(|error| format!("AGENT Core restart task failed: {error}"))?;
     match launch_result {
