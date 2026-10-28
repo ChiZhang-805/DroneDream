@@ -23,7 +23,6 @@ const MAX_RESPONSE_BYTES: usize = 256 * 1024 * 1024;
 const MAX_ASSET_SOURCE_BYTES: u64 = 8 * 1024 * 1024 * 1024;
 const MAX_ASSET_SOURCE_MEMBER_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 const MAX_ASSET_SOURCE_MEMBERS: usize = 20_000;
-const STARTUP_HEALTH_ATTEMPTS: usize = 900;
 const STARTUP_HEALTH_INTERVAL: Duration = Duration::from_millis(100);
 const STARTUP_LAUNCH_ATTEMPTS: usize = 2;
 const STARTUP_RETRY_DELAY: Duration = Duration::from_millis(500);
@@ -234,7 +233,7 @@ fn wait_until_ready(port: u16, terminated: &AtomicBool) -> Result<(), String> {
         .build()
         .map_err(|error| format!("Unable to create the AGENT Core health client: {error}"))?;
     let health_url = format!("http://127.0.0.1:{port}/health");
-    for _ in 0..STARTUP_HEALTH_ATTEMPTS {
+    loop {
         if terminated.load(Ordering::Acquire) {
             return Err("AGENT Core exited before its health endpoint became ready.".to_owned());
         }
@@ -255,7 +254,6 @@ fn wait_until_ready(port: u16, terminated: &AtomicBool) -> Result<(), String> {
         }
         std::thread::sleep(STARTUP_HEALTH_INTERVAL);
     }
-    Err("AGENT Core did not become ready within 90 seconds.".to_owned())
 }
 
 fn launch(app: &AppHandle) -> Result<(AgentCoreInfo, CommandChild), String> {
