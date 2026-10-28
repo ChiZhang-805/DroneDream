@@ -11,26 +11,35 @@ describe("asset pair selection", () => {
   it("does not resurrect retired defaults from an older sidecar", () => {
     const oldPair = { ...FALLBACK_ASSET_PAIR_CATALOG.pairs[0], vehicle_resource_id: "px4-x500-flow" };
     const olderCatalog = { ...FALLBACK_ASSET_PAIR_CATALOG, pairs: [...FALLBACK_ASSET_PAIR_CATALOG.pairs, oldPair] };
-    expect(compatibleAircraftChoices(olderCatalog, null).map(choice => choice.resourceId)).toEqual(["px4-x500-depth"]);
+    expect(compatibleAircraftChoices(olderCatalog, null).map(choice => choice.resourceId)).toEqual([
+      "px4-x500-depth",
+      "px4-x500-lidar-front",
+      "px4-x500-gimbal",
+      "px4-standard-vtol",
+      "px4-tiltrotor",
+      "px4-quadtailsitter",
+    ]);
     expect(selectedPair(olderCatalog, "dronedream-school-map", "px4-x500-flow")).toBeNull();
   });
   it("shows all assets while both selections are empty", () => {
     expect(compatibleMapChoices(FALLBACK_ASSET_PAIR_CATALOG, null)).toHaveLength(6);
-    expect(compatibleAircraftChoices(FALLBACK_ASSET_PAIR_CATALOG, null)).toHaveLength(1);
-    expect(FALLBACK_ASSET_PAIR_CATALOG.pair_count).toBe(6);
-    expect(FALLBACK_ASSET_PAIR_CATALOG.counts).toEqual({ qualified_builtin: 6, compatible_requires_qualification: 0, incompatible: 0 });
+    expect(compatibleAircraftChoices(FALLBACK_ASSET_PAIR_CATALOG, null)).toHaveLength(6);
+    expect(FALLBACK_ASSET_PAIR_CATALOG.pair_count).toBe(36);
+    expect(FALLBACK_ASSET_PAIR_CATALOG.counts).toEqual({ qualified_builtin: 6, compatible_requires_qualification: 30, incompatible: 0 });
   });
 
-  it("only lists the admitted aircraft for the outdoor campus", () => {
+  it("lists the six admitted aircraft for the outdoor campus", () => {
     const aircraft = compatibleAircraftChoices(FALLBACK_ASSET_PAIR_CATALOG, "dronedream-school-map");
-    expect(aircraft).toHaveLength(1);
+    expect(aircraft).toHaveLength(6);
     expect(aircraft.filter((choice) => choice.qualifiedPairCount > 0).map((choice) => choice.resourceId)).toEqual([
       "px4-x500-depth",
     ]);
   });
 
-  it("does not offer a map for a retired aircraft", () => {
-    expect(compatibleMapChoices(FALLBACK_ASSET_PAIR_CATALOG, "px4-standard-vtol").map((choice) => choice.resourceId)).toEqual([]);
+  it("offers the reviewed outdoor maps for Standard VTOL while keeping the pair unqualified", () => {
+    const maps = compatibleMapChoices(FALLBACK_ASSET_PAIR_CATALOG, "px4-standard-vtol");
+    expect(maps).toHaveLength(6);
+    expect(maps.every((choice) => choice.qualifiedPairCount === 0)).toBe(true);
   });
 
   it("reports the default qualified map and aircraft pair", () => {

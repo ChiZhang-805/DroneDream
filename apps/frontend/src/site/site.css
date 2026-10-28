@@ -1400,6 +1400,9 @@ html[lang="zh-CN"] .site-hero h1 {
 .organization-join-requests button.is-secondary { border: 1px solid #d9d0eb; background: #fff; color: #3d354d; }
 
 .organization-members-card {
+  display: flex;
+  min-height: clamp(520px, 56vh, 680px);
+  flex-direction: column;
   overflow: hidden;
   border: 1px solid rgba(91, 73, 144, 0.15);
   border-radius: 22px;
@@ -1455,7 +1458,7 @@ html[lang="zh-CN"] .site-hero h1 {
 .organization-member-actions button:disabled { opacity: 0.5; }
 .organization-error { margin: 0; padding: 10px 18px; background: #fff2f5; color: #a5224d; }
 
-.organization-member-table { width: 100%; overflow: hidden; }
+.organization-member-table { width: 100%; flex: 1; overflow: hidden; background: #fff; }
 .organization-member-table table { width: 100%; table-layout: fixed; border-collapse: collapse; }
 .organization-member-table th {
   padding: 11px 12px;
@@ -1476,12 +1479,6 @@ html[lang="zh-CN"] .site-hero h1 {
   text-overflow: ellipsis;
 }
 .organization-member-table tbody tr { height: 55px; }
-.organization-member-table .organization-member-placeholder td {
-  display: table-cell;
-  height: 55px;
-  padding: 0;
-  background: rgba(249, 247, 252, 0.34);
-}
 .organization-member-table th:nth-child(1) { width: 25%; }
 .organization-member-table th:nth-child(2) { width: 9%; }
 .organization-member-table th:nth-child(3) { width: 8%; }
@@ -1540,6 +1537,39 @@ html[lang="zh-CN"] .site-hero h1 {
 .organization-row-delete { display: grid; width: 32px; height: 32px; flex: 0 0 32px; place-items: center; border: 1px solid rgba(197, 40, 83, .24); border-radius: 9px; background: #fff1f4; color: #c52853; cursor: pointer; }
 .organization-row-delete svg { width: 15px; height: 15px; }
 .organization-row-delete:disabled { border-color: rgba(125, 116, 137, .12); background: #f6f4f8; color: #c9c3ce; cursor: not-allowed; opacity: 1; }
+
+.organization-member-pagination {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-top: 1px solid rgba(91, 73, 144, 0.1);
+  background: #fff;
+}
+.organization-member-pagination button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: #4d4657;
+  font-weight: 800;
+  cursor: pointer;
+}
+.organization-member-pagination button[aria-current="page"] {
+  border-color: rgba(121, 87, 232, 0.2);
+  background: #f0eaff;
+  color: #6842d7;
+}
+.organization-member-pagination button:disabled { color: #c9c3ce; cursor: default; }
+.organization-member-pagination button:not(:disabled):hover { background: #f7f3fc; }
+.organization-member-pagination svg { width: 17px; height: 17px; }
+.organization-member-pagination > span { width: 24px; color: #8a8294; text-align: center; }
 
 .organization-dialog-backdrop {
   position: fixed;
@@ -1623,7 +1653,7 @@ html[lang="zh-CN"] .site-hero h1 {
   .organization-member-table table,
   .organization-member-table tbody { display: block; }
   .organization-member-table thead { display: none; }
-  .organization-member-table .organization-member-placeholder { display: none; }
+  .organization-members-card { min-height: 520px; }
   .organization-member-table tr {
     display: grid;
     grid-template-columns: 1fr auto;

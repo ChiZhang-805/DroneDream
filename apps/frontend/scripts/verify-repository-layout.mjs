@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {chromium} from 'playwright';
+import {PNG} from 'pngjs';
 import {createServer} from 'vite';
 const output=path.resolve(process.argv.find(arg=>arg.startsWith('--output='))?.slice(9) ?? 'node_modules/.cache/repository-layout');
 await mkdir(output,{recursive:true});
@@ -20,6 +21,8 @@ for(const [width,height] of [[1440,900],[2560,1440],[390,844]])for(const locale 
  await page.goto('http://127.0.0.1:5292/autonomy/aircraft?docsPreview=1',{waitUntil:'networkidle'});
  await page.evaluate(()=>{document.querySelector('.account-dialog-backdrop')?.remove();document.querySelectorAll('[inert]').forEach(el=>el.removeAttribute('inert'));});
  const cards=page.locator('.autonomy-repository-grid > article');
+ assert.equal(await cards.count(),6);
+ assert.equal(await page.getByText(/Aircraft Pending|无人机待添加/).count(),0);
  const rects=await cards.evaluateAll(nodes=>nodes.slice(0,4).map(n=>{const r=n.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};}));
  assert(rects.length>=4);
  if(width>1050){assert(Math.abs(rects[0].y-rects[2].y)<1);assert(rects[1].x>rects[0].x);assert(rects[3].y>rects[0].y);}
@@ -32,8 +35,25 @@ for(const [width,height] of [[1440,900],[2560,1440],[390,844]])for(const locale 
  assert(details.rows>=10);assert(details.width<=width);assert(details.height<=height);
  await page.screenshot({path:`${output}/${width}-${locale}-details.png`});
  await page.goto('http://127.0.0.1:5292/autonomy/maps?docsPreview=1',{waitUntil:'networkidle'});
+ const mapCards=page.locator('.autonomy-repository-grid > article');
+ assert.equal(await mapCards.count(),6);
  const columns=await page.locator('.autonomy-repository-grid').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length);
  assert.equal(columns,width>1050?3:1);
+ if(width===1440&&locale==='en'){
+  for(let index=0;index<await mapCards.count();index+=1){
+   await mapCards.nth(index).locator('.autonomy-repository-card-surface').dblclick();
+   const canvas=page.locator('.autonomy-repository-dialog canvas');
+   await canvas.waitFor();
+   await page.waitForTimeout(700);
+   const image=PNG.sync.read(await canvas.screenshot());
+   const colors=new Set();
+   for(let pixel=0;pixel<image.data.length;pixel+=Math.max(4,Math.floor(image.data.length/2000/4)*4)){
+    colors.add(`${image.data[pixel]},${image.data[pixel+1]},${image.data[pixel+2]},${image.data[pixel+3]}`);
+   }
+   assert(colors.size>24,`map ${index+1} canvas did not render visible geometry`);
+   await page.locator('.autonomy-repository-dialog > header button').click();
+  }
+ }
  await page.screenshot({path:`${output}/${width}-${locale}-maps.png`});
  results.push({width,height,locale,rects,details,columns});
  await context.close();

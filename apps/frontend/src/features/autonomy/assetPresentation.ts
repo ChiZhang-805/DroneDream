@@ -126,7 +126,16 @@ function findDefinition(kind: CatalogAssetKind, id: string, name: string): Catal
 }
 
 export function catalogAssetDefinitions(kind: CatalogAssetKind): readonly CatalogAssetDefinition[] {
-  return kind === "vehicle" ? VEHICLES.filter(item => item.resourceId === "px4-x500-depth") : MAPS;
+  if (kind === "map") return MAPS;
+  const repositoryVehicles = new Set([
+    "px4-x500-depth",
+    "px4-x500-lidar-front",
+    "px4-x500-gimbal",
+    "px4-standard-vtol",
+    "px4-tiltrotor",
+    "px4-quadtailsitter",
+  ]);
+  return VEHICLES.filter((item) => repositoryVehicles.has(item.resourceId));
 }
 
 export function catalogAssetKey(kind: CatalogAssetKind, id: string, name: string): string | null {

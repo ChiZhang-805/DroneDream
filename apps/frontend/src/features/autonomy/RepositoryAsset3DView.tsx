@@ -26,7 +26,7 @@ type CatalogCollisionPrimitive = {
 
 type CatalogGraphNode = {
   node_id: string;
-  position_m: [number, number, number];
+  position_m: [number, number, number] | { x: number; y: number; z: number };
   semantic: string;
 };
 
@@ -111,6 +111,52 @@ function block(
   return mesh;
 }
 
+function aircraftRotor(x: number, y: number, z: number, radius = 0.54): THREE.Group {
+  const rotor = new THREE.Group();
+  const motor = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.13, 0.16, 0.28, 20),
+    new THREE.MeshStandardMaterial({ color: 0x292c35, roughness: 0.48, metalness: 0.34 }),
+  );
+  const propeller = new THREE.Mesh(
+    new THREE.BoxGeometry(radius * 2, 0.035, 0.1),
+    new THREE.MeshStandardMaterial({ color: 0x20232a, roughness: 0.38, metalness: 0.18 }),
+  );
+  motor.position.y = 0.05;
+  propeller.position.y = 0.23;
+  rotor.add(motor, propeller);
+  rotor.position.set(x, y, z);
+  return rotor;
+}
+
+function vtolModel(kind: "standard-vtol" | "tiltrotor" | "quadtailsitter"): THREE.Group {
+  const aircraft = new THREE.Group();
+  const wingColor = kind === "quadtailsitter" ? 0xbcc5d2 : 0xcbd1da;
+  const wing = block(kind === "quadtailsitter" ? 4.4 : 6.4, 0.16, kind === "quadtailsitter" ? 1.35 : 1.7, 0, 0, 0, wingColor);
+  const body = block(2.8, 0.46, 0.58, 0, 0.05, 0, 0x444b58);
+  aircraft.add(wing, body);
+  if (kind === "quadtailsitter") {
+    const fin = block(0.18, 1.55, 0.9, -1.0, 0.15, 0, 0x8f9aaa);
+    aircraft.add(fin);
+    aircraft.add(
+      aircraftRotor(-1.45, 0.2, -0.82, 0.72),
+      aircraftRotor(-1.45, 0.2, 0.82, 0.72),
+      aircraftRotor(1.45, 0.2, -0.82, 0.72),
+      aircraftRotor(1.45, 0.2, 0.82, 0.72),
+    );
+  } else {
+    const tail = block(1.45, 0.12, 0.62, -2.2, 0.12, 0, 0xaeb7c5);
+    aircraft.add(tail);
+    const rotorX = kind === "tiltrotor" ? 2.35 : 1.75;
+    aircraft.add(
+      aircraftRotor(-rotorX, 0.2, -0.72),
+      aircraftRotor(-rotorX, 0.2, 0.72),
+      aircraftRotor(rotorX, 0.2, -0.72),
+      aircraftRotor(rotorX, 0.2, 0.72),
+    );
+  }
+  return aircraft;
+}
+
 function catalogMapUrl(previewKey: string): string {
   const base = import.meta.env.BASE_URL.endsWith("/") ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
   return `${base}asset-geometry/maps/${encodeURIComponent(previewKey)}.json`;
@@ -130,6 +176,14 @@ function numberedBuildingFootprints(footprints: CatalogBuildingFootprint[]): Arr
       return left.name.localeCompare(right.name, "en");
     })
     .map((footprint, index) => ({ ...footprint, number: String(index + 1).padStart(3, "0") }));
+}
+
+export function catalogGraphNodePosition(node: CatalogGraphNode): [number, number, number] | null {
+  const position = node.position_m;
+  const values: [number, number, number] = Array.isArray(position)
+    ? [position[0], position[1], position[2]]
+    : [position.x, position.y, position.z];
+  return values.every(Number.isFinite) ? values : null;
 }
 
 function catalogMapModel(geometry: CatalogMapGeometry): { root: THREE.Group; buildings: THREE.Mesh[] } {
@@ -212,9 +266,12 @@ function catalogMapModel(geometry: CatalogMapGeometry): { root: THREE.Group; bui
     const from = nodeById.get(edge.from_node);
     const to = nodeById.get(edge.to_node);
     if (!from || !to) continue;
+    const fromPosition = catalogGraphNodePosition(from);
+    const toPosition = catalogGraphNodePosition(to);
+    if (!fromPosition || !toPosition) continue;
     routePositions.push(
-      from.position_m[0], from.position_m[2] + 0.09, -from.position_m[1],
-      to.position_m[0], to.position_m[2] + 0.09, -to.position_m[1],
+      fromPosition[0], fromPosition[2] + 0.09, -fromPosition[1],
+      toPosition[0], toPosition[2] + 0.09, -toPosition[1],
     );
   }
   if (routePositions.length) {
@@ -261,12 +318,11 @@ function fitCameraToModel(
 }
 
 function vehicleModel(key: string | null): THREE.Group {
-  const drone = createMyDroneModel();
   const normalized = key ?? "";
-  if (normalized.includes("vtol") || normalized.includes("tiltrotor") || normalized.includes("tailsitter")) {
-    const wing = block(6.8, 0.14, 1.1, 0, 0.2, 0, 0xc9ced8);
-    drone.add(wing);
-  }
+  if (normalized.includes("quadtailsitter")) return vtolModel("quadtailsitter");
+  if (normalized.includes("tiltrotor")) return vtolModel("tiltrotor");
+  if (normalized.includes("standard-vtol")) return vtolModel("standard-vtol");
+  const drone = createMyDroneModel();
   if (normalized.includes("gimbal")) {
     const camera = new THREE.Mesh(
       new THREE.SphereGeometry(0.32, 20, 14),
@@ -274,6 +330,15 @@ function vehicleModel(key: string | null): THREE.Group {
     );
     camera.position.set(0, -0.55, 0.28);
     drone.add(camera);
+  }
+  if (normalized.includes("lidar-front")) {
+    const lidar = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.18, 0.32, 24),
+      new THREE.MeshStandardMaterial({ color: 0x1f2530, metalness: 0.26, roughness: 0.42 }),
+    );
+    lidar.rotation.z = Math.PI / 2;
+    lidar.position.set(0.62, -0.2, 0);
+    drone.add(lidar);
   }
   return drone;
 }

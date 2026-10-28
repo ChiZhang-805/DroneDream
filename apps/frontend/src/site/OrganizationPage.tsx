@@ -1,5 +1,7 @@
 import {
   Building2,
+  ChevronLeft,
+  ChevronRight,
   CircleUserRound,
   Crown,
   Eye,
@@ -40,7 +42,7 @@ import {
 } from "../features/organization/organizationConsole";
 import { useModalFocus } from "../hooks/useModalFocus";
 
-const RESERVED_MEMBER_ROW_COUNT = 8;
+const MEMBERS_PER_PAGE = 8;
 
 type SiteLocale = "en" | "zh-CN";
 
@@ -119,6 +121,9 @@ const content = {
     saveName: "Save organization name",
     organizationDetails: "Organization details",
     deleteMember: "Delete member",
+    previousPage: "Previous page",
+    nextPage: "Next page",
+    page: "Page",
   },
   "zh-CN": {
     title: "企业管理",
@@ -194,6 +199,9 @@ const content = {
     saveName: "保存组织名称",
     organizationDetails: "组织信息",
     deleteMember: "删除成员",
+    previousPage: "上一页",
+    nextPage: "下一页",
+    page: "第",
   },
 } as const;
 
@@ -270,6 +278,7 @@ export function OrganizationPage({
   const [removalArmed, setRemovalArmed] = useState(false);
   const [transferArmed, setTransferArmed] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<OrganizationPlan>("free");
+  const [memberPage, setMemberPage] = useState(1);
   const [wizardStep, setWizardStep] = useState<1 | 2>(1);
   const [organizationName, setOrganizationName] = useState("");
   const [organizationDescription, setOrganizationDescription] = useState("");
@@ -566,6 +575,20 @@ export function OrganizationPage({
   const canManageSelected = selected?.role !== "owner" && (
     canManageAdmins || selected?.role === "member"
   );
+  const memberPageCount = Math.max(1, Math.ceil(snapshot.members.length / MEMBERS_PER_PAGE));
+  const activeMemberPage = Math.min(memberPage, memberPageCount);
+  const visibleMembers = snapshot.members.slice(
+    (activeMemberPage - 1) * MEMBERS_PER_PAGE,
+    activeMemberPage * MEMBERS_PER_PAGE,
+  );
+  const paginationItems = (() => {
+    if (memberPageCount <= 7) return Array.from({ length: memberPageCount }, (_, index) => index + 1);
+    const pages = new Set([1, 2, memberPageCount - 1, memberPageCount, activeMemberPage - 1, activeMemberPage, activeMemberPage + 1]);
+    const ordered = [...pages].filter((page) => page >= 1 && page <= memberPageCount).sort((left, right) => left - right);
+    return ordered.flatMap<(number | "ellipsis")>((page, index) => (
+      index > 0 && page - ordered[index - 1] > 1 ? ["ellipsis", page] : [page]
+    ));
+  })();
 
   return (
     <main className="organization-page site-shell">
@@ -601,7 +624,7 @@ export function OrganizationPage({
           <table>
             <thead><tr><th>{copy.account}</th><th>{copy.role}</th><th>{copy.plan}</th><th>{copy.apps}</th><th>{copy.created}</th><th>{copy.lastSignIn}</th><th /></tr></thead>
             <tbody>
-              {snapshot.members.map((member) => (
+              {visibleMembers.map((member) => (
                 <tr key={member.id}>
                   <td><OrganizationAvatar member={memberForDisplay(member)} fallbackUrl={member.id === accountId ? accountAvatarFallbackUrl : null} /><span><strong>{member.display_name}</strong><small>{member.email}</small></span></td>
                   <td><span className={`organization-role is-${member.role}`}>{roleLabel(member.role, copy)}</span></td>
@@ -612,20 +635,22 @@ export function OrganizationPage({
                   <td><div className="organization-row-actions"><button type="button" className="organization-details-button" onClick={() => openDetails(member)}><Eye aria-hidden="true" /><span>{copy.details}</span></button><button type="button" className="organization-row-delete" aria-label={`${copy.deleteMember}: ${member.display_name}`} title={copy.deleteMember} disabled={busy || !canRemove(member)} onClick={() => void removeMemberFromRow(member)}><Trash2 aria-hidden="true" /></button></div></td>
                 </tr>
               ))}
-              {Array.from({
-                length: Math.max(0, RESERVED_MEMBER_ROW_COUNT - snapshot.members.length),
-              }, (_, index) => (
-                <tr
-                  key={`reserved-member-row-${index}`}
-                  className="organization-member-placeholder"
-                  aria-hidden="true"
-                >
-                  <td colSpan={7} />
-                </tr>
-              ))}
             </tbody>
           </table>
         </div>
+        <nav className="organization-member-pagination" aria-label={copy.page}>
+          <button type="button" aria-label={copy.previousPage} disabled={activeMemberPage === 1} onClick={() => setMemberPage(activeMemberPage - 1)}><ChevronLeft aria-hidden="true" /></button>
+          {paginationItems.map((item, index) => item === "ellipsis"
+            ? <span key={`ellipsis-${index}`} aria-hidden="true">…</span>
+            : <button
+                type="button"
+                key={item}
+                aria-label={`${copy.page} ${item}`}
+                aria-current={item === activeMemberPage ? "page" : undefined}
+                onClick={() => setMemberPage(item)}
+              >{item}</button>)}
+          <button type="button" aria-label={copy.nextPage} disabled={activeMemberPage === memberPageCount} onClick={() => setMemberPage(activeMemberPage + 1)}><ChevronRight aria-hidden="true" /></button>
+        </nav>
       </section>
 
       {organizationDialogOpen ? <div className="organization-dialog-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setOrganizationDialogOpen(false); }}>

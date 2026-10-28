@@ -108,13 +108,16 @@ describe("OrganizationPage", () => {
     organizationMock.createOrganization.mockResolvedValue(snapshot());
   });
 
-  it("renders a compact member directory and five explicit application marks", async () => {
+  it("renders a spacious member directory and five explicit application marks", async () => {
     const { container } = render(<OrganizationPage locale="en" accountId="user-owner" />);
 
     expect(await screen.findByRole("heading", { name: "Aerial Systems Lab" })).toBeVisible();
     expect(screen.getByText("1 / 3")).toBeVisible();
     expect(screen.getAllByRole("row")).toHaveLength(4);
-    expect(container.querySelectorAll(".organization-member-placeholder")).toHaveLength(5);
+    expect(container.querySelectorAll(".organization-member-placeholder")).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Page 1" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "Previous page" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Next page" })).toBeDisabled();
     const ownerRow = screen.getByText("owner@example.test").closest("tr");
     expect(ownerRow).not.toBeNull();
     expect(within(ownerRow!).getAllByLabelText(
@@ -124,6 +127,28 @@ describe("OrganizationPage", () => {
     expect(ownerRow!.querySelector(".organization-avatar img"))
       .toHaveAttribute("src", "/owner-avatar.png");
     expect(container.querySelector(".organization-member-table")).toBeVisible();
+  });
+
+  it("paginates a large member directory without drawing empty table rows", async () => {
+    const paginated = snapshot();
+    const memberTemplate = paginated.members[2];
+    paginated.members = Array.from({ length: 82 }, (_, index) => ({
+      ...memberTemplate,
+      id: `member-${index + 1}`,
+      display_name: `Pilot ${index + 1}`,
+      email: `pilot-${index + 1}@example.test`,
+    }));
+    organizationMock.getOrganizationSnapshot.mockResolvedValueOnce(paginated);
+
+    const { container } = render(<OrganizationPage locale="en" accountId="user-owner" />);
+    expect(await screen.findByText("pilot-1@example.test")).toBeVisible();
+    expect(screen.queryByText("pilot-9@example.test")).not.toBeInTheDocument();
+    expect(screen.getByText("…")).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "Page 2" }));
+    expect(await screen.findByText("pilot-9@example.test")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Previous page" })).toBeEnabled();
+    expect(container.querySelectorAll(".organization-member-placeholder")).toHaveLength(0);
   });
 
   it("uses the authenticated account avatar when the organization snapshot lacks it", async () => {

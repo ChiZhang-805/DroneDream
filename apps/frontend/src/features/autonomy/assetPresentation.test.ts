@@ -28,11 +28,11 @@ function external(id: string, name: string, kind: "map" | "vehicle" = "map"): Au
 }
 
 describe("asset card presentation", () => {
-  it("ships six verified real default maps and one admitted aircraft before the runtime responds", () => {
+  it("ships six verified real default maps and six official PX4 aircraft before the runtime responds", () => {
     expect(catalogAssetDefinitions("map")).toHaveLength(6);
-    expect(catalogAssetDefinitions("vehicle")).toHaveLength(1);
+    expect(catalogAssetDefinitions("vehicle")).toHaveLength(6);
     expect(new Set(catalogAssetDefinitions("map").map((item) => item.key)).size).toBe(6);
-    expect(new Set(catalogAssetDefinitions("vehicle").map((item) => item.key)).size).toBe(1);
+    expect(new Set(catalogAssetDefinitions("vehicle").map((item) => item.key)).size).toBe(6);
   });
 
   it("merges stored School Map identities into the Kumpula Campus card", () => {

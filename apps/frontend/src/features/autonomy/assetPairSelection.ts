@@ -38,7 +38,11 @@ const MAPS: Array<{ resourceId: string; name: LocalizedName }> = [
 
 const VEHICLES: Array<{ resourceId: string; name: LocalizedName; vehicleClass: "multicopter" | "vtol" }> = [
   { resourceId: "px4-x500-depth", name: { "zh-CN": "X500 深度感知", "en-US": "X500 Depth" }, vehicleClass: "multicopter" },
-
+  { resourceId: "px4-x500-lidar-front", name: { "zh-CN": "X500 前视雷达", "en-US": "X500 Front LiDAR" }, vehicleClass: "multicopter" },
+  { resourceId: "px4-x500-gimbal", name: { "zh-CN": "X500 云台巡检", "en-US": "X500 Gimbal" }, vehicleClass: "multicopter" },
+  { resourceId: "px4-standard-vtol", name: { "zh-CN": "标准垂直起降机", "en-US": "Standard VTOL" }, vehicleClass: "vtol" },
+  { resourceId: "px4-tiltrotor", name: { "zh-CN": "倾转旋翼机", "en-US": "Tiltrotor VTOL" }, vehicleClass: "vtol" },
+  { resourceId: "px4-quadtailsitter", name: { "zh-CN": "四旋翼尾座机", "en-US": "Tailsitter VTOL" }, vehicleClass: "vtol" },
 ];
 
 const OUTDOOR_VTOL_MAPS = new Set(MAPS.map((map) => map.resourceId));
