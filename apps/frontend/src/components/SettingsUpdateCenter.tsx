@@ -203,8 +203,8 @@ export function SettingsUpdateCenter({
           <StatusIcon />
         </span>
         <p className="settings-update-copy">
-          <span>{copy.stateLabel}</span>
           <strong>{stateValue}</strong>
+          <span>{copy.stateLabel.replace(/[:：]$/, "")}</span>
         </p>
         {progress !== null && [
           "downloading",

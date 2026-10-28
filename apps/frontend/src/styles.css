@@ -12514,14 +12514,40 @@ a {
   width: 100%;
 }
 
+.settings-workspace-content > .launcher-settings-panels:has(> [data-settings-panel="administration"]:not([hidden])) {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 1rem;
+}
+
+.settings-workspace-content .launcher-settings-panel[data-settings-panel="administration"]:not([hidden]) {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+}
+
 .settings-organization-panel .organization-page {
   width: 100%;
   min-height: 0;
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
   padding: 0;
 }
 
 .settings-organization-panel {
-  height: 100%;
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.settings-organization-panel .organization-page > * {
+  flex-shrink: 0;
+}
+
+.settings-organization-panel .organization-members-card {
+  flex: 1 0 auto;
   min-height: 0;
 }
 
@@ -14770,7 +14796,7 @@ a {
   flex: 0 0 auto;
   border-radius: 50%;
   color: #e8e0ef;
-  background: rgba(255, 255, 255, 0.08);
+  background: transparent;
   font-weight: 800;
 }
 
@@ -14790,7 +14816,7 @@ a {
 
 .settings-runtime-status-healthy .settings-runtime-status-icon {
   color: #8ff5c3;
-  background: rgba(35, 180, 119, 0.18);
+  background: transparent;
 }
 
 .settings-runtime-status-warning {
@@ -14800,7 +14826,7 @@ a {
 
 .settings-runtime-status-warning .settings-runtime-status-icon {
   color: #ffd77b;
-  background: rgba(245, 190, 71, 0.17);
+  background: transparent;
 }
 
 .settings-runtime-status-error {
@@ -14810,12 +14836,12 @@ a {
 
 .settings-runtime-status-error .settings-runtime-status-icon {
   color: #ff9cb0;
-  background: rgba(255, 91, 124, 0.18);
+  background: transparent;
 }
 
 .settings-runtime-status-checking .settings-runtime-status-icon {
   color: #73edff;
-  background: rgba(78, 211, 240, 0.14);
+  background: transparent;
 }
 
 .settings-runtime-details {
@@ -18105,7 +18131,7 @@ html[data-dd-reduced-motion="true"] .assistant-voice-button.requesting svg {
 }
 
 .app-shell .settings-runtime-status-healthy .settings-runtime-status-icon {
-  background: #d8f4e9;
+  background: transparent;
   color: #167052;
 }
 
@@ -18115,7 +18141,7 @@ html[data-dd-reduced-motion="true"] .assistant-voice-button.requesting svg {
 }
 
 .app-shell .settings-runtime-status-warning .settings-runtime-status-icon {
-  background: #fff0c5;
+  background: transparent;
   color: #8a5a00;
 }
 
@@ -18125,12 +18151,12 @@ html[data-dd-reduced-motion="true"] .assistant-voice-button.requesting svg {
 }
 
 .app-shell .settings-runtime-status-error .settings-runtime-status-icon {
-  background: #ffe0e9;
+  background: transparent;
   color: #b92755;
 }
 
 .app-shell .settings-runtime-status-checking .settings-runtime-status-icon {
-  background: #edf9fc;
+  background: transparent;
   color: #1988a2;
 }
 
@@ -24878,13 +24904,12 @@ body {
 
 .settings-runtime-module .settings-update-copy {
   min-width: 0;
-  display: flex;
-  align-items: baseline;
-  gap: 0.38rem;
+  display: grid;
+  gap: 0.2rem;
   margin: 0;
   overflow: hidden;
   color: var(--text-dim);
-  font-size: 0.92rem;
+  font-size: 0.84rem;
   line-height: 1.35;
   white-space: nowrap;
 }
@@ -24897,6 +24922,7 @@ body {
 .settings-runtime-module .settings-update-copy strong {
   overflow: hidden;
   color: inherit;
+  font-size: 1rem;
   text-overflow: ellipsis;
 }
 
@@ -25604,12 +25630,28 @@ body {
 .settings-workspace-content .settings-model-usage-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); font-size: .95rem; gap: 18px; }
 .settings-workspace-content .settings-model-usage-grid > div { min-height: 54px; }
 .settings-workspace-content .settings-model-usage-grid > div > span { font-size: .9rem; }
-.settings-runtime-environment-module { grid-template-rows: auto auto minmax(0, 1fr); gap: 6px; }
+.settings-runtime-environment-module { grid-template-rows: auto 4.5rem minmax(0, 1fr); gap: 6px; }
 .settings-runtime-module .settings-runtime-check-steps { display: grid; grid-auto-rows: minmax(2.75rem, 1fr); min-height: 0; margin: 0; overflow-y: auto; scrollbar-width: none; }
 .settings-runtime-module .settings-runtime-check-steps::-webkit-scrollbar { display: none; }
 .settings-runtime-module .settings-runtime-check-steps > li { padding-block: 4px; }
-.settings-runtime-module.settings-update-center { grid-template-rows: auto auto minmax(0, 1fr); gap: 6px; }
-.settings-runtime-module .settings-update-state { min-height: 36px; padding-block: 4px; }
+.settings-runtime-module.settings-update-center { grid-template-rows: auto 4.5rem minmax(0, 1fr); gap: 6px; }
+.settings-runtime-module .settings-runtime-status,
+.settings-runtime-module .settings-update-state {
+  box-sizing: border-box;
+  min-height: 4.5rem;
+  display: grid;
+  grid-template-columns: 1.6rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.2rem;
+  border-bottom: 1px solid var(--border);
+}
+.settings-runtime-module .settings-update-state-current {
+  background: #effaf6;
+  border-color: #a8dfcb;
+}
+.settings-runtime-module .settings-update-icon { width: 1.6rem; height: 1.6rem; }
+.settings-runtime-module .settings-update-icon svg { width: 1.35rem; height: 1.35rem; }
 .settings-update-versions { display: grid; grid-auto-rows: minmax(3.15rem, 1fr); margin: 0; min-height: 0; }
 .settings-update-versions > div { display: grid; grid-template-columns: minmax(130px, .8fr) minmax(0, 1.5fr) minmax(110px, .7fr); align-items: center; gap: 16px; border-top: 1px solid var(--border); font-size: .95rem; }
 .settings-update-versions dt { font-weight: 600; }
