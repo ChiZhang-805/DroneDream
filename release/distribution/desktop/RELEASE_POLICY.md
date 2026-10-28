@@ -91,7 +91,7 @@ repository root:
 
 ```powershell
 & apps/desktop/scripts/publish-five-edition-release.ps1 `
-  -HandoffRoot "Q:\DroneDream-Workspace\Build\History\<build>\codex-builds\core-five-msvc" `
+  -HandoffRoot "Q:\DroneDream-Workspace\Build\codex-builds\core-five-msvc" `
   -PruneObsoleteReleases `
   -Confirm:$false
 ```

@@ -123,6 +123,7 @@ Go to the building where the computer science labs are and collect the package.
 - 源码事实以审查后的提交为准；本地构建目录不是发布事实源。
 - 发布暂存位于 `Build/Release-Staging`，只保留当前源提交和版本的完整五版本集合。
 - 正式发布以 GitHub Release 资产、摘要、签名和发布清单为准。
+- 本机缺少自动更新签名私钥时，先检查 GitHub Actions 的 `TAURI_SIGNING_PRIVATE_KEY` Secret 和现有 `Sign five-edition handoff` 工作流。可将同一源提交的五版安装包、摘要和收据上传到草稿 Release，在云端签名后取回签名及收据，验证后再同步发布；不要求用户导出或在聊天中提供私钥。自动更新签名与 SignPath 的 Windows 发布者签名是两件事，不能混为一谈。
 - PR 或发布说明应写清具体触发条件、修改后的行为和验证证据，不保留无关的尝试过程。
 - 桌面更新后核对五个图标和快捷方式。应用图标缺失、登录后进入错误产品页或安装器误关兄弟版本均视为交付失败。
 - 只生成安装器而未安装复验，不能称为软件已经更新。
