@@ -279,7 +279,7 @@ describe("useAppUpdater", () => {
 
     expect(installAppUpdateInBackgroundMock).toHaveBeenCalledExactlyOnceWith(expect.any(Function), false);
     expect(stopRuntimeForExitMock).not.toHaveBeenCalled();
-    expect(hook.result.current.status).toBe("available");
+    expect(hook.result.current.status).toBe("ready");
     expect(hook.result.current.blockedActivity).toMatchObject({
       kind: "running",
       runningJobs: [{ id: "job-running", name: "Office delivery" }],
@@ -348,6 +348,60 @@ describe("useAppUpdater", () => {
     expect(secondView.result.current.status).toBe("downloading");
     expect(checkMock).not.toHaveBeenCalled();
     secondView.unmount();
+  });
+
+  it("keeps a restored verified download installable after an experiment defers it", async () => {
+    getAppUpdateProgressMock.mockResolvedValue({
+      running: false,
+      progress: { phase: "ready", progress: 100, attempt: 1 },
+    });
+    probeRuntimeStatusMock.mockResolvedValue({ installed: true, running: true, ready: true });
+    listJobsMock.mockResolvedValue({ items: [{ id: "active", display_name: "Delivery" }] });
+    const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(hook.result.current.status).toBe("ready"));
+    expect(checkMock).not.toHaveBeenCalled();
+    await act(async () => hook.result.current.installAvailableUpdate());
+    expect(hook.result.current.status).toBe("ready");
+    expect(hook.result.current.progress).toBe(100);
+    expect(installAppUpdateInBackgroundMock).not.toHaveBeenCalled();
+    listJobsMock.mockResolvedValue({ items: [] });
+    await act(async () => hook.result.current.installAvailableUpdate());
+    expect(installAppUpdateInBackgroundMock).toHaveBeenCalledOnce();
+    hook.unmount();
+  });
+
+  it("allows a remounted view to retry when its native download fails", async () => {
+    getAppUpdateProgressMock.mockResolvedValue({
+      running: true,
+      progress: { phase: "downloading", progress: 60, attempt: 1 },
+    });
+    const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(hook.result.current.progress).toBe(60));
+    const listener = listenAppUpdateProgressMock.mock.calls[0][0];
+    act(() => listener({ phase: "failed", progress: 0, attempt: 0, error: "Download unavailable" }));
+    expect(hook.result.current.status).toBe("available");
+    expect(hook.result.current.error).toBe("Download unavailable");
+    await act(async () => hook.result.current.installAvailableUpdate());
+    expect(installAppUpdateInBackgroundMock).toHaveBeenCalledOnce();
+    hook.unmount();
+  });
+
+  it("retries a failed background download on the next scheduled check", async () => {
+    const schedule = vi.spyOn(window, "setInterval");
+    const first = update("1.0.1");
+    checkMock.mockResolvedValueOnce(first).mockResolvedValue(update("1.0.2"));
+    installAppUpdateInBackgroundMock.mockRejectedValueOnce(new Error("Download unavailable"));
+    const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(hook.result.current.error).toBe("Download unavailable"));
+    const callback = schedule.mock.calls.find((call) => call[1] === 6 * 60 * 60 * 1000)?.[0];
+    expect(typeof callback).toBe("function");
+    await act(async () => { await (callback as () => Promise<void>)(); });
+    await waitFor(() => expect(hook.result.current.status).toBe("ready"));
+    expect(checkMock).toHaveBeenCalledTimes(2);
+    expect(first.close).toHaveBeenCalledOnce();
+    expect(installAppUpdateInBackgroundMock).toHaveBeenCalledTimes(2);
+    hook.unmount();
+    schedule.mockRestore();
   });
 
   it("queries only exact RUNNING jobs when a ready Runtime is active", async () => {

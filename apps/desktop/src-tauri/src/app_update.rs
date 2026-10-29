@@ -38,6 +38,8 @@ struct AppUpdateProgress {
     phase: &'static str,
     progress: u8,
     attempt: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
 }
 
 #[derive(Clone, Serialize)]
@@ -53,6 +55,21 @@ impl AppUpdateCoordinator {
             phase,
             progress,
             attempt,
+            error: None,
+        };
+        if let Ok(mut current) = self.progress.lock() {
+            *current = Some(progress.clone());
+        }
+        let _ = app.emit(UPDATE_PROGRESS_EVENT, progress);
+    }
+
+    fn publish_failure(&self, app: &tauri::AppHandle, error: &str) {
+        let prepared = self.prepared.lock().map(|value| value.is_some()).unwrap_or(false);
+        let progress = AppUpdateProgress {
+            phase: if prepared { "ready" } else { "failed" },
+            progress: if prepared { 100 } else { 0 },
+            attempt: 0,
+            error: Some(error.to_string()),
         };
         if let Ok(mut current) = self.progress.lock() {
             *current = Some(progress.clone());
@@ -120,6 +137,18 @@ pub(crate) async fn download_install_app_update(
         .map_err(|_| "An application update is already in progress.".to_string())?;
     let _guard = AppUpdateGuard(&coordinator.running);
     let install = install.unwrap_or(true);
+    let result = download_update(&app, &coordinator, install).await;
+    if let Err(error) = &result {
+        coordinator.publish_failure(&app, error);
+    }
+    result
+}
+
+async fn download_update(
+    app: &tauri::AppHandle,
+    coordinator: &AppUpdateCoordinator,
+    install: bool,
+) -> Result<(), String> {
     let prepared = coordinator.prepared.lock().map_err(|e| e.to_string())?.is_some();
     if prepared {
         if !install { return Ok(()); }

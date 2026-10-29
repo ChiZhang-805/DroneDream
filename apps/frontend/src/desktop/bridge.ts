@@ -1510,6 +1510,7 @@ export function ensureAppUpdateIdle(): Promise<void> {
 
 export type AppUpdateProgressPhase =
   | "preflight"
+  | "failed"
   | "downloading"
   | "retrying"
   | "verifying"
@@ -1521,6 +1522,7 @@ export interface NativeAppUpdateProgress {
   phase: AppUpdateProgressPhase;
   progress: number;
   attempt: number;
+  error?: string;
 }
 
 export interface NativeAppUpdateSnapshot {
@@ -1534,6 +1536,7 @@ const APP_UPDATE_PROGRESS_PHASES = new Set<AppUpdateProgressPhase>([
   "retrying",
   "verifying",
   "ready",
+  "failed",
   "installing",
   "restarting",
 ]);
@@ -1552,7 +1555,7 @@ function parseNativeAppUpdateProgress(value: unknown): NativeAppUpdateProgress {
   if (!Number.isInteger(attempt) || attempt < 0) {
     throw new Error("app update progress.attempt must be a non-negative integer");
   }
-  return { phase, progress, attempt };
+  return { phase, progress, attempt, ...(typeof record.error === "string" ? { error: record.error } : {}) };
 }
 
 function parseNativeAppUpdateSnapshot(value: unknown): NativeAppUpdateSnapshot {

@@ -224,13 +224,13 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
   ));
 
   const applyNativeAppUpdateProgress = useCallback((event: NativeAppUpdateProgress) => {
-    installInFlightRef.current = event.phase !== "ready";
+    installInFlightRef.current = !["ready", "failed"].includes(event.phase);
     const installing = event.phase === "installing" || event.phase === "restarting";
     setState((current) => ({
       ...current,
-      status: event.phase === "ready" ? "ready" : installing ? "installing" : "downloading",
-      progress: Math.max(current.progress ?? 0, event.progress),
-      error: null,
+      status: event.phase === "failed" ? "available" : event.phase === "ready" ? "ready" : installing ? "installing" : "downloading",
+      progress: event.phase === "failed" ? null : event.progress,
+      error: event.error ?? null,
       blockedActivity: null,
     }));
   }, []);
@@ -486,7 +486,6 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
       || !desktopRuntime
       || import.meta.env.MODE === "test"
       || installInFlightRef.current
-      || updateRef.current
     ) return;
     if (await restoreNativeAppUpdate()) return;
     const generation = ++checkGenerationRef.current;
@@ -497,6 +496,7 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
         return;
       }
       if (!update) return;
+      await updateRef.current?.close();
       updateRef.current = update;
       setState({
         status: "available",
@@ -524,10 +524,9 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
   }, [applyNativeAppUpdateProgress, desktopRuntime, enabled, restoreNativeAppUpdate]);
 
   const installAvailableUpdate = useCallback(async () => {
-    const update = updateRef.current;
+    const prepared = state.status === "ready";
     if (
-      (!update && state.status !== "ready")
-      || !["available", "ready"].includes(state.status)
+      !["available", "ready"].includes(state.status)
       || installInFlightRef.current
     ) return;
     installInFlightRef.current = true;
@@ -543,8 +542,8 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
       if (initialBlock) {
         setState((current) => ({
           ...current,
-          status: "available",
-          progress: null,
+          status: prepared ? "ready" : "available",
+          progress: prepared ? 100 : null,
           blockedActivity: initialBlock,
         }));
         return;
@@ -554,8 +553,8 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
       const lateBlock = await detectRunningUpdateBlock();
       setState((current) => ({
         ...current,
-        status: "available",
-        progress: null,
+        status: prepared ? "ready" : "available",
+        progress: prepared ? 100 : null,
         error: errorMessage(error),
         blockedActivity: lateBlock,
       }));
