@@ -995,6 +995,7 @@ body:has(.autonomy-platform-page),
   border-radius: 0.52rem;
 }
 .autonomy-context-choice[aria-checked="true"] { color: #742f91; background: #f4eafa; }
+.autonomy-context-choice:disabled { opacity: 0.4; cursor: not-allowed; background: transparent; }
 .autonomy-context-choice > span { color: var(--dd-brand-middle); font-size: 0.82rem; font-weight: 850; }
 .autonomy-context-choice.is-clear { margin-bottom: 0.15rem; border-bottom: 1px solid #ece5ef; border-radius: 0; }
 

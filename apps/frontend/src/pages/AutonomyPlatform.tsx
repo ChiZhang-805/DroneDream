@@ -146,6 +146,8 @@ import {
   compatibleAircraftChoices,
   compatibleMapChoices,
   FALLBACK_ASSET_PAIR_CATALOG,
+  isMissionReadyPair,
+  reconcilePairSelection,
   selectedPair,
   type PairCatalogChoice,
 } from "../features/autonomy/assetPairSelection";
@@ -1685,15 +1687,15 @@ export function AutonomyOverview() {
       { title: "Unknown environment", body: "Use only the start and goal, build a local map in flight, plan a safe route, and replan as the world changes." },
     ],
   };
-  const allAircraftChoices = useMemo(() => compatibleAircraftChoices(assetPairCatalog, null), [assetPairCatalog]);
   const availableMapCatalog = useMemo(() => ({ ...assetPairCatalog, pairs: assetPairCatalog.pairs.filter(pair => {
     const assetId = pair.qualified_map_asset_id ?? (pair.map_resource_id === "dronedream-school-map" ? "dronedream.school-map.v1" : pair.map_resource_id);
     return !(assetLibrary.removedMapIds ?? []).includes(assetId);
   }) }), [assetPairCatalog, assetLibrary.removedMapIds]);
+  const allAircraftChoices = useMemo(() => compatibleAircraftChoices(availableMapCatalog, null), [availableMapCatalog]);
   const allMapChoices = useMemo(() => compatibleMapChoices(availableMapCatalog, null), [availableMapCatalog]);
   const aircraftChoices = useMemo(
-    () => compatibleAircraftChoices(assetPairCatalog, selectedContextMapId),
-    [assetPairCatalog, selectedContextMapId],
+    () => compatibleAircraftChoices(availableMapCatalog, selectedContextMapId),
+    [availableMapCatalog, selectedContextMapId],
   );
   const mapChoices = useMemo(
     () => compatibleMapChoices(availableMapCatalog, selectedContextAircraftId),
@@ -1701,6 +1703,13 @@ export function AutonomyOverview() {
   );
   const selectedAircraftChoice = allAircraftChoices.find((choice) => choice.resourceId === selectedContextAircraftId) ?? null;
   const selectedMapChoice = allMapChoices.find((choice) => choice.resourceId === selectedContextMapId) ?? null;
+  const contextSelectionComplete = (!selectedContextMapId && !selectedContextAircraftId)
+    || isMissionReadyPair(selectedPair(availableMapCatalog, selectedContextMapId, selectedContextAircraftId));
+  useEffect(() => {
+    const selection = reconcilePairSelection(availableMapCatalog, selectedContextMapId, selectedContextAircraftId);
+    if (selection.mapId !== selectedContextMapId) setSelectedContextMapId(selection.mapId);
+    if (selection.vehicleId !== selectedContextAircraftId) setSelectedContextAircraftId(selection.vehicleId);
+  }, [availableMapCatalog, selectedContextMapId, selectedContextAircraftId]);
   const localizedChoiceName = useCallback((choice: PairCatalogChoice | null) => (
     choice ? choice.name[chinese ? "zh-CN" : "en-US"] : copy.notSelected
   ), [chinese, copy.notSelected]);
@@ -1869,7 +1878,7 @@ export function AutonomyOverview() {
         selectedWorkspace = resolveMissionAssets(workspace, assetLibrary, intent);
       } else {
         if (!selectedContextAircraftId || !selectedContextMapId) throw new Error(copy.chooseBoth);
-        const pair = selectedPair(assetPairCatalog, selectedContextMapId, selectedContextAircraftId);
+        const pair = selectedPair(availableMapCatalog, selectedContextMapId, selectedContextAircraftId);
         if (!pair?.compatible) throw new Error(copy.chooseBoth);
         if (pair.status !== "qualified_builtin" || !pair.qualification_id) throw new Error(copy.pairNeedsQualification);
         try {
@@ -2266,7 +2275,8 @@ export function AutonomyOverview() {
                   {(["aircraft", "map"] as const).map((kind) => {
                     const open = contextSubmenu === kind;
                     const isAircraft = kind === "aircraft";
-                    const choices = isAircraft ? aircraftChoices : mapChoices;
+                    const choices = isAircraft ? allAircraftChoices : allMapChoices;
+                    const availableChoices = isAircraft ? aircraftChoices : mapChoices;
                     const selectedId = isAircraft ? selectedContextAircraftId : selectedContextMapId;
                     const selectedChoice = isAircraft ? selectedAircraftChoice : selectedMapChoice;
                     const title = selectedChoice ? localizedChoiceName(selectedChoice) : isAircraft ? copy.aircraft : copy.map;
@@ -2299,11 +2309,14 @@ export function AutonomyOverview() {
                         ><b>{copy.clearSelection}</b>{!selectedId ? <span aria-hidden="true">✓</span> : null}</button>
                         {choices.map((choice) => {
                           const selected = selectedId === choice.resourceId;
+                          const available = availableChoices.some((item) => item.resourceId === choice.resourceId && item.qualifiedPairCount > 0);
                           return <button
                             type="button"
                             className="autonomy-context-choice"
                             role="menuitemradio"
                             aria-checked={selected}
+                            disabled={!available}
+                            title={available ? undefined : chinese ? "暂无可用飞行配对" : "No available flight pairing"}
                             key={choice.resourceId}
                             onClick={() => {
                               if (isAircraft) setSelectedContextAircraftId(choice.resourceId);
@@ -2387,9 +2400,9 @@ export function AutonomyOverview() {
             <button
               type="submit"
               className="assistant-send-button"
-              disabled={!composer.trim() || !managedModelsReady || !selectedPlanningModel || generating}
+              disabled={!composer.trim() || !managedModelsReady || !selectedPlanningModel || generating || !contextSelectionComplete}
               aria-label={copy.send}
-              title={copy.send}
+              title={contextSelectionComplete ? copy.send : copy.chooseBoth}
             >
               <ArrowUp aria-hidden="true" strokeWidth={2} />
             </button>

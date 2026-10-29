@@ -66,7 +66,9 @@ const QUALIFICATION_IDS: Record<string, string> = {
 };
 
 function fallbackPair(map: (typeof MAPS)[number], vehicle: (typeof VEHICLES)[number]): AgentCoreAssetPairCatalogEntry {
-  const qualified = vehicle.resourceId === "px4-x500-depth";
+  const qualifiedVtol = map.resourceId === "dronedream-vuosaari-harbour-map"
+    && vehicle.resourceId === "px4-standard-vtol";
+  const qualified = vehicle.resourceId === "px4-x500-depth" || qualifiedVtol;
   const compatible = vehicle.vehicleClass !== "vtol" || OUTDOOR_VTOL_MAPS.has(map.resourceId);
   const status = qualified ? "qualified_builtin" as const
     : compatible ? "compatible_requires_qualification" as const : "incompatible" as const;
@@ -81,9 +83,10 @@ function fallbackPair(map: (typeof MAPS)[number], vehicle: (typeof VEHICLES)[num
     vehicle_class: vehicle.vehicleClass,
     status,
     compatible,
-    qualification_id: qualified ? QUALIFICATION_IDS[map.resourceId] : null,
+    qualification_id: qualifiedVtol ? "asset-qualification-fa690ccfacd75c5c9e137b97"
+      : qualified ? QUALIFICATION_IDS[map.resourceId] : null,
     qualified_map_asset_id: qualified ? QUALIFIED_MAP_ASSET_IDS[map.resourceId] : null,
-    qualified_vehicle_asset_id: qualified ? "dronedream.my-drone.v1" : null,
+    qualified_vehicle_asset_id: qualifiedVtol ? "standard-vtol" : qualified ? "dronedream.my-drone.v1" : null,
     qualification_scope: qualified ? "exact_builtin_normalized_package" : null,
     reasons: [],
     required_gates: status === "compatible_requires_qualification" ? ["aircraft_map_pair_qualification"] : [],
@@ -95,7 +98,7 @@ const FALLBACK_PAIRS = MAPS.flatMap((map) => VEHICLES.map((vehicle) => fallbackP
 
 export const FALLBACK_ASSET_PAIR_CATALOG: AgentCoreAssetPairCatalog = {
   schema_version: "dronedream.asset-pair-catalog.v1",
-  catalog_revision: "frontend-fallback-2026-10-27.1",
+  catalog_revision: "frontend-builtin-pairs",
   map_count: MAPS.length,
   vehicle_count: VEHICLES.length,
   pair_count: FALLBACK_PAIRS.length,
@@ -117,19 +120,34 @@ function uniqueChoices(pairs: AgentCoreAssetPairCatalogEntry[], kind: "map" | "v
       resourceId: id,
       name: (kind === "map" ? MAPS : VEHICLES).find((item) => item.resourceId === id)?.name ?? names(assetPairs[0]),
       compatiblePairCount: assetPairs.filter((pair) => pair.compatible).length,
-      qualifiedPairCount: assetPairs.filter((pair) => pair.status === "qualified_builtin").length,
+      qualifiedPairCount: assetPairs.filter(isMissionReadyPair).length,
     };
   });
 }
 
 export function compatibleAircraftChoices(catalog: AgentCoreAssetPairCatalog, selectedMapId: string | null): PairCatalogChoice[] {
-  const pairs = selectedMapId ? catalog.pairs.filter((pair) => pair.map_resource_id === selectedMapId && pair.compatible) : catalog.pairs;
+  const pairs = selectedMapId ? catalog.pairs.filter((pair) => pair.map_resource_id === selectedMapId && isMissionReadyPair(pair)) : catalog.pairs;
   return uniqueChoices(pairs, "vehicle");
 }
 
 export function compatibleMapChoices(catalog: AgentCoreAssetPairCatalog, selectedVehicleId: string | null): PairCatalogChoice[] {
-  const pairs = selectedVehicleId ? catalog.pairs.filter((pair) => pair.vehicle_resource_id === selectedVehicleId && pair.compatible) : catalog.pairs;
+  const pairs = selectedVehicleId ? catalog.pairs.filter((pair) => pair.vehicle_resource_id === selectedVehicleId && isMissionReadyPair(pair)) : catalog.pairs;
   return uniqueChoices(pairs, "map");
+}
+
+export function isMissionReadyPair(pair: AgentCoreAssetPairCatalogEntry | null): boolean {
+  return Boolean(pair?.compatible && pair.status === "qualified_builtin"
+    && pair.qualification_id && pair.qualified_map_asset_id && pair.qualified_vehicle_asset_id);
+}
+
+export function reconcilePairSelection(
+  catalog: AgentCoreAssetPairCatalog, mapId: string | null, vehicleId: string | null,
+): { mapId: string | null; vehicleId: string | null } {
+  const mapAvailable = compatibleMapChoices(catalog, null)
+    .some((choice) => choice.resourceId === mapId && choice.qualifiedPairCount > 0);
+  const aircraftAvailable = compatibleAircraftChoices(catalog, mapAvailable ? mapId : null)
+    .some((choice) => choice.resourceId === vehicleId && choice.qualifiedPairCount > 0);
+  return { mapId: mapAvailable ? mapId : null, vehicleId: aircraftAvailable ? vehicleId : null };
 }
 
 export function selectedPair(catalog: AgentCoreAssetPairCatalog, mapId: string | null, vehicleId: string | null): AgentCoreAssetPairCatalogEntry | null {

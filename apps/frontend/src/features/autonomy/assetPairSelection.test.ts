@@ -5,6 +5,7 @@ import {
   compatibleAircraftChoices,
   compatibleMapChoices,
   selectedPair,
+  reconcilePairSelection,
 } from "./assetPairSelection";
 
 describe("asset pair selection", () => {
@@ -25,21 +26,21 @@ describe("asset pair selection", () => {
     expect(compatibleMapChoices(FALLBACK_ASSET_PAIR_CATALOG, null)).toHaveLength(6);
     expect(compatibleAircraftChoices(FALLBACK_ASSET_PAIR_CATALOG, null)).toHaveLength(6);
     expect(FALLBACK_ASSET_PAIR_CATALOG.pair_count).toBe(36);
-    expect(FALLBACK_ASSET_PAIR_CATALOG.counts).toEqual({ qualified_builtin: 6, compatible_requires_qualification: 30, incompatible: 0 });
+    expect(FALLBACK_ASSET_PAIR_CATALOG.counts).toEqual({ qualified_builtin: 7, compatible_requires_qualification: 29, incompatible: 0 });
   });
 
-  it("lists the six admitted aircraft for the outdoor campus", () => {
+  it("allows only the qualified aircraft after selecting the campus", () => {
     const aircraft = compatibleAircraftChoices(FALLBACK_ASSET_PAIR_CATALOG, "dronedream-school-map");
-    expect(aircraft).toHaveLength(6);
+    expect(aircraft).toHaveLength(1);
     expect(aircraft.filter((choice) => choice.qualifiedPairCount > 0).map((choice) => choice.resourceId)).toEqual([
       "px4-x500-depth",
     ]);
   });
 
-  it("offers the reviewed outdoor maps for Standard VTOL while keeping the pair unqualified", () => {
+  it("allows only the harbour after selecting Standard VTOL", () => {
     const maps = compatibleMapChoices(FALLBACK_ASSET_PAIR_CATALOG, "px4-standard-vtol");
-    expect(maps).toHaveLength(6);
-    expect(maps.every((choice) => choice.qualifiedPairCount === 0)).toBe(true);
+    expect(maps.map((choice) => choice.resourceId)).toEqual(["dronedream-vuosaari-harbour-map"]);
+    expect(maps[0].qualifiedPairCount).toBe(1);
   });
 
   it("reports the default qualified map and aircraft pair", () => {
@@ -59,5 +60,41 @@ describe("asset pair selection", () => {
       "dronedream-uutela-coastal-forest-map",
     ]);
     expect(choices.every((choice) => choice.qualifiedPairCount === 1)).toBe(true);
+  });
+
+  it("restricts hospital selection in both directions and leaves display-only aircraft unavailable", () => {
+    expect(compatibleAircraftChoices(FALLBACK_ASSET_PAIR_CATALOG, "dronedream-meilahti-hospital-map")
+      .map((choice) => choice.resourceId)).toEqual(["px4-x500-depth"]);
+    expect(compatibleAircraftChoices(FALLBACK_ASSET_PAIR_CATALOG, "dronedream-vuosaari-harbour-map")
+      .map((choice) => choice.resourceId)).toEqual(["px4-x500-depth", "px4-standard-vtol"]);
+    expect(compatibleMapChoices(FALLBACK_ASSET_PAIR_CATALOG, "px4-tiltrotor")).toEqual([]);
+    expect(compatibleAircraftChoices(FALLBACK_ASSET_PAIR_CATALOG, null)
+      .filter((choice) => choice.qualifiedPairCount > 0).map((choice) => choice.resourceId))
+      .toEqual(["px4-x500-depth", "px4-standard-vtol"]);
+  });
+
+  it("does not enable a pair based on its status label without receipt and asset bindings", () => {
+    const original = FALLBACK_ASSET_PAIR_CATALOG.pairs[0];
+    for (const patch of [{ qualification_id: null }, { qualified_map_asset_id: null },
+      { qualified_vehicle_asset_id: null }, { compatible: false }]) {
+      const catalog = { ...FALLBACK_ASSET_PAIR_CATALOG, pairs: [{ ...original, ...patch }] };
+      expect(compatibleAircraftChoices(catalog, original.map_resource_id)).toEqual([]);
+      expect(compatibleMapChoices(catalog, original.vehicle_resource_id)).toEqual([]);
+    }
+  });
+
+  it("clears an invalid aircraft after a catalog change without silently choosing a replacement", () => {
+    expect(reconcilePairSelection(FALLBACK_ASSET_PAIR_CATALOG,
+      "dronedream-meilahti-hospital-map", "px4-standard-vtol"))
+      .toEqual({ mapId: "dronedream-meilahti-hospital-map", vehicleId: null });
+    expect(reconcilePairSelection(FALLBACK_ASSET_PAIR_CATALOG, null, "px4-standard-vtol"))
+      .toEqual({ mapId: null, vehicleId: "px4-standard-vtol" });
+    expect(reconcilePairSelection(FALLBACK_ASSET_PAIR_CATALOG,
+      "dronedream-vuosaari-harbour-map", "px4-standard-vtol"))
+      .toEqual({ mapId: "dronedream-vuosaari-harbour-map", vehicleId: "px4-standard-vtol" });
+    const removed = { ...FALLBACK_ASSET_PAIR_CATALOG, pairs: FALLBACK_ASSET_PAIR_CATALOG.pairs
+      .filter((pair) => pair.map_resource_id !== "dronedream-vuosaari-harbour-map") };
+    expect(reconcilePairSelection(removed, "dronedream-vuosaari-harbour-map", "px4-standard-vtol"))
+      .toEqual({ mapId: null, vehicleId: null });
   });
 });
