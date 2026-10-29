@@ -12,12 +12,32 @@ if (-not $MakeNsis) {
 }
 $makeNsisPath = (Resolve-Path -LiteralPath $MakeNsis).Path
 
-# Recompile once with verbose output. This is intentionally a real compiler
-# contract: the bug that mixed languages looked correct in source but emitted
-# both locale tables as language 1033.
-$compilerOutput = (& $makeNsisPath /V4 $generatedPath 2>&1 | Out-String)
-if ($LASTEXITCODE -ne 0) {
-    throw "MakeNSIS locale verification failed:`n$compilerOutput"
+# Compile the same language tables, without compressing the entire payload a
+# second time. The shipping installer has already been compiled by Tauri.
+$checkDirectory = Split-Path -Parent $generatedPath
+$checkScript = Join-Path $checkDirectory "installer-locales.nsi"
+$checkOutput = Join-Path $checkDirectory "installer-locales.exe"
+$source = Get-Content -LiteralPath $generatedPath -Raw -Encoding UTF8
+$compressionPattern = '(?m)^\s*SetCompressor\s+/SOLID\s+"[^"]+"\s*$'
+$outputPattern = '(?m)^!define OUTFILE "[^"]+"\s*$'
+if ([regex]::Matches($source, $compressionPattern).Count -ne 1 -or
+    [regex]::Matches($source, $outputPattern).Count -ne 1) {
+    throw "The generated installer compression/output declarations are not recognized."
+}
+$source = [regex]::Replace($source, $compressionPattern, "  SetCompressor zlib`n  SetCompress off")
+$source = [regex]::Replace($source, $outputPattern, '!define OUTFILE "installer-locales.exe"')
+try {
+    [IO.File]::WriteAllText($checkScript, $source, [Text.UTF8Encoding]::new($false))
+    $compilerOutput = (& $makeNsisPath /V4 $checkScript 2>&1 | Out-String)
+    if ($LASTEXITCODE -ne 0) {
+        throw "MakeNSIS locale verification failed:`n$compilerOutput"
+    }
+} finally {
+    foreach ($temporaryPath in @($checkScript, $checkOutput)) {
+        if (Test-Path -LiteralPath $temporaryPath -PathType Leaf) {
+            Remove-Item -LiteralPath $temporaryPath -Force
+        }
+    }
 }
 if ($compilerOutput -match 'warning 6030: LangString "DD_') {
     throw "A DroneDream language string was compiled more than once for the same locale"
