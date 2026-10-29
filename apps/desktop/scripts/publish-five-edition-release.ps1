@@ -303,14 +303,22 @@ try {
                 $obsoleteTags.Add($tag)
             }
         }
+        $existingTagRefs = (Invoke-GitHubCli -Arguments @(
+            "api", "--paginate", "repos/$Repository/git/matching-refs/tags",
+            "--jq", ".[].ref"
+        )) -split "`r?`n"
         foreach ($tag in @($obsoleteTags | Sort-Object -Unique)) {
             if ($PSCmdlet.ShouldProcess("$Repository release and tag $tag", "permanently delete obsolete release assets and tag")) {
-                Invoke-GitHubCli -Arguments @(
+                $deleteArguments = @(
                     "release", "delete", $tag,
                     "--repo", $Repository,
-                    "--cleanup-tag",
                     "--yes"
-                ) | Out-Null
+                )
+                # Unpublished drafts can have a release name without a Git tag.
+                if ($existingTagRefs -contains "refs/tags/$tag") {
+                    $deleteArguments += "--cleanup-tag"
+                }
+                Invoke-GitHubCli -Arguments $deleteArguments | Out-Null
             }
         }
 
