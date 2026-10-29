@@ -31,6 +31,7 @@ const updaterState = vi.hoisted(() => ({
       | "checking"
       | "current"
       | "available"
+      | "ready"
       | "downloading"
       | "installing"
       | "componentAvailable"
@@ -875,6 +876,43 @@ describe("DesktopSetup", () => {
     expect(screen.getByRole("progressbar")).not.toHaveAttribute("aria-valuenow", "100");
     await act(async () => resolveRuntime(runtime));
     await waitFor(() => expect(screen.getByTestId("current-route")).toHaveTextContent(editionLandingPath()));
+  });
+
+  it.each(["checking", "downloading", "ready", "error"] as const)(
+    "enters the workspace while a recommended update is %s",
+    async (status) => {
+      updaterState.current = { ...updaterState.current, status, updateRequired: false, progress: 42 };
+      window.__TAURI__ = { core: { invoke: vi.fn(async (command: string) => {
+        if (command === "probe_system_prerequisites") return prerequisites;
+        if (command === "probe_runtime_status") return runtime;
+        throw new Error(`Unexpected command: ${command}`);
+      }) } };
+      renderPage();
+      await waitFor(() => expect(screen.getByTestId("current-route")).toHaveTextContent(editionLandingPath()));
+      expect(screen.queryByText("Action required")).not.toBeInTheDocument();
+      expect(updaterState.current.installAvailableUpdate).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([true, false])("shows required download progress and restart action with signedIn=%s", async (signedIn) => {
+    if (!signedIn) optionalAuthState.current = { configured: true, loading: false, account: null };
+    updaterState.current = { ...updaterState.current, status: "downloading", updateRequired: true, progress: 42 };
+    window.__TAURI__ = { core: { invoke: vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return runtime;
+      throw new Error(`Unexpected command: ${command}`);
+    }) } };
+    const page = renderPage();
+    expect(await screen.findByText("Downloading update… 42%")).toBeInTheDocument();
+    expect(screen.queryByText("Action required")).not.toBeInTheDocument();
+    expect(screen.getByTestId("current-route")).toHaveTextContent(/^\/$/);
+    page.unmount();
+    updaterState.current = { ...updaterState.current, status: "ready", progress: 100 };
+    renderPage();
+    const restart = await screen.findByRole("button", { name: "Restart to update" });
+    expect(screen.getByTestId("current-route")).toHaveTextContent(/^\/$/);
+    await userEvent.click(restart);
+    expect(updaterState.current.installAvailableUpdate).toHaveBeenCalledTimes(1);
   });
 
   it("blocks entry and offers the signed updater when a newer application is available", async () => {

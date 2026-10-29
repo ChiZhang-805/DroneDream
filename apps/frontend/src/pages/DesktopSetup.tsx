@@ -383,14 +383,13 @@ export function DesktopSetup() {
       Boolean(signedInAccount) &&
       startupGate.accountId === signedInAccount?.id);
   const updaterBusy =
-    updater.status === "checking" ||
-    updater.status === "downloading" ||
+    (["checking", "downloading"].includes(updater.status) && updater.updateRequired) ||
     updater.status === "installing" ||
     updater.status === "reconcilingEngine" ||
     updater.status === "installingComponents";
   const updaterBlocksWorkspace =
     updaterBusy ||
-    (updater.status === "available" && updater.updateRequired) ||
+    (["available", "ready"].includes(updater.status) && updater.updateRequired) ||
     ([
       "componentAvailable",
       "componentUpdateDeferred",
@@ -398,7 +397,7 @@ export function DesktopSetup() {
     ].includes(updater.status) && updater.updateRequired) ||
     updater.status === "runtimeBaseRequired";
   const updaterActionRequired =
-    (updater.status === "available" && updater.updateRequired) ||
+    (["available", "ready"].includes(updater.status) && updater.updateRequired) ||
     ([
       "componentAvailable",
       "componentUpdateDeferred",
@@ -555,8 +554,7 @@ export function DesktopSetup() {
     // Inline account entry does not bypass fresh runtime or updater checks.
     if (!localChecksReady || !authCompletedForLaunch) return;
     if (
-      updater.status === "checking" ||
-      updater.status === "downloading" ||
+      (["checking", "downloading"].includes(updater.status) && updater.updateRequired) ||
       updater.status === "installing" ||
       updater.status === "reconcilingEngine" ||
       updater.status === "installingComponents"
@@ -567,7 +565,7 @@ export function DesktopSetup() {
       return;
     }
     if (
-      (updater.status === "available" && updater.updateRequired) ||
+      (["available", "ready"].includes(updater.status) && updater.updateRequired) ||
       ([
         "componentAvailable",
         "componentUpdateDeferred",
@@ -1370,7 +1368,7 @@ export function DesktopSetup() {
         aria-busy={busy}
       >
         <RuntimeLauncherHero
-          accountForm={!signedInAccount ? <LauncherAccountForm locale={locale}
+          accountForm={!signedInAccount && !updaterBlocksWorkspace ? <LauncherAccountForm locale={locale}
             onAuthenticated={() => setAuthCompletedForLaunch(true)} /> : null}
           snapshot={installState.snapshot}
           environmentProgress={launcherProgress}
@@ -1384,8 +1382,19 @@ export function DesktopSetup() {
             environmentBlocked ||
             runtimeSessionFailure !== null ||
             (localChecksReady &&
-              (postSignInBlocked || updaterBlocksWorkspace))
+              ((!updaterBusy && postSignInBlocked) || updaterActionRequired))
           }
+          updateStatus={updaterBusy
+            ? updater.status === "downloading"
+              ? t("updater.downloading", { progress: updater.progress ?? 0 })
+              : updater.status === "checking"
+                ? t("updater.checking")
+                : updater.status === "reconcilingEngine"
+                  ? t("updater.engine")
+                  : updater.status === "installingComponents"
+                    ? t("updater.components")
+                    : t("updater.installing")
+            : null}
           accountRequired={
             launcherEnvironmentReady &&
             !workspaceReady &&
@@ -1403,14 +1412,16 @@ export function DesktopSetup() {
           </Alert>
         ) : null}
 
-        {updater.status === "available" && updater.updateRequired ? (
+        {["available", "ready"].includes(updater.status) && updater.updateRequired ? (
           <div className="launcher-ready-actions">
             <button
               type="button"
               className="btn btn-primary launcher-primary-action"
               onClick={() => void updater.installAvailableUpdate()}
             >
-              {updater.error
+              {updater.status === "ready"
+                ? t("updater.sidebarRestart")
+                : updater.error
                 ? t("updater.sidebarDeferred")
                 : t("updater.available", {
                     version: updater.availableVersion ?? "",
@@ -2526,6 +2537,7 @@ function RuntimeLauncherHero({
   coreStarting,
   installationRequired,
   gateBlocked,
+  updateStatus,
   accountRequired,
   runtimeUpgradeRequired,
   automaticStartPending,
@@ -2542,6 +2554,7 @@ function RuntimeLauncherHero({
   coreStarting: boolean;
   installationRequired: boolean;
   gateBlocked: boolean;
+  updateStatus: string | null;
   accountRequired: boolean;
   runtimeUpgradeRequired: boolean;
   automaticStartPending: boolean;
@@ -2562,6 +2575,8 @@ function RuntimeLauncherHero({
       ? t("launcher.status.pausing")
       : commandBusy
         ? t("launcher.status.queued")
+      : updateStatus
+        ? updateStatus
       : gateBlocked
         ? t("launcher.status.blocked")
       : accountRequired

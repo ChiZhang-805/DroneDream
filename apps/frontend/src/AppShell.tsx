@@ -3942,7 +3942,7 @@ function AppShellContent() {
       return;
     }
     if (
-      updater.status === "checking" ||
+      (updater.status === "checking" && updater.updateRequired) ||
       (updater.status === "downloading" && updater.updateRequired) ||
       updater.status === "installing" ||
       updater.status === "reconcilingEngine" ||
