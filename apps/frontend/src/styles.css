@@ -893,18 +893,18 @@ body:has(.autonomy-platform-page),
 .assistant-asset-chip {
   display: inline-flex;
   min-width: 0;
-  max-width: 11rem;
+  max-width: 100%;
   min-height: 2.2rem;
   align-items: center;
   gap: 0.38rem;
   padding: 0.42rem 0.72rem;
-  overflow: hidden;
+  flex: 0 1 auto;
   border: 1px solid transparent;
   border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 750;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .assistant-asset-chip svg { width: 0.95rem; height: 0.95rem; flex: 0 0 auto; }
@@ -953,7 +953,7 @@ body:has(.autonomy-platform-page),
 .autonomy-context-menu-row > svg:first-child { width: 1.15rem; height: 1.15rem; color: var(--dd-brand-middle); }
 .autonomy-context-menu-row > svg:last-child { width: 0.9rem; color: #968b99; }
 .autonomy-context-menu-row b,
-.autonomy-context-choice b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.autonomy-context-choice b { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 .autonomy-context-menu-row b,
 .autonomy-context-choice b { font-size: 0.82rem; }
 
@@ -16729,6 +16729,7 @@ html[data-brand-edition="lab"] .assistant-examples button:nth-child(3) {
 
 .assistant-composer-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.55rem;
   padding: 0.45rem 0.62rem 0.65rem;
@@ -25408,8 +25409,8 @@ body {
 
 .autonomy-repository-grid { width: 100%; align-items: stretch; }
 .autonomy-repository-preview { min-height: 0; height: clamp(190px, 23vw, 280px); }
-.autonomy-repository-preview.is-aircraft > img { object-fit: contain; transform: scale(1.4); }
-.autonomy-repository-preview.is-aircraft[data-preview-key^="x500"] > img { transform: scale(2.1); }
+.autonomy-repository-preview.is-aircraft > img { object-fit: contain; padding: 1rem; transform: scale(1.3); }
+.autonomy-repository-preview.is-aircraft[data-preview-key^="x500"] > img { transform: scale(1.3); }
 .autonomy-repository-copy { flex-direction: column; align-items: flex-start; justify-content: center; gap: 5px; min-height: 94px; padding: 12px 64px 12px 14px; }
 .autonomy-repository-copy strong { width: 100%; font-size: 15px; }
 .autonomy-repository-copy small { max-width: 100%; font-size: 12px; white-space: normal; overflow-wrap: anywhere; }

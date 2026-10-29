@@ -311,6 +311,19 @@ function fitCameraToModel(
   controls.update();
 }
 
+export function prepareCatalogVehicleMeshes(model: THREE.Object3D) {
+  model.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    // Parts may share a glTF material; selection must only recolor this mesh.
+    object.material = Array.isArray(object.material)
+      ? object.material.map((material) => material.clone())
+      : object.material.clone();
+    if (!object.userData.catalogVehiclePart) {
+      object.userData.catalogVehiclePart = object.geometry.userData.catalogVehiclePart;
+    }
+  });
+}
+
 export function RepositoryAsset3DView({ kind, previewKey, name, chinese, onBuildingSelect, onMapMetadata, onVehicleMetadata }: Props) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [unavailable, setUnavailable] = useState(false);
@@ -467,13 +480,7 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese, onBuild
         .then(({ scene: model }) => {
           if (cancelled) { disposeScene(model); return; }
           onVehicleMetadataRef.current?.(model.userData.catalogVehicle ?? null);
-          model.traverse((object) => {
-            if (!(object instanceof THREE.Mesh)) return;
-            // glTF mesh extras contain source SDF part names, not invented hardware labels.
-            if (!object.userData.catalogVehiclePart) {
-              object.userData.catalogVehiclePart = object.geometry.userData.catalogVehiclePart;
-            }
-          });
+          prepareCatalogVehicleMeshes(model);
           modelRoot.add(model);
           fitCameraToModel(camera, controls, modelRoot, 1.04);
           setLoading(false);
