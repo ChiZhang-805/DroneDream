@@ -5,6 +5,7 @@ import { AutonomyConversationSidebar } from "../components/AutonomyConversationS
 import { acquireAutonomyPlanning } from "../features/autonomy/conversationActivity";
 import { autonomyConversationPath, deleteAutonomyConversation, listAutonomyConversations, loadAutonomyConversation, newAutonomyConversation, preserveLegacyAutonomyConversation, saveAutonomyConversation, setAutonomyConversationPinned } from "../features/autonomy/conversationStore";
 import { defaultAutonomyWorkspace, saveAutonomyWorkspace } from "../features/autonomy/workspaceStore";
+import { storeAutonomyHandoff } from "../features/experiment/assistantTaskRouter";
 import { registerExperimentWorkspace, updateExperimentWorkspace } from "../features/experiment/workspaceRegistry";
 import { I18nProvider } from "../i18n/I18nProvider";
 import { AutonomyLive, AutonomyMaps, AutonomyOverview, AutonomyPlatform } from "../pages/AutonomyPlatform";
@@ -110,6 +111,7 @@ function renderWorkspace(initial = "/autonomy") {
 
 beforeEach(() => {
   localStorage.clear();
+  sessionStorage.clear();
   mocks.owner = null;
   mocks.plan.mockReset().mockResolvedValue({ compiledPlan: null, planningBrief: "你指的是哪个取件处？", planningRunId: "test-plan" });
   mocks.reconcile.mockReset().mockImplementation(async (workspace) => workspace);
@@ -124,6 +126,14 @@ beforeEach(() => {
 });
 
 describe("autonomy conversation persistence", () => {
+  it("restores the Chatbot prompt without submitting or replacing the mission assets", async () => {
+    storeAutonomyHandoff("Bring me a coffee.");
+    renderWorkspace("/autonomy?from=tuning-chat");
+    await waitFor(() => expect(screen.getByRole("textbox")).toHaveValue("Bring me a coffee."));
+    expect(mocks.plan).not.toHaveBeenCalled();
+    expect(mocks.bindCatalog).not.toHaveBeenCalled();
+  });
+
   it("adds a newly created parameter optimization to Conversations immediately", async () => {
     renderWorkspace();
     act(() => {

@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { apiClient, ApiClientError } from "../api/client";
@@ -19,10 +19,16 @@ import { EditionThemeProvider } from "../theme/EditionThemeProvider";
 import type { BrandEditionId } from "../brand/edition-brand.generated";
 import type { ExperimentAssistantTurnResponse } from "../types/api";
 
+function CurrentRoute() {
+  const location = useLocation();
+  return <output data-testid="current-route">{location.pathname}{location.search}</output>;
+}
+
 function renderAssistant(edition: BrandEditionId = "sim") {
   return render(
     <I18nProvider>
       <MemoryRouter>
+        <CurrentRoute />
         <EditionThemeProvider edition={edition}>
           <ModelAccessProvider
             initialSettings={{
@@ -473,6 +479,22 @@ describe("conversational experiment drafting", () => {
       .toMatch(/^[0-9a-f]{64}$/u);
     expect(window.localStorage.getItem(EXPERIMENT_DRAFT_KEY))
       .not.toContain('{"track_type":"circle","altitude_m":3}');
+  });
+
+  it("keeps assets out of the workflow menu and opens the mission composer on selection", () => {
+    const compile = vi.spyOn(apiClient, "compileExperimentAssistantTurn");
+    renderAssistant("universal");
+    fireEvent.change(screen.getByLabelText("Describe your experiment…"), {
+      target: { value: "Bring me a coffee." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Parameter Optimization" }));
+    expect(screen.queryByText("Agent assets")).not.toBeInTheDocument();
+    expect(screen.queryByText("My Drone")).not.toBeInTheDocument();
+    expect(screen.queryByText("Kumpula Campus")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Agent Mission" }));
+    expect(screen.getByTestId("current-route")).toHaveTextContent("/autonomy?from=tuning-chat");
+    expect(loadAutonomyHandoff()).toBe("Bring me a coffee.");
+    expect(compile).not.toHaveBeenCalled();
   });
 
   it("hands AGENT requests to the autonomous mission workspace", async () => {

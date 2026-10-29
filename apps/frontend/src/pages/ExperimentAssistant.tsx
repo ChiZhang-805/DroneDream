@@ -17,13 +17,11 @@ import {
   FileUp,
   GitFork,
   LoaderCircle,
-  Layers3,
   MapPinned,
   Mic,
   MicOff,
   Microchip,
   MonitorPlay,
-  Navigation2,
   Orbit,
   PencilRuler,
   Plus,
@@ -65,11 +63,6 @@ import {
   storeAutonomyHandoff,
   type AssistantTaskType,
 } from "../features/experiment/assistantTaskRouter";
-import {
-  defaultAutonomyWorkspace,
-  loadAutonomyWorkspace,
-  saveAutonomyWorkspace,
-} from "../features/autonomy/workspaceStore";
 import { clearExperimentDraft } from "../features/experiment/draftStorage";
 import { publicDemoConsole } from "../features/demo/publicDemo";
 import { useOptionalAuth } from "../features/auth/AuthContext";
@@ -745,24 +738,14 @@ export function ExperimentAssistant() {
   const messages = draft.conversation.messages;
   const taskOptions = assistantTaskOptions(editionTheme.id, interfaceLocale);
   const selectedTask = taskOptions.find(({ id }) => id === selectedTaskType) ?? null;
-  const bindPublicAutonomyAsset = (kind: "aircraft" | "map") => {
-    const current = loadAutonomyWorkspace(ownerId, editionTheme.id);
-    const publicAssets = defaultAutonomyWorkspace();
-    const now = new Date().toISOString();
-    saveAutonomyWorkspace(ownerId, editionTheme.id, {
-      ...current,
-      aircraft: kind === "aircraft" ? publicAssets.aircraft : current.aircraft,
-      mapPack: kind === "map" ? publicAssets.mapPack : current.mapPack,
-      mission: {
-        ...current.mission,
-        aircraftProfileId: kind === "aircraft" ? publicAssets.aircraft.id : current.aircraft.id,
-        mapPackId: kind === "map" ? publicAssets.mapPack.id : current.mapPack.id,
-        compiledPlan: null,
-        updatedAt: now,
-      },
-    });
-    setSelectedTaskType("mission_autonomy");
+  const selectTask = (task: AssistantTaskType) => {
     setActionMenuOpen(false);
+    if (task === "mission_autonomy" && !publicDemoConsole) {
+      storeAutonomyHandoff(composer);
+      navigate("/autonomy?from=tuning-chat");
+      return;
+    }
+    setSelectedTaskType(task);
   };
 
   useEffect(() => {
@@ -1403,10 +1386,7 @@ export function ExperimentAssistant() {
                       aria-checked={selectedTaskType === task.id}
                       data-task-icon={task.id}
                       className={selectedTaskType === task.id ? "is-selected" : ""}
-                      onClick={() => {
-                        setSelectedTaskType(task.id);
-                        setActionMenuOpen(false);
-                      }}
+                      onClick={() => selectTask(task.id)}
                     >
                       <span className="assistant-task-icon" aria-hidden="true">
                         <TaskIcon strokeWidth={1.8} />
@@ -1415,28 +1395,6 @@ export function ExperimentAssistant() {
                     </button>
                   );
                 })}
-                <hr />
-                <strong className="assistant-task-popover-title">{chinese ? "任务智能体资产" : "Agent assets"}</strong>
-                <button
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked="true"
-                  data-task-icon="my-drone"
-                  onClick={() => bindPublicAutonomyAsset("aircraft")}
-                >
-                  <span className="assistant-task-icon" aria-hidden="true"><Navigation2 strokeWidth={1.8} /></span>
-                  <span className="assistant-task-popover-copy"><b>My Drone</b></span>
-                </button>
-                <button
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked="true"
-                  data-task-icon="school-map"
-                  onClick={() => bindPublicAutonomyAsset("map")}
-                >
-                  <span className="assistant-task-icon" aria-hidden="true"><Layers3 strokeWidth={1.8} /></span>
-                  <span className="assistant-task-popover-copy"><b>Kumpula Campus</b></span>
-                </button>
                 <hr />
                 <Link data-task-icon="manual" to="/jobs/new" role="menuitem" onClick={() => setActionMenuOpen(false)}>
                   <span className="assistant-task-icon" aria-hidden="true">

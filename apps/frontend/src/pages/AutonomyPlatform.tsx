@@ -158,7 +158,7 @@ import {
 } from "../features/autonomy/agentCorePlanning";
 import { useOptionalAuth } from "../features/auth/AuthContext";
 import { publicDemoConsole } from "../features/demo/publicDemo";
-import { consumeAutonomyHandoff } from "../features/experiment/assistantTaskRouter";
+import { consumeAutonomyHandoff, loadAutonomyHandoff } from "../features/experiment/assistantTaskRouter";
 import { useVoiceInput } from "../features/experiment/useVoiceInput";
 import { createExperimentWorkspaceId } from "../features/experiment/workspaceRegistry";
 import {
@@ -1165,14 +1165,17 @@ export function AutonomyPlatform() {
       }
     };
     loadView();
-    setMissionComposerDraft("");
+    setMissionComposerDraft(
+      !id && new URLSearchParams(location.search).get("from") === "tuning-chat"
+        ? loadAutonomyHandoff() ?? "" : "",
+    );
     const onChange = (event: Event) => {
       const detail = (event as CustomEvent).detail;
       if (id && detail?.ownerId === ownerId && detail?.edition === edition && detail?.id === id) loadView();
     };
     window.addEventListener(AUTONOMY_CONVERSATIONS_CHANGED, onChange);
     return () => window.removeEventListener(AUTONOMY_CONVERSATIONS_CHANGED, onChange);
-  }, [edition, ownerId, location.pathname, chinese]);
+  }, [edition, ownerId, location.pathname, location.search, chinese]);
 
   useEffect(() => {
     if (publicDemoConsole) {
