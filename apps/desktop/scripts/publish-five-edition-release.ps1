@@ -5,7 +5,8 @@ param(
     [string]$Repository = "ChiZhang-805/DroneDream",
     [ValidateRange(0, 10)]
     [int]$RollbackBuildsToKeep = 1,
-    [switch]$PruneObsoleteReleases
+    [switch]$PruneObsoleteReleases,
+    [switch]$PublishOnly
 )
 
 $ErrorActionPreference = "Stop"
@@ -22,8 +23,8 @@ if ($Repository -cnotmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') {
 if ($RollbackBuildsToKeep -ne 1) {
     throw "Public retention requires exactly one rollback five-edition build."
 }
-if (-not $PruneObsoleteReleases) {
-    throw "Publishing requires -PruneObsoleteReleases so Releases and Tags remain exact."
+if ($PublishOnly -eq $PruneObsoleteReleases) {
+    throw "Choose -PublishOnly before website verification, or -PruneObsoleteReleases to finish the synchronized release."
 }
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
     throw "GitHub CLI is required."
@@ -270,17 +271,17 @@ try {
     if ($PruneObsoleteReleases) {
         $releaseList = Invoke-GitHubCli -Arguments @(
             "release", "list", "--repo", $Repository,
-            "--limit", "100", "--json", "tagName,publishedAt"
+            "--limit", "100", "--json", "tagName,publishedAt,isDraft"
         ) | ConvertFrom-Json
         $combinedReleases = @(
             $releaseList |
-                Where-Object { [string]$_.tagName -match '^five-edition-v[0-9]+\.[0-9]+\.[0-9]+-build-[1-9][0-9]*$' } |
+                Where-Object { -not $_.isDraft -and [string]$_.tagName -match '^five-edition-v[0-9]+\.[0-9]+\.[0-9]+-build-[1-9][0-9]*$' } |
                 Sort-Object { [UInt64]([regex]::Match([string]$_.tagName, 'build-([1-9][0-9]*)$').Groups[1].Value) } -Descending
         )
         $keepCombined = @($combinedReleases | Select-Object -First (1 + $RollbackBuildsToKeep) | ForEach-Object { [string]$_.tagName })
         $runtimeReleases = @(
             $releaseList |
-                Where-Object { [string]$_.tagName -match '^runtime-v' } |
+                Where-Object { -not $_.isDraft -and [string]$_.tagName -match '^runtime-v' } |
                 Sort-Object publishedAt -Descending
         )
         $keepRuntime = @($runtimeReleases | Select-Object -First 1 | ForEach-Object { [string]$_.tagName })

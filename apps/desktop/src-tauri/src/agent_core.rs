@@ -417,6 +417,10 @@ fn validate_identity_header(value: Option<&str>) -> Result<(), String> {
 pub(crate) async fn agent_core_status(
     state: tauri::State<'_, AgentCoreState>,
 ) -> Result<AgentCoreStatus, String> {
+    // Keep the startup flag from the same observation as the connection. A
+    // launch may finish while the health task is queued; its earlier empty
+    // connection must not become an instruction to restart the new process.
+    let restarting = state.restarting.load(Ordering::Acquire);
     let info = state
         .info
         .lock()
@@ -447,7 +451,7 @@ pub(crate) async fn agent_core_status(
         .map_err(|_| "agent-core-state-poisoned".to_owned())?;
     Ok(AgentCoreStatus {
         available,
-        restarting: state.restarting.load(Ordering::Acquire),
+        restarting,
         endpoint: "loopback-random-port",
         authentication: "per-launch-bearer-token",
         process_isolation: "sidecar-and-plugin-isolator",
@@ -497,8 +501,10 @@ pub(crate) async fn agent_core_restart(
         }
     }
     let _restart_guard = RestartGuard(&state.restarting);
-    shutdown_state(&state);
-    let launch_result = tauri::async_runtime::spawn_blocking(move || launch_with_retry(&app))
+    let launch_result = tauri::async_runtime::spawn_blocking(move || {
+        shutdown_state(&app.state::<AgentCoreState>());
+        launch_with_retry(&app)
+    })
         .await
         .map_err(|error| format!("AGENT Core restart task failed: {error}"))?;
     match launch_result {

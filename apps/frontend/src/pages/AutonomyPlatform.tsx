@@ -179,6 +179,7 @@ type WorkspaceContext = {
   selectAircraft: (aircraftId: string) => void;
   selectMap: (mapId: string) => void;
   selectCatalogMap: (resourceId: string) => Promise<boolean>;
+  selectCatalogAircraft: (resourceId: string) => Promise<boolean>;
   registerExternalAsset: (
     version: AgentCoreAssetVersion,
     qualificationId?: string | null,
@@ -1324,7 +1325,7 @@ export function AutonomyPlatform() {
       const catalog = await getAgentCoreAssetPairCatalog();
       const pair = catalog.pairs.find((candidate) => (
         candidate.map_resource_id === resourceId
-        && candidate.vehicle_resource_id === "px4-x500-depth"
+        && candidate.qualified_vehicle_asset_id === workspace.aircraft.agentCoreAssetId
         && candidate.status === "qualified_builtin"
       ));
       if (!pair) return false;
@@ -1334,6 +1335,18 @@ export function AutonomyPlatform() {
     } catch {
       return false;
     }
+  }, [assetLibrary, persist, workspace]);
+
+  const selectCatalogAircraft = useCallback(async (resourceId: string) => {
+    const catalog = await getAgentCoreAssetPairCatalog();
+    const pair = catalog.pairs.find((candidate) => (
+      candidate.vehicle_resource_id === resourceId
+      && candidate.qualified_map_asset_id === workspace.mapPack.agentCoreAssetId
+      && candidate.status === "qualified_builtin"
+    ));
+    if (!pair) return false;
+    persist(await bindCatalogAssetPair(workspace, assetLibrary, pair));
+    return true;
   }, [assetLibrary, persist, workspace]);
 
   const removeAsset = useCallback((
@@ -1466,6 +1479,7 @@ export function AutonomyPlatform() {
           selectAircraft,
           selectMap,
           selectCatalogMap,
+          selectCatalogAircraft,
           registerExternalAsset,
           bindQualifiedAssetPair,
           agentCorePlugins,
@@ -2559,6 +2573,7 @@ export function AutonomyAircraft() {
     chinese,
     assetLibrary,
     selectAircraft,
+    selectCatalogAircraft,
     registerExternalAsset,
     removeAsset,
   } = useAutonomyWorkspace();
@@ -2686,16 +2701,15 @@ export function AutonomyAircraft() {
           return <article
             key={definition.key}
             data-catalog-resource="true"
-            data-selected={Boolean(aircraft && selectedRepositoryAircraftId === aircraft.id)}
+            data-selected={selectedRepositoryAircraftId === (aircraft?.id ?? definition.resourceId)}
           >
             <button
               type="button"
               className="autonomy-repository-card-surface"
               onClick={() => {
-                if (aircraft) {
-                  setSelectedRepositoryAircraftId(aircraft.id);
-                  selectAircraft(aircraft.id);
-                }
+                void selectCatalogAircraft(definition.resourceId).then((selected) => {
+                  if (selected) setSelectedRepositoryAircraftId(aircraft?.id ?? definition.resourceId);
+                }).catch(() => setResourceStates((current) => ({ ...current, [definition.resourceId]: "error" })));
               }}
               onDoubleClick={() => {
                 if (aircraft) openAircraftDetails(aircraft);
@@ -2782,7 +2796,6 @@ export function AutonomyMaps() {
     edition,
     removeAsset,
     assetLibrary,
-    selectMap,
     selectCatalogMap,
   } = useAutonomyWorkspace();
   const [details, setDetails] = useState<RepositoryDetails | null>(null);
@@ -2866,14 +2879,9 @@ export function AutonomyMaps() {
               type="button"
               className="autonomy-repository-card-surface"
               onClick={() => {
-                if (mapPack) {
-                  setSelectedRepositoryMapId(mapPack.id);
-                  selectMap(mapPack.id);
-                } else {
-                  void selectCatalogMap(definition.resourceId).then((selected) => {
-                    if (selected) setSelectedRepositoryMapId(definition.resourceId);
-                  });
-                }
+                void selectCatalogMap(definition.resourceId).then((selected) => {
+                  if (selected) setSelectedRepositoryMapId(mapPack?.id ?? definition.resourceId);
+                });
               }}
               onDoubleClick={() => {
                 if (mapPack) openMapDetails(mapPack, resource, presentation.name);

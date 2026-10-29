@@ -89,6 +89,11 @@ configured log/artifact retention are outside this one-record Pages policy.
 Build all five signed installers into one handoff directory, then publish from the
 repository root:
 
+First invoke the publisher with `-PublishOnly` instead of
+`-PruneObsoleteReleases`. Deploy the website with the new release metadata and
+verify its public downloads and all five updater manifests. Then run the command
+below to finish retention cleanup. Draft builds never count as rollback releases.
+
 ```powershell
 & apps/desktop/scripts/publish-five-edition-release.ps1 `
   -HandoffRoot "Q:\DroneDream-Workspace\Build\codex-builds\core-five-msvc" `

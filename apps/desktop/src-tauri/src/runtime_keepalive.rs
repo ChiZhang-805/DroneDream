@@ -2,19 +2,16 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 #[cfg(target_os = "windows")]
-use crate::process::{command_output, spawn_contained_background, windows_command, ContainedChild};
+use crate::process::{spawn_contained_background, windows_command, ContainedChild};
 
 const KEEPALIVE_PROGRAM: &str = "/usr/bin/sleep";
 const KEEPALIVE_ARGUMENT: &str = "infinity";
 const STARTUP_SETTLE_TIME: Duration = Duration::from_millis(250);
-#[cfg(target_os = "windows")]
-const EXIT_TERMINATION_TIMEOUT: Duration = Duration::from_secs(5);
 
 #[cfg(target_os = "windows")]
 struct RuntimeSession {
     child: ContainedChild,
-    lease: std::fs::File,
-    lease_path: std::path::PathBuf,
+    _lease: std::fs::File,
 }
 
 #[cfg(target_os = "windows")]
@@ -37,8 +34,8 @@ fn acquire_session_lease() -> Result<(std::fs::File, std::path::PathBuf), String
     let path = directory.join("desktop-sessions-v1.lock");
     let file = open_session_lease(&path)
         .map_err(|error| format!("Unable to open Runtime session lease: {error}"))?;
-    // Each open edition holds a shared kernel lock. An exit owns the exclusive
-    // lock only when the last session has closed; new starts wait for that exit.
+    // Each open edition holds a shared kernel lock. Storage maintenance can
+    // acquire the exclusive lock only after all desktop sessions have closed.
     file.lock_shared()
         .map_err(|error| format!("Unable to acquire Runtime session lease: {error}"))?;
     Ok((file, path))
@@ -100,7 +97,7 @@ impl RuntimeKeepalive {
         // reaches this branch, so this cannot interrupt a healthy Runtime.
         guard.take();
 
-        let (lease, lease_path) = acquire_session_lease()?;
+        let (lease, _) = acquire_session_lease()?;
 
         let mut command = windows_command("wsl.exe");
         command.args(keepalive_wsl_args());
@@ -115,8 +112,7 @@ impl RuntimeKeepalive {
         }
         *guard = Some(RuntimeSession {
             child,
-            lease,
-            lease_path,
+            _lease: lease,
         });
         Ok(())
     }
@@ -147,62 +143,10 @@ impl RuntimeKeepalive {
             .map_err(|_| "DroneDreamRuntime keepalive state is unavailable.".to_string())?;
         Ok(())
     }
-
-    /// Stop the dedicated distribution only after its last desktop session
-    /// closes. Each edition's Core is stopped separately before this call.
-    #[cfg(target_os = "windows")]
-    fn terminate_for_exit(&self) -> Result<(), String> {
-        // The launcher must remain immediately closable on a bare machine. If
-        // this app never started a Runtime keepalive, there is no owned Runtime
-        // session to terminate and invoking `wsl.exe --terminate` would add a
-        // needless timeout (or interfere with an externally managed session).
-        let Some(owned_child) = self.take_owned_child()? else {
-            return Ok(());
-        };
-        let RuntimeSession {
-            child,
-            lease,
-            lease_path,
-        } = owned_child;
-        drop(child);
-        drop(lease);
-        let Some(_last_session_exit) = claim_last_session_exit(&lease_path)? else {
-            return Ok(());
-        };
-        let mut command = windows_command("wsl.exe");
-        command.args(terminate_wsl_args());
-        let output = command_output(
-            command,
-            EXIT_TERMINATION_TIMEOUT,
-            "DroneDreamRuntime exit termination",
-        )?;
-        if output.status.success() {
-            return Ok(());
-        }
-        let detail = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        Err(format!(
-            "Unable to stop DroneDreamRuntime before exit (code {}): {}",
-            output.status.code().unwrap_or(-1),
-            if detail.is_empty() {
-                "wsl.exe returned no diagnostic output"
-            } else {
-                &detail
-            }
-        ))
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    fn terminate_for_exit(&self) -> Result<(), String> {
-        self.release()
-    }
 }
 
 fn keepalive_wsl_args() -> Vec<String> {
     crate::runtime::runtime_wsl_exec_args(KEEPALIVE_PROGRAM, &[KEEPALIVE_ARGUMENT])
-}
-
-fn terminate_wsl_args() -> [&'static str; 2] {
-    ["--terminate", "DroneDreamRuntime"]
 }
 
 #[tauri::command]
@@ -214,11 +158,15 @@ pub(crate) async fn stop_runtime_for_exit(
     // sidecar. Stop it explicitly before the updater terminates the desktop
     // process; RunEvent::Exit is not guaranteed to run after NSIS closes the
     // old executable, and a surviving sidecar would keep its own file locked.
-    crate::agent_core::stop(&app);
     let keepalive = keepalive.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || keepalive.terminate_for_exit())
-        .await
-        .map_err(|error| format!("Runtime exit termination task failed: {error}"))?
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::agent_core::stop(&app);
+        // Other desktop editions and independently running missions own their
+        // own WSL sessions. Release this helper; WSL handles the final idle exit.
+        keepalive.release()
+    })
+    .await
+    .map_err(|error| format!("Runtime session release task failed: {error}"))?
 }
 
 #[cfg(test)]
@@ -271,21 +219,31 @@ mod tests {
         assert!(!args.iter().any(|argument| argument == "--shutdown"));
     }
 
-    #[test]
-    fn exit_termination_targets_only_the_dedicated_runtime() {
-        assert_eq!(terminate_wsl_args(), ["--terminate", "DroneDreamRuntime"]);
-        assert!(!terminate_wsl_args().contains(&"--shutdown"));
-    }
-
     #[cfg(target_os = "windows")]
     #[test]
     fn exit_without_an_owned_runtime_is_an_immediate_noop() {
         let keepalive = RuntimeKeepalive::default();
         let started = Instant::now();
 
-        keepalive.terminate_for_exit().unwrap();
+        keepalive.release().unwrap();
 
         assert!(started.elapsed() < Duration::from_secs(1));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore = "requires an installed DroneDreamRuntime"]
+    fn releasing_desktop_session_preserves_independent_runtime_session() {
+        let mut command = windows_command("wsl.exe");
+        command.args(keepalive_wsl_args());
+        let mut independent =
+            spawn_contained_background(command, "independent Runtime session").unwrap();
+        let keepalive = RuntimeKeepalive::default();
+        keepalive.ensure_running().unwrap();
+        keepalive.release().unwrap();
+        std::thread::sleep(Duration::from_secs(2));
+        assert!(independent.is_running().unwrap());
+        assert!(crate::runtime::probe_runtime_running().unwrap());
     }
 
     #[cfg(target_os = "windows")]
