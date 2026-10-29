@@ -28,6 +28,7 @@ import {
 import {
   captchaProtectionConfigured,
   turnstileSiteKey,
+  verifyBrowserProviderReturn,
 } from "../features/auth/supabaseClient";
 import { useI18n } from "../i18n/I18nProvider";
 import { CommunityPage } from "./CommunityPage";
@@ -40,8 +41,10 @@ import { OAuthConsentPage } from "./OAuthConsentPage";
 import { DesktopProviderHandoffPage } from "./DesktopProviderHandoffPage";
 import {
   clearDesktopProviderReturn,
+  desktopProviderFailureCallback,
   consumeDesktopProviderReturn,
   hasDesktopProviderHandoff,
+  hasDesktopProviderReturn,
   markDesktopProviderRedirect,
   takeDesktopProviderPreference,
   type DesktopSocialProvider,
@@ -641,8 +644,26 @@ export function SiteApp() {
     : null;
   const hasValidOAuthAuthorizationId = oauthAuthorizationId !== null;
   const desktopProviderHandoff = sitePage === "oauth-consent" && hasDesktopProviderHandoff();
+  const directProviderReturn = hasValidOAuthAuthorizationId && ["google", "github", "slack_oidc"].includes(
+    new URLSearchParams(window.location.search).get("desktop_provider_return") ?? "",
+  );
   const [desktopOAuthFreshAuthReady, setDesktopOAuthFreshAuthReady] = useState(false);
   const desktopOAuthPreparedRef = useRef<string | null>(null);
+  const desktopProviderOpeningRef = useRef(false);
+  const [directProviderIdentity, setDirectProviderIdentity] = useState<string | null>(null);
+  useEffect(() => {
+    if (!directProviderReturn) return;
+    let active = true;
+    void verifyBrowserProviderReturn().then((identity) => {
+      if (!active) return;
+      if (identity) setDirectProviderIdentity(identity);
+      else {
+        const callback = desktopProviderFailureCallback();
+        if (callback) window.location.replace(callback);
+      }
+    });
+    return () => { active = false; };
+  }, [directProviderReturn]);
   const oauthAuthPage = hasValidOAuthAuthorizationId && (
     !desktopOAuthFreshAuthReady || !auth.account || authPending || Boolean(authError)
   );
@@ -697,14 +718,14 @@ export function SiteApp() {
       : { title: copy.metaTitle, description: copy.metaDescription };
 
   useEffect(() => {
-    document.title = pageMetadata.title;
+    document.title = directProviderReturn || desktopProviderHandoff ? "" : pageMetadata.title;
     document.querySelector<HTMLMetaElement>('meta[name="description"]')
       ?.setAttribute("content", pageMetadata.description);
     document.querySelector<HTMLMetaElement>('meta[property="og:title"]')
       ?.setAttribute("content", pageMetadata.title);
     document.querySelector<HTMLMetaElement>('meta[property="og:description"]')
       ?.setAttribute("content", pageMetadata.description);
-  }, [pageMetadata.description, pageMetadata.title]);
+  }, [desktopProviderHandoff, directProviderReturn, pageMetadata.description, pageMetadata.title]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -962,6 +983,7 @@ export function SiteApp() {
       if (oauthAuthorizationId) markDesktopProviderRedirect(oauthAuthorizationId, provider);
       await auth.signInWithProvider(provider);
     } catch (reason) {
+      desktopProviderOpeningRef.current = false;
       if (oauthAuthorizationId) clearDesktopProviderReturn();
       setAuthError(localizedAuthError(reason));
       setAuthOpen(true);
@@ -973,6 +995,7 @@ export function SiteApp() {
   useEffect(() => {
     if (sitePage !== "oauth-consent" || !oauthAuthorizationId || desktopProviderHandoff) return;
     if (auth.loading) return;
+    if (directProviderReturn) return;
     // A completed social redirect is already this request's fresh sign-in.
     // Accept a delayed SDK account publication as well as initial hydration.
     if (auth.account && consumeDesktopProviderReturn(oauthAuthorizationId)) {
@@ -981,16 +1004,22 @@ export function SiteApp() {
       setAuthOpen(false);
       return;
     }
+    // Keep the provider redirect and SDK session hydration off the email form.
+    if (!authError && (desktopProviderOpeningRef.current
+      || hasDesktopProviderReturn(oauthAuthorizationId))) return;
     if (desktopOAuthPreparedRef.current !== oauthAuthorizationId) {
       desktopOAuthPreparedRef.current = oauthAuthorizationId;
       setDesktopOAuthFreshAuthReady(false);
       const preferredProvider = takeDesktopProviderPreference();
+      desktopProviderOpeningRef.current = Boolean(preferredProvider);
+      if (preferredProvider) setAuthOpen(false);
       setAuthPending(true);
       void (async () => {
         if (auth.account) await auth.signOut();
         if (preferredProvider) await startSiteProviderSignIn(preferredProvider);
         else openAccount("sign-in");
       })().catch((reason: unknown) => {
+        desktopProviderOpeningRef.current = false;
         setAuthError(localizedAuthError(reason));
         setAuthOpen(true);
       }).finally(() => setAuthPending(false));
@@ -1026,6 +1055,7 @@ export function SiteApp() {
     authPending,
     desktopOAuthFreshAuthReady,
     desktopProviderHandoff,
+    directProviderReturn,
     hasValidOAuthAuthorizationId,
     localizedAuthError,
     oauthAuthorizationId,
@@ -1255,6 +1285,17 @@ export function SiteApp() {
             : null;
   const accountName = auth.account?.displayName.trim() || copy.account;
 
+  // OAuth returns establish the website session and immediately hand the PKCE
+  // code back to native. No website chrome, login form or loading page here.
+  if (desktopProviderHandoff) return <DesktopProviderHandoffPage locale={locale} />;
+  if (directProviderReturn) {
+    if (auth.loading || !auth.account || auth.account.id !== directProviderIdentity) return null;
+    return <OAuthConsentPage locale={locale} account={auth.account}
+      authConfigured={auth.configured} authLoading={auth.loading}
+      onRequireSignIn={() => undefined} onRequireRegistration={() => undefined}
+      onSwitchAccount={() => undefined} />;
+  }
+
   return (
     <div
       className="dd-site"
@@ -1456,7 +1497,7 @@ export function SiteApp() {
                 .finally(() => setAuthPending(false));
             }}
           />
-        ) : sitePage === "oauth-consent" && desktopOAuthFreshAuthReady ? (
+        ) : sitePage === "oauth-consent" ? (
           <div className="site-oauth-auth-stage" aria-hidden="true" />
         ) : (
           <HomeExperience release={release} />

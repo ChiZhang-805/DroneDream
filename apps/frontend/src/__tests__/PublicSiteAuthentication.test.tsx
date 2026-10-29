@@ -337,7 +337,7 @@ describe("public website account authentication", () => {
     expect(consumeDesktopProviderReturn("authorization-other")).toBe(false);
     expect(consumeDesktopProviderReturn("authorization-1")).toBe(true);
     expect(authMock.signOut).not.toHaveBeenCalled();
-    expect(await screen.findByRole("dialog", { name: "Sign in" })).toBeVisible();
+    expect(screen.queryByRole("dialog", { name: "Sign in" })).not.toBeInTheDocument();
   });
 
   it("waits for the prior browser account to sign out before launching the selected provider", async () => {
@@ -377,7 +377,7 @@ describe("public website account authentication", () => {
   it("waits for the authenticated account before consuming a matching provider return", async () => {
     markDesktopProviderRedirect("authorization-1", "google");
     const page = renderOAuthPage();
-    expect(await screen.findByRole("dialog", { name: "Sign in" })).toBeVisible();
+    expect(screen.queryByRole("dialog", { name: "Sign in" })).not.toBeInTheDocument();
     authMock.state.account = {
       id: "returned-account", email: "pilot@example.com", displayName: "Pilot", avatarUrl: null,
     };

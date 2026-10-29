@@ -77,8 +77,8 @@
       "officialRepository": "https://github.com/PX4/PX4-gazebo-models",
       "integrationStatus": "transitive",
       "integrationMode": "px4-submodule",
-      "distributionMode": "runtime-transitive",
-      "copiedIntoRepository": false,
+      "distributionMode": "desktop-and-runtime",
+      "copiedIntoRepository": true,
       "pin": {
         "kind": "commit",
         "value": "PX4 v1.16.0 Tools/simulation/gz submodule",
@@ -95,11 +95,13 @@
         }
       ],
       "noticeObligations": [
-        "Retain the BSD notice for distributed models and review model-specific assets before adding new Vehicle Packs."
+        "Retain the BSD notice for distributed models and review model-specific assets before adding new Vehicle Packs.",
+        "Desktop-derived GLB previews retain the original notice at apps/frontend/public/asset-geometry/vehicles/LICENSE.txt."
       ],
       "validationTier": "integrated-contract",
       "validationNotes": [
-        "Only model/world combinations covered by a frozen simulator receipt may be labelled validated."
+        "Only model/world combinations covered by a frozen simulator receipt may be labelled validated.",
+        "Desktop previews are derived from the same pinned SDF, meshes and textures as Runtime; their catalog records source revision, dimensions, mass and file hashes."
       ]
     },
     {

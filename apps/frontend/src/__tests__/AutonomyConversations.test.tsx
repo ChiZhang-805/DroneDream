@@ -385,7 +385,7 @@ describe("Chatbot to independent conversation", () => {
     mocks.sources.mockResolvedValue({ sources: [{ id: "gazebo-render", kind: "simulation", label: "Gazebo", ready: true, mode: "simulation", transport: "agent-core-frame" }] });
     vi.stubGlobal("createImageBitmap", vi.fn(async () => ({ width: 640, height: 360, close: vi.fn() })));
     const canvasContext = vi.spyOn(HTMLCanvasElement.prototype, "getContext")
-      .mockReturnValue({ drawImage: vi.fn() } as unknown as CanvasRenderingContext2D);
+      .mockImplementation((() => ({ drawImage: vi.fn() })) as unknown as HTMLCanvasElement["getContext"]);
 
     renderWorkspace("/autonomy/conversations/map-view");
     fireEvent.click(await screen.findByRole("button", { name: "打开运行画面" }));

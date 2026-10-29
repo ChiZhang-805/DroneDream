@@ -35,6 +35,13 @@ license files should be retained with every distributed runtime version.
   [LICENSE](https://github.com/PX4/PX4-Autopilot/blob/6ea3539157ca358c70a515878b77077af7d4611d/LICENSE)
   is retained at `/opt/PX4-Autopilot/LICENSE`. PX4 submodules, models, assets,
   and build dependencies may carry separate notices.
+- **PX4 Gazebo Models** — the Runtime submodule and desktop aircraft previews
+  use commit `e05f4312d3f28aa621157610584a4870406cb6d3` of
+  [PX4-gazebo-models](https://github.com/PX4/PX4-gazebo-models/tree/e05f4312d3f28aa621157610584a4870406cb6d3).
+  The desktop GLBs are derived from the pinned SDF, meshes and textures.
+  Their original BSD-3-Clause notice accompanies them at
+  `asset-geometry/vehicles/LICENSE.txt`; `catalog.json` records provenance
+  and file hashes. Rendering a model does not establish flight qualification.
 - **Gazebo Harmonic** — installed as the `gz-harmonic` metapackage version
   `1.0.0-1~noble` from the OSRF Ubuntu repository. Harmonic is a collection of
   separately versioned and licensed libraries, so this notice does not assign

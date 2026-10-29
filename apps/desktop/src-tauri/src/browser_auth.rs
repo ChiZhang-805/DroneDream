@@ -405,7 +405,11 @@ fn run_browser_auth(
         let code_challenge = pkce_challenge(&code_verifier);
         let authorize_url =
             build_authorize_url(identity, oauth_client_id, &state, &nonce, &code_challenge)?;
-        let browser_url = build_browser_entry_url(&authorize_url, &request)?;
+        let browser_url = if let Some(provider) = request.provider.as_deref() {
+            direct_provider_entry(&authorize_url, provider)?
+        } else {
+            authorize_url.clone()
+        };
         app.opener()
             .open_url(browser_url.as_str(), None::<&str>)
             .map_err(|error| format!("Could not open the system browser: {error}"))?;
@@ -485,8 +489,8 @@ fn run_browser_auth(
                             continue;
                         }
                         let AuthorizationCallback::Authorized { code, .. } = callback else {
-                            let page = render_auth_result_page(
-                                &request.locale,
+                            let page = render_browser_completion(
+                                &request,
                                 identity,
                                 false,
                                 &attempt_id,
@@ -502,8 +506,8 @@ fn run_browser_auth(
                         ) {
                             Ok(response) => response,
                             Err(error) => {
-                                let page = render_auth_result_page(
-                                    &request.locale,
+                                let page = render_browser_completion(
+                                    &request,
                                     identity,
                                     false,
                                     &attempt_id,
@@ -518,8 +522,8 @@ fn run_browser_auth(
                             {
                                 Ok(subject) => subject,
                                 Err(error) => {
-                                    let page = render_auth_result_page(
-                                        &request.locale,
+                                    let page = render_browser_completion(
+                                        &request,
                                         identity,
                                         false,
                                         &attempt_id,
@@ -558,8 +562,8 @@ fn run_browser_auth(
                         ) {
                             Ok(revision) => committed_revision = Some(revision),
                             Err(error) => {
-                                let page = render_auth_result_page(
-                                    &request.locale,
+                                let page = render_browser_completion(
+                                    &request,
                                     identity,
                                     false,
                                     &attempt_id,
@@ -648,7 +652,7 @@ fn run_browser_auth(
             if let Some(revision) = &committed_revision {
                 let _ = browser_auth_vault::clear_refresh_token_if_current(revision);
             }
-            if let Ok(page) = render_auth_result_page(&request.locale, identity, false, &attempt_id)
+            if let Ok(page) = render_browser_completion(&request, identity, false, &attempt_id)
             {
                 let _ = write_html_response(&mut stream, page.as_bytes(), &attempt_id);
             }
@@ -657,13 +661,22 @@ fn run_browser_auth(
     }
     match outcome {
         Ok((session, mut stream)) => {
-            if let Ok(page) = render_auth_result_page(&request.locale, identity, true, &attempt_id)
-            {
+            if let Ok(page) = render_browser_completion(&request, identity, true, &attempt_id) {
                 let _ = write_html_response(&mut stream, page.as_bytes(), &attempt_id);
+            }
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
             }
             Ok(session)
         }
-        Err(error) => Err(error),
+        Err(error) => {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+            Err(error)
+        },
     }
 }
 
@@ -711,28 +724,46 @@ fn pkce_challenge(code_verifier: &str) -> String {
 }
 
 /// Only the fixed broker URL receives the public challenge and registered redirect.
-fn build_browser_entry_url(
-    authorize_url: &Url,
-    request: &BrowserAuthRequest,
-) -> Result<Url, String> {
-    validate_request(request)?;
-    if authorize_url.as_str().split('?').next() != Some(OAUTH_AUTHORIZE_URL)
-        || authorize_url.fragment().is_some()
-    {
-        return Err("Browser sign-in authorization URL is not approved.".to_owned());
+fn direct_provider_entry(authorize_url: &Url, provider: &str) -> Result<Url, String> {
+    // Create the native PKCE authorization request before opening a browser.
+    // The browser goes straight through Supabase's HTTP redirect to the provider.
+    let client = Client::builder().redirect(Policy::none())
+        .connect_timeout(TOKEN_REQUEST_TIMEOUT).timeout(TOKEN_REQUEST_TIMEOUT)
+        .build().map_err(|_| "Unable to prepare provider sign-in.".to_string())?;
+    let response = client.get(authorize_url.clone()).send()
+        .map_err(|_| "Unable to reach the account service.".to_string())?;
+    if !response.status().is_redirection() {
+        return Err("The account service could not prepare desktop sign-in.".to_string());
     }
-    let Some(provider) = request.provider.as_deref() else {
-        return Ok(authorize_url.clone());
-    };
-    // The approved website remembers the provider in this browser tab before
-    // entering the unchanged authorization request. Native retains code/state/PKCE.
-    let mut entry = Url::parse("https://getdronedream.com/oauth/consent/")
-        .map_err(|_| "The approved account website URL is invalid.".to_owned())?;
-    entry
-        .query_pairs_mut()
-        .append_pair("desktop_provider", provider)
-        .append_pair("desktop_authorize", authorize_url.as_str())
-        .append_pair("locale", &request.locale);
+    let location = response.headers().get(reqwest::header::LOCATION)
+        .and_then(|value| value.to_str().ok())
+        .ok_or_else(|| "The account service did not return a sign-in request.".to_string())?;
+    provider_entry_for_consent(location, provider, authorize_url)
+}
+
+fn provider_entry_for_consent(location: &str, provider: &str, authorize_url: &Url) -> Result<Url, String> {
+    let mut callback = Url::parse(location).map_err(|_| "Invalid sign-in callback.".to_string())?;
+    let fields = callback.query_pairs().collect::<Vec<_>>();
+    if callback.origin().ascii_serialization() != "https://getdronedream.com"
+        || !matches!(callback.path(), "/oauth/consent" | "/oauth/consent/")
+        || callback.fragment().is_some()
+        || fields.len() != 1 || fields[0].0 != "authorization_id"
+        || fields[0].1.len() < 8 || fields[0].1.len() > 512
+        || !fields[0].1.bytes().all(|c| c.is_ascii_alphanumeric() || b"._~-".contains(&c))
+        || !matches!(provider, "google" | "github" | "slack_oidc") {
+        return Err("The account service returned an unapproved sign-in callback.".to_string());
+    }
+    drop(fields);
+    let native_fields = authorize_url.query_pairs().collect::<HashMap<_, _>>();
+    let redirect_uri = native_fields.get("redirect_uri").ok_or("Missing desktop callback.")?;
+    let state = native_fields.get("state").ok_or("Missing desktop authorization state.")?;
+    callback.query_pairs_mut().append_pair("desktop_provider_return", provider)
+        .append_pair("desktop_callback", redirect_uri)
+        .append_pair("desktop_state", state);
+    let mut entry = Url::parse("https://yggabfynndpzymlqvnim.supabase.co/auth/v1/authorize")
+        .map_err(|_| "Invalid provider endpoint.".to_string())?;
+    entry.query_pairs_mut().append_pair("provider", provider)
+        .append_pair("redirect_to", callback.as_str());
     Ok(entry)
 }
 
@@ -1088,6 +1119,18 @@ fn restore_browser_auth_vault_sync() -> Result<Option<BrowserAuthSession>, Strin
 }
 
 /// Render a credential-free result page; JSON-encode script values, pin CSP nonce.
+fn render_browser_completion(
+    request: &BrowserAuthRequest,
+    identity: DesktopAuthIdentity,
+    success: bool,
+    nonce: &str,
+) -> Result<String, String> {
+    if request.provider.is_some() {
+        return Ok(format!("<!doctype html><html><head><title></title></head><body><script nonce=\"{nonce}\">window.close()</script></body></html>"));
+    }
+    render_auth_result_page(&request.locale, identity, success, nonce)
+}
+
 fn render_auth_result_page(
     locale: &str,
     identity: DesktopAuthIdentity,
@@ -1392,57 +1435,42 @@ mod tests {
     }
 
     #[test]
-    fn provider_handoff_preserves_native_pkce_and_edition_on_the_approved_website() {
+    fn provider_entry_opens_auth_service_without_website_interstitial() {
         for edition in ["universal", "sim", "lab", "field", "autonomy"] {
             let identity = desktop_auth_identity(edition).unwrap();
-            let authorize = build_authorize_url(
-                identity,
-                "public-client-id",
-                "state-123",
-                "nonce-123",
-                "challenge-123",
-            )
-            .unwrap();
-            assert_eq!(
-                build_browser_entry_url(&authorize, &valid_request()).unwrap(),
-                authorize
-            );
+            let authorize = build_authorize_url(identity, "public-client-id", "state-123",
+                "nonce-123", "challenge-123").unwrap();
             for provider in ["google", "github", "slack_oidc"] {
-                let mut request = valid_request();
-                request.provider = Some(provider.to_owned());
-                let entry = build_browser_entry_url(&authorize, &request).unwrap();
-                assert_eq!(
-                    entry.origin().ascii_serialization(),
-                    "https://getdronedream.com"
-                );
-                assert_eq!(entry.path(), "/oauth/consent/");
+                let entry = provider_entry_for_consent(
+                    "https://getdronedream.com/oauth/consent?authorization_id=request-123",
+                    provider, &authorize).unwrap();
+                assert_eq!(entry.origin().ascii_serialization(),
+                    "https://yggabfynndpzymlqvnim.supabase.co");
+                assert_eq!(entry.path(), "/auth/v1/authorize");
                 let query = entry.query_pairs().collect::<HashMap<_, _>>();
-                assert_eq!(query.len(), 3);
-                assert_eq!(
-                    query.get("desktop_provider").map(|value| value.as_ref()),
-                    Some(provider)
-                );
-                assert_eq!(
-                    query.get("desktop_authorize").map(|value| value.as_ref()),
-                    Some(authorize.as_str())
-                );
+                assert_eq!(query.get("provider").unwrap(), provider);
+                let callback = Url::parse(query.get("redirect_to").unwrap()).unwrap();
+                let fields = callback.query_pairs().collect::<HashMap<_, _>>();
+                assert_eq!(fields.get("authorization_id").unwrap(), "request-123");
+                assert_eq!(fields.get("desktop_callback").unwrap(), identity.redirect_uri);
+                assert_eq!(fields.get("desktop_state").unwrap(), "state-123");
                 assert!(!entry.as_str().contains("code_verifier"));
                 assert!(!entry.as_str().contains("access_token"));
-                assert!(!entry.as_str().contains("refresh_token"));
             }
         }
     }
 
     #[test]
-    fn provider_handoff_cannot_open_an_arbitrary_authorization_url() {
-        let mut request = valid_request();
-        request.provider = Some("google".to_owned());
-        for url in [
-            "http://yggabfynndpzymlqvnim.supabase.co/auth/v1/oauth/authorize",
-            "https://example.com/auth/v1/oauth/authorize",
-            "https://yggabfynndpzymlqvnim.supabase.co/auth/v1/oauth/authorize#redirect",
+    fn provider_entry_rejects_unapproved_consent_targets() {
+        let authorize = build_authorize_url(desktop_auth_identity("universal").unwrap(),
+            "public-client-id", "state-123", "nonce-123", "challenge-123").unwrap();
+        for callback in [
+            "http://getdronedream.com/oauth/consent?authorization_id=request-123",
+            "https://example.com/oauth/consent?authorization_id=request-123",
+            "https://getdronedream.com/oauth/consent?authorization_id=request-123#redirect",
+            "https://getdronedream.com/oauth/consent?authorization_id=request-123&authorization_id=other-123",
         ] {
-            assert!(build_browser_entry_url(&Url::parse(url).unwrap(), &request).is_err());
+            assert!(provider_entry_for_consent(callback, "google", &authorize).is_err());
         }
     }
 
@@ -1467,6 +1495,19 @@ mod tests {
             assert!(!page.contains("accessToken"));
             assert!(!page.contains("refreshToken"));
             assert!(!page.contains("Cancel this sign-in"));
+        }
+    }
+
+    #[test]
+    fn social_completion_keeps_all_messages_in_the_desktop() {
+        let mut request = valid_request();
+        request.provider = Some("google".to_owned());
+        for success in [true, false] {
+            let page = render_browser_completion(&request,
+                desktop_auth_identity("universal").unwrap(), success, "nonce-123").unwrap();
+            assert!(!page.contains("DroneDream"));
+            assert!(!page.contains("<img"));
+            assert!(page.contains("window.close()"));
         }
     }
 

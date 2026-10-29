@@ -15,6 +15,8 @@ import argparse
 import hashlib
 import json
 import math
+import io
+import zipfile
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,7 +26,7 @@ from xml.etree import ElementTree
 from PIL import Image, ImageDraw, ImageFont
 from pyproj import Transformer
 from shapely.geometry import MultiPolygon, Point, Polygon, box, shape
-from shapely.ops import transform
+from shapely.ops import transform, unary_union
 
 ASSET_ID = "dronedream.school-map.v1"
 DISPLAY_NAME = "Kumpula Campus"
@@ -169,13 +171,17 @@ def _parse_args() -> argparse.Namespace:
     """Parse explicit source and destination paths; no implicit cache is used."""
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--buildings", required=True, type=Path)
-    parser.add_argument("--named-buildings", required=True, type=Path)
-    parser.add_argument("--orthophoto", required=True, type=Path)
-    parser.add_argument("--output-map", required=True, type=Path)
+    parser.add_argument("--runtime-package", type=Path, help="Generate previews from the actual prepared runtime package")
+    parser.add_argument("--buildings", type=Path)
+    parser.add_argument("--named-buildings", type=Path)
+    parser.add_argument("--orthophoto", type=Path)
+    parser.add_argument("--output-map", type=Path)
     parser.add_argument("--output-frontend-geometry", required=True, type=Path)
     parser.add_argument("--output-preview", required=True, type=Path)
-    return parser.parse_args()
+    args = parser.parse_args()
+    if not args.runtime_package and not all((args.buildings, args.named_buildings, args.orthophoto, args.output_map)):
+        parser.error("Source generation requires buildings, named buildings, orthophoto and output map")
+    return args
 
 
 def _sha256(path: Path) -> str:
@@ -605,7 +611,7 @@ def _semantic(
             "building_visuals": "city-footprint-extrusions",
             "building_collisions": "conservative-oriented-boxes",
             "interior_geometry": False,
-            "qualified_routes": 1,
+            "qualified_routes": 0,
         },
         "entities": entities,
         # The qualification planner reads the same conservative boxes that
@@ -813,10 +819,83 @@ def _preview(
     result.resize((800, 450), Image.Resampling.LANCZOS).save(output, "WEBP", quality=90, method=6)
 
 
+def export_runtime_preview(package: Path, geometry_path: Path, preview_path: Path) -> dict:
+    """Derive the catalog scene from the same prepared assets used by simulation."""
+    metadata = json.loads((Path(__file__).parent / "data/kumpula-building-metadata.json").read_text(encoding="utf-8"))
+    with zipfile.ZipFile(package) as archive:
+        manifest = json.loads(archive.read("manifest.json"))
+        files = {entry["path"]: entry for entry in manifest["files"]}
+        def read(name):
+            value = archive.read(name)
+            if hashlib.sha256(value).hexdigest() != files[name]["sha256"]:
+                raise ValueError(f"Package content does not match manifest: {name}")
+            return value
+        prefix = "normalized/map/gazebo/"
+        semantic = json.loads(read(prefix + "semantic.json"))
+        evidence = json.loads(read(prefix + "building-extent-evidence.json"))
+        footprints = []
+        for uri in evidence["visual_mesh_resources"]:
+            vertices, groups, group = [], {}, None
+            for line in read(prefix + uri).decode().splitlines():
+                if line.startswith("g "):
+                    group = line[2:]
+                    groups[group] = {"caps": [], "z": []}
+                elif line.startswith("v "):
+                    vertices.append(tuple(map(float, line.split()[1:4])))
+                elif line.startswith("f "):
+                    points = [vertices[int(v.split('/')[0])-1] for v in line.split()[1:]]
+                    groups[group]["z"].extend(p[2] for p in points)
+                    if max(p[2] for p in points)-min(p[2] for p in points) < 1e-8:
+                        groups[group]["caps"].append(Polygon([(p[0], p[1]) for p in points]))
+            for identifier, data in groups.items():
+                outline = unary_union(data["caps"])
+                if not isinstance(outline, Polygon):
+                    raise ValueError(f"Building group has disconnected geometry: {identifier}")
+                footprints.append({"building_id": identifier, "semantic": "building",
+                    "height_m": max(data["z"])-min(data["z"]), "base_z_m": min(data["z"]),
+                    "points": list(outline.exterior.coords)[:-1],
+                    "holes": [list(r.coords)[:-1] for r in outline.interiors],
+                    **metadata.get(identifier, {"name": identifier, "name_zh": identifier,
+                                               "function": "Building", "function_zh": "建筑"})})
+        expected = {b["id"] for b in evidence["buildings"]}
+        if {b["building_id"] for b in footprints} != expected:
+            raise ValueError("Preview and runtime building identities differ")
+        canopy_heights = {p["id"]: p for batch in semantic.get("canopy_collision_meshes", [])
+                          for mesh in batch["meshes"] for p in mesh["footprints"]}
+        vegetation = []
+        for exclusion in semantic["traversability"]["exclusions"]:
+            info = canopy_heights.get(exclusion["id"])
+            if info:
+                vegetation.append({"points": exclusion["polygon_xy_m"], "holes": exclusion.get("holes_xy_m", []),
+                    "height_m": info["illustration_top_z_m"]-info["ground_z_m"], "base_z_m": info["ground_z_m"]})
+        x0, y0, x1, y1 = semantic["extent_enu_m"]
+        graph = json.loads(read("normalized/map/navigation-graph.json"))
+        geometry = {"schema_version": "dronedream.catalog-map-geometry.v1",
+            "source_content_sha256": manifest["content_sha256"],
+            "metadata": {"bounds_m": semantic["bounds_m"], "coordinate_frame": "ENU",
+                         "resolution_m": (x1-x0)/semantic["live_map"]["width_px"],
+                         "building_count": len(footprints), "source": "City of Helsinki · HSY"},
+            "building_footprints": footprints, "vegetation_footprints": vegetation,
+            "primitives": [{"center_x": (x0+x1)/2, "center_y": (y0+y1)/2, "center_z": -.1,
+                            "size_x": x1-x0, "size_y": y1-y0, "size_z": .2, "yaw_rad": 0., "semantic": "terrain"},
+                           *[p for p in semantic["collision_primitives"] if p.get("semantic") not in {"building", "terrain"}]],
+            "nodes": graph["nodes"], "edges": graph["edges"],
+            "texture_url": "asset-previews/maps/kumpula-campus-source.jpg"}
+        _write_text(geometry_path, json.dumps(geometry, ensure_ascii=False, separators=(",", ":")) + "\n")
+        photo = Image.open(io.BytesIO(read(semantic["live_map"]["image_path"]))).convert("RGB")
+        preview_path.parent.mkdir(parents=True, exist_ok=True)
+        photo.save(preview_path.with_name("kumpula-campus-source.jpg"), "JPEG", quality=95)
+        photo.resize((800, 450), Image.Resampling.LANCZOS).save(preview_path, "WEBP", quality=90)
+        return {"buildings": len(footprints), "vegetation": len(vegetation), "nodes": len(graph["nodes"])}
+
+
 def main() -> None:
     """Generate every runtime/UI artifact and fail on unsafe route endpoints."""
 
     args = _parse_args()
+    if args.runtime_package:
+        print(json.dumps(export_runtime_preview(args.runtime_package, args.output_frontend_geometry, args.output_preview)))
+        return
     buildings = _load_buildings(args.buildings, args.named_buildings)
     named_positions = _named_positions(args.named_buildings)
     for x, y, _z, phase, _speed in ROUTE:
@@ -911,7 +990,7 @@ def main() -> None:
                 "building_visuals": "city-footprint-extrusions",
                 "building_collisions": "conservative-oriented-boxes",
                 "interior_geometry": False,
-                "qualified_routes": 1,
+                "qualified_routes": 0,
             },
             "sources": sources,
         },
@@ -926,7 +1005,8 @@ Building names are cross-checked against the University of Helsinki campus list
 and OpenStreetMap contributors (ODbL 1.0). This is an exterior-only map: it does
 not claim rooms, doors, furniture, trees, terrain relief, or photorealistic
 facades. Collision boxes are conservative proxies around the footprint-extruded
-visual meshes; the outdoor mission route is verified against those proxies.
+visual meshes. Generated routes require independent geometry and physical
+qualification against this exact package before execution.
 """,
     )
     _write_json(args.output_frontend_geometry, _frontend_geometry(buildings))

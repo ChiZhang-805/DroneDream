@@ -295,15 +295,29 @@ fn launch(app: &AppHandle) -> Result<(AgentCoreInfo, CommandChild), String> {
         .map_err(|error| format!("Unable to start the AGENT Core sidecar: {error}"))?;
     let terminated = Arc::new(AtomicBool::new(false));
     let receiver_terminated = Arc::clone(&terminated);
+    let startup_output = Arc::new(Mutex::new(Vec::new()));
+    let receiver_output = Arc::clone(&startup_output);
     tauri::async_runtime::spawn(async move {
         while let Some(event) = receiver.recv().await {
-            if matches!(event, CommandEvent::Terminated(_)) {
-                receiver_terminated.store(true, Ordering::Release);
-                break;
+            match event {
+                CommandEvent::Stderr(bytes) => {
+                    let mut output = receiver_output.lock().unwrap();
+                    output.extend_from_slice(&bytes);
+                    output.push(b'\n');
+                    let excess = output.len().saturating_sub(64 * 1024);
+                    output.drain(..excess);
+                }
+                CommandEvent::Terminated(_) => {
+                    receiver_terminated.store(true, Ordering::Release);
+                    break;
+                }
+                _ => {}
             }
         }
     });
     if let Err(error) = wait_until_ready(port, &terminated) {
+        let output = startup_output.lock().unwrap();
+        let _ = fs::write(data_root.join("startup-error.log"), &*output);
         let _ = child.kill();
         return Err(error);
     }
@@ -323,6 +337,9 @@ fn launch_with_retry(app: &AppHandle) -> Result<(AgentCoreInfo, CommandChild), S
             Ok(result) => return Ok(result),
             Err(error) => {
                 eprintln!("AGENT Core startup attempt {attempt} failed: {error}");
+                if let Ok(root) = app.path().app_local_data_dir() {
+                    let _ = fs::write(root.join("agent-core/startup-launch-error.log"), &error);
+                }
                 last_error = Some(error);
             }
         }

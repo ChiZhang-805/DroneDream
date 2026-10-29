@@ -7,7 +7,7 @@ use std::sync::{
 };
 use std::time::Duration;
 use tauri::{Emitter, Manager};
-use tauri_plugin_updater::{Error as UpdaterError, UpdaterExt};
+use tauri_plugin_updater::{Error as UpdaterError, Update, UpdaterExt};
 
 const BUILD_NUMBER_PREFIX: &str = "build-number: ";
 const EDITION_ID_PREFIX: &str = "edition-id: ";
@@ -21,6 +21,7 @@ const LEGACY_RUNTIME_IDLE_PROBE_UNAVAILABLE: &str =
 pub(crate) struct AppUpdateCoordinator {
     running: AtomicBool,
     progress: Mutex<Option<AppUpdateProgress>>,
+    prepared: Mutex<Option<(Update, Vec<u8>)>>,
 }
 
 struct AppUpdateGuard<'a>(&'a AtomicBool);
@@ -111,15 +112,21 @@ fn ensure_update_idle_allowing_legacy_runtime() -> Result<(), String> {
 pub(crate) async fn download_install_app_update(
     app: tauri::AppHandle,
     coordinator: tauri::State<'_, AppUpdateCoordinator>,
+    install: Option<bool>,
 ) -> Result<(), String> {
     coordinator
         .running
         .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
         .map_err(|_| "An application update is already in progress.".to_string())?;
     let _guard = AppUpdateGuard(&coordinator.running);
+    let install = install.unwrap_or(true);
+    let prepared = coordinator.prepared.lock().map_err(|e| e.to_string())?.is_some();
+    if prepared {
+        if !install { return Ok(()); }
+        return install_prepared_update(&app, &coordinator).await;
+    }
 
     coordinator.publish(&app, "preflight", 0, 0);
-    ensure_update_idle_allowing_legacy_runtime()?;
     coordinator.publish(&app, "preflight", 5, 0);
 
     let updater = app
@@ -172,15 +179,32 @@ pub(crate) async fn download_install_app_update(
         }
     };
 
-    // A task could have started while the update downloaded. Re-check the
-    // native Runtime lease immediately before any process is stopped.
+    // The updater has verified the signature. Keep the bytes native-owned;
+    // downloading must never stop a mission or close the user's workspace.
+    *coordinator.prepared.lock().map_err(|e| e.to_string())? = Some((update, bytes));
+    coordinator.publish(&app, "ready", 100, attempt);
+    if !install { return Ok(()); }
+    install_prepared_update(&app, &coordinator).await
+}
+
+async fn install_prepared_update(
+    app: &tauri::AppHandle,
+    coordinator: &AppUpdateCoordinator,
+) -> Result<(), String> {
     ensure_update_idle_allowing_legacy_runtime()?;
-    coordinator.publish(&app, "installing", 100, attempt);
-    crate::runtime_keepalive::stop_runtime_for_exit(app.clone(), app.state()).await?;
-    update
-        .install(bytes)
-        .map_err(|error| format!("Signed update installation failed: {error}"))?;
-    coordinator.publish(&app, "restarting", 100, attempt);
+    coordinator.publish(app, "installing", 100, 0);
+    if let Err(error) = crate::runtime_keepalive::stop_runtime_for_exit(app.clone(), app.state()).await {
+        coordinator.publish(app, "ready", 100, 0);
+        return Err(error);
+    }
+    let (update, bytes) = coordinator.prepared.lock().map_err(|e| e.to_string())?
+        .take().ok_or_else(|| "No verified update is ready to install.".to_string())?;
+    if let Err(error) = update.install(&bytes) {
+        *coordinator.prepared.lock().map_err(|e| e.to_string())? = Some((update, bytes));
+        coordinator.publish(app, "ready", 100, 0);
+        return Err(format!("Signed update installation failed: {error}"));
+    }
+    coordinator.publish(app, "restarting", 100, 0);
     app.restart();
 }
 

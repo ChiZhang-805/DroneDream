@@ -24,6 +24,7 @@ export type AppUpdateStatus =
   | "checking"
   | "current"
   | "available"
+  | "ready"
   | "downloading"
   | "installing"
   | "reconcilingEngine"
@@ -223,11 +224,11 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
   ));
 
   const applyNativeAppUpdateProgress = useCallback((event: NativeAppUpdateProgress) => {
-    installInFlightRef.current = true;
+    installInFlightRef.current = event.phase !== "ready";
     const installing = event.phase === "installing" || event.phase === "restarting";
     setState((current) => ({
       ...current,
-      status: installing ? "installing" : "downloading",
+      status: event.phase === "ready" ? "ready" : installing ? "installing" : "downloading",
       progress: Math.max(current.progress ?? 0, event.progress),
       error: null,
       blockedActivity: null,
@@ -238,8 +239,7 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
     if (!desktopRuntime || import.meta.env.MODE === "test") return false;
     try {
       const snapshot = await getAppUpdateProgress();
-      if (!snapshot.running) return false;
-      installInFlightRef.current = true;
+      if (!snapshot.running && snapshot.progress?.phase !== "ready") return false;
       if (snapshot.progress) applyNativeAppUpdateProgress(snapshot.progress);
       return true;
     } catch {
@@ -508,17 +508,26 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
         componentUpdates: null,
         blockedActivity: null,
       });
+      installInFlightRef.current = true;
+      try {
+        await installAppUpdateInBackground(applyNativeAppUpdateProgress, false);
+        setState((current) => ({ ...current, status: "ready", progress: 100 }));
+      } catch (error) {
+        setState((current) => ({ ...current, status: "available", progress: null, error: errorMessage(error) }));
+      } finally {
+        installInFlightRef.current = false;
+      }
     } catch {
       // Scheduled checks are deliberately invisible. The next six-hour poll,
       // an explicit settings check, or the next authenticated launch retries.
     }
-  }, [desktopRuntime, enabled, restoreNativeAppUpdate]);
+  }, [applyNativeAppUpdateProgress, desktopRuntime, enabled, restoreNativeAppUpdate]);
 
   const installAvailableUpdate = useCallback(async () => {
     const update = updateRef.current;
     if (
-      !update
-      || state.status !== "available"
+      (!update && state.status !== "ready")
+      || !["available", "ready"].includes(state.status)
       || installInFlightRef.current
     ) return;
     installInFlightRef.current = true;

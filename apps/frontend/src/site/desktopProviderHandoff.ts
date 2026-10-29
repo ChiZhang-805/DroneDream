@@ -87,6 +87,10 @@ export function markDesktopProviderRedirect(authorizationId: string, provider: D
 }
 
 /** Consume only after the SDK publishes an authenticated account on OAuth return. */
+export function hasDesktopProviderReturn(authorizationId: string, now = Date.now()): boolean {
+  return readFresh(RETURN_KEY, now)?.authorizationId === authorizationId;
+}
+
 export function consumeDesktopProviderReturn(authorizationId: string, now = Date.now()): boolean {
   const value = readFresh(RETURN_KEY, now);
   if (value?.authorizationId !== authorizationId) return false;
@@ -96,4 +100,16 @@ export function consumeDesktopProviderReturn(authorizationId: string, now = Date
 
 export function clearDesktopProviderReturn(): void {
   try { window.sessionStorage.removeItem(RETURN_KEY); } catch { /* No persisted continuation. */ }
+}
+
+/** Report cancellation in the desktop first screen instead of opening a web login. */
+export function desktopProviderFailureCallback(search = window.location.search): string | null {
+  const params = new URLSearchParams(search);
+  const callback = params.get("desktop_callback") ?? "";
+  const state = params.get("desktop_state") ?? "";
+  if (!isAllowedDesktopRedirectUri(callback) || !/^[a-f0-9]{64}$/u.test(state)) return null;
+  const target = new URL(callback);
+  target.searchParams.set("error", "access_denied");
+  target.searchParams.set("state", state);
+  return target.toString();
 }

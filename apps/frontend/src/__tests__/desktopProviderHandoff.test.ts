@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   clearDesktopProviderReturn,
+  desktopProviderFailureCallback,
   consumeDesktopProviderReturn,
   hasDesktopProviderHandoff,
   markDesktopProviderRedirect,
@@ -39,6 +40,17 @@ function entryUrl(authorize = authorizeUrl(), provider = "google") {
 }
 
 describe("desktop social provider handoff", () => {
+  it("returns cancellation only to a registered desktop callback with the original state", () => {
+    const params = new URLSearchParams({
+      desktop_callback: "http://127.0.0.1:49214/desktop-auth/autonomy/callback",
+      desktop_state: "a".repeat(64),
+    });
+    const result = new URL(desktopProviderFailureCallback(params.toString())!);
+    expect(result.searchParams.get("error")).toBe("access_denied");
+    expect(result.searchParams.get("state")).toBe("a".repeat(64));
+    params.set("desktop_callback", "https://example.com/callback");
+    expect(desktopProviderFailureCallback(params.toString())).toBeNull();
+  });
   beforeEach(() => {
     window.sessionStorage.clear();
     window.localStorage.clear();

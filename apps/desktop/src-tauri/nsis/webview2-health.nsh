@@ -173,9 +173,11 @@
   ; handoff gate has succeeded, then let the install section recreate only the
   ; files present in the current signed package. User data and the separately
   ; managed DroneDreamRuntime installation are outside this directory.
-  !if "${DRONEDREAM_EDITION_ID}" == "autonomy"
+  ; All five editions bundle Agent Core. Leaving this cleanup exclusive to
+  ; AGENT retains obsolete wheels after Universal/SIM/LAB/FIELD upgrades.
+  ${If} ${FileExists} "$INSTDIR\agent-core\agent-core-stage.json"
     RMDir /r "$INSTDIR\agent-core"
-  !endif
+  ${EndIf}
 
   Pop $1
   Pop $0

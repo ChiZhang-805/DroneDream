@@ -3,13 +3,15 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 
 import type { CatalogAssetKind } from "./assetPresentation";
-import { createMyDroneModel } from "./myDroneModel";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 
 type Props = {
   kind: CatalogAssetKind;
   previewKey: string | null;
   name: string;
   chinese: boolean;
+  onMapMetadata?: (metadata: CatalogMapMetadata | null) => void;
+  onVehicleMetadata?: (metadata: CatalogVehicleMetadata | null) => void;
   onBuildingSelect?: (building: CatalogBuildingSelection | null) => void;
 };
 
@@ -38,7 +40,9 @@ type CatalogGraphEdge = {
 type CatalogBuildingFootprint = {
   building_id: string;
   height_m: number;
+  base_z_m?: number;
   points: [number, number][];
+  holes?: [number, number][][];
   semantic: "building";
   name: string;
   name_zh: string;
@@ -58,103 +62,42 @@ type CatalogVehiclePartSelection = {
   function_zh: string;
 };
 
-const VEHICLE_PARTS: Record<string, CatalogVehiclePartSelection> = {
-  "frame-plate": { number: "001", name: "Carbon-fibre frame", name_zh: "碳纤维机架", function: "Carries the flight electronics and transfers loads between all four arms.", function_zh: "承载飞控与电源系统，并在四个机臂之间传递载荷。" },
-  "carbon-arm": { number: "002", name: "Carbon-fibre arm", name_zh: "碳纤维机臂", function: "Positions each motor on the 500 mm wheelbase while keeping the frame light and rigid.", function_zh: "在 500 毫米轴距上定位电机，同时保持机架轻量和刚性。" },
-  motor: { number: "003", name: "2216 motor", name_zh: "2216 电机", function: "Drives a 10-inch propeller to generate lift and attitude control.", function_zh: "驱动 10 英寸螺旋桨，提供升力和姿态控制。" },
-  "motor-cap": { number: "003", name: "2216 motor", name_zh: "2216 电机", function: "Drives a 10-inch propeller to generate lift and attitude control.", function_zh: "驱动 10 英寸螺旋桨，提供升力和姿态控制。" },
-  "propeller-blade": { number: "004", name: "1045 propeller", name_zh: "1045 螺旋桨", function: "Converts motor torque into lift for takeoff, cruise and landing.", function_zh: "把电机扭矩转换为起飞、巡航和降落所需的升力。" },
-  "flight-controller": { number: "005", name: "Pixhawk flight controller", name_zh: "Pixhawk 飞控", function: "Fuses sensor data and executes the PX4 flight-control loop.", function_zh: "融合传感器数据并执行 PX4 飞行控制回路。" },
-  gnss: { number: "006", name: "M10 GNSS", name_zh: "M10 卫星定位模块", function: "Provides global position, velocity and time for outdoor navigation.", function_zh: "为室外导航提供全球位置、速度与时间信息。" },
-  battery: { number: "007", name: "4S flight battery", name_zh: "4S 飞行电池", function: "Supplies propulsion and avionics power through the power distribution board.", function_zh: "通过配电板为动力系统和航电设备供电。" },
-  "landing-gear": { number: "008", name: "Carbon landing gear", name_zh: "碳纤维起落架", function: "Keeps the airframe and payload clear of the ground during takeoff and landing.", function_zh: "在起降时让机身和任务载荷与地面保持安全间距。" },
-  "depth-camera": { number: "009", name: "Depth camera", name_zh: "深度相机", function: "Measures scene depth for obstacle awareness and local navigation.", function_zh: "测量场景深度，用于障碍感知和局部导航。" },
+export type CatalogVehicleMetadata = {
+  model: string;
+  source_revision: string;
+  mass_kg: number;
+  size_m: [number, number, number];
+};
+
+export type CatalogMapMetadata = {
+  bounds_m: { x: number; y: number; z: number };
+  coordinate_frame: string;
+  resolution_m: number;
+  building_count: number;
+  source: string;
 };
 
 type CatalogMapGeometry = {
   schema_version: "dronedream.catalog-map-geometry.v1";
+  metadata?: CatalogMapMetadata;
   building_footprints?: CatalogBuildingFootprint[];
+  vegetation_footprints?: Array<{ points: [number, number][]; holes?: [number, number][][]; height_m: number; base_z_m?: number }>;
   primitives: CatalogCollisionPrimitive[];
   nodes: CatalogGraphNode[];
   edges: CatalogGraphEdge[];
   texture_url?: string;
 };
 
-function disposeScene(scene: THREE.Scene): void {
+function disposeScene(scene: THREE.Object3D): void {
   scene.traverse((object) => {
     if (!(object instanceof THREE.Mesh) && !(object instanceof THREE.Line) && !(object instanceof THREE.Sprite)) return;
     if (object instanceof THREE.Mesh || object instanceof THREE.Line) object.geometry.dispose();
     const materials = Array.isArray(object.material) ? object.material : [object.material];
     materials.forEach((material) => {
-      if ("map" in material && material.map instanceof THREE.Texture) material.map.dispose();
+      Object.values(material).forEach((value) => { if (value instanceof THREE.Texture) value.dispose(); });
       material.dispose();
     });
   });
-}
-
-function block(
-  width: number,
-  height: number,
-  depth: number,
-  x: number,
-  y: number,
-  z: number,
-  color: number,
-): THREE.Mesh {
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(width, height, depth),
-    new THREE.MeshStandardMaterial({ color, roughness: 0.74, metalness: 0.05 }),
-  );
-  mesh.position.set(x, y + height / 2, z);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  return mesh;
-}
-
-function aircraftRotor(x: number, y: number, z: number, radius = 0.54): THREE.Group {
-  const rotor = new THREE.Group();
-  const motor = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.13, 0.16, 0.28, 20),
-    new THREE.MeshStandardMaterial({ color: 0x292c35, roughness: 0.48, metalness: 0.34 }),
-  );
-  const propeller = new THREE.Mesh(
-    new THREE.BoxGeometry(radius * 2, 0.035, 0.1),
-    new THREE.MeshStandardMaterial({ color: 0x20232a, roughness: 0.38, metalness: 0.18 }),
-  );
-  motor.position.y = 0.05;
-  propeller.position.y = 0.23;
-  rotor.add(motor, propeller);
-  rotor.position.set(x, y, z);
-  return rotor;
-}
-
-function vtolModel(kind: "standard-vtol" | "tiltrotor" | "quadtailsitter"): THREE.Group {
-  const aircraft = new THREE.Group();
-  const wingColor = kind === "quadtailsitter" ? 0xbcc5d2 : 0xcbd1da;
-  const wing = block(kind === "quadtailsitter" ? 4.4 : 6.4, 0.16, kind === "quadtailsitter" ? 1.35 : 1.7, 0, 0, 0, wingColor);
-  const body = block(2.8, 0.46, 0.58, 0, 0.05, 0, 0x444b58);
-  aircraft.add(wing, body);
-  if (kind === "quadtailsitter") {
-    const fin = block(0.18, 1.55, 0.9, -1.0, 0.15, 0, 0x8f9aaa);
-    aircraft.add(fin);
-    aircraft.add(
-      aircraftRotor(-1.45, 0.2, -0.82, 0.72),
-      aircraftRotor(-1.45, 0.2, 0.82, 0.72),
-      aircraftRotor(1.45, 0.2, -0.82, 0.72),
-      aircraftRotor(1.45, 0.2, 0.82, 0.72),
-    );
-  } else {
-    const tail = block(1.45, 0.12, 0.62, -2.2, 0.12, 0, 0xaeb7c5);
-    aircraft.add(tail);
-    const rotorX = kind === "tiltrotor" ? 2.35 : 1.75;
-    aircraft.add(
-      aircraftRotor(-rotorX, 0.2, -0.72),
-      aircraftRotor(-rotorX, 0.2, 0.72),
-      aircraftRotor(rotorX, 0.2, -0.72),
-      aircraftRotor(rotorX, 0.2, 0.72),
-    );
-  }
-  return aircraft;
 }
 
 function catalogMapUrl(previewKey: string): string {
@@ -230,6 +173,15 @@ function catalogMapModel(geometry: CatalogMapGeometry): { root: THREE.Group; bui
       else shape.lineTo(x, y);
     });
     shape.closePath();
+    for (const ring of footprint.holes ?? []) {
+      const hole = new THREE.Path();
+      ring.forEach(([x, y], index) => {
+        if (index === 0) hole.moveTo(x, y);
+        else hole.lineTo(x, y);
+      });
+      hole.closePath();
+      shape.holes.push(hole);
+    }
     const buildingGeometry = new THREE.ExtrudeGeometry(shape, {
       depth: footprint.height_m,
       bevelEnabled: false,
@@ -245,6 +197,7 @@ function catalogMapModel(geometry: CatalogMapGeometry): { root: THREE.Group; bui
       metalness: 0.03,
       emissive: 0x000000,
     }));
+    building.position.y = footprint.base_z_m ?? 0;
     building.name = footprint.building_id;
     building.userData.catalogBuilding = {
       building_id: footprint.building_id,
@@ -258,6 +211,23 @@ function catalogMapModel(geometry: CatalogMapGeometry): { root: THREE.Group; bui
     building.receiveShadow = true;
     root.add(building);
     buildings.push(building);
+  }
+
+  const canopyMaterial = new THREE.MeshStandardMaterial({ color: 0x335c26, roughness: 1, metalness: 0 });
+  for (const footprint of geometry.vegetation_footprints ?? []) {
+    const shape = new THREE.Shape(footprint.points.map(([x, y]) => new THREE.Vector2(x, y)));
+    for (const ring of footprint.holes ?? []) {
+      shape.holes.push(new THREE.Path(ring.map(([x, y]) => new THREE.Vector2(x, y))));
+    }
+    const canopyGeometry = new THREE.ExtrudeGeometry(shape, {
+      depth: footprint.height_m, bevelEnabled: false, curveSegments: 1, steps: 1,
+    });
+    canopyGeometry.rotateX(-Math.PI / 2);
+    const canopy = new THREE.Mesh(canopyGeometry, canopyMaterial);
+    canopy.position.y = footprint.base_z_m ?? 0;
+    canopy.castShadow = true;
+    canopy.receiveShadow = true;
+    root.add(canopy);
   }
 
   const nodeById = new Map(geometry.nodes.map((node) => [node.node_id, node]));
@@ -285,9 +255,33 @@ function catalogMapModel(geometry: CatalogMapGeometry): { root: THREE.Group; bui
   }
 
   const bounds = new THREE.Box3().setFromObject(root);
+  const terrain = geometry.primitives.find((primitive) => primitive.semantic === "terrain");
+  if (terrain) {
+    bounds.min.x = terrain.center_x - terrain.size_x / 2;
+    bounds.max.x = terrain.center_x + terrain.size_x / 2;
+    bounds.min.z = -terrain.center_y - terrain.size_y / 2;
+    bounds.max.z = -terrain.center_y + terrain.size_y / 2;
+  }
   if (!bounds.isEmpty()) {
     const center = bounds.getCenter(new THREE.Vector3());
     root.position.set(-center.x, -bounds.min.y, -center.z);
+    const displayedBounds = bounds.clone().translate(root.position);
+    root.userData.displayedBounds = displayedBounds;
+    if (terrain) {
+      // Clip the view at the registered map boundary, keeping complete source
+      // buildings and their runtime collision geometry intact.
+      const planes = [
+        new THREE.Plane(new THREE.Vector3(1, 0, 0), -displayedBounds.min.x),
+        new THREE.Plane(new THREE.Vector3(-1, 0, 0), displayedBounds.max.x),
+        new THREE.Plane(new THREE.Vector3(0, 0, 1), -displayedBounds.min.z),
+        new THREE.Plane(new THREE.Vector3(0, 0, -1), displayedBounds.max.z),
+      ];
+      root.traverse((object) => {
+        if (!(object instanceof THREE.Mesh) && !(object instanceof THREE.Line)) return;
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        materials.forEach((material) => { material.clippingPlanes = planes; material.clipShadows = true; });
+      });
+    }
   }
   return { root, buildings };
 }
@@ -298,7 +292,7 @@ function fitCameraToModel(
   model: THREE.Object3D,
   padding = 1.12,
 ): void {
-  const bounds = new THREE.Box3().setFromObject(model);
+  const bounds: THREE.Box3 = model.userData.displayedBounds ?? new THREE.Box3().setFromObject(model);
   if (bounds.isEmpty()) return;
   const center = bounds.getCenter(new THREE.Vector3());
   const radius = bounds.getBoundingSphere(new THREE.Sphere()).radius;
@@ -317,38 +311,16 @@ function fitCameraToModel(
   controls.update();
 }
 
-function vehicleModel(key: string | null): THREE.Group {
-  const normalized = key ?? "";
-  if (normalized.includes("quadtailsitter")) return vtolModel("quadtailsitter");
-  if (normalized.includes("tiltrotor")) return vtolModel("tiltrotor");
-  if (normalized.includes("standard-vtol")) return vtolModel("standard-vtol");
-  const drone = createMyDroneModel();
-  if (normalized.includes("gimbal")) {
-    const camera = new THREE.Mesh(
-      new THREE.SphereGeometry(0.32, 20, 14),
-      new THREE.MeshStandardMaterial({ color: 0x242934, metalness: 0.35, roughness: 0.4 }),
-    );
-    camera.position.set(0, -0.55, 0.28);
-    drone.add(camera);
-  }
-  if (normalized.includes("lidar-front")) {
-    const lidar = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.18, 0.18, 0.32, 24),
-      new THREE.MeshStandardMaterial({ color: 0x1f2530, metalness: 0.26, roughness: 0.42 }),
-    );
-    lidar.rotation.z = Math.PI / 2;
-    lidar.position.set(0.62, -0.2, 0);
-    drone.add(lidar);
-  }
-  return drone;
-}
-
-export function RepositoryAsset3DView({ kind, previewKey, name, chinese, onBuildingSelect }: Props) {
+export function RepositoryAsset3DView({ kind, previewKey, name, chinese, onBuildingSelect, onMapMetadata, onVehicleMetadata }: Props) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedVehiclePart, setSelectedVehiclePart] = useState<CatalogVehiclePartSelection | null>(null);
   const onBuildingSelectRef = useRef(onBuildingSelect);
+  const onMapMetadataRef = useRef(onMapMetadata);
+  onMapMetadataRef.current = onMapMetadata;
+  const onVehicleMetadataRef = useRef(onVehicleMetadata);
+  onVehicleMetadataRef.current = onVehicleMetadata;
 
   useEffect(() => {
     onBuildingSelectRef.current = onBuildingSelect;
@@ -358,8 +330,11 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese, onBuild
     const mount = mountRef.current;
     if (!mount) return undefined;
     if (navigator.userAgent.toLocaleLowerCase("en-US").includes("jsdom")) return undefined;
+    onMapMetadataRef.current?.(null);
+    onVehicleMetadataRef.current?.(null);
     setUnavailable(false);
     setLoading(false);
+    setSelectedVehiclePart(null);
     let cancelled = false;
     let renderer: THREE.WebGLRenderer;
     try {
@@ -372,6 +347,7 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese, onBuild
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.02;
     renderer.shadowMap.enabled = true;
+    renderer.localClippingEnabled = true;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75));
     mount.appendChild(renderer.domElement);
     onBuildingSelectRef.current?.(null);
@@ -422,7 +398,7 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese, onBuild
     const vehiclePartForObject = (object: THREE.Object3D): CatalogVehiclePartSelection | undefined => {
       let candidate: THREE.Object3D | null = object;
       while (candidate) {
-        const part = VEHICLE_PARTS[String(candidate.userData.semanticKind ?? "")];
+        const part = candidate.userData.catalogVehiclePart as CatalogVehiclePartSelection | undefined;
         if (part) return part;
         candidate = candidate.parent;
       }
@@ -464,7 +440,10 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese, onBuild
       raycaster.setFromCamera(pointer, camera);
       const intersections = raycaster.intersectObjects(modelRoot.children, true);
       if (kind === "map") {
-        const hit = intersections.find((intersection) => Boolean(intersection.object.userData.catalogBuilding));
+        const bounds: THREE.Box3 | undefined = modelRoot.userData.displayedBounds;
+        const hit = intersections.find((intersection) => Boolean(intersection.object.userData.catalogBuilding)
+          && (!bounds || (intersection.point.x >= bounds.min.x && intersection.point.x <= bounds.max.x
+            && intersection.point.z >= bounds.min.z && intersection.point.z <= bounds.max.z)));
         const selection = hit?.object.userData.catalogBuilding as CatalogBuildingSelection | undefined;
         if (selection) selectBuilding(selection);
       } else {
@@ -481,11 +460,29 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese, onBuild
 
     const modelRoot = new THREE.Group();
     scene.add(modelRoot);
-    if (kind === "vehicle") {
-      const model = vehicleModel(previewKey);
-      model.scale.setScalar(2.4);
-      modelRoot.add(model);
-      fitCameraToModel(camera, controls, modelRoot, 0.82);
+    if (kind === "vehicle" && previewKey) {
+      setLoading(true);
+      const base = import.meta.env.BASE_URL.endsWith("/") ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
+      void new GLTFLoader().loadAsync(`${base}asset-geometry/vehicles/${encodeURIComponent(previewKey)}.glb`)
+        .then(({ scene: model }) => {
+          if (cancelled) { disposeScene(model); return; }
+          onVehicleMetadataRef.current?.(model.userData.catalogVehicle ?? null);
+          model.traverse((object) => {
+            if (!(object instanceof THREE.Mesh)) return;
+            // glTF mesh extras contain source SDF part names, not invented hardware labels.
+            if (!object.userData.catalogVehiclePart) {
+              object.userData.catalogVehiclePart = object.geometry.userData.catalogVehiclePart;
+            }
+          });
+          modelRoot.add(model);
+          fitCameraToModel(camera, controls, modelRoot, 1.04);
+          setLoading(false);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setLoading(false);
+          setUnavailable(true);
+        });
     } else if (previewKey) {
       setLoading(true);
       void fetch(catalogMapUrl(previewKey))
@@ -495,10 +492,12 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese, onBuild
         })
         .then((geometry) => {
           if (cancelled || geometry.schema_version !== "dronedream.catalog-map-geometry.v1") return;
+          onMapMetadataRef.current?.(geometry.metadata ?? null);
           const model = catalogMapModel(geometry);
           buildings = model.buildings;
           modelRoot.add(model.root);
-          fitCameraToModel(camera, controls, modelRoot, 0.76);
+          modelRoot.userData.displayedBounds = model.root.userData.displayedBounds;
+          fitCameraToModel(camera, controls, modelRoot, 1.04);
           const firstBuilding = buildings[0]?.userData.catalogBuilding as CatalogBuildingSelection | undefined;
           if (firstBuilding) selectBuilding(firstBuilding);
           setLoading(false);
@@ -518,7 +517,7 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese, onBuild
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
-      if (modelRoot.children.length) fitCameraToModel(camera, controls, modelRoot, kind === "map" ? 0.76 : 0.82);
+      if (modelRoot.children.length) fitCameraToModel(camera, controls, modelRoot, 1.04);
     };
     const observer = new ResizeObserver(resize);
     observer.observe(mount);

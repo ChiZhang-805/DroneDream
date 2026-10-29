@@ -3865,6 +3865,7 @@ function AppShellContent() {
   const mobileMenuExpanded = mobileNavigationEnabled && mobileMenuOpen;
   const sidebarUpdateVisible = desktopRuntime && [
     "available",
+    "ready",
     "downloading",
     "installing",
   ].includes(updater.status);
@@ -3908,11 +3909,13 @@ function AppShellContent() {
     : MODE_NAV_ITEMS[universalMode];
   const sidebarUpdateLabel = sidebarUpdateBusy
     ? `${t("updater.sidebarProgress")} ${sidebarUpdateProgress}%`
-    : updater.error
+    : updater.status === "ready"
+      ? t("updater.sidebarRestart")
+      : updater.error
       ? t("updater.sidebarDeferred")
       : t("updater.sidebarAvailable");
   const handleSidebarUpdate = useCallback(() => {
-    if (updater.status === "available") {
+    if (["available", "ready"].includes(updater.status)) {
       void updater.installAvailableUpdate();
     }
   }, [updater]);
@@ -3940,7 +3943,7 @@ function AppShellContent() {
     }
     if (
       updater.status === "checking" ||
-      updater.status === "downloading" ||
+      (updater.status === "downloading" && updater.updateRequired) ||
       updater.status === "installing" ||
       updater.status === "reconcilingEngine" ||
       updater.status === "installingComponents"
@@ -3951,7 +3954,7 @@ function AppShellContent() {
       return;
     }
     if (
-      (updater.status === "available" && updater.updateRequired) ||
+      (["available", "ready"].includes(updater.status) && updater.updateRequired) ||
       ([
         "componentAvailable",
         "componentUpdateDeferred",

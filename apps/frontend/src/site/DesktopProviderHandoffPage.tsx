@@ -22,9 +22,10 @@ export function DesktopProviderHandoffPage({ locale }: { locale: Locale }) {
       setFailed(true);
     }
   }, []);
+  if (!failed) return null;
   const message = locale === "zh-CN"
-    ? failed ? "无法开始本次快捷登录。请返回软件后重试。" : "正在打开安全登录…"
-    : failed ? "This sign-in could not be started. Return to the app and try again." : "Opening secure sign-in…";
+    ? "无法开始本次快捷登录。请返回软件后重试。"
+    : "This sign-in could not be started. Return to the app and try again.";
   return <section className="site-oauth-consent"><div className="site-oauth-card">
     <p role={failed ? "alert" : "status"}>{message}</p>
   </div></section>;

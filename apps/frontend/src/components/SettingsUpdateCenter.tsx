@@ -85,11 +85,13 @@ export function SettingsUpdateCenter({
     actionLabel = t("updater.checking");
     action = null;
     actionDisabled = true;
-  } else if (updater.status === "available") {
+  } else if (updater.status === "available" || updater.status === "ready") {
     stateValue = `${copy.oldVersion}${updater.availableVersion ? ` · v${updater.availableVersion}` : ""}`;
     tone = "attention";
     StatusIcon = Download;
-    actionLabel = localizedError
+    actionLabel = updater.status === "ready"
+      ? t("updater.sidebarRestart")
+      : localizedError
       ? t("settings.updates.retry")
       : t("settings.updates.installApp");
     action = () => { void updater.installAvailableUpdate(); };

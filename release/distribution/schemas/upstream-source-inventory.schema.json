@@ -90,10 +90,11 @@
           "enum": [
             "runtime-bundled",
             "runtime-transitive",
+            "desktop-and-runtime",
             "not-distributed"
           ]
         },
-        "copiedIntoRepository": {"const": false},
+        "copiedIntoRepository": {"type": "boolean"},
         "pin": {
           "type": "object",
           "additionalProperties": false,

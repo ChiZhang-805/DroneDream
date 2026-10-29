@@ -280,11 +280,11 @@ describe("workspace profile photo editor", () => {
   it("supports keyboard and pointer crop adjustments, then uploads exactly once", async () => {
     mockAvatarObjectUrls();
     const drawImage = vi.fn();
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((() => ({
       imageSmoothingEnabled: false,
       imageSmoothingQuality: "low",
       drawImage,
-    } as unknown as CanvasRenderingContext2D);
+    })) as unknown as HTMLCanvasElement["getContext"]);
     vi.spyOn(HTMLCanvasElement.prototype, "toDataURL")
       .mockReturnValue("data:image/jpeg;base64,cropped-avatar");
     window.localStorage.setItem("drone-dream:locale", "en");
@@ -324,9 +324,9 @@ describe("workspace profile photo editor", () => {
 
   it("does not let Escape dismiss the cropper while a confirmed upload is pending", async () => {
     mockAvatarObjectUrls();
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((() => ({
       drawImage: vi.fn(),
-    } as unknown as CanvasRenderingContext2D);
+    })) as unknown as HTMLCanvasElement["getContext"]);
     vi.spyOn(HTMLCanvasElement.prototype, "toDataURL")
       .mockReturnValue("data:image/jpeg;base64,pending-avatar");
     let finishUpload: (() => void) | undefined;
@@ -368,11 +368,11 @@ describe("workspace profile photo editor", () => {
     const translate = vi.fn();
     const scale = vi.fn();
     const drawImage = vi.fn();
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((() => ({
       translate,
       scale,
       drawImage,
-    } as unknown as CanvasRenderingContext2D);
+    })) as unknown as HTMLCanvasElement["getContext"]);
     vi.spyOn(HTMLCanvasElement.prototype, "toBlob").mockImplementation(
       (callback) => callback(new Blob(["camera-frame"], { type: "image/jpeg" })),
     );

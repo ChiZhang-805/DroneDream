@@ -234,10 +234,10 @@ describe("useAppUpdater", () => {
   it("starts only one installer when invoked twice before rerender", async () => {
     const installing = deferred<void>();
     const availableUpdate = update("1.0.2");
-    installAppUpdateInBackgroundMock.mockReturnValue(installing.promise);
+    installAppUpdateInBackgroundMock.mockImplementation((_progress, install = true) => install ? installing.promise : Promise.resolve());
     checkMock.mockResolvedValue(availableUpdate);
     const hook = renderHook(() => useAppUpdater());
-    await waitFor(() => expect(hook.result.current.status).toBe("available"));
+    await waitFor(() => expect(hook.result.current.status).toBe("ready"));
 
     let firstInstall!: Promise<void>;
     let secondInstall!: Promise<void>;
@@ -245,15 +245,15 @@ describe("useAppUpdater", () => {
       firstInstall = hook.result.current.installAvailableUpdate();
       secondInstall = hook.result.current.installAvailableUpdate();
     });
-    await waitFor(() => expect(installAppUpdateInBackgroundMock).toHaveBeenCalledOnce());
+    await waitFor(() => expect(installAppUpdateInBackgroundMock).toHaveBeenCalledTimes(2));
 
     installing.resolve();
     await act(async () => Promise.all([firstInstall, secondInstall]));
-    expect(installAppUpdateInBackgroundMock).toHaveBeenCalledOnce();
+    expect(installAppUpdateInBackgroundMock).toHaveBeenCalledTimes(2);
     hook.unmount();
   });
 
-  it("does not download, install, or relaunch while a Runtime experiment is active", async () => {
+  it("downloads silently but does not install or relaunch while a Runtime experiment is active", async () => {
     const availableUpdate = update("1.0.0");
     checkMock.mockResolvedValue(availableUpdate);
     probeRuntimeStatusMock.mockResolvedValue({
@@ -273,11 +273,11 @@ describe("useAppUpdater", () => {
       total: 1,
     });
     const hook = renderHook(() => useAppUpdater());
-    await waitFor(() => expect(hook.result.current.status).toBe("available"));
+    await waitFor(() => expect(hook.result.current.status).toBe("ready"));
 
     await act(async () => hook.result.current.installAvailableUpdate());
 
-    expect(installAppUpdateInBackgroundMock).not.toHaveBeenCalled();
+    expect(installAppUpdateInBackgroundMock).toHaveBeenCalledExactlyOnceWith(expect.any(Function), false);
     expect(stopRuntimeForExitMock).not.toHaveBeenCalled();
     expect(hook.result.current.status).toBe("available");
     expect(hook.result.current.blockedActivity).toMatchObject({
@@ -291,11 +291,11 @@ describe("useAppUpdater", () => {
     const availableUpdate = update("1.0.2");
     checkMock.mockResolvedValue(availableUpdate);
     const hook = renderHook(() => useAppUpdater());
-    await waitFor(() => expect(hook.result.current.status).toBe("available"));
+    await waitFor(() => expect(hook.result.current.status).toBe("ready"));
 
     await act(async () => hook.result.current.installAvailableUpdate());
 
-    expect(installAppUpdateInBackgroundMock).toHaveBeenCalledOnce();
+    expect(installAppUpdateInBackgroundMock).toHaveBeenCalledTimes(2);
     expect(hook.result.current.progress).toBe(100);
     expect(hook.result.current.status).toBe("installing");
     expect(probeRuntimeStatusMock).toHaveBeenCalledOnce();
@@ -316,12 +316,6 @@ describe("useAppUpdater", () => {
       ({ enabled }) => useAppUpdater({ enabled }),
       { initialProps: { enabled: true } },
     );
-    await waitFor(() => expect(hook.result.current.status).toBe("available"));
-
-    let installation!: Promise<void>;
-    act(() => {
-      installation = hook.result.current.installAvailableUpdate();
-    });
     await waitFor(() => expect(hook.result.current.progress).toBe(41));
 
     hook.rerender({ enabled: false });
@@ -330,7 +324,7 @@ describe("useAppUpdater", () => {
     expect(availableUpdate.close).not.toHaveBeenCalled();
 
     nativeUpdate.resolve();
-    await act(async () => installation);
+    await act(async () => { await nativeUpdate.promise; });
     hook.unmount();
   });
 
@@ -411,7 +405,7 @@ describe("useAppUpdater", () => {
     checkMock.mockResolvedValue(availableUpdate);
 
     const hook = renderHook(() => useAppUpdater());
-    await waitFor(() => expect(hook.result.current.status).toBe("available"));
+    await waitFor(() => expect(hook.result.current.status).toBe("ready"));
 
     expect(hook.result.current.enginePack).toBeNull();
     expect(getEnginePackStatusMock).not.toHaveBeenCalled();

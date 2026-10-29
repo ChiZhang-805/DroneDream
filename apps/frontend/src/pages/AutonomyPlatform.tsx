@@ -66,7 +66,7 @@ import {
   clarificationOtherAnswer,
   presentAutonomyClarification,
 } from "../features/autonomy/clarificationPresentation";
-import { RepositoryAsset3DView, type CatalogBuildingSelection } from "../features/autonomy/RepositoryAsset3DView";
+import { RepositoryAsset3DView, type CatalogBuildingSelection, type CatalogMapMetadata, type CatalogVehicleMetadata } from "../features/autonomy/RepositoryAsset3DView";
 import {
   catalogAssetDefinitions,
   catalogAssetKey,
@@ -2806,7 +2806,7 @@ export function AutonomyMaps() {
       [chinese ? "坐标系" : "Coordinates", mapPack.coordinateFrame],
       [chinese ? "分辨率" : "Resolution", `${mapPack.resolutionM} m`],
       [chinese ? "建筑" : "Buildings", String(resource?.analysis.building_count ?? resource?.analysis.model_count ?? "—")],
-      [chinese ? "范围" : "Size", `${mapPack.boundsM.x} × ${mapPack.boundsM.y} × ${mapPack.boundsM.z} m`],
+      [chinese ? "范围" : "Size", `${(resource?.analysis.bounds_m ?? mapPack.boundsM).x} × ${(resource?.analysis.bounds_m ?? mapPack.boundsM).y} × ${(resource?.analysis.bounds_m ?? mapPack.boundsM).z} m`],
       [chinese ? "来源" : "Source", resource?.analysis.source_page ?? (resource?.source.source_type === "bundled_ddpkg" ? "City of Helsinki open data" : resource?.source.source_type ?? "DroneDream")],
     ],
   }), [chinese]);
@@ -2924,6 +2924,21 @@ function RepositoryDetailsDialog({
   onClose: () => void;
 }) {
   const [selectedBuilding, setSelectedBuilding] = useState<CatalogBuildingSelection | null>(null);
+  const [mapMetadata, setMapMetadata] = useState<CatalogMapMetadata | null>(null);
+  const [vehicleMetadata, setVehicleMetadata] = useState<CatalogVehicleMetadata | null>(null);
+  const rows = details.kind === "map" && mapMetadata ? [
+    [chinese ? "类型" : "Type", "Hybrid 3D"],
+    [chinese ? "坐标系" : "Coordinates", mapMetadata.coordinate_frame],
+    [chinese ? "分辨率" : "Resolution", `${Number(mapMetadata.resolution_m.toFixed(3))} m`],
+    [chinese ? "建筑" : "Buildings", String(mapMetadata.building_count)],
+    [chinese ? "范围" : "Size", `${mapMetadata.bounds_m.x} × ${mapMetadata.bounds_m.y} × ${mapMetadata.bounds_m.z} m`],
+    [chinese ? "来源" : "Source", mapMetadata.source],
+  ] : details.kind === "vehicle" && vehicleMetadata ? [
+    ...details.rows.filter(([label]) => !["Dry mass", "空机质量", "Source", "来源"].includes(label)),
+    [chinese ? "空机质量" : "Dry mass", `${Number(vehicleMetadata.mass_kg.toFixed(3))} kg`],
+    [chinese ? "模型尺寸" : "Model size", `${vehicleMetadata.size_m.map(value => Number(value.toFixed(3))).join(" × ")} m`],
+    [chinese ? "来源" : "Source", `PX4 Gazebo Models @ ${vehicleMetadata.source_revision.slice(0, 12)}`],
+  ] : details.rows;
   return (
     <div className="autonomy-repository-dialog-backdrop" role="presentation" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
@@ -2933,7 +2948,7 @@ function RepositoryDetailsDialog({
         <div className="autonomy-repository-dialog-body">
           <div className="autonomy-repository-dialog-copy">
             {details.description ? <p>{details.description}</p> : null}
-            <dl>{details.rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+            <dl>{rows.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
             {details.kind === "map" && selectedBuilding ? <aside
               className="autonomy-repository-building-card"
               aria-live="polite"
@@ -2952,6 +2967,8 @@ function RepositoryDetailsDialog({
             name={details.title}
             chinese={chinese}
             onBuildingSelect={details.kind === "map" ? setSelectedBuilding : undefined}
+            onMapMetadata={details.kind === "map" ? setMapMetadata : undefined}
+            onVehicleMetadata={details.kind === "vehicle" ? setVehicleMetadata : undefined}
           />
         </div>
       </section>

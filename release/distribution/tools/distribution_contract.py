@@ -44,7 +44,7 @@ INTEGRATION_MODES = {
     "external-launch-only",
     "contract-only",
 }
-DISTRIBUTION_MODES = {"runtime-bundled", "runtime-transitive", "not-distributed"}
+DISTRIBUTION_MODES = {"runtime-bundled", "runtime-transitive", "desktop-and-runtime", "not-distributed"}
 PIN_KINDS = {"commit", "tag-and-commit", "apt-version", "oci-digest"}
 VALIDATION_TIERS = {
     "integrated-contract",
@@ -548,8 +548,8 @@ def validate_upstream_source_inventory(document: Any) -> dict[str, Any]:
             raise DistributionContractError(f"{label}.integrationMode is unsupported")
         if source["distributionMode"] not in DISTRIBUTION_MODES:
             raise DistributionContractError(f"{label}.distributionMode is unsupported")
-        if source["copiedIntoRepository"] is not False:
-            raise DistributionContractError(f"{label} cannot claim unreviewed copied source")
+        if not isinstance(source["copiedIntoRepository"], bool):
+            raise DistributionContractError(f"{label}.copiedIntoRepository must be boolean")
         _validate_pin(source["pin"], f"{label}.pin")
         audited_commit = source.get("auditedUpstreamCommit")
         if audited_commit is not None and (

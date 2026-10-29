@@ -9,6 +9,12 @@ const supabasePublishableKey = (
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined
 )?.trim();
 const desktopRuntime = isDesktopRuntime();
+// Capture before the SDK consumes and removes the provider response fragment.
+let providerReturnAccessToken = (() => {
+  if (typeof window === "undefined" || !new URLSearchParams(window.location.search).has("desktop_provider_return")) return null;
+  const response = new URLSearchParams(typeof window === "undefined" ? "" : window.location.hash.slice(1));
+  return response.has("error") ? null : response.get("access_token");
+})();
 export const BROWSER_AUTH_STORAGE_KEY = "dronedream-browser-auth:v1";
 const LEGACY_BROWSER_AUTH_STORAGE_KEY = "undefined";
 
@@ -165,6 +171,20 @@ export const supabaseClient: SupabaseClient | null = cloudAuthConfigured
         },
       }))
   : null;
+
+let providerReturnIdentity: Promise<string | null> | undefined;
+/** A query marker or an old browser session cannot complete a new provider login. */
+export function verifyBrowserProviderReturn(): Promise<string | null> {
+  return providerReturnIdentity ??= (async () => {
+    const responseToken = providerReturnAccessToken;
+    providerReturnAccessToken = null;
+    if (!responseToken || !supabaseClient) return null;
+    const { data, error } = await supabaseClient.auth.getSession();
+    if (error || data.session?.access_token !== responseToken) return null;
+    const verified = await supabaseClient.auth.getUser(responseToken);
+    return verified.error ? null : verified.data.user?.id ?? null;
+  })().catch(() => null);
+}
 
 export const googleAuthEnabled =
   import.meta.env.VITE_AUTH_GOOGLE_ENABLED === "true";

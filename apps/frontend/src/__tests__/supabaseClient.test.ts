@@ -129,3 +129,37 @@ describe("desktop session hydration", () => {
     expect(hasActiveDesktopAuthSession()).toBe(false);
   });
 });
+
+describe("direct browser provider response", () => {
+  afterEach(() => {
+    delete (globalThis as Record<string, unknown>).__droneDreamSupabaseClient;
+    window.history.replaceState(null, "", "/");
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  it.each([
+    ["#access_token=fresh&refresh_token=refresh", "fresh", "pilot-1"],
+    ["#access_token=fresh&refresh_token=refresh", "old-session", null],
+    ["#error=access_denied", "old-session", null],
+    ["", "old-session", null],
+  ])("verifies the returned grant, never a previously stored session (%s)", async (hash, storedToken, expected) => {
+    vi.resetModules();
+    delete window.__TAURI__;
+    vi.stubEnv("VITE_SUPABASE_URL", "https://example.supabase.co");
+    vi.stubEnv("VITE_SUPABASE_PUBLISHABLE_KEY", "public-test-key");
+    window.history.replaceState(null, "", `/oauth/consent?authorization_id=request-123&desktop_provider_return=google${hash}`);
+    const getUser = vi.fn().mockResolvedValue({ data: { user: { id: "pilot-1" } }, error: null });
+    (globalThis as Record<string, unknown>).__droneDreamSupabaseClient = {
+      auth: {
+        getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: storedToken } }, error: null }),
+        getUser,
+      },
+    };
+    const { verifyBrowserProviderReturn } = await import("../features/auth/supabaseClient");
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    expect(await verifyBrowserProviderReturn()).toBe(expected);
+    expect(await verifyBrowserProviderReturn()).toBe(expected);
+    expect(getUser).toHaveBeenCalledTimes(expected ? 1 : 0);
+  });
+});

@@ -45,9 +45,9 @@ describe("FieldRoot", () => {
     fieldAuth.account = { id: "field-pilot" };
     document.documentElement.dataset.brandEdition = "field";
     document.documentElement.style.setProperty("--dd-brand-start", "#ff9f3f");
-    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation(() => ({
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockImplementation((() => ({
       getExtension: () => ({ loseContext: vi.fn() }),
-    }) as unknown as RenderingContext);
+    })) as unknown as HTMLCanvasElement["getContext"]);
   });
 
   afterEach(() => {

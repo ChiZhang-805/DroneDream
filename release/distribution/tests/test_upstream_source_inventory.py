@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import hashlib
 import json
 import re
 import sys
@@ -161,10 +162,20 @@ class UpstreamSourceInventoryTests(unittest.TestCase):
                     self.assertRegex(evidence["url"], immutable_raw)
                     self.assertRegex(evidence["sha256"], r"^[0-9a-f]{64}$")
 
-    def test_inventory_never_claims_source_was_copied_into_repository(self) -> None:
-        self.assertTrue(
-            all(source["copiedIntoRepository"] is False for source in self.sources.values())
-        )
+    def test_distributed_model_previews_match_source_and_original_notice(self) -> None:
+        copied = [source["id"] for source in self.sources.values() if source["copiedIntoRepository"]]
+        self.assertEqual(copied, ["px4-gazebo-models"])
+        source = self.sources[copied[0]]
+        self.assertEqual(source["distributionMode"], "desktop-and-runtime")
+        assets = ROOT / "apps/frontend/public/asset-geometry/vehicles"
+        catalog = _load_json(assets / "catalog.json")
+        self.assertEqual(catalog["revision"], source["pin"]["commit"])
+        self.assertEqual(hashlib.sha256((assets / "LICENSE.txt").read_bytes()).hexdigest(),
+                         source["licenseEvidence"][0]["sha256"])
+        for model in catalog["models"]:
+            self.assertEqual(model["source_revision"], catalog["revision"])
+            self.assertEqual(hashlib.sha256((assets / f'{model["preview_key"]}.glb').read_bytes()).hexdigest(),
+                             model["sha256"])
 
     def test_validator_rejects_duplicate_ids(self) -> None:
         invalid = deepcopy(self.inventory)

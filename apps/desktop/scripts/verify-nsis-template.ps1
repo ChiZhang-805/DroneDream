@@ -456,6 +456,7 @@ foreach ($required in @(
     'FileOpen $1 "$INSTDIR\${MAINBINARYNAME}.exe" a',
     'Sleep 100',
     'Abort "$(DD_UpdateAppStillRunning)"',
+    '${If} ${FileExists} "$INSTDIR\agent-core\agent-core-stage.json"',
     'RMDir /r "$INSTDIR\agent-core"'
 )) {
     if (-not $installerHook.Contains($required)) {

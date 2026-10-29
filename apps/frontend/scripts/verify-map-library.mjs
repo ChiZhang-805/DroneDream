@@ -1,19 +1,38 @@
 import assert from 'node:assert/strict';
-import { readFile, mkdir, writeFile } from 'node:fs/promises';
+import { readFile, mkdir, writeFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 import { createServer } from 'vite';
 
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
-const output = path.resolve(root, '../artifacts/test-runs/map-library');
+const output = path.resolve(process.env.DRONEDREAM_MAP_TEST_OUTPUT || path.join(root, '../artifacts/test-runs/map-library'));
 await mkdir(output, { recursive: true });
 const previews = JSON.parse(await readFile(path.join(root, 'src/features/autonomy/retiredMapVersions.json'), 'utf8'));
 process.env.VITE_PUBLIC_DEMO_CONSOLE = 'true';
 process.env.VITE_API_BASE_URL = 'http://127.0.0.1:5204';
 process.env.VITE_SUPABASE_URL = 'https://local-build.invalid';
 process.env.VITE_SUPABASE_PUBLISHABLE_KEY = 'local-build-placeholder';
-const server = await createServer({ root, configFile: path.join(root, 'vite.console.config.ts'), logLevel: 'warn', server: { host: '127.0.0.1', port: 5204, strictPort: true } });
+const candidatePublic = process.env.DRONEDREAM_MAP_CANDIDATE_PUBLIC;
+const servedCandidates = new Set();
+const candidatePlugin = {
+  name: 'map-candidate-verification',
+  configureServer(server) {
+    if (!candidatePublic) return;
+    server.middlewares.use(async (req, res, next) => {
+      const pathname = new URL(req.url, 'http://localhost').pathname.replace(/^\/console(?=\/)/, '');
+      if (!/^\/asset-(geometry|previews)\/maps\/[a-z0-9-]+\.(json|jpg|webp)$/.test(pathname)) return next();
+      const file = path.join(path.resolve(candidatePublic), pathname.slice(1));
+      if (!(await stat(file).catch(() => null))?.isFile()) return next();
+      const bytes = await readFile(file);
+      servedCandidates.add(pathname);
+      res.setHeader('Content-Type', pathname.endsWith('.json') ? 'application/json' : pathname.endsWith('.jpg') ? 'image/jpeg' : 'image/webp');
+      res.setHeader('Cache-Control', 'no-store');
+      res.end(bytes);
+    });
+  },
+};
+const server = await createServer({ root, configFile: path.join(root, 'vite.console.config.ts'), plugins: [candidatePlugin], logLevel: 'warn', server: { host: '127.0.0.1', port: 5204, strictPort: true } });
 let browser;
 const clearDialog = page => page.evaluate(() => {
   document.querySelector('.account-dialog-backdrop')?.remove();
@@ -37,12 +56,41 @@ try {
   await page.reload({ waitUntil: 'networkidle' });
   await clearDialog(page);
   const grid = page.locator('.autonomy-repository-grid');
-  assert.equal(await grid.locator('article').count(), 1); // Only current campus and Import map; retired demo versions must not return.
-  assert.equal(await grid.locator('.autonomy-repository-delete').count(), 1);
+  assert.equal(await grid.locator('article').count(), 6); // Current six maps only; retired demos must not return.
+  assert.equal(await grid.locator('.autonomy-repository-delete').count(), 6);
   assert.equal(await page.locator('.autonomy-repository-toolbar').count(), 1);
   await page.getByRole('button', { name: 'Import map', exact: true }).click();
   await page.locator('dialog.map-import-dialog').waitFor({ state: 'visible' });
   await page.keyboard.press('Escape');
+  const mapNames = ['Kumpula Campus', 'Meilahti Hospital Campus', 'Kalasatama Waterfront',
+    'Vuosaari Harbour', 'Suomenlinna Sea Fortress', 'Uutela Coastal Forest'];
+  for (const name of mapNames) {
+    await grid.locator('article').filter({ hasText: name }).locator('.autonomy-repository-card-surface').dblclick();
+    const mapDialog = page.getByRole('dialog', { name, exact: true });
+    await mapDialog.locator('canvas').waitFor();
+    await page.waitForFunction(() => !document.querySelector('.autonomy-repository-3d-loading'));
+    await page.waitForTimeout(500);
+    if (candidatePublic) {
+      const geometry = JSON.parse(await readFile(path.join(candidatePublic, 'asset-geometry/maps',
+        `${name.toLowerCase().replaceAll(' ', '-')}.json`), 'utf8'));
+      const metadata = geometry.metadata;
+      const row = label => mapDialog.locator('.autonomy-repository-dialog-copy > dl > div')
+        .filter({ has: page.locator('dt', { hasText: new RegExp(`^${label}$`) }) }).locator('dd');
+      assert.equal(await row('Buildings').innerText(), String(metadata.building_count));
+      assert.equal(await row('Size').innerText(), `${metadata.bounds_m.x} × ${metadata.bounds_m.y} × ${metadata.bounds_m.z} m`);
+    }
+    const mapCanvas = mapDialog.locator('canvas');
+    const initial = await mapCanvas.screenshot();
+    const bounds = await mapCanvas.boundingBox();
+    await page.mouse.move(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(bounds.x + bounds.width / 2 + 120, bounds.y + bounds.height / 2 + 40, { steps: 12 });
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+    assert.notEqual((await mapCanvas.screenshot()).toString('base64'), initial.toString('base64'), `${name}: 3-D scene must render and rotate`);
+    await page.screenshot({ path: path.join(output, `${name.toLowerCase().replaceAll(' ', '-')}-detail.png`) });
+    await mapDialog.getByRole('button', { name: 'Close', exact: true }).click();
+  }
   await grid.locator('article').filter({ hasText: 'Kumpula Campus' }).locator('.autonomy-repository-card-surface').dblclick();
   const detail = page.getByRole('dialog', { name: 'Kumpula Campus', exact: true });
   await detail.locator('canvas').waitFor();
@@ -81,6 +129,14 @@ try {
   await page.locator('.assistant-add-button').click();
   await page.getByRole('menuitem', { name: 'Select map', exact: true }).hover();
   assert.equal(await page.getByRole('menuitemradio', { name: 'Kumpula Campus', exact: true }).count(), 0, 'Deleted maps must not remain in Select Map');
-  await writeFile(path.join(output, 'result.json'), JSON.stringify({ passed: true, retiredDemosRemoved: 7, deletionPersists: true, detailWidths: [1100, 1920] }, null, 2));
+  if (candidatePublic) {
+    for (const name of mapNames) {
+      const url = `/asset-geometry/maps/${name.toLowerCase().replaceAll(' ', '-')}.json`;
+      assert(servedCandidates.has(url), `${name}: candidate geometry was not served`);
+      const response = await page.request.get(`http://127.0.0.1:5204/console${url}`);
+      assert.deepEqual(await response.body(), await readFile(path.join(candidatePublic, url.slice(1))));
+    }
+  }
+  await writeFile(path.join(output, 'result.json'), JSON.stringify({ passed: true, checkedMaps: mapNames, candidatePublic: candidatePublic || null, retiredDemosRemoved: 7, deletionPersists: true, detailWidths: [1100, 1920] }, null, 2));
   console.log(output);
 } finally { await browser?.close(); await server.close(); }

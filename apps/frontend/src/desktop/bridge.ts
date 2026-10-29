@@ -1513,6 +1513,7 @@ export type AppUpdateProgressPhase =
   | "downloading"
   | "retrying"
   | "verifying"
+  | "ready"
   | "installing"
   | "restarting";
 
@@ -1532,6 +1533,7 @@ const APP_UPDATE_PROGRESS_PHASES = new Set<AppUpdateProgressPhase>([
   "downloading",
   "retrying",
   "verifying",
+  "ready",
   "installing",
   "restarting",
 ]);
@@ -1584,10 +1586,11 @@ export async function listenAppUpdateProgress(
 /** Release progress subscriptions even when download, signature verification or installation fails. */
 export async function installAppUpdateInBackground(
   onProgress: (progress: NativeAppUpdateProgress) => void,
+  install = true,
 ): Promise<void> {
   const unlisten = await listenAppUpdateProgress(onProgress);
   try {
-    await invokeDesktop("download_install_app_update", () => undefined);
+    await invokeDesktop("download_install_app_update", () => undefined, { install });
   } finally {
     unlisten();
   }

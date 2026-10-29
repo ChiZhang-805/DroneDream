@@ -8,7 +8,6 @@ import heapq
 import json
 import math
 import os
-import shutil
 import subprocess
 import sys
 import time
@@ -17,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import school_map_px4_mission as support
+from app.autonomy.px4_standard_vtol_vehicle import export_standard_vtol_gazebo_artifact
 
 
 def parse_args() -> argparse.Namespace:
@@ -24,7 +24,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--map-root", required=True, type=Path)
     parser.add_argument("--run-dir", required=True, type=Path)
     parser.add_argument("--px4-root", type=Path, default=Path("/opt/PX4-Autopilot"))
-    parser.add_argument("--vehicle-package", required=True, type=Path)
+    parser.add_argument("--vehicle-package", type=Path)
+    parser.add_argument("--vehicle-model", choices=("x500-depth", "standard-vtol"), default="x500-depth")
     parser.add_argument("--velocity-m-s", type=float, default=5.0)
     parser.add_argument("--cruise-altitude-m", type=float, default=8.0)
     return parser.parse_args()
@@ -104,7 +105,9 @@ def grounded_model_root(
     return (
         float(spawn["x"]) - float(offset["x"]),
         float(spawn["y"]) - float(offset["y"]),
-        support_z + float(vehicle["body_height_m"]) / 2 - float(offset["z"]),
+        support_z - float(vehicle.get(
+            "model_root_to_contact_m", float(offset["z"]) - float(vehicle["body_height_m"]) / 2
+        )),
     )
 
 
@@ -119,21 +122,33 @@ def route_contract(
     start_id = graph["named_entities"]["launch"]
     goal_id = graph["named_entities"]["outdoor_handoff"]
     nodes = {entry["node_id"]: entry for entry in graph["nodes"]}
-    outward_ids = shortest_path(graph, start_id, goal_id)
-    # Preserve a route made only of real graph edges.  The flight executor can
-    # handle the full point sequence; simplifying by skipping graph nodes would
-    # create synthetic straight segments and break qualification provenance.
+    from dronedream_agent_core.contracts import MapAsset, RouteQuery, Vector3
+    from dronedream_agent_core.known_map_planner import KnownMapMetricPlanner, MetricPlannerPolicy
+
+    planner = KnownMapMetricPlanner(
+        graph=MapAsset.model_validate(graph),
+        semantic_path=map_root / "gazebo" / "semantic.json",
+        vehicle_diameter_m=vehicle["body_radius_m"] * 2,
+        vehicle_height_m=vehicle["body_height_m"],
+        policy=MetricPlannerPolicy(required_clearance_m=0.8),
+    )
+    outward = planner.plan_positions(
+        RouteQuery(start_node=start_id, goal_node=goal_id),
+        start_position_m=Vector3(**{**nodes[start_id]["position_m"], "z": altitude_m}),
+        goal_position_m=Vector3(**{**nodes[goal_id]["position_m"], "z": altitude_m}),
+    )
+    outward_ids = outward.node_ids
     root = grounded_model_root(semantic, vehicle)
     offset_value = vehicle["collision_center_offset_model_m"]
     offset = (float(offset_value["x"]), float(offset_value["y"]), float(offset_value["z"]))
     round_trip_ids = [*outward_ids, *reversed(outward_ids[:-1])]
     world_points = [
         {
-            "east_m": float(nodes[identifier]["position_m"]["x"]),
-            "north_m": float(nodes[identifier]["position_m"]["y"]),
-            "up_m": altitude_m,
+            "east_m": point.x,
+            "north_m": point.y,
+            "up_m": point.z,
         }
-        for identifier in round_trip_ids
+        for point in [*outward.positions_m, *reversed(outward.positions_m[:-1])]
     ]
     points = []
     for index, world in enumerate(world_points):
@@ -157,15 +172,7 @@ def route_contract(
                 "speed_limit_mps": velocity_m_s,
             }
         )
-    edge_by_nodes = {}
-    for edge in graph["edges"]:
-        edge_by_nodes[(edge["from_node"], edge["to_node"])] = edge["edge_id"]
-        if edge.get("bidirectional"):
-            edge_by_nodes[(edge["to_node"], edge["from_node"])] = edge["edge_id"]
-    edge_ids = [
-        edge_by_nodes[(left, right)]
-        for left, right in zip(round_trip_ids, round_trip_ids[1:], strict=False)
-    ]
+    edge_ids = [*outward.edge_ids, *reversed(outward.edge_ids)]
     positions = [
         {"x": world["east_m"], "y": world["north_m"], "z": world["up_m"]} for world in world_points
     ]
@@ -205,11 +212,11 @@ def route_contract(
         "points": points,
         "source_world_points": world_points,
     }
-    spawn = semantic["runtime_bindings"]["vehicle_spawn"]
-    return route, track, (float(spawn["x"]), float(spawn["y"]), float(spawn["z"])), track["points"]
+    return route, track, root, track["points"]
 
 
-def collision_count(samples: list[support.GazeboPoseSample], semantic: dict[str, Any]) -> int:
+def collision_count(samples: list[support.GazeboPoseSample], semantic: dict[str, Any],
+                    vehicle: dict[str, Any]) -> int:
     collisions = 0
     for sample in samples:
         for primitive in semantic["collision_primitives"]:
@@ -221,12 +228,13 @@ def collision_count(samples: list[support.GazeboPoseSample], semantic: dict[str,
             local_x = dx * math.cos(yaw) - dy * math.sin(yaw)
             local_y = dx * math.sin(yaw) + dy * math.cos(yaw)
             horizontal = (
-                abs(local_x) <= float(primitive["size_x"]) / 2 + 0.45
-                and abs(local_y) <= float(primitive["size_y"]) / 2 + 0.45
+                abs(local_x) <= float(primitive["size_x"]) / 2 + vehicle["body_radius_m"]
+                and abs(local_y) <= float(primitive["size_y"]) / 2 + vehicle["body_radius_m"]
             )
             vertical = (
-                sample.model_root_z
-                <= float(primitive["center_z"]) + float(primitive["size_z"]) / 2 + 0.2
+                abs(sample.model_root_z + vehicle["collision_center_offset_model_m"]["z"]
+                    - float(primitive["center_z"]))
+                <= (float(primitive["size_z"]) + vehicle["body_height_m"]) / 2
             )
             if horizontal and vertical:
                 collisions += 1
@@ -239,14 +247,36 @@ def main() -> int:
     map_root = args.map_root.resolve()
     run_dir = args.run_dir.resolve()
     px4_root = args.px4_root.resolve()
-    if run_dir.exists():
-        shutil.rmtree(run_dir)
-    run_dir.mkdir(parents=True)
+    run_dir.mkdir(parents=True, exist_ok=False)
     semantic = json.loads((map_root / "gazebo" / "semantic.json").read_text(encoding="utf-8"))
-    vehicle = vehicle_contract(args.vehicle_package.resolve())
+    if args.vehicle_model == "standard-vtol":
+        # Geometry envelope includes the full wing, camera and attached parcel.
+        # These dimensions are candidate inputs, not measured flight capability.
+        vehicle = {
+            "body_radius_m": 1.2, "body_height_m": 0.5,
+            "collision_center_offset_model_m": {"x": 0.0, "y": 0.0, "z": 0.3},
+            "model_root_to_contact_m": 0.151,
+        }
+        autopilot_model, autostart = "standard_vtol", "4004"
+    else:
+        if args.vehicle_package is None:
+            raise ValueError("X500 qualification needs --vehicle-package")
+        vehicle = vehicle_contract(args.vehicle_package.resolve())
+        autopilot_model, autostart = "x500", "4001"
     route, track, spawn, points = route_contract(
         map_root, args.cruise_altitude_m, args.velocity_m_s, vehicle
     )
+    from dronedream_agent_core.contracts import GraphRoute
+    from dronedream_agent_core.collision import validate_route_clearance
+
+    clearance = validate_route_clearance(
+        GraphRoute.model_validate(route), map_root / "gazebo" / "semantic.json",
+        vehicle_diameter_m=vehicle["body_radius_m"] * 2,
+        vehicle_height_m=vehicle["body_height_m"], sample_interval_m=0.05,
+    )
+    write_json(run_dir / "clearance.json", clearance.model_dump(mode="json"))
+    if not clearance.accepted or clearance.minimum_clearance_m < 0.79:
+        raise ValueError("route does not fit the selected aircraft envelope")
     write_json(run_dir / "mission-route.json", route)
     track_path = run_dir / "reference_track.json"
     params_path = run_dir / "controller_params.json"
@@ -263,9 +293,10 @@ def main() -> int:
         },
     )
     write_json(
-        run_dir / "natural_language_mission.json",
+        run_dir / "qualification-inputs.json",
         {
-            "schema_version": "dronedream.natural-language-map-acceptance.v1",
+            "schema_version": "dronedream.map-flight-qualification.v1",
+            "natural_language_acceptance": False,
             "en-US": (
                 f"Take off in {semantic['display_name']['en-US']}, follow the "
                 "mapped outdoor route to the handoff point, return home, and land."
@@ -285,7 +316,10 @@ def main() -> int:
     gz_binary = support._require_executable("gz")
     trial_rootfs, px4_executable = support._prepare_isolated_px4_rootfs(px4_root, run_dir)
     vehicle_dir = run_dir / "my-drone"
-    support.export_my_drone_gazebo_artifact(vehicle_dir)
+    if args.vehicle_model == "standard-vtol":
+        export_standard_vtol_gazebo_artifact(vehicle_dir)
+    else:
+        support.export_my_drone_gazebo_artifact(vehicle_dir)
     partition = f"dronedream_{semantic['scene_id'].replace('-', '_')}_{os.getpid()}"
     env = os.environ.copy()
     px4_plugins = px4_root / "build/px4_sitl_default/src/modules/simulation/gz_plugins"
@@ -311,7 +345,7 @@ def main() -> int:
             "HEADLESS": "1",
             "PX4_GZ_STANDALONE": "1",
             "PX4_GZ_MODEL_NAME": "my_drone",
-            "PX4_SYS_AUTOSTART": "4001",
+            "PX4_SYS_AUTOSTART": autostart,
             "GZ_IP": "127.0.0.1",
             "PYTHONUNBUFFERED": "1",
             "XDG_CACHE_HOME": str(state_root / "cache"),
@@ -384,7 +418,7 @@ def main() -> int:
                     "--params",
                     str(params_path),
                     "--vehicle",
-                    "x500",
+                    autopilot_model,
                     "--world",
                     support.WORLD_NAME,
                     "--abort-file",
@@ -394,7 +428,7 @@ def main() -> int:
                     "--setpoint-rate-hz",
                     "20",
                     "--takeoff-timeout-seconds",
-                    "90",
+                    "300",
                     "--takeoff-climb-rate-m-s",
                     "0.7",
                     "--track-timeout-seconds",
@@ -412,12 +446,12 @@ def main() -> int:
                 text=True,
                 start_new_session=True,
             )
-            return_code = executor.wait(timeout=timeout_seconds + 210)
+            return_code = executor.wait(timeout=timeout_seconds + 420)
             time.sleep(4)
             if recorder is not None:
                 recorder.stop()
             samples = recorder.samples if recorder is not None else []
-            unsafe = collision_count(samples, semantic)
+            unsafe = collision_count(samples, semantic, vehicle)
             maximum_z = max((sample.model_root_z for sample in samples), default=0.0)
             final = samples[-1] if samples else None
             returned = (
@@ -449,9 +483,10 @@ def main() -> int:
                 "route_waypoint_count": len(points),
                 "gazebo_version": "8.15.0",
                 "px4_root": str(px4_root),
-                "vehicle": "x500_depth / My Drone",
+                "vehicle": args.vehicle_model,
+                "natural_language_acceptance": False,
                 "artifacts": {
-                    "natural_language_mission": "natural_language_mission.json",
+                    "qualification_inputs": "qualification-inputs.json",
                     "route": "mission-route.json",
                     "track": "reference_track.json",
                     "poses": "gazebo_pose_samples.csv",

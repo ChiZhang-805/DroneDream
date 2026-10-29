@@ -18,6 +18,7 @@ import math
 import mimetypes
 import shutil
 import zipfile
+from datetime import datetime, timezone
 from collections import defaultdict, deque
 from collections.abc import Iterable
 from pathlib import Path
@@ -28,8 +29,14 @@ from xml.etree import ElementTree
 import requests
 from PIL import Image, ImageDraw
 from pyproj import Transformer
-from shapely.geometry import LineString, MultiLineString, MultiPolygon, Point, Polygon, box, shape
-from shapely.ops import transform, unary_union
+from shapely.geometry import GeometryCollection, LineString, MultiLineString, MultiPolygon, Point, Polygon, box, shape
+from shapely.ops import nearest_points, transform, unary_union
+from shapely import STRtree, set_precision
+
+from map_geometry import extruded_obj, footprint_cells, surface_connections, partition_polygon
+from helsinki_service_map import append_service_entrances
+from helsinki_land_cover import acquire_layers, load_land_cover, polygon_parts, ATTRIBUTION
+from helsinki_city_model import acquire_measured_heights
 
 CITY_WFS = "https://kartta.hel.fi/ws/geoserver/avoindata/wfs"
 CITY_WMS = "https://kartta.hel.fi/ws/geoserver/avoindata/wms"
@@ -82,15 +89,17 @@ def sha256_file(path: Path) -> str:
 def polygons(value: Any) -> Iterable[Polygon]:
     if isinstance(value, Polygon):
         yield value
-    elif isinstance(value, MultiPolygon):
-        yield from value.geoms
+    elif isinstance(value, (MultiPolygon, GeometryCollection)):
+        for part in value.geoms:
+            yield from polygons(part)
 
 
 def lines(value: Any) -> Iterable[LineString]:
     if isinstance(value, LineString):
         yield value
-    elif isinstance(value, MultiLineString):
-        yield from value.geoms
+    elif isinstance(value, (MultiLineString, GeometryCollection)):
+        for part in value.geoms:
+            yield from lines(part)
 
 
 def download(session: requests.Session, url: str, destination: Path, *, refresh: bool) -> None:
@@ -152,9 +161,8 @@ def acquire_sources(
     east, north = to_local.transform(config["longitude"], config["latitude"])
     half_x, half_y = config["width_m"] / 2, config["height_m"] / 2
     bounds = (east - half_x, north - half_y, east + half_x, north + half_y)
-    west, south = to_wgs84.transform(bounds[0], bounds[1])
-    east_lon, north_lat = to_wgs84.transform(bounds[2], bounds[3])
-    bbox_wgs84 = (west, south, east_lon, north_lat)
+    # All four sides matter: a projected crop is not axis-aligned in WGS84.
+    bbox_wgs84 = to_wgs84.transform_bounds(*bounds, densify_pts=21)
     paths = source_paths(cache_root, config["key"])
     with requests.Session() as session:
         session.headers["User-Agent"] = "DroneDream map builder/1.0 (first-party product assets)"
@@ -189,7 +197,7 @@ def building_name(properties: dict[str, Any], identifier: str) -> tuple[str, str
 
 
 def load_buildings(
-    path: Path, config: dict[str, Any], origin: tuple[float, float]
+    path: Path, config: dict[str, Any], origin: tuple[float, float], measured_heights: dict | None = None
 ) -> list[dict[str, Any]]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     projection = Transformer.from_crs(4326, 3879, always_xy=True).transform
@@ -209,20 +217,32 @@ def load_buildings(
         floors = (
             int(floors_value) if isinstance(floors_value, (int, float)) and floors_value > 0 else 2
         )
-        height_m = min(float(config["ceiling_m"]), max(4.0, floors * 3.4))
+        # The operating ceiling must never shorten a real obstacle. These are
+        # explicit floor-count estimates until a measured height is supplied.
+        height_m = max(4.0, floors * 3.4)
         identifier = str(
             properties.get("vtj_prt") or properties.get("id") or feature.get("id") or "building"
         )
+        measurement = (measured_heights or {}).get(identifier)
+        if measurement:
+            height_m = measurement["height_m"]
         name, function = building_name(properties, identifier)
         for index, polygon in enumerate(polygons(geometry)):
-            if polygon.area < 12:
+            if polygon.is_empty or polygon.area <= 0:
                 continue
-            simplified = polygon.simplify(0.18, preserve_topology=True)
+            cells, yaw, cover = footprint_cells(polygon)
             result.append(
                 {
-                    "id": f"{identifier}-{index}",
-                    "polygon": simplified,
+                    # Registry check letters are uppercase; runtime entity IDs
+                    # use lowercase. Keep the official identifier separately.
+                    "id": f"{identifier.lower()}-{index}",
+                    "polygon": polygon,
+                    "collision_cells": cells,
+                    "collision_yaw": yaw,
+                    "collision_cover": cover,
                     "height_m": height_m,
+                    "height_source": "Helsinki-LoD2-measured" if measurement else "registered-floors-times-3.4m" if floors_value else "unmeasured-two-floor-proxy",
+                    "height_reference": measurement,
                     "floors": floors,
                     "name": name,
                     "name_zh": name,
@@ -262,7 +282,7 @@ def load_trees(
             points.append(
                 {"x": value.x, "y": value.y, "radius": radius, "height": max(5.0, radius * 3.0)}
             )
-    return points[:1000], len(points)
+    return points, len(points)
 
 
 def load_regions(
@@ -290,12 +310,37 @@ def load_regions(
     return result
 
 
+def building_ground_approach(polygon, segments, edge_index, observed_ground, obstructions):
+    """Bind a building to a visible, source-grounded approach on the launch network.
+
+    A nearby road behind another building is not access to this building. Try
+    the other nearby segments before leaving the location unresolved. This is
+    an exterior approach, not a claim that a surveyed doorway exists there.
+    """
+    candidates = []
+    for number in edge_index.query(polygon.buffer(35.)):
+        boundary, point = nearest_points(polygon, segments[number])
+        distance = boundary.distance(point)
+        if distance <= 35.:
+            candidates.append((distance, int(number), boundary, point))
+    for distance, number, boundary, point in sorted(candidates, key=lambda item: item[:2]):
+        access = LineString([boundary, point])
+        if access.intersection(obstructions).length > .001:
+            continue
+        if observed_ground is not None and not observed_ground.covers(access):
+            continue
+        return number, point, distance, list(access.coords)
+    return None
+
+
 def load_road_graph(
     path: Path,
     config: dict[str, Any],
     origin: tuple[float, float],
     buildings: list[dict[str, Any]],
     trees: list[dict[str, float]],
+    ground_surface=None,
+    canopies=(),
 ) -> dict[str, Any]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     projection = Transformer.from_crs(4326, 3879, always_xy=True).transform
@@ -308,40 +353,77 @@ def load_road_graph(
     nodes: dict[tuple[float, float], dict[str, Any]] = {}
     edges: dict[tuple[str, str], dict[str, Any]] = {}
     adjacency: dict[str, set[str]] = defaultdict(set)
+    # X500 radius + required clearance + the continuous checker’s 0.1 m
+    # sampling bound (half an interval) + projection/noding margin.
+    route_inset_m = .38 + .8 + .05 + .02
     obstacle = unary_union(
         [
             *[
-                entry["polygon"].minimum_rotated_rectangle.buffer(0.8, join_style="mitre")
+                entry["collision_cover"].buffer(route_inset_m, join_style="mitre")
                 for entry in buildings
             ],
-            *[Point(entry["x"], entry["y"]).buffer(entry["radius"] + 0.8) for entry in trees],
+            *[box(entry["x"]-entry["radius"], entry["y"]-entry["radius"],
+                  entry["x"]+entry["radius"], entry["y"]+entry["radius"]).buffer(route_inset_m, join_style="mitre")
+              for entry in trees],
+            *[entry["polygon"].buffer(route_inset_m, join_style="mitre") for entry in canopies],
         ]
     )
 
     def node_id(x: float, y: float) -> str:
-        key = (round(x, 1), round(y, 1))
+        key = (round(x, 8), round(y, 8))
         if key not in nodes:
             identifier = f"road-{len(nodes):05d}"
             nodes[key] = {
                 "node_id": identifier,
-                "label": "Official road network",
+                "label": "Observed ground route",
                 "position_m": {"x": key[0], "y": key[1], "z": 8.0},
                 "semantic": "outdoor",
             }
         return nodes[key]["node_id"]
 
+    ground_roads = []
+    unsupported_grade_features = []
+    grade_geometry = []
     for feature in payload.get("features", []):
         if not feature.get("geometry"):
             continue
         geometry = local_geometry(feature["geometry"], projection, origin).intersection(crop)
-        for segment in lines(geometry):
+        grade = (feature.get("properties") or {}).get("silta_alikulku")
+        if grade in {"Alikulku, tunneli", "Silta, ylikulku"}:
+            # A 2-D crossing does not connect a tunnel or bridge to the road
+            # above/below it. Preserve its source identity for elevation work.
+            unsupported_grade_features.append(str(feature.get("id")))
+            grade_geometry.extend(lines(geometry))
+            continue
+        ground_roads.extend(lines(geometry))
+    usable_surface = ground_surface
+    if ground_surface is not None:
+        # Surface simplification is inset and intersected with the exact source;
+        # every generated centerline retains room for aircraft and clearance.
+        usable_surface = ground_surface
+        if grade_geometry:
+            # The land-cover projection does not distinguish upper/lower decks.
+            # Keep those crossings out until a 3-D road source establishes them.
+            usable_surface = usable_surface.difference(unary_union(grade_geometry).buffer(3.))
+        safe_surface = usable_surface.buffer(-route_inset_m, join_style="mitre").difference(obstacle)
+        official = unary_union(ground_roads).intersection(safe_surface)
+        surface_lines = surface_connections(safe_surface, list(lines(official)),
+                                            [b["polygon"] for b in buildings])
+        ground_roads = [*lines(official), *surface_lines]
+    # Node actual intersections before clipping blocked parts. Do not discard
+    # short source connectors: they often bind a pavement to a junction.
+    # Source projection and edge projection may differ by a few floating-point
+    # ulps at a shared endpoint. A micrometre grid restores their shared vertex
+    # without changing the map-scale clearance or inventing a connection.
+    connected_roads = unary_union([set_precision(road, 1e-6) for road in ground_roads])
+    for segment in lines(connected_roads.difference(obstacle)):
             coordinates = list(segment.coords)
             for start, end in zip(coordinates, coordinates[1:], strict=False):
-                if math.dist(start[:2], end[:2]) < 0.4:
-                    continue
-                if LineString((start[:2], end[:2])).intersects(obstacle):
+                if math.dist(start[:2], end[:2]) < 1e-7:
                     continue
                 left, right = node_id(*start[:2]), node_id(*end[:2])
+                if left == right:
+                    continue
                 key = tuple(sorted((left, right)))
                 if key in edges:
                     continue
@@ -349,7 +431,7 @@ def load_road_graph(
                     "edge_id": f"road-edge-{len(edges):05d}",
                     "from_node": left,
                     "to_node": right,
-                    "distance_m": round(math.dist(start[:2], end[:2]), 3),
+                    "distance_m": math.dist(start[:2], end[:2]),
                     "speed_limit_mps": 5.0,
                     "minimum_clearance_m": 0.8,
                     "bidirectional": True,
@@ -420,93 +502,112 @@ def load_road_graph(
     launch["semantic"] = "launch"
     handoff["label"] = f"{config['name']} outdoor handoff point"
     handoff["semantic"] = "delivery"
-    connected_nodes = [by_id[identifier] for identifier in sorted(largest)]
     building_handoffs = []
+    unresolved_handoffs = []
+    connected_edges = [e for e in edges.values() if e["from_node"] in largest and e["to_node"] in largest]
+    segments = [LineString([(by_id[e[k]]["position_m"]["x"], by_id[e[k]]["position_m"]["y"])
+                            for k in ("from_node", "to_node")]) for e in connected_edges]
+    edge_index = STRtree(segments)
+    access_obstructions = unary_union([
+        *[b["polygon"] for b in buildings],
+        *[c["polygon"] for c in canopies],
+        *[box(t["x"]-t["radius"], t["y"]-t["radius"],
+              t["x"]+t["radius"], t["y"]+t["radius"]) for t in trees],
+    ])
+    # Only absorb coordinate serialization differences, not unmapped land.
+    access_ground = usable_surface.buffer(.01) if usable_surface is not None else None
+    splits = defaultdict(list)
     for building in buildings:
-        center = building["polygon"].centroid
-        road_node = min(
-            connected_nodes,
-            key=lambda entry: math.dist(
-                (center.x, center.y),
-                (entry["position_m"]["x"], entry["position_m"]["y"]),
-            ),
-        )
+        approach = building_ground_approach(building["polygon"], segments, edge_index,
+                                             access_ground, access_obstructions)
+        if approach is None:
+            nearest = segments[int(edge_index.nearest(building["polygon"]))]
+            unresolved_handoffs.append({"building_id": building["id"],
+                "nearest_road_distance_m": building["polygon"].distance(nearest),
+                "reason": "no-source-grounded-unobstructed-building-approach"})
+            continue
+        edge_number, point, distance, access_path = approach
+        segment = segments[edge_number]
+        identifier = node_id(point.x, point.y)
+        road_node = nodes[(round(point.x, 8), round(point.y, 8))]
+        splits[edge_number].append((segment.project(point), identifier))
         building_handoffs.append(
             {
                 "building_id": building["id"],
                 "node_id": road_node["node_id"],
                 "position_m": road_node["position_m"],
-                "distance_to_building_m": round(
-                    math.dist(
-                        (center.x, center.y),
-                        (road_node["position_m"]["x"], road_node["position_m"]["y"]),
-                    ),
-                    3,
-                ),
+                "distance_to_building_m": round(distance, 3),
+                "building_access_path_xy_m": access_path,
             }
         )
+    for edge_number, points in splits.items():
+        original, segment = connected_edges[edge_number], segments[edge_number]
+        edges.pop(tuple(sorted((original["from_node"], original["to_node"]))))
+        chain = sorted(set([(0., original["from_node"]), (segment.length, original["to_node"]), *points]))
+        for (a, left), (b, right) in zip(chain, chain[1:]):
+            if left != right:
+                edges[tuple(sorted((left, right)))] = {**original, "from_node": left, "to_node": right, "distance_m": b-a}
+    # Edge lengths must describe the serialized endpoints. Rounding short
+    # triangulation/split connectors to millimetres produced zero-cost edges
+    # rejected by the runtime graph, even though their endpoints were distinct.
+    final_nodes = {node["node_id"]: node for node in nodes.values()}
+    for i, edge in enumerate(edges.values()):
+        edge["edge_id"] = f"road-edge-{i:05d}"
+        edge["distance_m"] = math.dist(
+            tuple(final_nodes[edge["from_node"]]["position_m"][a] for a in ("x", "y", "z")),
+            tuple(final_nodes[edge["to_node"]]["position_m"][a] for a in ("x", "y", "z")),
+        )
+    adjacency = defaultdict(set)
+    for edge in edges.values():
+        adjacency[edge["from_node"]].add(edge["to_node"])
+        adjacency[edge["to_node"]].add(edge["from_node"])
+    remaining = {node["node_id"] for node in nodes.values()}
+    final_components = []
+    while remaining:
+        component, queue = set(), [remaining.pop()]
+        while queue:
+            current = queue.pop()
+            component.add(current)
+            neighbors = adjacency[current] & remaining
+            remaining.difference_update(neighbors)
+            queue.extend(neighbors)
+        final_components.append(component)
     return {
         "nodes": list(nodes.values()),
         "edges": list(edges.values()),
         "launch": launch,
         "handoff": handoff,
         "building_handoffs": building_handoffs,
-        "largest_component_size": len(largest),
-    }
-
-
-def obb(building: dict[str, Any]) -> dict[str, Any]:
-    rectangle = building["polygon"].minimum_rotated_rectangle
-    coordinates = list(rectangle.exterior.coords)[:4]
-    sides = [
-        (
-            math.dist(coordinates[i], coordinates[(i + 1) % 4]),
-            coordinates[i],
-            coordinates[(i + 1) % 4],
-        )
-        for i in range(4)
-    ]
-    longest = max(sides, key=lambda item: item[0])
-    shortest = min(sides, key=lambda item: item[0])
-    center = rectangle.centroid
-    return {
-        "name": f"{building['id']}-collision",
-        "semantic": "building",
-        "center_x": round(center.x, 4),
-        "center_y": round(center.y, 4),
-        "center_z": round(building["height_m"] / 2, 4),
-        "size_x": round(longest[0], 4),
-        "size_y": round(shortest[0], 4),
-        "size_z": round(building["height_m"], 4),
-        "yaw_rad": round(
-            math.atan2(longest[2][1] - longest[1][1], longest[2][0] - longest[1][0]), 8
-        ),
+        "unresolved_building_handoffs": unresolved_handoffs,
+        "largest_component_size": max(map(len, final_components)),
+        "component_sizes": sorted(map(len, final_components), reverse=True),
+        "ground_surface": usable_surface,
+        "grade_separated_source_features": unsupported_grade_features,
     }
 
 
 def building_mesh(buildings: list[dict[str, Any]], key: str) -> tuple[str, str]:
-    lines_out = [f"mtllib {key}-buildings.mtl", f"o {key}"]
-    vertex = 1
-    for building in buildings:
-        points = list(building["polygon"].exterior.coords)[:-1]
-        if len(points) < 3:
-            continue
-        lines_out.extend((f"g {building['id']}", "usemtl buildings"))
-        lines_out.extend(f"v {x:.4f} {y:.4f} 0.0000" for x, y in points)
-        lines_out.extend(f"v {x:.4f} {y:.4f} {building['height_m']:.4f}" for x, y in points)
-        count = len(points)
-        lines_out.append("f " + " ".join(str(vertex + count + offset) for offset in range(count)))
-        lines_out.append("f " + " ".join(str(vertex + offset) for offset in reversed(range(count))))
-        for offset in range(count):
-            nxt = (offset + 1) % count
-            lines_out.append(
-                "f "
-                f"{vertex + offset} {vertex + nxt} "
-                f"{vertex + count + nxt} {vertex + count + offset}"
-            )
-        vertex += count * 2
     material = "newmtl buildings\nKd 0.72 0.75 0.80\nKa 0.10 0.10 0.10\nKs 0.05 0.05 0.05\nNs 12\n"
-    return "\n".join(lines_out) + "\n", material
+    return extruded_obj(
+        [(b["id"], b["polygon"], b["height_m"]) for b in buildings],
+        material_library=f"{key}-buildings.mtl",
+    ), material
+
+
+def building_collision_primitives(buildings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    result = []
+    for building in buildings:
+        yaw = building["collision_yaw"]
+        c, s = math.cos(yaw), math.sin(yaw)
+        for index, (x0, y0, x1, y1) in enumerate(building["collision_cells"]):
+            x, y = (x0+x1)/2, (y0+y1)/2
+            result.append({
+                "name": f"{building['id']}-cell-{index:04d}", "semantic": "building",
+                "center_x": x*c-y*s, "center_y": x*s+y*c,
+                "center_z": building["height_m"]/2, "size_x": x1-x0,
+                "size_y": y1-y0, "size_z": building["height_m"], "yaw_rad": yaw,
+            })
+    return result
 
 
 def ground_mesh(config: dict[str, Any]) -> str:
@@ -531,6 +632,7 @@ def sdf_text(
     trees: list[dict[str, float]],
     *,
     model_only: bool = False,
+    canopy_meshes=(),
 ) -> str:
     root = ElementTree.Element("sdf", {"version": "1.9"})
     if model_only:
@@ -578,29 +680,41 @@ def sdf_text(
         ElementTree.SubElement(building_visual, "geometry"), "mesh"
     )
     ElementTree.SubElement(visual_mesh, "uri").text = f"meshes/{config['key']}-buildings.obj"
-    # DART/ODE cannot safely collide one OBJ containing many concave footprint
-    # groups.  Use one conservative oriented box per registered footprint while
-    # retaining the exact extrusion for the visual and semantic geometry.
-    for index, primitive in enumerate(obb(building) for building in buildings):
+    # Each building has a closed mesh of the exact union of its planner cells.
+    # This preserves courtyards without thousands of independent contact seams.
+    for index, building in enumerate(buildings):
         link = ElementTree.SubElement(model, "link", {"name": f"building-collision-{index:04d}"})
-        item = ElementTree.SubElement(link, "collision", {"name": str(primitive["name"])})
-        ElementTree.SubElement(item, "pose").text = (
-            f"{primitive['center_x']} {primitive['center_y']} {primitive['center_z']} "
-            f"0 0 {primitive['yaw_rad']}"
-        )
-        item_box = ElementTree.SubElement(ElementTree.SubElement(item, "geometry"), "box")
-        ElementTree.SubElement(
-            item_box, "size"
-        ).text = f"{primitive['size_x']} {primitive['size_y']} {primitive['size_z']}"
+        item = ElementTree.SubElement(link, "collision", {"name": f"{building['id']}-collision"})
+        model_meshes = building.get("collision_meshes", [f"meshes/{building['id']}-collision.obj"])
+        link.remove(item)
+        for part, uri in enumerate(model_meshes):
+            item = ElementTree.SubElement(link, "collision", {"name": f"{building['id']}-collision-{part}"})
+            mesh = ElementTree.SubElement(ElementTree.SubElement(item, "geometry"), "mesh")
+            ElementTree.SubElement(mesh, "uri").text = uri
     for index, tree in enumerate(trees):
         link = ElementTree.SubElement(model, "link", {"name": f"tree-{index:04d}"})
-        item = ElementTree.SubElement(link, "collision", {"name": f"tree-canopy-{index:04d}"})
-        ElementTree.SubElement(
-            item, "pose"
-        ).text = f"{tree['x']:.3f} {tree['y']:.3f} {tree['height'] / 2:.3f} 0 0 0"
-        cylinder = ElementTree.SubElement(ElementTree.SubElement(item, "geometry"), "cylinder")
-        ElementTree.SubElement(cylinder, "radius").text = f"{tree['radius']:.3f}"
-        ElementTree.SubElement(cylinder, "length").text = f"{tree['height']:.3f}"
+        # Match the same footprint used by the planner and catalog, instead of
+        # leaving a collision-only tree invisible to depth and optical mapping.
+        for tag in ("collision", "visual"):
+            item = ElementTree.SubElement(link, tag, {"name": f"tree-canopy-{tag}-{index:04d}"})
+            ElementTree.SubElement(item, "pose").text = f"{tree['x']:.17g} {tree['y']:.17g} {tree['height'] / 2:.17g} 0 0 0"
+            solid = ElementTree.SubElement(ElementTree.SubElement(item, "geometry"), "box")
+            ElementTree.SubElement(solid, "size").text = f"{tree['radius']*2:.17g} {tree['radius']*2:.17g} {tree['height']:.17g}"
+            if tag == "visual":
+                material = ElementTree.SubElement(item, "material")
+                ElementTree.SubElement(material, "ambient").text = "0.12 0.25 0.10 1"
+                ElementTree.SubElement(material, "diffuse").text = "0.20 0.36 0.15 1"
+    if canopy_meshes:
+        vegetation = ElementTree.SubElement(model, "link", {"name": "observed-canopy"})
+        for index, uri in enumerate(canopy_meshes):
+            for tag in ("collision", "visual"):
+                item = ElementTree.SubElement(vegetation, tag, {"name": f"canopy-{tag}-{index}"})
+                mesh = ElementTree.SubElement(ElementTree.SubElement(item, "geometry"), "mesh")
+                ElementTree.SubElement(mesh, "uri").text = uri
+                if tag == "visual":
+                    material = ElementTree.SubElement(item, "material")
+                    ElementTree.SubElement(material, "ambient").text = "0.12 0.25 0.10 1"
+                    ElementTree.SubElement(material, "diffuse").text = "0.20 0.36 0.15 1"
     ElementTree.indent(root, space="  ")
     return '<?xml version="1.0"?>\n' + ElementTree.tostring(root, encoding="unicode") + "\n"
 
@@ -621,7 +735,7 @@ def semantic_contract(
         aliases = [building["name"]]
         if building["address"]:
             aliases.append(building["address"])
-        handoff = handoff_by_building[building["id"]]
+        handoff = handoff_by_building.get(building["id"])
         handoff_entity_id = f"building-{building['id']}-outdoor-handoff"
         entities.append(
             {
@@ -637,17 +751,22 @@ def semantic_contract(
                     "z": round(building["height_m"] / 2, 3),
                 },
                 "floors": building["floors"],
+                "height_m": building["height_m"],
+                "height_source": building["height_source"],
                 "function": building["function"],
                 "address": building["address"],
                 "registry_id": building["registry_id"],
-                "outdoor_handoff_entity_id": handoff_entity_id,
+                "outdoor_handoff_entity_id": handoff_entity_id if handoff else None,
                 "footprint_m": [
                     [round(x, 3), round(y, 3)]
                     for x, y in list(building["polygon"].exterior.coords)[:-1]
                 ],
+                "footprint_holes_m": [list(ring.coords)[:-1] for ring in building["polygon"].interiors],
                 "source": "City of Helsinki building register",
             }
         )
+        if handoff is None:
+            continue
         entities.append(
             {
                 "entity_id": handoff_entity_id,
@@ -664,8 +783,9 @@ def semantic_contract(
                 "building_entity_id": f"building-{building['id']}",
                 "route_node_id": handoff["node_id"],
                 "distance_to_building_m": handoff["distance_to_building_m"],
+                "building_access_path_xy_m": handoff["building_access_path_xy_m"],
                 "route_source": "official-road-network",
-                "location_claim": "nearest-connected-road-node-not-a-surveyed-doorway",
+                "location_claim": "nearby-connected-ground-approach-not-a-surveyed-doorway",
             }
         )
     launch, handoff = graph["launch"], graph["handoff"]
@@ -698,7 +818,7 @@ def semantic_contract(
             "size_z": 0.2,
             "yaw_rad": 0.0,
         },
-        *[obb(item) for item in buildings],
+        *building_collision_primitives(buildings),
     ]
     primitives.extend(
         {
@@ -733,18 +853,20 @@ def semantic_contract(
             "scope": "outdoor-exterior-only",
             "terrain": "registered-orthophoto-plane",
             "building_visuals": "city-register-footprint-extrusions",
-            "building_collisions": "conservative-oriented-boxes",
-            "tree_collisions": "city-tree-register-canopy-cylinders",
-            "forest_restrictions": "city-ecological-network-polygons",
+            "building_collisions": "shared-footprint-cell-union-meshes",
+            "building_height": "registry-linked-measured-heights-where-available; explicitly-labelled-floor-proxies-otherwise",
+            "tree_collisions": "unmeasured-register-point-proxies-and-observed-land-cover-canopy",
+            "ecological_regions": "city-ecological-network-not-legal-access-restrictions",
             "interior_geometry": False,
             "qualified_routes": 0,
         },
         "entities": entities,
         "collision_primitives": primitives,
-        "restricted_regions": [
+        "restricted_regions": [],
+        "ecological_regions": [
             {
                 "region_id": f"forest-{index:04d}",
-                "semantic": "protected-forest",
+                "semantic": "ecological-network",
                 "polygon_m": polygon,
             }
             for index, polygon in enumerate(forests)
@@ -821,6 +943,7 @@ def frontend_geometry(
                     [round(x, 4), round(y, 4)]
                     for x, y in list(item["polygon"].exterior.coords)[:-1]
                 ],
+                "holes": [list(ring.coords)[:-1] for ring in item["polygon"].interiors],
                 "semantic": "building",
                 "name": item["name"],
                 "name_zh": item["name_zh"],
@@ -842,8 +965,8 @@ def frontend_geometry(
                 "semantic": "terrain",
             },
             *[
-                {key: value for key, value in obb(item).items() if key != "name"}
-                for item in buildings
+                {key: value for key, value in item.items() if key != "name"}
+                for item in building_collision_primitives(buildings)
             ],
             *[
                 {
@@ -861,7 +984,7 @@ def frontend_geometry(
         ],
         "nodes": graph["nodes"],
         "edges": graph["edges"],
-        "restricted_regions": forests,
+        "ecological_regions": forests,
         "texture_url": f"asset-previews/maps/{config['key']}-source.jpg",
     }
 
@@ -888,11 +1011,39 @@ def package_content_sha256(files: list[dict[str, Any]]) -> str:
     return sha256_bytes(encoded.encode())
 
 
-def build_ddpkg(config: dict[str, Any], source_root: Path, destination: Path) -> dict[str, str]:
+def map_payloads(source_root: Path) -> dict[str, bytes]:
     payloads: dict[str, bytes] = {}
+    # Package only geometry referenced by the current worlds. A rebuilt map must
+    # not collect obsolete mesh chunks left from an earlier spatial partition.
+    referenced: dict[Path, str] = {}
+    for sdf in source_root.glob("gazebo/*.sdf"):
+        for element in ElementTree.parse(sdf).iter():
+            if element.tag in {"uri", "albedo_map", "normal_map", "roughness_map", "metalness_map"} and element.text:
+                candidate = sdf.parent / element.text.strip()
+                if not candidate.is_file():
+                    raise FileNotFoundError(f"Missing map resource referenced by {sdf}: {element.text.strip()}")
+                # Use the spelling in the world, not a stale directory-entry
+                # spelling retained by Windows after a case-only revision.
+                referenced[candidate.resolve()] = candidate.relative_to(source_root).as_posix()
+    for source in list(referenced):
+        if source.suffix == ".obj":
+            for line in source.read_text(encoding="utf-8").splitlines():
+                if line.startswith("mtllib "):
+                    material = source.parent / line[7:].strip()
+                    if not material.is_file():
+                        raise FileNotFoundError(f"Missing material referenced by {source}: {material}")
+                    referenced[material.resolve()] = (Path(referenced[source]).parent / line[7:].strip()).as_posix()
     for source in sorted(path for path in source_root.rglob("*") if path.is_file()):
         relative = source.relative_to(source_root).as_posix()
+        if relative.startswith("gazebo/meshes/") and source.resolve() not in referenced:
+            continue
+        relative = referenced.get(source.resolve(), relative)
         payloads[f"normalized/map/{relative}"] = source.read_bytes()
+    return payloads
+
+
+def build_ddpkg(config: dict[str, Any], source_root: Path, destination: Path) -> dict[str, str]:
+    payloads = map_payloads(source_root)
     files = []
     for path, payload in sorted(payloads.items()):
         media_type = (
@@ -953,7 +1104,7 @@ def build_ddpkg(config: dict[str, Any], source_root: Path, destination: Path) ->
             "collision_count": summary["collision_primitive_count"],
         },
         "physics": {
-            "link_count": 3 + summary["tree_collision_count"],
+            "link_count": summary["physics_link_count"],
             "joint_count": 0,
             "mass_entry_count": 0,
             "inertia_entry_count": 0,
@@ -968,7 +1119,7 @@ def build_ddpkg(config: dict[str, Any], source_root: Path, destination: Path) ->
             "named_place_count": len(graph["named_entities"]),
             "region_count": summary["forest_region_count"],
             "navigation_graph_path": "normalized/map/navigation-graph.json",
-            "traversability_path": None,
+            "traversability_path": "normalized/map/traversability.json",
         },
         "interfaces": {
             "gazebo_entrypoints": ["normalized/map/gazebo/world.sdf"],
@@ -1013,7 +1164,7 @@ def build_ddpkg(config: dict[str, Any], source_root: Path, destination: Path) ->
         "content_sha256": package_content_sha256([*files, ir_file]),
         "files": [*files, ir_file],
         "qualification": None,
-        "created_at": "2026-10-27T00:00:00Z",
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
     destination.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(
@@ -1042,13 +1193,21 @@ def build_ddpkg(config: dict[str, Any], source_root: Path, destination: Path) ->
 
 def build_map(config: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
     paths, georef = acquire_sources(config, args.cache_root, refresh=args.refresh)
+    config = dict(config)
+    with Image.open(paths["orthophoto"]) as raster:
+        config["resolution_m"] = config["width_m"] / raster.width
     origin = (georef["origin_easting_m"], georef["origin_northing_m"])
-    buildings = load_buildings(paths["buildings"], config, origin)
+    heights = acquire_measured_heights(georef["bbox_wgs84"], args.cache_root, refresh=args.refresh)
+    buildings = load_buildings(paths["buildings"], config, origin, heights["buildings"])
+    land_paths = acquire_layers(args.cache_root / config["key"], georef["bounds_epsg_3879"], refresh=args.refresh)
+    ground_surface, canopies = load_land_cover(land_paths, config, origin)
     trees, tree_source_count = load_trees(paths["trees"], config, origin)
     forests = load_regions(paths["forest"], config, origin)
-    graph = load_road_graph(paths["roads"], config, origin, buildings, trees)
+    graph = load_road_graph(paths["roads"], config, origin, buildings, trees, ground_surface, canopies)
     sources = {
-        "retrieved_at": "2026-10-27",
+        "city_model": {k: v for k, v in heights.items() if k != "buildings"},
+        "land_cover": {"attribution": ATTRIBUTION, "license": "CC-BY-4.0",
+                       "sha256": {name: sha256_file(path) for name, path in land_paths.items()}},
         "city_data_license": "CC-BY-4.0",
         "city_data_owner": "City of Helsinki",
         "building_register_url": CITY_WFS,
@@ -1061,18 +1220,40 @@ def build_map(config: dict[str, Any], args: argparse.Namespace) -> dict[str, Any
         **{f"{name}_sha256": sha256_file(path) for name, path in paths.items()},
     }
     map_root = args.backend_assets / config["key"] / "gazebo"
-    if map_root.parent.exists():
-        shutil.rmtree(map_root.parent)
     texture = map_root / "materials" / "textures" / f"{config['key']}-orthophoto.jpg"
     texture.parent.mkdir(parents=True, exist_ok=True)
     Image.open(paths["orthophoto"]).convert("RGB").save(texture, "JPEG", quality=91, optimize=True)
     mesh, material = building_mesh(buildings, config["key"])
     write_text(map_root / "meshes" / f"{config['key']}-buildings.obj", mesh)
     write_text(map_root / "meshes" / f"{config['key']}-buildings.mtl", material)
+    write_text(map_root / "meshes" / "collision.mtl", "newmtl collision\nKd 0.7 0.7 0.7\n")
+    write_text(map_root / "meshes" / "canopy.mtl", "newmtl canopy\nKd 0.20 0.36 0.15\nKa 0.12 0.25 0.10\n")
+    for building in buildings:
+        building["collision_meshes"] = []
+        for number, part in enumerate(partition_polygon(building["collision_cover"])):
+            uri = f"meshes/{building['id']}-collision-{number}.obj"
+            write_text(map_root / uri, extruded_obj([(building["id"], part, building["height_m"])],
+                                                   material_library="collision.mtl", material_name="collision"))
+            building["collision_meshes"].append(uri)
+    canopy_meshes, group, vertex_count = [], [], 0
+    def save_canopy_group():
+        uri = f"meshes/observed-canopy-{len(canopy_meshes)}.obj"
+        write_text(map_root / uri, extruded_obj(group, material_library="canopy.mtl", material_name="canopy"))
+        canopy_meshes.append(uri)
+    for canopy in canopies:
+        for part in partition_polygon(canopy["polygon"]):
+            count = len(part.exterior.coords) + sum(len(r.coords) for r in part.interiors)
+            if group and vertex_count + count > 1000:
+                save_canopy_group()
+                group, vertex_count = [], 0
+            group.append((canopy["id"], part, canopy["height_m"]))
+            vertex_count += count
+    if group:
+        save_canopy_group()
     write_text(map_root / "meshes" / f"{config['key']}-ground.obj", ground_mesh(config))
-    write_text(map_root / "world.sdf", sdf_text(config, buildings, trees))
-    write_text(map_root / "world.physics.sdf", sdf_text(config, buildings, trees))
-    write_text(map_root / "model.sdf", sdf_text(config, buildings, trees, model_only=True))
+    write_text(map_root / "world.sdf", sdf_text(config, buildings, trees, canopy_meshes=canopy_meshes))
+    write_text(map_root / "world.physics.sdf", sdf_text(config, buildings, trees, canopy_meshes=canopy_meshes))
+    write_text(map_root / "model.sdf", sdf_text(config, buildings, trees, model_only=True, canopy_meshes=canopy_meshes))
     write_text(
         map_root / "model.config",
         '<?xml version="1.0"?>\n'
@@ -1082,7 +1263,27 @@ def build_map(config: dict[str, Any], args: argparse.Namespace) -> dict[str, Any
         f"<description>{config['description']}</description></model>\n",
     )
     semantic = semantic_contract(config, georef, buildings, trees, forests, graph, sources)
-    write_json(map_root / "semantic.json", semantic)
+    entrance_count = append_service_entrances(semantic, args.cache_root,
+        (-config["width_m"]/2, -config["height_m"]/2, config["width_m"]/2, config["height_m"]/2),
+        refresh=args.refresh)
+    semantic["bounds_m"]["z"] = max(float(config["ceiling_m"]),
+        *(item["height_m"] for item in buildings), *(item["height"] for item in trees),
+        *(item["height_m"] for item in canopies))
+    def polygon_fields(polygon):
+        return {"polygon_xy_m": list(polygon.exterior.coords)[:-1],
+                "holes_xy_m": [list(r.coords)[:-1] for r in polygon.interiors]}
+    semantic["traversability"] = {
+        "schema_version": "dronedream.traversability.v1", "required": True,
+        "minimum_agl_m": 0., "maximum_agl_m": float(config["ceiling_m"]),
+        "areas": [{"id": f"observed-ground-{i}", "kind": "open-space", "ground_z_m": 0.,
+                   **polygon_fields(p)} for i, p in enumerate(polygon_parts(graph["ground_surface"]))],
+        "exclusions": [{"id": f"canopy-{c['id']}", "kind": "tree-canopy", **polygon_fields(c["polygon"]),
+                        "evidence": {"source_layer": c["source_layer"], "height_source": c["height_source"]}}
+                       for c in canopies],
+    }
+    semantic["fidelity"]["canopy"] = "HSY-2024-observed-footprint-columns; mean-height-illustration; all-altitude-navigation-exclusion"
+    write_text(map_root / "semantic.json", json.dumps(semantic, ensure_ascii=False, separators=(",", ":")) + "\n")
+    write_json(map_root.parent / "traversability.json", semantic["traversability"])
     write_json(
         map_root / "collision-primitives.json", {"primitives": semantic["collision_primitives"]}
     )
@@ -1098,6 +1299,10 @@ def build_map(config: dict[str, Any], args: argparse.Namespace) -> dict[str, Any
                 f"building-{item['building_id']}-outdoor-handoff": item["node_id"]
                 for item in graph["building_handoffs"]
             },
+            **{
+                f"building-{item['building_id']}": item["node_id"]
+                for item in graph["building_handoffs"]
+            },
         },
         "nodes": graph["nodes"],
         "edges": graph["edges"],
@@ -1108,16 +1313,24 @@ def build_map(config: dict[str, Any], args: argparse.Namespace) -> dict[str, Any
         "asset_id": config["asset_id"],
         "name": config["name"],
         "source_kind": "real-geospatial-data",
-        "visual_primitive_count": len(buildings) + 1,
-        "collision_primitive_count": len(buildings) + len(trees) + 1,
+        "visual_primitive_count": 2 + len(trees) + len(canopy_meshes),
+        "collision_primitive_count": len(semantic["collision_primitives"]),
+        "physics_link_count": 2 + len(buildings) + len(trees) + bool(canopy_meshes),
         "building_count": len(buildings),
+        "measured_height_count": sum(b["height_source"] == "Helsinki-LoD2-measured" for b in buildings),
+        "unmeasured_height_buildings": [b["id"] for b in buildings if b["height_source"] != "Helsinki-LoD2-measured"],
+        "canopy_polygon_count": len(canopies),
         "building_handoff_count": len(graph["building_handoffs"]),
+        "official_entrance_record_count": entrance_count,
+        "unresolved_building_handoffs": graph["unresolved_building_handoffs"],
+        "road_component_sizes": graph["component_sizes"],
+        "grade_separated_source_features": graph["grade_separated_source_features"],
         "tree_collision_count": len(trees),
         "tree_source_count": tree_source_count,
         "road_node_count": len(graph["nodes"]),
         "road_edge_count": len(graph["edges"]),
         "forest_region_count": len(forests),
-        "bounds_m": {"x": config["width_m"], "y": config["height_m"], "z": config["ceiling_m"]},
+        "bounds_m": semantic["bounds_m"],
         "resolution_m": config["resolution_m"],
         "fidelity": semantic["fidelity"],
         "sources": sources,
@@ -1130,7 +1343,9 @@ def build_map(config: dict[str, Any], args: argparse.Namespace) -> dict[str, Any
         "building, road, tree, ecological-network, and "
         f"{ORTHOPHOTO_LAYER} data under CC BY 4.0. Buildings use registered "
         "footprints and addresses; launch and handoff points are selected on "
-        "the official road network. No indoor geometry or unverified doorway "
+        "observed ground linked to the official road network. HSY 2024 ground and canopy data "
+        "provide additional geometry; registry-linked Helsinki LoD2 heights are used where available. "
+        "Unknown heights remain explicit proxies. No indoor geometry or unverified doorway "
         "location is claimed.\n",
     )
     geometry_path = args.frontend_public / "asset-geometry" / "maps" / f"{config['key']}.json"
@@ -1138,7 +1353,14 @@ def build_map(config: dict[str, Any], args: argparse.Namespace) -> dict[str, Any
     source_preview = (
         args.frontend_public / "asset-previews" / "maps" / f"{config['key']}-source.jpg"
     )
-    write_json(geometry_path, frontend_geometry(config, buildings, trees, forests, graph))
+    geometry = frontend_geometry(config, buildings, trees, forests, graph)
+    geometry["metadata"] = {"bounds_m": semantic["bounds_m"], "coordinate_frame": "ENU",
+                            "resolution_m": config["resolution_m"], "building_count": len(buildings),
+                            "source": "City of Helsinki · HSY"}
+    geometry["vegetation_footprints"] = [{"points": list(c["polygon"].exterior.coords)[:-1],
+                                          "holes": [list(r.coords)[:-1] for r in c["polygon"].interiors],
+                                          "height_m": c["height_m"]} for c in canopies]
+    write_text(geometry_path, json.dumps(geometry, ensure_ascii=False, separators=(",", ":")) + "\n")
     source_preview.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(texture, source_preview)
     render_preview(config, source_preview, buildings, graph, preview_path)
@@ -1216,7 +1438,8 @@ def catalog_resource(item: dict[str, Any]) -> dict[str, Any]:
 
 def update_preview_manifest(public_root: Path, resources: list[dict[str, Any]]) -> None:
     path = public_root / "asset-previews" / "manifest.json"
-    manifest = json.loads(path.read_text(encoding="utf-8"))
+    manifest = (json.loads(path.read_text(encoding="utf-8")) if path.is_file()
+                else {"schema_version": "dronedream.asset-previews.v1", "sources": {}, "files": []})
     generated_paths = {f"maps/{resource['key']}.webp" for resource in resources} | {
         f"maps/{resource['key']}-source.jpg" for resource in resources
     }
@@ -1234,7 +1457,7 @@ def update_preview_manifest(public_root: Path, resources: list[dict[str, Any]]) 
     manifest["generator"] = "tools/build-helsinki-maps.py"
     manifest["sources"]["maps"] = {
         "project": "City of Helsinki Open Data",
-        "retrieved_at": "2026-10-27",
+        "imagery_layer": ORTHOPHOTO_LAYER,
         "license": "CC-BY-4.0",
     }
     manifest["files"] = sorted([*retained, *generated], key=lambda entry: entry["path"])
@@ -1250,12 +1473,16 @@ def main() -> None:
     if not selected:
         raise ValueError("No configured map matched --map")
     resources = [catalog_resource(build_map(entry, args)) for entry in selected]
+    previous = (json.loads(args.catalog_output.read_text(encoding="utf-8"))["resources"]
+                if args.catalog_output.is_file() else [])
+    updated_ids = {item["resource_id"] for item in resources}
+    catalog = [item for item in previous if item["resource_id"] not in updated_ids] + resources
     write_json(
         args.catalog_output,
         {
             "schema_version": "dronedream.generated-map-resources.v1",
-            "generated_at": "2026-10-27",
-            "resources": resources,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "resources": sorted(catalog, key=lambda item: item["resource_id"]),
         },
     )
     update_preview_manifest(args.frontend_public, selected)
