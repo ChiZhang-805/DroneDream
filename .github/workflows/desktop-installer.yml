@@ -88,7 +88,7 @@ jobs:
             | sudo tee /etc/apt/sources.list.d/gazebo-stable.list
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends "gz-harmonic=$GAZEBO_VERSION" \
-            build-essential cmake python3-venv
+            build-essential cmake python3-venv cppzmq-dev
 
       - name: Build and test current native sensor components
         run: |
