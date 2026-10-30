@@ -14,6 +14,11 @@ on:
           - lab
           - field
           - autonomy
+      test_signing:
+        description: Submit the source-built installer to SignPath test-signing (never publish)
+        required: false
+        type: boolean
+        default: false
   push:
     tags:
       - "desktop-universal-v*-build-*"
@@ -48,7 +53,7 @@ jobs:
         id: core-inputs
         run: |
           python3 apps/desktop/scripts/prepare-core-build-inputs.py \
-            --source-reference docs/agent-core-public-source.json \
+            --source-reference docs/guides/agent-core-public-source.json \
             --inputs release/distribution/desktop/core-build-inputs.json \
             --github-output "$GITHUB_OUTPUT"
 
@@ -89,7 +94,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 -m venv artifacts/agent-core-source/.venv
-          artifacts/agent-core-source/.venv/bin/python -m pip install -e ./artifacts/agent-core-source
+          artifacts/agent-core-source/.venv/bin/python -m pip install setuptools wheel -e ./artifacts/agent-core-source
           artifacts/agent-core-source/.venv/bin/python \
             artifacts/agent-core-source/scripts/build_native_sensor_runtime.py \
             --px4-root "$GITHUB_WORKSPACE/artifacts/px4-source" \
@@ -97,7 +102,23 @@ jobs:
           artifacts/agent-core-source/.venv/bin/python \
             artifacts/agent-core-source/scripts/stage_native_sensor_runtime.py \
             --source "$GITHUB_WORKSPACE/artifacts/native-build" \
-            --output "$GITHUB_WORKSPACE/artifacts/native-runtime"
+            --output "$GITHUB_WORKSPACE/artifacts/native-runtime/native-sensors"
+          artifacts/agent-core-source/.venv/bin/python \
+            artifacts/agent-core-source/scripts/build_payload_placement_runtime.py \
+            --output "$GITHUB_WORKSPACE/artifacts/payload-build"
+          artifacts/agent-core-source/.venv/bin/python \
+            artifacts/agent-core-source/scripts/build_payload_placement_runtime.py \
+            --stage-from "$GITHUB_WORKSPACE/artifacts/payload-build" \
+            --output "$GITHUB_WORKSPACE/artifacts/native-runtime/payload-placement"
+          cmake -S artifacts/agent-core-source/native/camera_clock -B artifacts/camera-clock-build -DCMAKE_BUILD_TYPE=Release
+          cmake --build artifacts/camera-clock-build -j 2
+          artifacts/agent-core-source/.venv/bin/python \
+            artifacts/agent-core-source/scripts/record_camera_clock_build.py --build artifacts/camera-clock-build
+          artifacts/agent-core-source/.venv/bin/python \
+            artifacts/agent-core-source/scripts/stage_native_camera_clock.py \
+            --source artifacts/camera-clock-build --output artifacts/native-runtime/camera-clock
+          SOURCE_DATE_EPOCH=946684800 artifacts/agent-core-source/.venv/bin/python -m pip wheel \
+            --no-deps --no-build-isolation --wheel-dir artifacts/native-runtime/wheels ./artifacts/agent-core-source
 
       - name: Upload source-bound native Runtime
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -269,26 +290,34 @@ jobs:
       - name: Download exact admitted model input
         shell: pwsh
         run: |
-          python apps/desktop/scripts/prepare-core-build-inputs.py `
-            --source-reference docs/agent-core-public-source.json `
-            --inputs release/distribution/desktop/core-build-inputs.json `
-            --download-to artifacts/model-input
-          if ($LASTEXITCODE -ne 0) { throw 'Pinned model input preparation failed' }
+          $inputs = Get-Content release/distribution/desktop/core-build-inputs.json -Raw | ConvertFrom-Json
+          if ($null -ne $inputs.model_bundle) {
+            python apps/desktop/scripts/prepare-core-build-inputs.py `
+              --source-reference docs/guides/agent-core-public-source.json `
+              --inputs release/distribution/desktop/core-build-inputs.json `
+              --download-to artifacts/model-input
+            if ($LASTEXITCODE -ne 0) { throw 'Pinned model input preparation failed' }
+          }
 
       - name: Build complete Core components from source
         shell: pwsh
         run: |
           python -m venv artifacts/agent-core-source/.venv
           if ($LASTEXITCODE -ne 0) { throw 'Core Python environment creation failed' }
-          ./artifacts/agent-core-source/.venv/Scripts/python.exe -m pip install `
-            -e './artifacts/agent-core-source[dev,local-policy]'
-          if ($LASTEXITCODE -ne 0) { throw 'Core build dependency installation failed' }
+          $policy = @{}
+          if (Test-Path artifacts/model-input/package/manifest.json) {
+            $policy.LocalPolicyPackage = Join-Path $env:GITHUB_WORKSPACE 'artifacts/model-input/package'
+            $policy.LocalPolicySimulationAdmission = Join-Path $env:GITHUB_WORKSPACE 'artifacts/model-input/simulation-admission.json'
+            $policy.LocalPolicyDistributionLicenses = Join-Path $env:GITHUB_WORKSPACE 'artifacts/model-input/licenses.json'
+          }
+          $wheels = @(Get-ChildItem artifacts/native-runtime/wheels -Filter '*.whl' -File)
+          if ($wheels.Count -ne 1) { throw 'Expected one source-built Linux Core wheel from this run' }
           ./artifacts/agent-core-source/scripts/build-autonomy-windows.ps1 `
-            -StageOnly `
-            -LocalPolicyPackage (Join-Path $env:GITHUB_WORKSPACE 'artifacts/model-input/package') `
-            -LocalPolicySimulationAdmission (Join-Path $env:GITHUB_WORKSPACE 'artifacts/model-input/simulation-admission.json') `
-            -LocalPolicyDistributionLicenses (Join-Path $env:GITHUB_WORKSPACE 'artifacts/model-input/licenses.json') `
-            -NativeSensorRuntime (Join-Path $env:GITHUB_WORKSPACE 'artifacts/native-runtime')
+            -StageOnly @policy `
+            -RuntimeCoreWheel $wheels[0].FullName `
+            -NativeSensorRuntime (Join-Path $env:GITHUB_WORKSPACE 'artifacts/native-runtime/native-sensors') `
+            -PayloadPlacementRuntime (Join-Path $env:GITHUB_WORKSPACE 'artifacts/native-runtime/payload-placement') `
+            -CameraClockRuntime (Join-Path $env:GITHUB_WORKSPACE 'artifacts/native-runtime/camera-clock')
 
       - name: Stage verified Core into product
         shell: pwsh
@@ -315,7 +344,7 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           npm ci --prefix apps/frontend
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npm ci --prefix desktop
+          npm ci --prefix apps/desktop
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Verify updater build and signing contracts
@@ -476,9 +505,6 @@ jobs:
           wait-for-completion-timeout-in-seconds: 1800
           output-artifact-directory: apps/desktop/src-tauri/target/release/signpath/application
           skip-decompress: true
-          parameters: |
-            version: "${{ steps.release-version.outputs.version }}"
-            productName: "${{ steps.release.outputs.product_name }}"
 
       - name: Install and verify signed application
         if: ${{ steps.release.outputs.is_release == 'true' }}
@@ -559,9 +585,6 @@ jobs:
           wait-for-completion-timeout-in-seconds: 1800
           output-artifact-directory: apps/desktop/src-tauri/target/release/signpath/installer
           skip-decompress: true
-          parameters: |
-            version: "${{ steps.release-version.outputs.version }}"
-            productName: "${{ steps.release.outputs.product_name }}"
 
       - name: Install and verify signed installer
         if: ${{ steps.release.outputs.is_release == 'true' }}
@@ -978,6 +1001,42 @@ jobs:
           retention-days: ${{ github.event_name == 'pull_request' && 3 || (github.event_name == 'workflow_dispatch' && 14 || 30) }}
           compression-level: 0
           path: apps/desktop/release-dist/*
+
+      - name: Upload source-built installer for test signing
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_signing }}
+        id: upload-test-installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: DroneDream-test-signing-installer
+          archive: false
+          if-no-files-found: error
+          retention-days: 3
+          path: apps/desktop/release-dist/${{ steps.release.outputs.public_installer }}
+
+      - name: Submit source-built installer to SignPath test-signing
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_signing }}
+        id: test-signing
+        uses: signpath/github-action-submit-signing-request@b9d91eadd323de506c0c81cf0c7fe7438f3360fd # v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: test-signing
+          artifact-configuration-slug: ${{ vars.SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION_SLUG }}
+          github-artifact-id: ${{ steps.upload-test-installer.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 1800
+          skip-decompress: true
+          output-artifact-directory: artifacts/signpath-test
+
+      - name: Upload test-signed installer (not a release)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_signing }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: DroneDream-test-signed-installer
+          path: artifacts/signpath-test/*
+          if-no-files-found: error
+          retention-days: 3
 
   publish-release:
     name: Publish signed Windows release

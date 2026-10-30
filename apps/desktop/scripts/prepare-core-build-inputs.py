@@ -74,7 +74,7 @@ def read_object(path: Path) -> dict:
 #   require_model：是否必须已有通过准入并获准分发的模型下载条目。
 # 输出：
 #   values：可传递给构建任务的固定来源字段。
-def resolve_inputs(reference: dict, inputs: dict, *, require_model: bool = True) -> dict:
+def resolve_inputs(reference: dict, inputs: dict, *, require_model: bool = False) -> dict:
     if (reference.get("schema_version") != "dronedream.public-core-source-reference.v1"
             or reference.get("repository") != "ChiZhang-805/DroneDream-Agent-Core"
             or not re.fullmatch(r"[0-9a-f]{40}", str(reference.get("commit", "")))):
@@ -96,7 +96,7 @@ def resolve_inputs(reference: dict, inputs: dict, *, require_model: bool = True)
     if bundle is None and require_model:
         raise ValueError(
             "CURRENT_MODEL_BUNDLE_NOT_QUALIFIED: no current, licensed, admitted model bundle "
-            "is pinned; train/evaluate and register actual artifact bytes before installer builds"
+            "is pinned; register actual artifact bytes before downloading the optional model"
         )
     if bundle is not None:
         if not isinstance(bundle, dict):
@@ -209,7 +209,7 @@ def download_bundle(bundle: dict, output: Path) -> Path:
 
 
 # 功能：
-#   为 CI 输出固定源码字段，按需取得模型输入；未登记合格模型时明确终止构建。
+#   为 CI 输出固定源码字段；路线控制无需本地模型，显式下载时才要求模型输入。
 # 输入：
 #   无：来源文件、输入锁及输出选项来自命令行。
 # 输出：
@@ -226,7 +226,7 @@ def main() -> int:
         parser.error("--native-only cannot download models")
     inputs = read_object(args.inputs)
     values = resolve_inputs(read_object(args.source_reference), inputs,
-                            require_model=not args.native_only)
+                            require_model=bool(args.download_to))
     if args.download_to:
         download_bundle(inputs["model_bundle"], args.download_to)
     if args.github_output:

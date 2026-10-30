@@ -34,7 +34,7 @@ def inputs() -> tuple[dict, dict]:
 
 
 # 功能：
-#   验证没有合格模型时阻止安装构建，但允许明确请求的原生源码检查。
+#   路线控制可以不带可选模型构建；显式请求模型下载时仍必须有真实的输入锁。
 # 输入：
 #   无：使用隔离配置对象。
 # 输出：
@@ -43,8 +43,8 @@ def test_missing_current_model_never_falls_back() -> None:
     reference, value = inputs()
     value["model_bundle"] = None
     with pytest.raises(ValueError, match="CURRENT_MODEL_BUNDLE_NOT_QUALIFIED"):
-        module.resolve_inputs(reference, value)
-    resolved = module.resolve_inputs(reference, value, require_model=False)
+        module.resolve_inputs(reference, value, require_model=True)
+    resolved = module.resolve_inputs(reference, value)
     assert resolved["commit"] == reference["commit"]
 
 
