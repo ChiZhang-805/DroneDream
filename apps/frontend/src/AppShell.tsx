@@ -3914,6 +3914,9 @@ function AppShellContent() {
       : updater.error
       ? t("updater.sidebarDeferred")
       : t("updater.sidebarAvailable");
+  const sidebarUpdateDetails = sidebarUpdateBusy && updater.transfer?.downloadedBytes != null
+    ? `${sidebarUpdateLabel} · ${(updater.transfer.downloadedBytes / 1048576).toFixed(1)}${updater.transfer.totalBytes ? ` / ${(updater.transfer.totalBytes / 1048576).toFixed(1)}` : ""} MB · ${((updater.transfer.bytesPerSecond ?? 0) / 1048576).toFixed(2)} MB/s`
+    : sidebarUpdateLabel;
   const handleSidebarUpdate = useCallback(() => {
     if (["available", "ready"].includes(updater.status)) {
       void updater.installAvailableUpdate();
@@ -4642,7 +4645,7 @@ function AppShellContent() {
                 type="button"
                 className={`app-account-trailing-button app-update-button${sidebarUpdateBusy ? " is-busy has-progress" : ""}`}
                 aria-label={sidebarUpdateLabel}
-                title={sidebarUpdateLabel}
+                title={sidebarUpdateDetails}
                 aria-live={sidebarUpdateBusy ? "polite" : undefined}
                 disabled={sidebarUpdateBusy}
                 onClick={handleSidebarUpdate}

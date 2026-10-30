@@ -44,6 +44,7 @@ export interface AppUpdateBlock {
 }
 
 interface AppUpdateState {
+  transfer?: NativeAppUpdateProgress;
   status: AppUpdateStatus;
   availableVersion: string | null;
   updateRequired: boolean;
@@ -231,6 +232,7 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
       status: event.phase === "failed" ? "available" : event.phase === "ready" ? "ready" : installing ? "installing" : "downloading",
       progress: event.phase === "failed" ? null : event.progress,
       error: event.error ?? null,
+      transfer: event,
       blockedActivity: null,
     }));
   }, []);

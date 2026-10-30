@@ -357,6 +357,96 @@ pub async fn restore_browser_auth_vault() -> Result<Option<BrowserAuthSession>, 
         .map_err(|error| format!("Desktop session restoration task failed: {error}"))?
 }
 
+// Profile writes use native HTTPS, just like desktop sign-in. No caller-supplied
+// server or arbitrary metadata is accepted by this command.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ProfileUpdateRequest {
+    access_token: String,
+    publishable_key: String,
+    user_id: String,
+    change: ProfileChange,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
+enum ProfileChange {
+    Name { value: String },
+    Avatar { value: Option<String> },
+}
+
+#[tauri::command]
+pub async fn update_account_profile(request: ProfileUpdateRequest) -> Result<serde_json::Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        update_account_profile_sync(request, "https://yggabfynndpzymlqvnim.supabase.co")
+    }).await.map_err(|_| "The profile save could not finish. Try again.".to_string())?
+}
+
+fn profile_response(response: reqwest::blocking::Response) -> Result<serde_json::Value, String> {
+    let status = response.status();
+    let body: serde_json::Value = response.json()
+        .map_err(|_| "The account service returned an unreadable response. Try again.".to_string())?;
+    if !status.is_success() {
+        return Err(if status == StatusCode::UNAUTHORIZED {
+            "Your sign-in has expired. Sign in again before saving.".to_string()
+        } else {
+            format!("The account change could not be saved (HTTP {}). Try again.", status.as_u16())
+        });
+    }
+    Ok(body)
+}
+
+fn update_account_profile_sync(request: ProfileUpdateRequest, origin: &str) -> Result<serde_json::Value, String> {
+    let client = Client::builder().redirect(Policy::none())
+        .connect_timeout(Duration::from_secs(30)).timeout(Duration::from_secs(120))
+        .build().map_err(|_| "Unable to initialize the account connection.".to_string())?;
+    let network_error = |_| "Could not reach the account service. Your changes have not been confirmed; try saving again.".to_string();
+    let user_url = format!("{origin}/auth/v1/user");
+    let authorized = |method, url: &str| client.request(method, url)
+        .header("apikey", &request.publishable_key).bearer_auth(&request.access_token);
+    let data = match request.change {
+        ProfileChange::Name { value } => {
+            let name = value.split_whitespace().collect::<Vec<_>>().join(" ");
+            if name.is_empty() || name.chars().count() > 48 || name.chars().any(char::is_control) {
+                return Err("Username must contain between 1 and 48 readable characters.".to_string());
+            }
+            serde_json::json!({"display_name": name})
+        },
+        ProfileChange::Avatar { value } => {
+            let user = profile_response(authorized(reqwest::Method::GET, &user_url).send().map_err(network_error)?)?;
+            if user.get("id").and_then(|id| id.as_str()) != Some(request.user_id.as_str()) {
+                return Err("The account changed. Reopen your profile before saving.".to_string());
+            }
+            let id = Uuid::parse_str(&request.user_id).map_err(|_| "Invalid account identity.".to_string())?;
+            let object_url = format!("{origin}/storage/v1/object/profile-avatars/{id}/avatar.jpg");
+            let avatar_url = if let Some(value) = value {
+                let encoded = value.strip_prefix("data:image/jpeg;base64,")
+                    .ok_or_else(|| "The profile photo must be a JPEG image.".to_string())?;
+                if encoded.len() > 600_000 { return Err("The profile photo is too large.".to_string()); }
+                let bytes = BASE64_STANDARD.decode(encoded).map_err(|_| "The profile photo could not be read.".to_string())?;
+                if !bytes.starts_with(&[0xff, 0xd8, 0xff]) { return Err("The profile photo is not a JPEG image.".to_string()); }
+                profile_response(authorized(reqwest::Method::POST, &object_url)
+                    .header("Content-Type", "image/jpeg").header("x-upsert", "true")
+                    .body(bytes).send().map_err(network_error)?)?;
+                Some(format!("{origin}/storage/v1/object/public/profile-avatars/{id}/avatar.jpg?v={}", Utc::now().timestamp_millis()))
+            } else {
+                let response = authorized(reqwest::Method::DELETE, &format!("{origin}/storage/v1/object/profile-avatars"))
+                    .json(&serde_json::json!({"prefixes": [format!("{id}/avatar.jpg")]}))
+                    .send().map_err(network_error)?;
+                if response.status() != StatusCode::NOT_FOUND { profile_response(response)?; }
+                None
+            };
+            serde_json::json!({"dronedream_avatar_url": avatar_url})
+        },
+    };
+    let user = profile_response(authorized(reqwest::Method::PUT, &user_url)
+        .json(&serde_json::json!({"data": data})).send().map_err(network_error)?)?;
+    if user.get("id").and_then(|id| id.as_str()) != Some(request.user_id.as_str()) {
+        return Err("The account changed. Reopen your profile before saving.".to_string());
+    }
+    Ok(user)
+}
+
 /// User-selected fields cannot alter native identity, callback, scope, or PKCE.
 fn validate_request(request: &BrowserAuthRequest) -> Result<(), String> {
     if request.locale != "en" && request.locale != "zh-CN" {
@@ -1371,6 +1461,68 @@ fn write_text_response(
 mod tests {
     use super::*;
     use std::io::Cursor;
+
+    fn profile_server(responses: Vec<(&'static str, serde_json::Value)>) -> (String, thread::JoinHandle<Vec<String>>) {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let handle = thread::spawn(move || {
+            let mut requests = Vec::new();
+            for (status, body) in responses {
+                let (mut socket, _) = listener.accept().unwrap();
+                socket.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+                let mut bytes = Vec::new();
+                let mut byte = [0];
+                while !bytes.ends_with(b"\r\n\r\n") { socket.read_exact(&mut byte).unwrap(); bytes.push(byte[0]); }
+                let header = String::from_utf8(bytes.clone()).unwrap();
+                let length = header.lines().find_map(|line| line.to_lowercase().strip_prefix("content-length: ").and_then(|v| v.parse::<usize>().ok())).unwrap_or(0);
+                let mut body_bytes = vec![0; length];
+                socket.read_exact(&mut body_bytes).unwrap(); bytes.extend(body_bytes);
+                requests.push(String::from_utf8_lossy(&bytes).to_string());
+                let body = body.to_string();
+                write!(socket, "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
+            }
+            requests
+        });
+        (origin, handle)
+    }
+
+    #[test]
+    fn profile_name_round_trip_preserves_unicode_and_server_identity() {
+        let user = serde_json::json!({"id":"account", "user_metadata":{"display_name":"驰驰睡不醒"}});
+        let (origin, server) = profile_server(vec![("200 OK", user.clone())]);
+        let result = update_account_profile_sync(ProfileUpdateRequest {
+            access_token:"test-token".into(), publishable_key:"test-key".into(), user_id:"account".into(),
+            change:ProfileChange::Name{value:" 驰驰睡不醒 ".into()},
+        }, &origin).unwrap();
+        assert_eq!(result, user);
+        let requests = server.join().unwrap();
+        assert!(requests[0].starts_with("PUT /auth/v1/user "));
+        assert!(requests[0].contains("驰驰睡不醒"));
+        assert!(requests[0].contains("Bearer test-token"));
+    }
+
+    #[test]
+    fn avatar_upload_and_remove_use_owned_storage_then_confirm_metadata() {
+        let id = "00000000-0000-4000-8000-000000000001";
+        for upload in [true, false] {
+            let user = serde_json::json!({"id":id,"user_metadata":{}});
+            let (origin, server) = profile_server(vec![("200 OK",user.clone()),("200 OK",serde_json::json!({})),("200 OK",user)]);
+            update_account_profile_sync(ProfileUpdateRequest {
+                access_token:"test-token".into(), publishable_key:"test-key".into(), user_id:id.into(),
+                change:ProfileChange::Avatar{value:upload.then(|| format!("data:image/jpeg;base64,{}", BASE64_STANDARD.encode([0xff,0xd8,0xff,0xd9])))},
+            }, &origin).unwrap();
+            let requests = server.join().unwrap();
+            assert!(requests[0].starts_with("GET /auth/v1/user "));
+            if upload {
+                assert!(requests[1].starts_with(&format!("POST /storage/v1/object/profile-avatars/{id}/avatar.jpg ")));
+                assert!(requests[2].contains("dronedream_avatar_url"));
+            } else {
+                assert!(requests[1].starts_with("DELETE /storage/v1/object/profile-avatars "));
+                assert!(requests[1].contains("prefixes"));
+                assert!(requests[2].contains("\"dronedream_avatar_url\":null"));
+            }
+        }
+    }
 
     /// No fixture contains real credentials or invokes the remote OAuth service.
     fn valid_request() -> BrowserAuthRequest {

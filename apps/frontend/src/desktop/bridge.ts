@@ -1480,6 +1480,20 @@ export function restoreBrowserAuthVault(): Promise<BrowserAuthSession | null> {
   );
 }
 
+export function updateAccountProfile(request: {
+  accessToken: string;
+  publishableKey: string;
+  userId: string;
+  change: { kind: "name"; value: string } | { kind: "avatar"; value: string | null };
+}): Promise<import("@supabase/supabase-js").User> {
+  return invokeDesktop("update_account_profile", (value) => {
+    const user = expectRecord(value, "profile user");
+    if (user.id !== request.userId) throw new Error("The account changed while saving your profile.");
+    expectRecord(user.user_metadata, "profile metadata");
+    return user as unknown as import("@supabase/supabase-js").User;
+  }, { request });
+}
+
 /** Bind the returned preview to a detached copy of the exact requested selection. */
 export function validateDistributionPlan(
   request: DistributionPlanRequest,
@@ -1523,6 +1537,9 @@ export interface NativeAppUpdateProgress {
   progress: number;
   attempt: number;
   error?: string;
+  downloadedBytes?: number;
+  totalBytes?: number;
+  bytesPerSecond?: number;
 }
 
 export interface NativeAppUpdateSnapshot {
@@ -1555,7 +1572,15 @@ function parseNativeAppUpdateProgress(value: unknown): NativeAppUpdateProgress {
   if (!Number.isInteger(attempt) || attempt < 0) {
     throw new Error("app update progress.attempt must be a non-negative integer");
   }
-  return { phase, progress, attempt, ...(typeof record.error === "string" ? { error: record.error } : {}) };
+  const transfer: Partial<NativeAppUpdateProgress> = {};
+  for (const key of ["downloadedBytes", "totalBytes", "bytesPerSecond"] as const) {
+    if (record[key] != null) {
+      const value = expectFiniteNumber(record[key], `app update progress.${key}`);
+      if (value < 0) throw new Error(`app update progress.${key} must be non-negative`);
+      transfer[key] = value;
+    }
+  }
+  return { phase, progress, attempt, ...transfer, ...(typeof record.error === "string" ? { error: record.error } : {}) };
 }
 
 function parseNativeAppUpdateSnapshot(value: unknown): NativeAppUpdateSnapshot {

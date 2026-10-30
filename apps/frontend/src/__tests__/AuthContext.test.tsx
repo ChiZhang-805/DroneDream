@@ -287,9 +287,9 @@ describe("AuthContext account profile", () => {
   });
 
   it("does not rename the new desktop account with a late old-account response", async () => {
-    let resolve!: (value: Response) => void;
-    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((accept) => { resolve = accept; })));
-    window.__TAURI__ = { core: { invoke: vi.fn(async () => undefined) } };
+    let resolve!: (value: typeof authMock.state.user) => void;
+    window.__TAURI__ = { core: { invoke: vi.fn((command: string) => command === "update_account_profile"
+      ? new Promise((accept) => { resolve = accept; }) : Promise.resolve(undefined)) } };
     render(<AuthProvider><AccountProbe /></AuthProvider>);
     act(() => { activateDesktopAuthSession(); adoptDesktopAccount(); });
     fireEvent.click(screen.getByRole("button", { name: "Rename" }));
@@ -299,7 +299,7 @@ describe("AuthContext account profile", () => {
         accessToken: "new-token",
       },
     })));
-    await act(async () => resolve(new Response("{}", { status: 200 })));
+    await act(async () => resolve({ ...authMock.state.user, user_metadata: { display_name: "Flight Pilot" } }));
     expect(screen.getByLabelText("username")).toHaveTextContent("new");
     expect(screen.getByLabelText("profile-error")).toHaveTextContent("account changed");
   });
@@ -667,8 +667,7 @@ describe("AuthContext account profile", () => {
     expect(authMock.onAuthStateChange).not.toHaveBeenCalled();
     expect(screen.getByLabelText("username")).toHaveTextContent("");
 
-    activateDesktopAuthSession();
-    adoptDesktopAccount();
+    act(() => { activateDesktopAuthSession(); adoptDesktopAccount(); });
 
     await waitFor(() => {
       expect(authMock.getSession).not.toHaveBeenCalled();
@@ -811,118 +810,64 @@ describe("AuthContext account profile", () => {
     },
   );
 
-  it("updates a desktop username with the native-adopted access token", async () => {
-    const request = vi.fn(async () => new Response("{}", { status: 200 }));
-    vi.stubGlobal("fetch", request);
-    window.__TAURI__ = { core: { invoke: vi.fn(async () => undefined) } };
-
-    render(
-      <AuthProvider>
-        <AccountProbe />
-      </AuthProvider>,
-    );
-    activateDesktopAuthSession();
-    adoptDesktopAccount();
+  it("saves a desktop username through native HTTPS and adopts the returned cloud profile", async () => {
+    const invoke = vi.fn(async (command: string) => command === "update_account_profile"
+      ? { ...authMock.state.user, user_metadata: { display_name: "Flight Pilot" } } : undefined);
+    window.__TAURI__ = { core: { invoke } };
+    render(<AuthProvider><AccountProbe /></AuthProvider>);
+    act(() => { activateDesktopAuthSession(); adoptDesktopAccount(); });
     await screen.findByText("pilot.name");
-
     fireEvent.click(screen.getByRole("button", { name: "Rename" }));
-
-    await waitFor(() => {
-      expect(screen.getByLabelText("username")).toHaveTextContent("Flight Pilot");
-    });
-    expect(request).toHaveBeenCalledWith(
-      "https://accounts.example.test/auth/v1/user",
-      expect.objectContaining({
-        method: "PUT",
-        headers: {
-          apikey: "public-browser-key",
-          Authorization: "Bearer session-token",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ data: { display_name: "Flight Pilot" } }),
-      }),
-    );
+    await waitFor(() => expect(screen.getByLabelText("username")).toHaveTextContent("Flight Pilot"));
+    expect(invoke).toHaveBeenCalledWith("update_account_profile", { request: {
+      accessToken: "session-token", publishableKey: "public-browser-key", userId: "user-1",
+      change: { kind: "name", value: "Flight Pilot" },
+    } });
     expect(authMock.updateUser).not.toHaveBeenCalled();
-    expect(authMock.getSession).not.toHaveBeenCalled();
   });
 
-  it("uploads a desktop avatar with the adopted token and persists its shared URL", async () => {
+  it("persists the confirmed desktop avatar URL returned by the account service", async () => {
     vi.spyOn(Date, "now").mockReturnValue(1_888_888_888_888);
-    const request = vi.fn(async () => new Response("{}", { status: 200 }));
-    vi.stubGlobal("fetch", request);
-    window.__TAURI__ = { core: { invoke: vi.fn(async () => undefined) } };
-
-    render(
-      <AuthProvider>
-        <AccountProbe />
-      </AuthProvider>,
-    );
-    activateDesktopAuthSession();
-    adoptDesktopAccount();
+    const remoteAvatar = "https://accounts.example.test/storage/v1/object/public/profile-avatars/user-1/avatar.jpg?v=1888888888888";
+    const invoke = vi.fn(async (command: string) => command === "update_account_profile"
+      ? { ...authMock.state.user, user_metadata: { dronedream_avatar_url: remoteAvatar } } : undefined);
+    window.__TAURI__ = { core: { invoke } };
+    render(<AuthProvider><AccountProbe /></AuthProvider>);
+    act(() => { activateDesktopAuthSession(); adoptDesktopAccount(); });
     await screen.findByText("pilot.name");
-
     fireEvent.click(screen.getByRole("button", { name: "Change avatar" }));
-
-    const remoteAvatar =
-      "https://accounts.example.test/storage/v1/object/public/profile-avatars/user-1/avatar.jpg?v=1888888888888";
-    await waitFor(() => {
-      expect(screen.getByLabelText("avatar")).toHaveTextContent(remoteAvatar);
-    });
-    expect(request).toHaveBeenNthCalledWith(
-      1,
-      "https://accounts.example.test/storage/v1/object/profile-avatars/user-1/avatar.jpg",
-      expect.objectContaining({
-        method: "POST",
-        headers: {
-          apikey: "public-browser-key",
-          Authorization: "Bearer session-token",
-          "Content-Type": "image/jpeg",
-          "x-upsert": "true",
-        },
-        body: expect.any(Blob),
-      }),
-    );
-    expect(request).toHaveBeenNthCalledWith(
-      2,
-      "https://accounts.example.test/auth/v1/user",
-      expect.objectContaining({
-        method: "PUT",
-        body: JSON.stringify({ data: { dronedream_avatar_url: remoteAvatar } }),
-      }),
-    );
+    await waitFor(() => expect(screen.getByLabelText("avatar")).toHaveTextContent(remoteAvatar));
+    expect(invoke).toHaveBeenCalledWith("update_account_profile", { request: {
+      accessToken: "session-token", publishableKey: "public-browser-key", userId: "user-1",
+      change: { kind: "avatar", value: "data:image/jpeg;base64,ZmFrZS1hdmF0YXI=" },
+    } });
+    expect(window.localStorage.getItem("drone-dream:account-avatar:user-1")).toBe(remoteAvatar);
     expect(authMock.updateUser).not.toHaveBeenCalled();
-    expect(window.localStorage.getItem("drone-dream:account-avatar:user-1"))
-      .toBe(remoteAvatar);
   });
 
-  it("replaces a raw desktop fetch failure with a useful avatar error", async () => {
-    const request = vi.fn(async () => {
-      throw new TypeError("Failed to fetch");
-    });
-    vi.stubGlobal("fetch", request);
-    window.__TAURI__ = { core: { invoke: vi.fn(async () => undefined) } };
-
-    render(
-      <AuthProvider>
-        <AccountProbe />
-      </AuthProvider>,
-    );
-    activateDesktopAuthSession();
-    adoptDesktopAccount();
+  it("keeps the existing desktop profile when the native save fails", async () => {
+    const message = "Could not reach the account service. Try saving again.";
+    window.__TAURI__ = { core: { invoke: vi.fn(async (command: string) => {
+      if (command === "update_account_profile") throw new Error(message);
+      return undefined;
+    }) } };
+    render(<AuthProvider><AccountProbe /></AuthProvider>);
+    act(() => { activateDesktopAuthSession(); adoptDesktopAccount(); });
     await screen.findByText("pilot.name");
-
     fireEvent.click(screen.getByRole("button", { name: "Change avatar" }));
+    await waitFor(() => expect(screen.getByLabelText("avatar-error")).toHaveTextContent(message));
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    await waitFor(() => expect(screen.getByLabelText("profile-error")).toHaveTextContent(message));
+    expect(screen.getByLabelText("username")).toHaveTextContent("pilot.name");
+  });
 
-    await waitFor(() => {
-      expect(screen.getByLabelText("avatar-error")).toHaveTextContent(
-        "The profile photo could not be uploaded. Check your connection and try again.",
-      );
-    });
-    const sharedAvatar =
-      "https://accounts.example.test/storage/v1/object/public/profile-avatars/user-1/avatar.jpg";
-    expect(screen.getByLabelText("avatar")).toHaveTextContent(sharedAvatar);
-    expect(window.localStorage.getItem("drone-dream:account-avatar:user-1"))
-      .toContain(sharedAvatar);
+  it("does not restore a deleted cloud avatar from stale local cache", async () => {
+    window.localStorage.setItem("drone-dream:account-avatar:user-1", "https://accounts.example.test/storage/v1/object/public/profile-avatars/user-1/avatar.jpg");
+    authMock.state.user.user_metadata = { dronedream_avatar_url: null };
+    render(<AuthProvider><AccountProbe /></AuthProvider>);
+    await screen.findByText("pilot.name");
+    expect(screen.getByLabelText("avatar")).toBeEmptyDOMElement();
+    expect(window.localStorage.getItem("drone-dream:account-avatar:user-1")).toBeNull();
   });
 
   it("reconstructs the shared avatar URL when optional WebView storage is unavailable", async () => {
@@ -990,8 +935,7 @@ describe("AuthContext account profile", () => {
         <AccountProbe />
       </AuthProvider>,
     );
-    activateDesktopAuthSession();
-    adoptDesktopAccount();
+    act(() => { activateDesktopAuthSession(); adoptDesktopAccount(); });
     await screen.findByText("pilot.name");
 
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
@@ -1017,8 +961,7 @@ describe("AuthContext account profile", () => {
         <AccountProbe />
       </AuthProvider>,
     );
-    activateDesktopAuthSession();
-    adoptDesktopAccount();
+    act(() => { activateDesktopAuthSession(); adoptDesktopAccount(); });
     await screen.findByText("pilot.name");
 
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));

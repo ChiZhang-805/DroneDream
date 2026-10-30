@@ -1,3 +1,4 @@
+import { updateAccountProfile } from "../../desktop/bridge";
 import {
   createContext,
   useCallback,
@@ -217,6 +218,11 @@ function providerAvatar(user: User): string | null {
 
 function resolvedAvatarForUser(user: User): string | null {
   // Prefer current cloud metadata over a possibly stale WebView cache.
+  if (Object.hasOwn(user.user_metadata, PROFILE_AVATAR_METADATA_KEY)
+      && user.user_metadata[PROFILE_AVATAR_METADATA_KEY] === null) {
+    cacheAvatarForUser(user.id, null);
+    return null;
+  }
   const metadata = metadataAvatar(user);
   const provider = providerAvatar(user);
   const cached = localAvatarForUser(user.id);
@@ -653,22 +659,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!configuration || !accessToken) {
         throw new Error("Sign in before changing the username.");
       }
-      const response = await fetch(`${configuration.supabaseUrl}/auth/v1/user`, {
-        method: "PUT",
-        headers: {
-          apikey: configuration.publishableKey,
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ data: { display_name: normalized } }),
+      const user = await updateAccountProfile({
+        accessToken, publishableKey: configuration.publishableKey,
+        userId: currentAccount.id, change: { kind: "name", value: normalized },
       });
-      if (!response.ok) {
-        throw new Error("The username could not be saved.");
-      }
       assertProfileOwner(currentAccount.id, generation);
-      setAccount((current) =>
-        current?.id === currentAccount.id ? { ...current, displayName: normalized } : current,
-      );
+      adoptUser(user, accessToken);
       return;
     }
 
@@ -730,57 +726,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!accessToken) {
         throw new Error("Sign in before changing the profile photo.");
       }
-      const objectUrl = new URL(
-        `/storage/v1/object/${PROFILE_AVATAR_BUCKET}/${encodeURIComponent(currentAccount.id)}/${PROFILE_AVATAR_FILE}`,
-        configuration.supabaseUrl,
-      ).toString();
-      let objectResponse: Response;
-      try {
-        objectResponse = await fetch(objectUrl, {
-          method: avatarDataUrl ? "POST" : "DELETE",
-          headers: {
-            apikey: configuration.publishableKey,
-            Authorization: `Bearer ${accessToken}`,
-            ...(avatarDataUrl
-              ? { "Content-Type": "image/jpeg", "x-upsert": "true" }
-              : {}),
-          },
-          ...(avatarDataUrl ? { body: avatarJpegBlob(avatarDataUrl) } : {}),
-        });
-      } catch {
-        throw new Error(
-          "The profile photo could not be uploaded. Check your connection and try again.",
-        );
-      }
-      if (!objectResponse.ok && !(avatarDataUrl === null && objectResponse.status === 404)) {
-        throw new Error("The profile photo could not be uploaded.");
-      }
+      const user = await updateAccountProfile({
+        accessToken, publishableKey: configuration.publishableKey,
+        userId: currentAccount.id, change: { kind: "avatar", value: avatarDataUrl },
+      });
       assertProfileOwner(currentAccount.id, generation);
-      let metadataResponse: Response;
-      try {
-        metadataResponse = await fetch(
-          `${configuration.supabaseUrl}/auth/v1/user`,
-          {
-            method: "PUT",
-            headers: {
-              apikey: configuration.publishableKey,
-              Authorization: `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              data: { [PROFILE_AVATAR_METADATA_KEY]: nextAvatarUrl },
-            }),
-          },
-        );
-      } catch {
-        throw new Error(
-          "The profile photo was uploaded, but the account could not be updated. Try saving it again.",
-        );
-      }
-      if (!metadataResponse.ok) {
-        throw new Error("The profile photo metadata could not be saved.");
-      }
-      assertProfileOwner(currentAccount.id, generation);
+      cacheAvatarForUser(currentAccount.id, metadataAvatar(user));
+      adoptUser(user, accessToken);
+      return;
     } else {
       const client = requireClient();
       if (avatarDataUrl) {
@@ -816,10 +769,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    cacheAvatarForUser(currentAccount.id, nextAvatarUrl);
-    setAccount((current) =>
-      current?.id === currentAccount.id ? { ...current, avatarUrl: nextAvatarUrl } : current,
-    );
   }, [account, adoptUser, assertProfileOwner, docsPreview]);
 
   const signOut = useCallback(async () => {

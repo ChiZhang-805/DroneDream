@@ -934,6 +934,7 @@ dependencies = [
  "ed25519-dalek",
  "hex",
  "mavlink",
+ "minisign-verify",
  "multiwii_serial_protocol",
  "reqwest 0.12.28",
  "semver",
