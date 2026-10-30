@@ -1,7 +1,16 @@
 # SignPath Foundation application packet
 
-Updated 2026-09-16. **Preparation only: not submitted or accepted.** This packet
-is not a claim that the complete product already meets every condition.
+**Foundation eligibility approved; signing setup pending.** The maintainer's
+2026-10-29 approval email confirms eligibility and creation of DroneDream [OSS].
+The account is active. The supplied dashboard still marks `release-signing`
+as `INVALID`; its detail page is needed to identify the missing configuration.
+The repository currently has none of the SignPath secret/variable names listed
+below. Complete the CI-user email confirmation after accepting the organization
+invitation, connect the GitHub trusted build system, configure application and
+installer artifacts, and complete test signing before Foundation review and
+production-certificate issuance. This is separate from the existing Tauri updater
+signature. The historical application material below is not evidence of a
+production signing run.
 
 ## Project details
 
@@ -37,7 +46,8 @@ user numbers, student eligibility, reputation, or a guaranteed acceptance decisi
    redistribution terms; the grant does not relicense them.
 3. The current local model package fails current control-protocol admission.
    This is an installer/flight issue, not something signing or MIT can fix.
-4. SignPath account/project/token settings are not provisioned. The desktop
+4. The SignPath organization/account are provisioned; CI credentials, valid signing
+   policies and repository integration remain to be configured. The desktop
    workflow also needs the exact public Core source binding and complete sidecar
    build/staging. A shell-only build does not prove the whole product's origin.
 5. GitHub MFA was unavailable in the account API response; verify it in account

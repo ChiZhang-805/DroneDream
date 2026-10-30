@@ -1,10 +1,13 @@
 # Code signing policy
 
-**Status: preparation; acceptance is not yet confirmed.** DroneDream intends to
-apply for SignPath Foundation signing. This policy describes the intended process,
-not an existing certificate, approval, or signature on the current installer.
+**Status: Foundation eligibility approved; production signing setup pending.**
+SignPath confirmed eligibility by email on 2026-10-29 and created the
+DroneDream [OSS] organization. The maintainer has activated their account.
+The production certificate and a successful production signing run are not yet
+confirmed. Current build 2181 has Tauri updater signatures, not SignPath
+Authenticode publisher signatures.
 
-After acceptance, the required acknowledgment will read:
+For releases signed through the completed production setup, the acknowledgment will read:
 “Free code signing provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).”
 
 ## Scope
