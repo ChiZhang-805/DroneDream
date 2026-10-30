@@ -18,6 +18,16 @@ optional; the current model-bundle lock is empty. The manual `test_signing=true`
 workflow submits its source-built installer to SignPath without publishing it
 or changing installed applications or updater channels.
 
+The complete source-build/test-signing chain passed in
+[GitHub run 41052486606](https://github.com/ChiZhang-805/DroneDream/actions/runs/41052486606)
+at product commit `7a88b2ab551a9bfd7394f58c9b9e39fcc7aede9b`.
+Native Runtime components, Windows Core, the full NSIS installer and installer
+lifecycle checks succeeded. SignPath test request
+`9999d111-8fb1-4631-b3a8-a55204a5e616` completed and returned the signed installer.
+This test artifact is not a public release and must not be installed over the
+five daily-use editions. Foundation must still review the setup and issue the
+production certificate; public downloads and desktop installations remain 2181.
+
 The following sections retain earlier development evidence. Their release
 numbers, missing-configuration statements and model blockers are historical,
 not the current publication state. See `signpath-foundation-application.md` for

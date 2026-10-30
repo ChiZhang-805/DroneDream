@@ -9,8 +9,14 @@ SignPath secret and variables listed below. The default artifact configuration
 has slug `initial` and accepts a raw PE executable. The manual desktop workflow
 uses `test_signing=true` to build from pinned product/Core sources and submit its
 full installer to `test-signing`; this does not publish or install a test-signed
-build. Complete this actual test run before Foundation review and
-production-certificate issuance. This is separate from the existing Tauri updater
+build. The full source-build/test-signing run has now succeeded:
+[GitHub run 41052486606](https://github.com/ChiZhang-805/DroneDream/actions/runs/41052486606),
+product commit `7a88b2ab551a9bfd7394f58c9b9e39fcc7aede9b`, pinned Core commit
+`c04b22da15627a8c6532c4008e8c041492f858d1`.
+[SignPath request 9999d111-8fb1-4631-b3a8-a55204a5e616](https://app.signpath.io/Web/dbfd6224-095f-4822-80b8-9556f2fb0dec/SigningRequests/9999d111-8fb1-4631-b3a8-a55204a5e616)
+returned `Completed`; the signed installer was downloaded and retained as the
+`DroneDream-test-signed-installer` workflow artifact. Foundation setup review and
+production-certificate issuance remain outstanding. This is separate from the existing Tauri updater
 signature. The historical application material below is not evidence of a
 production signing run.
 
@@ -53,9 +59,10 @@ user numbers, student eligibility, reputation, or a guaranteed acceptance decisi
 4. The SignPath organization/account, CI credentials, test policy and repository
    integration are configured. The desktop workflow builds native sensors,
    payload placement, camera clock and the Linux Core wheel on Ubuntu, then
-   builds Windows sidecars and the full installer on Windows. A successful
-   source build and actual test-signing result are still required; configuration
-   presence and a shell-only build do not prove the whole product's origin.
+   builds Windows sidecars and the full installer on Windows. The linked run
+   completed this build, installer lifecycle checks and actual test signing.
+   This is build/signing evidence, not natural-language flight acceptance or
+   proof of a production certificate.
 5. GitHub MFA was unavailable in the account API response; verify it in account
    settings. A missing response field does not mean MFA is disabled.
 
@@ -125,13 +132,12 @@ browser configuration are not SignPath credentials; do not replace them to apply
 
 ## Remaining human steps
 
-1. Approve the test request in SignPath if its configured policy asks for approval.
-   Use the request URL returned by the actual GitHub run.
-2. After the full source-build/test-signing run succeeds, give its GitHub run and
-   SignPath request links to Foundation support for their setup review. Their
+1. Give the successful GitHub run and SignPath request links above to Foundation
+   support for their setup review. No further approval is pending for this
+   completed test request. Their
    approval email says they will order and import the production certificate
    after this review; `CSR PENDING` does not mean a usable certificate is issued.
-3. Once Foundation activates the production certificate, verify `release-signing`
+2. Once Foundation activates the production certificate, verify `release-signing`
    is valid and approve the production signing requests. Test-signed files must
    not replace public downloads or installed desktop editions.
 
