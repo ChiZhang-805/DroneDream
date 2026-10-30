@@ -49,12 +49,8 @@
         color: #fff;
         font-size: 30px;
         font-weight: 800;
-        background: linear-gradient(135deg, #ff5574, #6a4cff 52%, #e657d1);
-        box-shadow: 0 14px 34px rgba(106, 76, 255, 0.22);
-      }
-
-      .result-mark[data-success="false"] {
         background: #c33c60;
+        box-shadow: 0 14px 34px rgba(106, 76, 255, 0.22);
       }
 
       h1 {
@@ -93,35 +89,21 @@
     </main>
     <script nonce="__CSP_NONCE__">
       const locale = __LOCALE_JSON__;
-      const success = __SUCCESS_JSON__;
       const displayName = __DISPLAY_NAME_JSON__;
-      const homeUrl = __HOME_URL_JSON__;
       const copy = locale === "zh-CN"
         ? {
-            successTitle: "登录成功",
-            successMessage: `${displayName} 已获得本次独立授权，正在返回 DroneDream 首页。`,
             failureTitle: "登录未完成",
             failureMessage: `请返回 ${displayName}，重新点击“登录并进入调优平台”。`,
           }
         : {
-            successTitle: "Sign-in complete",
-            successMessage: `${displayName} received this independent authorization. Returning to the DroneDream homepage.`,
             failureTitle: "Sign-in not completed",
             failureMessage: `Return to ${displayName} and select “Sign in and enter tuning workspace” again.`,
           };
       const mark = document.querySelector("#result-mark");
-      mark.dataset.success = String(success);
-      mark.textContent = success ? "✓" : "!";
-      document.querySelector("#result-title").textContent = success
-        ? copy.successTitle
-        : copy.failureTitle;
-      document.querySelector("#result-message").textContent = success
-        ? copy.successMessage
-        : copy.failureMessage;
-      document.title = `${success ? copy.successTitle : copy.failureTitle} · ${displayName}`;
-      if (success) {
-        window.setTimeout(() => window.location.replace(homeUrl), 1200);
-      }
+      mark.textContent = "!";
+      document.querySelector("#result-title").textContent = copy.failureTitle;
+      document.querySelector("#result-message").textContent = copy.failureMessage;
+      document.title = copy.failureTitle + " · " + displayName;
     </script>
   </body>
 </html>

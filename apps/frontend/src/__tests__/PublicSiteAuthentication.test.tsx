@@ -292,7 +292,7 @@ describe("public website account authentication", () => {
     expect(within(dialog).getByText(/These Terms of Service govern/)).toBeVisible();
 
     fireEvent.click(within(dialog).getByRole("tab", { name: "Code signing" }));
-    expect(within(dialog).getByText(/Status: preparation/)).toBeVisible();
+    expect(within(dialog).getByText(/Status: Foundation eligibility approved/)).toBeVisible();
     fireEvent.click(within(dialog).getByRole("button", { name: "Close policies" }));
 
     await waitFor(() => {

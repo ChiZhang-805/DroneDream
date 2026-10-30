@@ -579,12 +579,7 @@ fn run_browser_auth(
                             continue;
                         }
                         let AuthorizationCallback::Authorized { code, .. } = callback else {
-                            let page = render_browser_completion(
-                                &request,
-                                identity,
-                                false,
-                                &attempt_id,
-                            )?;
+                            let page = render_auth_error_page(&request.locale, identity, &attempt_id)?;
                             let _ = write_html_response(&mut stream, page.as_bytes(), &attempt_id);
                             return Err("Browser sign-in was denied or cancelled.".to_owned());
                         };
@@ -596,12 +591,8 @@ fn run_browser_auth(
                         ) {
                             Ok(response) => response,
                             Err(error) => {
-                                let page = render_browser_completion(
-                                    &request,
-                                    identity,
-                                    false,
-                                    &attempt_id,
-                                )?;
+                                let page =
+                                    render_auth_error_page(&request.locale, identity, &attempt_id)?;
                                 let _ =
                                     write_html_response(&mut stream, page.as_bytes(), &attempt_id);
                                 return Err(error);
@@ -612,12 +603,8 @@ fn run_browser_auth(
                             {
                                 Ok(subject) => subject,
                                 Err(error) => {
-                                    let page = render_browser_completion(
-                                        &request,
-                                        identity,
-                                        false,
-                                        &attempt_id,
-                                    )?;
+                                    let page =
+                                        render_auth_error_page(&request.locale, identity, &attempt_id)?;
                                     let _ = write_html_response(
                                         &mut stream,
                                         page.as_bytes(),
@@ -652,12 +639,8 @@ fn run_browser_auth(
                         ) {
                             Ok(revision) => committed_revision = Some(revision),
                             Err(error) => {
-                                let page = render_browser_completion(
-                                    &request,
-                                    identity,
-                                    false,
-                                    &attempt_id,
-                                )?;
+                                let page =
+                                    render_auth_error_page(&request.locale, identity, &attempt_id)?;
                                 let _ =
                                     write_html_response(&mut stream, page.as_bytes(), &attempt_id);
                                 return Err(error);
@@ -742,8 +725,7 @@ fn run_browser_auth(
             if let Some(revision) = &committed_revision {
                 let _ = browser_auth_vault::clear_refresh_token_if_current(revision);
             }
-            if let Ok(page) = render_browser_completion(&request, identity, false, &attempt_id)
-            {
+            if let Ok(page) = render_auth_error_page(&request.locale, identity, &attempt_id) {
                 let _ = write_html_response(&mut stream, page.as_bytes(), &attempt_id);
             }
         }
@@ -751,9 +733,7 @@ fn run_browser_auth(
     }
     match outcome {
         Ok((session, mut stream)) => {
-            if let Ok(page) = render_browser_completion(&request, identity, true, &attempt_id) {
-                let _ = write_html_response(&mut stream, page.as_bytes(), &attempt_id);
-            }
+            let _ = write_homepage_redirect(&mut stream);
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
                 let _ = window.set_focus();
@@ -1215,23 +1195,10 @@ fn restore_browser_auth_vault_sync() -> Result<Option<BrowserAuthSession>, Strin
     }
 }
 
-/// Render a credential-free result page; JSON-encode script values, pin CSP nonce.
-fn render_browser_completion(
-    request: &BrowserAuthRequest,
-    identity: DesktopAuthIdentity,
-    success: bool,
-    nonce: &str,
-) -> Result<String, String> {
-    if request.provider.is_some() {
-        return Ok(format!("<!doctype html><html><head><title></title></head><body><script nonce=\"{nonce}\">window.close()</script></body></html>"));
-    }
-    render_auth_result_page(&request.locale, identity, success, nonce)
-}
-
-fn render_auth_result_page(
+/// Only failed sign-ins render a page; successful callbacks redirect immediately.
+fn render_auth_error_page(
     locale: &str,
     identity: DesktopAuthIdentity,
-    success: bool,
     nonce: &str,
 ) -> Result<String, String> {
     let brand_lockup = format!(
@@ -1252,16 +1219,6 @@ fn render_auth_result_page(
             serde_json::to_string(locale)
                 .map_err(|error| format!("Could not render sign-in locale: {error}"))?,
         ),
-        (
-            "__SUCCESS_JSON__",
-            serde_json::to_string(&success)
-                .map_err(|error| format!("Could not render sign-in result: {error}"))?,
-        ),
-        (
-            "__HOME_URL_JSON__",
-            serde_json::to_string(HOMEPAGE_URL)
-                .map_err(|error| format!("Could not render homepage URL: {error}"))?,
-        ),
     ];
     let mut page = AUTH_RESULT_TEMPLATE.to_owned();
     for (placeholder, replacement) in replacements {
@@ -1272,8 +1229,6 @@ fn render_auth_result_page(
         || page.contains("__BRAND_LOCKUP_DATA_URL__")
         || page.contains("__DISPLAY_NAME_JSON__")
         || page.contains("__LOCALE_JSON__")
-        || page.contains("__SUCCESS_JSON__")
-        || page.contains("__HOME_URL_JSON__")
     {
         return Err("The browser sign-in result page was not rendered completely.".to_owned());
     }
@@ -1419,7 +1374,27 @@ fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
         .position(|window| window == needle)
 }
 
-/// Success/error HTML shares the same non-cacheable credential-free response policy.
+/// The website persisted its session before returning the desktop code.
+/// HTTP redirects work even when browsers refuse to close a tab via script.
+fn write_homepage_redirect(stream: &mut TcpStream) -> Result<(), String> {
+    stream
+        .set_write_timeout(Some(Duration::from_secs(3)))
+        .map_err(|_| "Could not bound the local sign-in response.".to_owned())?;
+    let response = format!(
+        "HTTP/1.1 303 See Other\r\n\
+         Location: {HOMEPAGE_URL}\r\n\
+         Content-Length: 0\r\n\
+         Cache-Control: no-store, max-age=0\r\n\
+         Referrer-Policy: no-referrer\r\n\
+         Connection: close\r\n\r\n"
+    );
+    stream
+        .write_all(response.as_bytes())
+        .and_then(|_| stream.flush())
+        .map_err(|error| format!("Could not redirect after browser sign-in: {error}"))
+}
+
+/// Error HTML uses the same non-cacheable credential-free response policy.
 fn write_html_response(stream: &mut TcpStream, body: &[u8], nonce: &str) -> Result<(), String> {
     write_text_response(stream, 200, "OK", "text/html; charset=utf-8", body, nonce)
 }
@@ -1643,10 +1618,9 @@ mod tests {
         for locale in ["en", "zh-CN"] {
             let mut request = valid_request();
             request.locale = locale.to_owned();
-            let page = render_auth_result_page(
+            let page = render_auth_error_page(
                 &request.locale,
                 desktop_auth_identity("universal").unwrap(),
-                true,
                 "nonce-123",
             )
             .unwrap();
@@ -1663,16 +1637,28 @@ mod tests {
     }
 
     #[test]
-    fn social_completion_keeps_all_messages_in_the_desktop() {
-        let mut request = valid_request();
-        request.provider = Some("google".to_owned());
-        for success in [true, false] {
-            let page = render_browser_completion(&request,
-                desktop_auth_identity("universal").unwrap(), success, "nonce-123").unwrap();
-            assert!(!page.contains("DroneDream"));
-            assert!(!page.contains("<img"));
-            assert!(page.contains("window.close()"));
-        }
+    fn successful_callback_redirects_without_an_intermediate_page() {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let address = listener.local_addr().unwrap();
+        let reader = thread::spawn(move || {
+            let mut client = TcpStream::connect(address).unwrap();
+            client.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            let mut response = String::new();
+            client.read_to_string(&mut response).unwrap();
+            response
+        });
+        let (mut stream, _) = listener.accept().unwrap();
+        write_homepage_redirect(&mut stream).unwrap();
+        drop(stream);
+        let response = reader.join().unwrap();
+        let (headers, body) = response.split_once("\r\n\r\n").unwrap();
+        assert!(headers.starts_with("HTTP/1.1 303 See Other\r\n"));
+        assert!(headers.lines().any(|line| line == "Location: https://getdronedream.com/"));
+        assert!(headers.contains("Cache-Control: no-store"));
+        assert!(headers.contains("Referrer-Policy: no-referrer"));
+        assert!(body.is_empty());
+        assert!(!response.contains("code="));
+        assert!(!response.contains("state="));
     }
 
     #[test]
@@ -1913,7 +1899,7 @@ mod tests {
         for locale in ["en", "zh-CN"] {
             for edition in ["universal", "sim", "lab", "field", "autonomy"] {
                 let identity = desktop_auth_identity(edition).unwrap();
-                let page = render_auth_result_page(locale, identity, true, "nonce-123").unwrap();
+                let page = render_auth_error_page(locale, identity, "nonce-123").unwrap();
                 assert!(page.contains(identity.display_name));
                 assert!(page.contains("nonce=\"nonce-123\""));
                 assert!(page.contains("data:image/png;base64,"));

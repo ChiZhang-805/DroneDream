@@ -20,7 +20,6 @@ if (outputIndex >= 0 && !process.argv[outputIndex + 1]) {
 if (outputDirectory) mkdirSync(outputDirectory, { recursive: true });
 
 const nonce = "browser-auth-result-visual-nonce";
-const homeUrl = "http://getdronedream.com/";
 const editions = {
   universal: {
     displayName: "DroneDream",
@@ -44,7 +43,7 @@ const editions = {
   },
 };
 
-function renderPage({ edition, locale, success }) {
+function renderPage({ edition, locale }) {
   const identity = editions[edition];
   if (!identity) throw new Error(`Unknown browser-auth edition: ${edition}`);
   const brandLockupDataUrl = `data:image/png;base64,${readFileSync(
@@ -56,8 +55,6 @@ function renderPage({ edition, locale, success }) {
     ["__BRAND_LOCKUP_DATA_URL__", brandLockupDataUrl],
     ["__DISPLAY_NAME_JSON__", JSON.stringify(identity.displayName)],
     ["__LOCALE_JSON__", JSON.stringify(locale)],
-    ["__SUCCESS_JSON__", JSON.stringify(success)],
-    ["__HOME_URL_JSON__", JSON.stringify(homeUrl)],
   ]);
   let page = template;
   for (const [placeholder, replacement] of replacements) {
@@ -90,7 +87,6 @@ const server = createServer((request, response) => {
     const body = Buffer.from(renderPage({
       edition: url.searchParams.get("edition") ?? "universal",
       locale: url.searchParams.get("locale") === "zh-CN" ? "zh-CN" : "en",
-      success: url.searchParams.get("success") === "true",
     }), "utf8");
     response.writeHead(200, {
       "cache-control": "no-store",
@@ -126,11 +122,11 @@ try {
 }
 
 const cases = [
-  { edition: "universal", locale: "en", success: true, width: 1440, height: 900 },
-  { edition: "sim", locale: "zh-CN", success: true, width: 390, height: 844 },
-  { edition: "lab", locale: "en", success: false, width: 760, height: 900 },
-  { edition: "field", locale: "zh-CN", success: false, width: 390, height: 844 },
-  { edition: "autonomy", locale: "en", success: true, width: 1440, height: 900 },
+  { edition: "universal", locale: "en", width: 1440, height: 900 },
+  { edition: "sim", locale: "zh-CN", width: 390, height: 844 },
+  { edition: "lab", locale: "en", width: 760, height: 900 },
+  { edition: "field", locale: "zh-CN", width: 390, height: 844 },
+  { edition: "autonomy", locale: "en", width: 1440, height: 900 },
 ];
 const measurements = [];
 
@@ -139,15 +135,9 @@ try {
     const page = await browser.newPage({
       viewport: { width: testCase.width, height: testCase.height },
     });
-    await page.route(homeUrl, (route) => route.fulfill({
-      status: 200,
-      contentType: "text/html",
-      body: "<title>DroneDream</title>",
-    }));
     const url = new URL("/callback-result", localOrigin);
     url.searchParams.set("edition", testCase.edition);
     url.searchParams.set("locale", testCase.locale);
-    url.searchParams.set("success", String(testCase.success));
     await page.goto(url.toString());
     await page.locator("#result-title").waitFor();
     const measurement = await page.evaluate(() => ({
@@ -159,7 +149,7 @@ try {
       buttonCount: document.querySelectorAll("button").length,
       hasCancel: document.body.textContent?.includes("Cancel this sign-in") ?? false,
       hasPassword: /password|密码/iu.test(document.body.textContent ?? ""),
-      result: document.querySelector("#result-mark")?.getAttribute("data-success"),
+      result: document.querySelector("#result-mark")?.textContent,
       title: document.title,
     }));
     if (
@@ -170,7 +160,7 @@ try {
       || measurement.buttonCount !== 0
       || measurement.hasCancel
       || measurement.hasPassword
-      || measurement.result !== String(testCase.success)
+      || measurement.result !== "!"
     ) {
       throw new Error(
         `Browser-auth result layout failed for ${testCase.edition}: `
@@ -182,18 +172,13 @@ try {
       await page.screenshot({
         path: resolve(
           outputDirectory,
-          `${testCase.edition}-${testCase.locale}-${testCase.success ? "success" : "failure"}-${testCase.width}x${testCase.height}.png`,
+          `${testCase.edition}-${testCase.locale}-failure-${testCase.width}x${testCase.height}.png`,
         ),
         fullPage: true,
       });
     }
-    if (testCase.success) {
-      await page.waitForURL(homeUrl, { timeout: 5_000 });
-    } else {
-      await page.waitForTimeout(1_350);
-      if (page.url() !== url.toString()) {
-        throw new Error("Failed browser-auth result must not redirect automatically");
-      }
+    if (page.url() !== url.toString()) {
+      throw new Error("Failed browser-auth result must not redirect automatically");
     }
     await page.close();
   }
@@ -208,7 +193,6 @@ const summary = {
   cases: measurements,
   credentialFields: 0,
   cancellationControls: 0,
-  successRedirect: homeUrl,
   failureRedirect: null,
 };
 if (outputDirectory) {
