@@ -272,6 +272,82 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Verify desktop release workflow contract
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          python -m pip install "pytest==9.1.1"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m pytest release/distribution/tests/test_desktop_release_workflow_contract.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify desktop browser-auth public configuration
+        shell: pwsh
+        run: node ./apps/desktop/scripts/verify-browser-auth-config.mjs
+
+      - name: Install JavaScript dependencies
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm ci --prefix apps/frontend
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm ci --prefix apps/desktop
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify updater build and signing contracts
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          npm --prefix apps/desktop run verify:updater-build
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm --prefix apps/desktop run verify:updater-signing
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify open-source release inventory
+        shell: pwsh
+        run: npm --prefix apps/desktop run verify:release-source
+
+      - name: Verify pinned NSIS template
+        shell: pwsh
+        run: |
+          ./apps/desktop/scripts/verify-nsis-template.ps1
+          ./apps/desktop/scripts/verify-installer-removal-wait.ps1
+
+      - name: Validate SignPath release configuration
+        if: ${{ steps.release.outputs.is_release == 'true' }}
+        shell: pwsh
+        env:
+          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
+          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          SIGNPATH_APPLICATION_POLICY_SLUG: ${{ vars.SIGNPATH_APPLICATION_POLICY_SLUG }}
+          SIGNPATH_APPLICATION_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_APPLICATION_ARTIFACT_CONFIGURATION_SLUG }}
+          SIGNPATH_INSTALLER_POLICY_SLUG: ${{ vars.SIGNPATH_INSTALLER_POLICY_SLUG }}
+          SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION_SLUG }}
+        run: |
+          $required = @(
+            "SIGNPATH_API_TOKEN",
+            "SIGNPATH_ORGANIZATION_ID",
+            "SIGNPATH_PROJECT_SLUG",
+            "SIGNPATH_APPLICATION_POLICY_SLUG",
+            "SIGNPATH_APPLICATION_ARTIFACT_CONFIGURATION_SLUG",
+            "SIGNPATH_INSTALLER_POLICY_SLUG",
+            "SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION_SLUG"
+          )
+          $missing = @($required | Where-Object {
+            [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_))
+          })
+          if ($missing.Count -gt 0) {
+            throw "Formal releases require accepted SignPath configuration: $($missing -join ', ')"
+          }
+
+      - name: Generate edition installer icons
+        shell: pwsh
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          python -m pip install "Pillow==12.2.0"
+          python tools/build-brand-assets.py --edition "${{ steps.release.outputs.edition_id }}"
+
       - name: Check out source-bound Core for Windows
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -325,37 +401,6 @@ jobs:
           ./apps/desktop/scripts/stage-agent-core.ps1 `
             -AgentCoreRepository (Join-Path $env:GITHUB_WORKSPACE 'artifacts/agent-core-source')
 
-      - name: Verify desktop release workflow contract
-        shell: pwsh
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          python -m pip install "pytest==9.1.1"
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          python -m pytest release/distribution/tests/test_desktop_release_workflow_contract.py
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Verify desktop browser-auth public configuration
-        shell: pwsh
-        run: node ./apps/desktop/scripts/verify-browser-auth-config.mjs
-
-      - name: Install JavaScript dependencies
-        shell: pwsh
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          npm ci --prefix apps/frontend
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npm ci --prefix apps/desktop
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Verify updater build and signing contracts
-        shell: pwsh
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          npm --prefix apps/desktop run verify:updater-build
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npm --prefix apps/desktop run verify:updater-signing
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
       - name: Install backend test dependencies
         # Pull requests are already gated by the repository quality workflow.
         # Keep the duplicated full backend suite only for immutable release tags,
@@ -367,10 +412,6 @@ jobs:
           python -m pip install -e "./services/backend[dev]" `
             "ruff==0.15.21" "mypy==2.2.0" "pytest==9.1.1"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Verify open-source release inventory
-        shell: pwsh
-        run: npm --prefix apps/desktop run verify:release-source
 
       - name: Verify backend
         if: ${{ steps.release.outputs.is_release == 'true' }}
@@ -414,40 +455,6 @@ jobs:
           # Release-profile tests reuse most compiled artifacts in the NSIS build.
           cargo test --release --locked --manifest-path apps/desktop/src-tauri/Cargo.toml --all-targets
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Verify pinned NSIS template
-        shell: pwsh
-        run: |
-          ./apps/desktop/scripts/verify-nsis-template.ps1
-          ./apps/desktop/scripts/verify-installer-removal-wait.ps1
-
-      - name: Validate SignPath release configuration
-        if: ${{ steps.release.outputs.is_release == 'true' }}
-        shell: pwsh
-        env:
-          SIGNPATH_API_TOKEN: ${{ secrets.SIGNPATH_API_TOKEN }}
-          SIGNPATH_ORGANIZATION_ID: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
-          SIGNPATH_PROJECT_SLUG: ${{ vars.SIGNPATH_PROJECT_SLUG }}
-          SIGNPATH_APPLICATION_POLICY_SLUG: ${{ vars.SIGNPATH_APPLICATION_POLICY_SLUG }}
-          SIGNPATH_APPLICATION_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_APPLICATION_ARTIFACT_CONFIGURATION_SLUG }}
-          SIGNPATH_INSTALLER_POLICY_SLUG: ${{ vars.SIGNPATH_INSTALLER_POLICY_SLUG }}
-          SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION_SLUG: ${{ vars.SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION_SLUG }}
-        run: |
-          $required = @(
-            "SIGNPATH_API_TOKEN",
-            "SIGNPATH_ORGANIZATION_ID",
-            "SIGNPATH_PROJECT_SLUG",
-            "SIGNPATH_APPLICATION_POLICY_SLUG",
-            "SIGNPATH_APPLICATION_ARTIFACT_CONFIGURATION_SLUG",
-            "SIGNPATH_INSTALLER_POLICY_SLUG",
-            "SIGNPATH_INSTALLER_ARTIFACT_CONFIGURATION_SLUG"
-          )
-          $missing = @($required | Where-Object {
-            [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_))
-          })
-          if ($missing.Count -gt 0) {
-            throw "Formal releases require accepted SignPath configuration: $($missing -join ', ')"
-          }
 
       - name: Build DroneDream application or unsigned test installer
         shell: pwsh

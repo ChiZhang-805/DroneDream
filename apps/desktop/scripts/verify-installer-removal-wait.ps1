@@ -9,7 +9,7 @@ if (-not (Test-Path -LiteralPath $waitScript -PathType Leaf)) {
 }
 
 $workflowText = Get-Content -LiteralPath $workflow -Raw
-if ($workflowText -notmatch [regex]::Escape("./wait-path-removal.ps1")) {
+if ($workflowText -notmatch [regex]::Escape("./apps/desktop/scripts/wait-path-removal.ps1")) {
     throw "Desktop installer workflow does not invoke the path-removal wait helper"
 }
 if ($workflowText -notmatch "-TimeoutSeconds 30") {
