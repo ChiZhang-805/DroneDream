@@ -1,4 +1,27 @@
-# Desktop publication status — 2026-09-16
+# Desktop publication status
+
+## Current publication and signing setup
+
+The public five-edition installer release is build **2181**:
+https://github.com/ChiZhang-805/DroneDream/releases/tag/five-edition-v1.0.0-build-2181.
+Its Tauri updater signatures are not Windows Authenticode publisher signatures.
+
+SignPath Foundation eligibility is approved; the organization, GitHub trusted
+build connection, API secret and configuration variables are present. The
+`test-signing` policy is available. `release-signing` is invalid because its
+production certificate is still `CSR PENDING`.
+
+The source build uses the exact Core reference in `agent-core-public-source.json`.
+Ubuntu builds all native Runtime components and its Python wheel; Windows builds
+the sidecars, plugins and complete NSIS installer. Local model weights are
+optional; the current model-bundle lock is empty. The manual `test_signing=true`
+workflow submits its source-built installer to SignPath without publishing it
+or changing installed applications or updater channels.
+
+The following sections retain earlier development evidence. Their release
+numbers, missing-configuration statements and model blockers are historical,
+not the current publication state. See `signpath-foundation-application.md` for
+remaining Foundation setup steps.
 
 ## Publication order
 

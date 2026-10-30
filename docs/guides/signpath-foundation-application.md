@@ -3,11 +3,13 @@
 **Foundation eligibility approved; signing setup pending.** The maintainer's
 2026-10-29 approval email confirms eligibility and creation of DroneDream [OSS].
 The account is active. The supplied dashboard still marks `release-signing`
-as `INVALID`; its detail page is needed to identify the missing configuration.
-The repository currently has none of the SignPath secret/variable names listed
-below. Complete the CI-user email confirmation after accepting the organization
-invitation, connect the GitHub trusted build system, configure application and
-installer artifacts, and complete test signing before Foundation review and
+as `INVALID` because its production certificate is `CSR PENDING`.
+The GitHub trusted build system is linked, and the repository now contains the
+SignPath secret and variables listed below. The default artifact configuration
+has slug `initial` and accepts a raw PE executable. The manual desktop workflow
+uses `test_signing=true` to build from pinned product/Core sources and submit its
+full installer to `test-signing`; this does not publish or install a test-signed
+build. Complete this actual test run before Foundation review and
 production-certificate issuance. This is separate from the existing Tauri updater
 signature. The historical application material below is not evidence of a
 production signing run.
@@ -44,12 +46,16 @@ user numbers, student eligibility, reputation, or a guaranteed acceptance decisi
    the historical `NOASSERTION` metadata or qualification-bound archive bytes.
    Third-party dependencies, weights, and datasets still need their own verified
    redistribution terms; the grant does not relicense them.
-3. The current local model package fails current control-protocol admission.
-   This is an installer/flight issue, not something signing or MIT can fix.
-4. The SignPath organization/account are provisioned; CI credentials, valid signing
-   policies and repository integration remain to be configured. The desktop
-   workflow also needs the exact public Core source binding and complete sidecar
-   build/staging. A shell-only build does not prove the whole product's origin.
+3. Local model weights are optional in the current build contract. No model
+   bundle is declared, so CI must not require or download a retired package.
+   If a model bundle is declared later, its own source, license and compatibility
+   requirements still apply.
+4. The SignPath organization/account, CI credentials, test policy and repository
+   integration are configured. The desktop workflow builds native sensors,
+   payload placement, camera clock and the Linux Core wheel on Ubuntu, then
+   builds Windows sidecars and the full installer on Windows. A successful
+   source build and actual test-signing result are still required; configuration
+   presence and a shell-only build do not prove the whole product's origin.
 5. GitHub MFA was unavailable in the account API response; verify it in account
    settings. A missing response field does not mean MFA is disabled.
 
@@ -117,22 +123,20 @@ The workflow expects these names; never put secret values in Git:
 The Tauri key is independent. Existing public OAuth client IDs and Supabase
 browser configuration are not SignPath credentials; do not replace them to apply.
 
-## Human steps
+## Remaining human steps
 
-1. Core repository placement and MIT rights for the two first-party default assets
-   were confirmed on 2026-09-16. Review the exact proposed binary/model inventory;
-   this confirmation does not cover third-party weights or training datasets.
-2. Verify GitHub MFA at https://github.com/settings/security; confirm maintainer
-   name and contact email.
-3. Read https://signpath.org/terms.html. Once the technical conditions above are
-   resolved, submit https://signpath.org/apply using truthful information. This
-   document does not claim submission or terms acceptance on your behalf.
-4. If accepted, complete SignPath account setup and MFA, authorize the GitHub App
-   for the intended repositories, and approve agreed artifact/policy settings.
-5. Enter the provider-issued token directly into GitHub Actions Secrets; never
-   send it in chat or source. Enter nonsecret IDs/slugs in repository Variables.
-6. Manually approve signing requests when a qualified release is ready.
-   Application acceptance is not automatic release approval.
+1. Approve the test request in SignPath if its configured policy asks for approval.
+   Use the request URL returned by the actual GitHub run.
+2. After the full source-build/test-signing run succeeds, give its GitHub run and
+   SignPath request links to Foundation support for their setup review. Their
+   approval email says they will order and import the production certificate
+   after this review; `CSR PENDING` does not mean a usable certificate is issued.
+3. Once Foundation activates the production certificate, verify `release-signing`
+   is valid and approve the production signing requests. Test-signed files must
+   not replace public downloads or installed desktop editions.
+
+The secret is already in GitHub Actions Secrets. Do not resend it in chat or
+commit it to source. An API token and a Tauri updater key serve different purposes.
 
 Run `python apps/desktop/scripts/check-signpath-readiness.py` to inspect configured
 names and repository visibility without reading or printing secret values.
