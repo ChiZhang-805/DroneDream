@@ -144,6 +144,8 @@ Go to the building where the computer science labs are and collect the package.
 
 ## 9. 清理规则
 
+- GitHub `Desktop installer` 每次构建、签名及所需发布成功后，只保留本次运行，删除更早已结束的运行记录、日志和 Actions 产物。更新失败时保留上一份成功构建；正在运行或更新的任务不删除。此规则不删除 Release、Tag、更新渠道或 Git 源码历史。
+
 ### 可重新生成
 
 - 各工作树 `desktop/src-tauri/target` 等 Rust/Cargo 构建缓存。

@@ -84,6 +84,17 @@ Deployment records are operational history, not Releases, Tags, immutable site
 artifacts, or additional live websites. Workflow runs and their independently
 configured log/artifact retention are outside this one-record Pages policy.
 
+## Desktop installer workflow history
+
+After a successful Desktop installer build/signing run (and publication when
+requested), retain that run and remove older completed runs, including their
+logs and Actions artifacts. Newer, queued and running builds are not deleted.
+A failed replacement build does not delete the previous successful build.
+The final `Retain latest installer run` job performs this cleanup; it does not
+delete Git history, Releases, tags, updater manifests or installed applications.
+The current SignPath test-signing run remains available for Foundation review
+until a newer successful installer run supersedes it.
+
 ## Publishing
 
 Build all five signed installers into one handoff directory, then publish from the
