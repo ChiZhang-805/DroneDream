@@ -30,6 +30,7 @@ import {
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -1849,6 +1850,46 @@ export function AutonomyOverview() {
       document.removeEventListener("keydown", closeOnEscape);
     };
   }, [contextMenuOpen, contextSubmenu]);
+
+  useLayoutEffect(() => {
+    if (!contextMenuOpen) return;
+    const root = contextMenuRef.current;
+    const menu = root?.querySelector<HTMLElement>(".autonomy-context-popover");
+    if (!root || !menu) return;
+    const place = () => {
+      const margin = 16;
+      const anchor = root.getBoundingClientRect();
+      const width = menu.getBoundingClientRect().width;
+      menu.style.left = `${Math.max(margin, Math.min(anchor.left, window.innerWidth - width - margin)) - anchor.left}px`;
+      const submenu = menu.querySelector<HTMLElement>(".autonomy-context-submenu");
+      if (!submenu) return;
+      const row = submenu.parentElement!.getBoundingClientRect();
+      const box = submenu.getBoundingClientRect();
+      const right = row.right + 7;
+      const left = right + box.width <= window.innerWidth - margin
+        ? right
+        : row.left - box.width - 7 >= margin
+          ? row.left - box.width - 7
+          : Math.max(margin, window.innerWidth - box.width - margin);
+      const top = Math.max(margin, Math.min(row.bottom - box.height, window.innerHeight - box.height - margin));
+      submenu.style.left = `${left - row.left}px`;
+      submenu.style.top = `${top - row.top}px`;
+      submenu.style.bottom = "auto";
+      submenu.style.right = "auto";
+    };
+    place();
+    const observer = new ResizeObserver(place);
+    observer.observe(menu);
+    const submenu = menu.querySelector<HTMLElement>(".autonomy-context-submenu");
+    if (submenu) observer.observe(submenu);
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [contextMenuOpen, contextSubmenu, selectedContextAircraftId, selectedContextMapId]);
 
   const submitMission = async (event?: FormEvent, intentOverride?: string, displayIntentOverride?: string) => {
     event?.preventDefault();

@@ -764,6 +764,13 @@ fn provider_entry_for_consent(location: &str, provider: &str, authorize_url: &Ur
         .map_err(|_| "Invalid provider endpoint.".to_string())?;
     entry.query_pairs_mut().append_pair("provider", provider)
         .append_pair("redirect_to", callback.as_str());
+    match provider {
+        "google" => { entry.query_pairs_mut().append_pair("prompt", "select_account consent"); }
+        "github" => { entry.query_pairs_mut().append_pair("prompt", "select_account"); }
+        // Slack's documented OIDC flow owns its confirmation screen; do not
+        // invent an unsupported reauthentication parameter or revoke its grant.
+        _ => {}
+    }
     Ok(entry)
 }
 
@@ -1449,6 +1456,11 @@ mod tests {
                 assert_eq!(entry.path(), "/auth/v1/authorize");
                 let query = entry.query_pairs().collect::<HashMap<_, _>>();
                 assert_eq!(query.get("provider").unwrap(), provider);
+                match provider {
+                    "google" => assert_eq!(query.get("prompt").unwrap(), "select_account consent"),
+                    "github" => assert_eq!(query.get("prompt").unwrap(), "select_account"),
+                    _ => assert!(!query.contains_key("prompt")),
+                }
                 let callback = Url::parse(query.get("redirect_to").unwrap()).unwrap();
                 let fields = callback.query_pairs().collect::<HashMap<_, _>>();
                 assert_eq!(fields.get("authorization_id").unwrap(), "request-123");

@@ -80,11 +80,11 @@ describe("desktop session hydration", () => {
     vi.resetModules();
   });
 
-  it("resumes an existing session only within the current edition's WebView", async () => {
+  it("does not restore a desktop login from a previous WebView session", async () => {
     window.sessionStorage.setItem(currentKey, session);
     const { hasActiveDesktopAuthSession } = await import("../features/auth/supabaseClient");
 
-    expect(hasActiveDesktopAuthSession()).toBe(true);
+    expect(hasActiveDesktopAuthSession()).toBe(false);
     window.sessionStorage.removeItem(currentKey);
     expect(hasActiveDesktopAuthSession()).toBe(false);
   });

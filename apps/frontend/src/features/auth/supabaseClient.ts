@@ -88,11 +88,11 @@ const STORAGE_PROBE_KEY = "__dronedream_auth_storage_probe__";
 /** Select the permitted persistence class; unavailable storage never broadens it. */
 function authStorage(): Storage | undefined {
   if (typeof window === "undefined") return undefined;
-  // Native owns the persistent refresh grant in an edition-scoped Windows
-  // credential namespace. The WebView keeps only its active process session;
-  // browser deployments may use normal origin-scoped localStorage.
+  // Desktop credentials never survive a WebView lifetime. Native refresh state
+  // is also cleared at process startup/exit. Website sessions remain independent.
+  if (desktopRuntime) return volatileAuthStorage;
   try {
-    const storage = desktopRuntime ? window.sessionStorage : window.localStorage;
+    const storage = window.localStorage;
     storage.setItem(STORAGE_PROBE_KEY, "1");
     storage.removeItem(STORAGE_PROBE_KEY);
     return storage;

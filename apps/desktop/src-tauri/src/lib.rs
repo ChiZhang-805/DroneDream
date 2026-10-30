@@ -100,6 +100,10 @@ pub fn run() {
         }))
         .manage(browser_auth::BrowserAuthCoordinator::default())
         .setup(|app| {
+            // A new desktop process always starts signed out, including after a crash.
+            if let Err(error) = browser_auth::clear_browser_auth_vault() {
+                eprintln!("Could not clear the previous desktop session: {error}");
+            }
             #[cfg(target_os = "windows")]
             if let Some(window) = app.get_webview_window("main") {
                 if let Err(error) = window_placement::clamp_to_nearest_work_area(&window) {
@@ -336,6 +340,11 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building DroneDream desktop");
     app.run(|handle, event| {
+        if matches!(event, tauri::RunEvent::Exit) {
+            if let Err(error) = browser_auth::clear_browser_auth_vault() {
+                eprintln!("Could not clear this desktop session: {error}");
+            }
+        }
         #[cfg(dronedream_agent)]
         if matches!(
             event,
