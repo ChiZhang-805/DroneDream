@@ -646,7 +646,7 @@ def _detached_fixture(tmp_path: Path) -> tuple[Path, dict[str, object]]:
     tauri_entrypoint.write_text("// attested fixture\n", encoding="utf-8")
     native_package.write_text(json.dumps({"version": "2.11.4"}), encoding="utf-8")
     native_binary.write_bytes(b"attested-native-fixture")
-    vite_package.write_text(json.dumps({"version": "7.3.6"}), encoding="utf-8")
+    vite_package.write_text(json.dumps({"version": "7.3.7"}), encoding="utf-8")
 
     entries: list[dict[str, object]] = []
     for item in sorted(bundle_root.rglob("*"), key=lambda value: value.as_posix()):
@@ -717,7 +717,7 @@ def _detached_fixture(tmp_path: Path) -> tuple[Path, dict[str, object]]:
                 "binarySha256": _sha256(native_binary),
             },
             "vite": {
-                "version": "7.3.6",
+                "version": "7.3.7",
                 "packageJsonPath": "frontend/node_modules/vite/package.json",
                 "packageJsonSha256": _sha256(vite_package),
             },
@@ -802,7 +802,7 @@ def test_detached_dependency_schema_freezes_tools_mounts_and_offline_policy() ->
     )
     assert (
         schema["properties"]["toolchain"]["properties"]["vite"]["properties"]["version"]["const"]
-        == "7.3.6"
+        == "7.3.7"
     )
     assert schema["properties"]["mounts"]["maxItems"] == 2
     policies = schema["properties"]["policies"]["properties"]

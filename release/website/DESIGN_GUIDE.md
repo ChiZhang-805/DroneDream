@@ -9,7 +9,7 @@ The public website treats copy layout as part of the visual system, not as an af
 - Revise wording before changing font size or forcing justification. Do not stretch the final line with `text-align-last: justify`.
 - Validate both locales at 1440 × 1000 and 2048 × 1280 desktop viewports. Mobile screenshots remain mandatory, but natural wrapping takes priority over an exact 80% threshold on very narrow screens.
 
-Run the automated desktop audit against a local preview:
+Run the existing layout check against a local preview. It checks navigation, downloads, keyboard carousel selection, and clipping in both locale settings. Final-line metrics apply only to explicitly marked copy blocks; unmarked copy still needs visual review:
 
 ```powershell
 node release/website/scripts/audit-site-typography.mjs http://127.0.0.1:4174 1440 1000 0.80
@@ -27,5 +27,5 @@ node release/website/scripts/audit-site-typography.mjs http://127.0.0.1:4174 390
 
 - Build and lint before deployment.
 - Capture every major section in both locales at desktop and mobile sizes.
-- Inspect the manual dialog, capability card front/back states, workflow motion, download metadata, keyboard focus, reduced-motion behavior, and the public release manifest.
+- Inspect the current home carousel, manual navigation, download metadata, keyboard focus, reduced-motion behavior, and the public release manifest.
 - Deploy atomically, then repeat the smoke test and visual capture against the public origin.

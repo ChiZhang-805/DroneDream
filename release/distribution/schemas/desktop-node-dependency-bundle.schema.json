@@ -92,7 +92,7 @@
           "additionalProperties": false,
           "required": ["version", "packageJsonPath", "packageJsonSha256"],
           "properties": {
-            "version": {"const": "7.3.6"},
+            "version": {"const": "7.3.7"},
             "packageJsonPath": {"const": "frontend/node_modules/vite/package.json"},
             "packageJsonSha256": {"$ref": "#/$defs/sha256"}
           }

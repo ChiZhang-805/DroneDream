@@ -269,7 +269,7 @@ if ([int]$lockContract.desktopLockfileVersion -ne 3 -or
     [int]$lockContract.frontendLockfileVersion -ne 3 -or
     [string]$lockContract.tauriCliVersion -cne "2.11.4" -or
     [string]$lockContract.platformCliVersion -cne "2.11.4" -or
-    [string]$lockContract.viteVersion -cne "7.3.6") {
+    [string]$lockContract.viteVersion -cne "7.3.7") {
     throw "The exact package locks do not contain the approved desktop tool versions."
 }
 $sourceInputHashes = @($manifest.sourceInputs | ForEach-Object { [string]$_.sha256 })
@@ -305,7 +305,7 @@ $toolDefinitions = @(
     [pscustomobject]@{
         value = $manifest.toolchain.vite
         fields = @("version", "packageJsonPath", "packageJsonSha256")
-        version = "7.3.6"
+        version = "7.3.7"
         packagePath = "frontend/node_modules/vite/package.json"
         hashFields = @(
             [pscustomobject]@{ pathField = "packageJsonPath"; hashField = "packageJsonSha256" }

@@ -105,7 +105,7 @@ jobs:
       - name: Install Chromium for the public-site visual contract
         run: npx --prefix apps/frontend playwright install --with-deps chromium
 
-      - name: Enforce bilingual copy rhythm and responsive layout
+      - name: Check homepage navigation and responsive layout
         shell: bash
         run: |
           set -euo pipefail

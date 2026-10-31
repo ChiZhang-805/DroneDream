@@ -163,6 +163,9 @@ const collectLayout = async (page, locale, state) => page.evaluate(({ activeLoca
   const criticalSelectors = [
     ".site-header",
     ".site-hero-copy",
+    ".site-home-copy",
+    ".site-home-actions",
+    ".site-home-card-viewport",
     ".site-section",
     ".site-product-demo",
     ".site-workflow-visual",
@@ -224,8 +227,7 @@ const collectLayout = async (page, locale, state) => page.evaluate(({ activeLoca
     ".site-header",
     ".site-brand",
     ".site-account-button",
-    ".site-language",
-    viewportWidth <= 1050 ? ".site-menu-button" : ".site-header-download",
+    viewportWidth <= 900 ? ".site-menu-button" : ".site-nav",
   ];
   for (const selector of requiredHeaderSelectors) {
     const node = document.querySelector(selector);
@@ -311,53 +313,31 @@ async function collectLocale(page, locale) {
   await mergeVisibleCopy(page, copy);
   await addLayoutSnapshot(page, layout, locale, "initial");
 
-  const tabs = page.locator(".site-phase-tabs [role=tab]");
-  for (let index = 0; index < await tabs.count(); index += 1) {
-    const tab = tabs.nth(index);
-    await tab.click();
-    await tab.waitFor({ state: "visible" });
-    await page.waitForFunction((tabId) => document.getElementById(tabId)?.getAttribute("aria-selected") === "true", await tab.getAttribute("id"));
-    await waitForStableLayout(page);
-    await mergeVisibleCopy(page, copy);
-    await addLayoutSnapshot(page, layout, locale, `phase-${index}`);
-  }
-
-  const cards = page.locator(".site-capability-card");
-  for (let cardIndex = 0; cardIndex < await cards.count(); cardIndex += 1) {
-    const card = cards.nth(cardIndex);
-    const front = card.locator(".site-capability-front");
-    await front.click();
-    await page.waitForFunction((cardNumber) => {
-      const candidate = document.querySelectorAll(".site-capability-card")[cardNumber];
-      return candidate?.classList.contains("is-flipped")
-        && candidate.querySelector(".site-capability-back")?.getAttribute("aria-hidden") === "false";
-    }, cardIndex);
-    await waitForStableLayout(page);
-    const counter = await card.locator(".site-capability-back nav > span").textContent();
-    const detailCount = Number(counter?.split("/")[1]?.trim() || 0);
-    for (let detailIndex = 0; detailIndex < detailCount; detailIndex += 1) {
-      await mergeVisibleCopy(page, copy);
-      await addLayoutSnapshot(page, layout, locale, `capability-${cardIndex}-detail-${detailIndex}`);
-      if (detailIndex + 1 < detailCount) {
-        await card.locator(".site-capability-back nav button:last-child").click();
-        await waitForStableLayout(page);
-      }
-    }
-    await card.locator(".site-capability-flip-back").click();
-    await page.waitForFunction((cardNumber) => !document.querySelectorAll(".site-capability-card")[cardNumber]?.classList.contains("is-flipped"), cardIndex);
-  }
+  const missionCards = page.locator('.site-home-card[data-home-card-copy="1"]');
+  const cardCount = await missionCards.count();
+  if (cardCount === 0) throw new Error("Homepage mission cards are missing.");
+  const carousel = page.locator(".site-home-card-viewport");
+  // aria-current belongs to the card itself, not a descendant.
+  const activeBefore = await page.locator('.site-home-card[aria-current="true"][data-home-card-copy="1"]').getAttribute("data-home-card-index");
+  await carousel.focus();
+  await page.keyboard.press("ArrowRight");
+  await page.waitForFunction((previous) => document.querySelector('.site-home-card[aria-current="true"][data-home-card-copy="1"]')?.getAttribute("data-home-card-index") !== previous, activeBefore);
+  await addLayoutSnapshot(page, layout, locale, "mission-carousel");
+  const download = page.locator(".site-home-download:not(.is-cli)");
+  await download.waitFor({ state: "visible" });
+  if (!await download.getAttribute("href")) throw new Error("Homepage download target is missing.");
 
   const menuButton = page.locator(".site-menu-button");
   if (await menuButton.isVisible()) {
     await menuButton.click();
     await page.waitForFunction(() => document.querySelector(".site-menu-button")?.getAttribute("aria-expanded") === "true");
     await addLayoutSnapshot(page, layout, locale, "mobile-menu");
-    await page.keyboard.press("Escape");
   }
 
-  const manualLink = page.locator('.site-manual-links a[href="/manual/"]');
+  const manualLink = page.locator('.site-nav a[href="/manual/"]');
   await manualLink.waitFor({ state: "visible" });
-  await addLayoutSnapshot(page, layout, locale, "manual-links");
+  await addLayoutSnapshot(page, layout, locale, "navigation");
+  if (await menuButton.isVisible()) await menuButton.click();
   return { copy, layout };
 }
 
