@@ -1,5 +1,5 @@
-name: 签名更新包
-run-name: 签名更新包 - ${{ inputs.release_tag }}
+name: Sign updates
+run-name: Sign updates
 
 on:
   workflow_dispatch:

@@ -122,14 +122,14 @@ Go to the building where the computer science labs are and collect the package.
 
 ## 7. 发布与安装
 
-GitHub Actions 的名称按职责保持简短：`检查产品代码` 验证应用代码，`检查运行环境` 验证 Runtime 配置与打包约定，`构建安装包` 从源码生成桌面安装器，`签名更新包` 为五版交付包生成更新签名，`发布运行环境` 构建并发布 WSL 镜像，`发布官网` 部署网站，`清理旧记录` 执行保留规则。运行记录不是源码分支；旧分支的失败应先在当前源码复现和修复，不盲目重跑历史提交。
+GitHub Actions 的名称按职责保持简短：`Check code` 验证应用代码，`Check runtime` 验证 Runtime 配置与打包约定，`Build installer` 从源码生成桌面安装器，`Sign updates` 为五版交付包生成更新签名，`Release runtime` 构建并发布 WSL 镜像，`Deploy website` 部署网站，`Clean runs` 执行保留规则。运行记录不是源码分支；旧分支的失败应先在当前源码复现和修复，不盲目重跑历史提交。
 
-`发布运行环境` 需要带 `dronedream-runtime-builder` 标签的专用 Linux x64 runner；触发之前确认该机器在线。没有注册机器时应恢复构建机器，不能以跳过镜像构建或仿真验证的方式制造成功记录。上传失败先检查现有发布资产是否完整，再决定恢复上传或重新构建，不覆盖已经公开的不可变版本。
+`Release runtime` 需要带 `dronedream-runtime-builder` 标签的专用 Linux x64 runner；触发之前确认该机器在线。没有注册机器时应恢复构建机器，不能以跳过镜像构建或仿真验证的方式制造成功记录。上传失败先检查现有发布资产是否完整，再决定恢复上传或重新构建，不覆盖已经公开的不可变版本。
 
 - 源码事实以审查后的提交为准；本地构建目录不是发布事实源。
 - 发布暂存位于 `Build/Release-Staging`，只保留当前源提交和版本的完整五版本集合。
 - 正式发布以 GitHub Release 资产、摘要、签名和发布清单为准。
-- 本机缺少自动更新签名私钥时，先检查 GitHub Actions 的 `TAURI_SIGNING_PRIVATE_KEY` Secret 和现有 `签名更新包` 工作流。可将同一源提交的五版安装包、摘要和收据上传到草稿 Release，在云端签名后取回签名及收据，验证后再同步发布；不要求用户导出或在聊天中提供私钥。自动更新签名与 SignPath 的 Windows 发布者签名是两件事，不能混为一谈。
+- 本机缺少自动更新签名私钥时，先检查 GitHub Actions 的 `TAURI_SIGNING_PRIVATE_KEY` Secret 和现有 `Sign updates` 工作流。可将同一源提交的五版安装包、摘要和收据上传到草稿 Release，在云端签名后取回签名及收据，验证后再同步发布；不要求用户导出或在聊天中提供私钥。自动更新签名与 SignPath 的 Windows 发布者签名是两件事，不能混为一谈。
 - PR 或发布说明应写清具体触发条件、修改后的行为和验证证据，不保留无关的尝试过程。
 - 桌面更新后核对五个图标和快捷方式。应用图标缺失、登录后进入错误产品页或安装器误关兄弟版本均视为交付失败。
 - 只生成安装器而未安装复验，不能称为软件已经更新。

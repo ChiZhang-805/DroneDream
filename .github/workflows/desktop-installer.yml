@@ -1,5 +1,5 @@
-name: 构建安装包
-run-name: 构建安装包
+name: Build installer
+run-name: Build installer
 
 on:
   workflow_dispatch:

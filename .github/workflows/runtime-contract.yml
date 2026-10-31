@@ -1,5 +1,5 @@
-name: 检查运行环境
-run-name: 检查运行环境
+name: Check runtime
+run-name: Check runtime
 
 on:
   workflow_dispatch:

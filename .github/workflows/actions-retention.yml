@@ -1,16 +1,16 @@
-name: 清理旧记录
-run-name: 清理旧记录
+name: Clean runs
+run-name: Clean runs
 
 on:
   workflow_dispatch:
   workflow_run:
     workflows:
-      - 构建安装包
-      - 发布官网
-      - 检查产品代码
-      - 检查运行环境
-      - 发布运行环境
-      - 签名更新包
+      - Build installer
+      - Deploy website
+      - Check code
+      - Check runtime
+      - Release runtime
+      - Sign updates
     types: [completed]
   schedule:
     - cron: '23 3 * * 1'

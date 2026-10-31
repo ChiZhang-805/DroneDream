@@ -1,5 +1,5 @@
-name: 发布官网
-run-name: 发布官网
+name: Deploy website
+run-name: Deploy website
 
 on:
   push:

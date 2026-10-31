@@ -1,5 +1,5 @@
-name: 检查产品代码
-run-name: 检查产品代码
+name: Check code
+run-name: Check code
 
 on:
   workflow_dispatch:
