@@ -1,4 +1,5 @@
 name: Sign five-edition handoff
+run-name: Sign five-edition handoff - ${{ inputs.release_tag }}
 
 on:
   workflow_dispatch:
@@ -17,18 +18,20 @@ concurrency:
 
 jobs:
   sign:
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
       - name: Validate release tag
         shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
-          if ("${{ inputs.release_tag }}" -cnotmatch '^five-edition-v1\.0\.0-build-[1-9][0-9]*$') {
+          if ($env:RELEASE_TAG -cnotmatch '^five-edition-v1\.0\.0-build-[1-9][0-9]*$') {
             throw "The handoff tag does not match the five-edition release contract."
           }
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 22
           cache: npm

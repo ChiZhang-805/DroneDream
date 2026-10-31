@@ -1,4 +1,5 @@
 name: Runtime release
+run-name: Runtime release - ${{ inputs.release_tag }}
 
 on:
   workflow_dispatch:

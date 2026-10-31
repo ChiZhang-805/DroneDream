@@ -84,16 +84,26 @@ Deployment records are operational history, not Releases, Tags, immutable site
 artifacts, or additional live websites. Workflow runs and their independently
 configured log/artifact retention are outside this one-record Pages policy.
 
-## Desktop installer workflow history
+## Actions workflow history
 
-After a successful Desktop installer build/signing run (and publication when
-requested), retain that run and remove older completed runs, including their
-logs and Actions artifacts. Newer, queued and running builds are not deleted.
-A failed replacement build does not delete the previous successful build.
-The final `Retain latest installer run` job performs this cleanup; it does not
-delete Git history, Releases, tags, updater manifests or installed applications.
-The current SignPath test-signing run remains available for Foundation review
-until a newer successful installer run supersedes it.
+The Actions retention workflow runs after product workflows complete, weekly,
+or manually. Keep the latest success of each active workflow and its latest
+failure when no newer success resolves it. Keep queued/running jobs, successful
+builds tied to retained releases (including the required rollback), and explicit
+SignPath review pins in `actions-retention.json`. A newer build does not remove a
+review pin: remove that pin only after Foundation review completes.
+
+Release associations use immutable source commits, tag-triggered runs and full
+release tags in run names. Legacy run IDs cover older publication workflows
+whose titles omitted the release tag; those associations expire when the release
+is removed. Superseded completed runs of retired workflows are also removed.
+Deleting a run removes its logs and Actions artifacts, not Release assets, tags,
+Git history or installed applications. In-progress reruns are rechecked before
+deletion. Changed release inventories defer remaining cleanup to a fresh run.
+
+Use `python apps/desktop/scripts/prune-installer-runs.py --repository
+ChiZhang-805/DroneDream` to preview retained IDs and reasons; add `--apply` to
+delete the superseded history. The cleanup tool keeps its established filename.
 
 ## Publishing
 

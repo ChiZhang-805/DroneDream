@@ -1,4 +1,5 @@
 import importlib.util
+import unittest
 from pathlib import Path
 
 
@@ -10,29 +11,53 @@ MODULE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MODULE)
 
 
-def run(identity, number, status="completed", workflow=10):
-    return dict(id=identity, run_number=number, status=status, workflow_id=workflow)
+def run(identity, number, status="completed", workflow=10, conclusion="success", **extra):
+    return dict(id=identity, run_number=number, status=status, workflow_id=workflow,
+                conclusion=conclusion, run_attempt=1, updated_at="unchanged", **extra)
 
 
-def test_retains_current_newer_and_active_runs():
-    retained = run(500, 5, "in_progress")
-    older_success = run(400, 4)
-    older_failure = run(300, 3)
-    runs = [
-        retained, older_success, older_failure,
-        run(600, 6), run(200, 2, "in_progress"), run(100, 1, "queued"),
-        run(50, 1, workflow=20),
-    ]
-    assert MODULE.obsolete_runs(runs, retained) == [older_success, older_failure]
+class RetentionTests(unittest.TestCase):
+    workflows = [dict(id=10, state="active"), dict(id=20, state="active"), dict(id=30, state="deleted")]
 
+    def keep(self, runs, releases=(), policy=None):
+        return set(MODULE.retention_reasons(runs, self.workflows, releases, policy or {}))
 
-def test_cleanup_waits_for_build_and_publication():
-    import yaml
+    def test_success_per_workflow_and_active_runs(self):
+        runs = [run(1, 1), run(2, 2), run(3, 3, "in_progress"), run(4, 4, "queued"),
+                run(5, 1, workflow=20), run(6, 1, workflow=30)]
+        self.assertEqual(self.keep(runs), {2, 3, 4, 5})
 
-    workflow = yaml.safe_load((ROOT / ".github/workflows/desktop-installer.yml").read_text())
-    job = workflow["jobs"]["retain-latest-run"]
-    assert set(job["needs"]) == {"native-core", "windows-nsis", "publish-release"}
-    assert "needs.windows-nsis.result == 'success'" in job["if"]
-    assert "needs.publish-release.result == 'success'" in job["if"]
-    assert "needs.publish-release.result == 'skipped'" in job["if"]
-    assert job["permissions"] == {"actions": "write", "contents": "read"}
+    def test_only_latest_unresolved_failure(self):
+        runs = [run(1, 1, conclusion="failure"), run(2, 2), run(3, 3, conclusion="failure"),
+                run(4, 4, conclusion="timed_out"), run(5, 5, conclusion="cancelled")]
+        self.assertEqual(self.keep(runs), {2, 4})
+        self.assertEqual(self.keep(runs + [run(6, 6)]), {6})
+        self.assertEqual(self.keep([run(7, 1, conclusion="failure")]), {7})
+
+    def test_review_survives_new_success(self):
+        self.assertEqual(self.keep([run(1, 1), run(2, 2)], policy={"review_runs": {"1": "review"}}), {1, 2})
+
+    def test_release_commit_tag_and_legacy_associations(self):
+        releases = [dict(tag_name="build-10", commit_sha="sha")]
+        runs = [run(1, 1, head_sha="sha"), run(2, 2, head_branch="build-10"),
+                run(3, 3, display_title="Sign - build-10"), run(4, 4),
+                run(5, 5, display_title="Sign - build-100"), run(6, 6)]
+        policy = {"legacy_release_runs": {"build-10": [4]}}
+        self.assertEqual(self.keep(runs, releases, policy), {1, 2, 3, 4, 6})
+        self.assertEqual(self.keep(runs, [], policy), {6})
+
+    def test_mutable_channel_target_does_not_pin_old_build(self):
+        self.assertEqual(self.keep([run(1, 1, head_sha="old"), run(2, 2)],
+                                  [dict(tag_name="desktop-sim-channel", commit_sha="old")]), {2})
+
+    def test_rerun_is_not_deleted(self):
+        original = run(1, 1)
+        self.assertTrue(MODULE.unchanged_completed(original, original))
+        for changes in ({"status": "queued"}, {"run_attempt": 2}, {"updated_at": "new"}):
+            self.assertFalse(MODULE.unchanged_completed(original, dict(original, **changes)))
+
+    def test_cleanup_uses_default_branch_and_does_not_trigger_itself(self):
+        workflow = (ROOT / ".github/workflows/actions-retention.yml").read_text()
+        self.assertIn("ref: ${{ github.event.repository.default_branch }}", workflow)
+        self.assertNotIn("- Actions retention", workflow)
+        self.assertNotIn("retain-latest-run:", (ROOT / ".github/workflows/desktop-installer.yml").read_text())

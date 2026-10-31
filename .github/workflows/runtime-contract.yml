@@ -6,6 +6,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: runtime-contract-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   static-contract:
     runs-on: ubuntu-24.04
@@ -33,7 +37,7 @@ jobs:
           python -m pytest platform/runtime/tests -q
       - name: Validate shell syntax
         run: |
-          mapfile -d '' scripts < <(find runtime tools/simulators -type f -name '*.sh' -print0)
+          mapfile -d '' scripts < <(find platform/runtime tools/simulators -type f -name '*.sh' -print0)
           if (( ${#scripts[@]} == 0 )); then
             echo "No Runtime or simulator shell scripts were found" >&2
             exit 1

@@ -144,7 +144,7 @@ Go to the building where the computer science labs are and collect the package.
 
 ## 9. 清理规则
 
-- GitHub `Desktop installer` 每次构建、签名及所需发布成功后，只保留本次运行，删除更早已结束的运行记录、日志和 Actions 产物。更新失败时保留上一份成功构建；正在运行或更新的任务不删除。此规则不删除 Release、Tag、更新渠道或 Git 源码历史。
+- GitHub Actions 按现用工作流分别保留最近一次成功、尚未被新成功解决的最近一次失败、当前正式与必要回退版本关联记录，以及 SignPath 正式证书复核所需的固定记录。正在运行或排队的任务保留，其余已被替代及废弃工作流记录自动清理。规则见 `release/distribution/desktop/RELEASE_POLICY.md`；不删除 Release、Tag、更新渠道或 Git 源码历史。
 
 ### 可重新生成
 

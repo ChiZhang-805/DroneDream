@@ -239,7 +239,7 @@ jobs:
       - name: Validate every Runtime shell script
         shell: bash
         run: |
-          mapfile -d '' scripts < <(find runtime scripts -type f -name '*.sh' -print0)
+          mapfile -d '' scripts < <(find platform/runtime tools/simulators -type f -name '*.sh' -print0)
           if (( ${#scripts[@]} == 0 )); then
             echo "No Runtime shell scripts were found" >&2
             exit 1
