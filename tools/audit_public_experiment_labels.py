@@ -29,7 +29,7 @@ PUBLIC_TEXT_SUFFIXES = {
     ".yml",
 }
 EXPERIMENT_SEQUENCE_LABEL = re.compile(
-    r"(?i)(?<![a-z0-9])r[0-9]{1,3}(?![a-z0-9])"
+    r"(?i)(?<![a-z0-9$])r[0-9]{1,3}(?![a-z0-9])"
 )
 VISIBLE_REVISION_LABEL = re.compile(r"R\{[^}\n]*revision")
 VISIBLE_INTERNAL_VERSION_EXPRESSION = re.compile(
@@ -48,6 +48,7 @@ VISIBLE_INTERNAL_VERSION_COPY = re.compile(
 # These files bind literal names owned by third parties or installer-language
 # register syntax. Their numeric tokens are not DroneDream experiment labels.
 EXTERNAL_LITERAL_FILES = {
+    "tools/audit_public_experiment_labels.py",
     "services/backend/app/benchmarking/method_inventory.py",
     "services/backend/app/benchmarking/pycma_reference_contract.py",
     "apps/desktop/scripts/verify-installer-removal-wait.ps1",
@@ -90,7 +91,7 @@ def find_public_experiment_labels(repository: Path) -> list[str]:
                 ".tsx",
             }
             if (
-                EXPERIMENT_SEQUENCE_LABEL.search(line)
+                (EXPERIMENT_SEQUENCE_LABEL.search(line) and not _documented_external_reference(relative, line))
                 or VISIBLE_REVISION_LABEL.search(line)
                 or (
                     frontend_source
@@ -103,6 +104,17 @@ def find_public_experiment_labels(repository: Path) -> list[str]:
             ):
                 violations.append(f"{relative}:{line_number}")
     return violations
+
+
+def _documented_external_reference(relative: str, line: str) -> bool:
+    if relative == "docs/guides/PROJECT_MEMORY.md":
+        # The naming prohibition quotes examples; R2 is also Cloudflare's product name.
+        return line.startswith("- 普通代码、文档、图片和目录更新") or (
+            line.startswith("- 下载加速") and "Cloudflare R2" in line
+        )
+    return relative == "docs/guides/development-and-release.md" and line.startswith(
+        "- 核心收据：`TestRuns/"
+    )
 
 
 def main() -> int:

@@ -519,7 +519,8 @@ def test_formal_release_workflow_fails_closed_on_signing_and_source_binding() ->
         encoding="utf-8"
     )
 
-    assert workflow.count("signpath/github-action-submit-signing-request@") == 2
+    assert workflow.count("signpath/github-action-submit-signing-request@") == 3
+    assert workflow.count("signing-policy-slug: test-signing") == 1
     assert workflow.count('if ($signature.Status -ne "Valid")') == 2
     assert ".sourceCommit == env.GITHUB_SHA" in workflow
     assert "release already exists and will never be overwritten" in workflow

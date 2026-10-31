@@ -37,7 +37,9 @@ def _clear_jwks_client_cache() -> Iterator[None]:
 def test_jwks_client_uses_configured_timeout_and_bounded_read(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    body = json.dumps({"keys": []}).encode("utf-8")
+    jwks = {"keys": [{"kty": "oct", "k": "dGVzdC1vbmx5", "kid": "test", "alg": "HS256"}]}
+    body = json.dumps(jwks).encode("utf-8")
+    maximum_bytes = len(body) + 16
     response = _FakeResponse(body, content_length=str(len(body)))
     observed: dict[str, Any] = {}
 
@@ -52,15 +54,15 @@ def test_jwks_client_uses_configured_timeout_and_bounded_read(
 
     monkeypatch.setattr("app.auth.url_request.urlopen", fake_urlopen)
 
-    client = auth._jwks_client("https://identity.example.test/jwks.json", 2, 64)
+    client = auth._jwks_client("https://identity.example.test/jwks.json", 2, maximum_bytes)
 
-    assert client.fetch_data() == {"keys": []}
+    assert client.fetch_data() == jwks
     assert observed == {
         "url": "https://identity.example.test/jwks.json",
         "timeout": 2,
         "context": None,
     }
-    assert response.read_sizes == [65]
+    assert response.read_sizes == [maximum_bytes + 1]
 
 
 @pytest.mark.parametrize("declared_length", ["65", "-1", "not-a-number"])

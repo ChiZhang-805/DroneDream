@@ -140,9 +140,7 @@ def main() -> int:
     casefolded_paths: dict[str, Path] = {}
     for relative_path in files:
         if relative_path.parts and relative_path.parts[0] == "artifacts":
-            errors.append(
-                f"{relative_path}: generated artifacts must not be committed"
-            )
+            errors.append(f"{relative_path}: generated artifacts must not be committed")
         folded = relative_path.as_posix().casefold()
         previous = casefolded_paths.get(folded)
         if previous is not None and previous != relative_path:
