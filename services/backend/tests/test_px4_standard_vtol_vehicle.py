@@ -28,9 +28,9 @@ def test_mission_assembly_preserves_vtol_and_adds_physical_perception_and_payloa
     assert model.findtext("plugin/child_model") == "takeout_payload"
     assert artifact.summary["px4_sitl_model"] == "standard_vtol"
     assert "maximum_qualified_payload_kg" not in artifact.summary
-    assert AIRFRAME_MASS_KG == pytest.approx(5 + 5 * 0.005 + 3e-8)
-    assert DRY_MASS_KG == pytest.approx(AIRFRAME_MASS_KG + 0.061)
-    assert VERTICAL_THRUST_N == pytest.approx(180)
+    assert pytest.approx(5 + 5 * 0.005 + 3e-8) == AIRFRAME_MASS_KG
+    assert pytest.approx(AIRFRAME_MASS_KG + 0.061) == DRY_MASS_KG
+    assert pytest.approx(180) == VERTICAL_THRUST_N
 
 
 def test_payload_clears_wing_and_lift_rotors():

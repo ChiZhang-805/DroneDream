@@ -1,4 +1,4 @@
-name: Sign five-edition handoff
+name: 签名更新包
 run-name: Sign five-edition handoff - ${{ inputs.release_tag }}
 
 on:

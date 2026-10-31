@@ -1,15 +1,16 @@
-name: Actions retention
+name: 清理旧记录
+run-name: 清理旧记录
 
 on:
   workflow_dispatch:
   workflow_run:
     workflows:
-      - Desktop installer
-      - Deploy global product website
-      - Quality gate
-      - Runtime contract
-      - Runtime release
-      - Sign five-edition handoff
+      - 构建安装包
+      - 发布官网
+      - 检查产品代码
+      - 检查运行环境
+      - 发布运行环境
+      - 签名更新包
     types: [completed]
   schedule:
     - cron: '23 3 * * 1'

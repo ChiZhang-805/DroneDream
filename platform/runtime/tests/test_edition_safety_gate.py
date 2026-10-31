@@ -40,11 +40,14 @@ FIXTURE = contract.bind_test_fixture_to_edition_manifest(
 )
 
 
-@pytest.mark.parametrize("loader,filename", [
-    (gate._load_contract, "edition_safety_contract.py"),
-    (gate._load_distribution_contract, "distribution_contract.py"),
-    (gate._load_profile_contract, "engine_pack_profile_contract.py"),
-])
+@pytest.mark.parametrize(
+    "loader,filename",
+    [
+        (gate._load_contract, "edition_safety_contract.py"),
+        (gate._load_distribution_contract, "distribution_contract.py"),
+        (gate._load_profile_contract, "engine_pack_profile_contract.py"),
+    ],
+)
 def test_contract_loader_uses_selected_root_and_current_source(tmp_path, loader, filename):
     """A new active payload must not inherit a previous payload's Python module."""
     first = tmp_path / "first"
@@ -64,11 +67,14 @@ def test_contract_loader_uses_selected_root_and_current_source(tmp_path, loader,
     assert loader(first).MARKER == 3
 
 
-@pytest.mark.parametrize("loader,filename", [
-    (gate._load_contract, "edition_safety_contract.py"),
-    (gate._load_distribution_contract, "distribution_contract.py"),
-    (gate._load_profile_contract, "engine_pack_profile_contract.py"),
-])
+@pytest.mark.parametrize(
+    "loader,filename",
+    [
+        (gate._load_contract, "edition_safety_contract.py"),
+        (gate._load_distribution_contract, "distribution_contract.py"),
+        (gate._load_profile_contract, "engine_pack_profile_contract.py"),
+    ],
+)
 def test_contract_loader_never_falls_back_after_source_failure(tmp_path, loader, filename):
     path = tmp_path / "release/distribution/tools" / filename
     path.parent.mkdir(parents=True)
@@ -93,28 +99,62 @@ def request_fixture() -> dict[str, object]:
 
 @pytest.mark.parametrize("size", [True, False, 1.5, -1])
 def test_manifest_sizes_are_actual_nonnegative_integers(size):
-    assert gate._manifest_records({"files": [{
-        "path": "distribution/tools/contract.py", "sizeBytes": size, "sha256": "a" * 64,
-    }]}) == {}
+    assert (
+        gate._manifest_records(
+            {
+                "files": [
+                    {
+                        "path": "distribution/tools/contract.py",
+                        "sizeBytes": size,
+                        "sha256": "a" * 64,
+                    }
+                ]
+            }
+        )
+        == {}
+    )
 
 
-@pytest.mark.parametrize("path", [
-    "./distribution/file.py", "distribution//file.py", "distribution/file.py/",
-    "C:/outside.py", "distribution/file.py:stream", r"distribution\file.py",
-    "distribution/file\x00.py", "distribution/../outside.py",
-])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "./distribution/file.py",
+        "distribution//file.py",
+        "distribution/file.py/",
+        "C:/outside.py",
+        "distribution/file.py:stream",
+        r"distribution\file.py",
+        "distribution/file\x00.py",
+        "distribution/../outside.py",
+    ],
+)
 def test_manifest_paths_are_canonical_on_windows_and_posix(path):
-    assert gate._manifest_records({"files": [{
-        "path": path, "sizeBytes": 0, "sha256": "a" * 64,
-    }]}) == {}
+    assert (
+        gate._manifest_records(
+            {
+                "files": [
+                    {
+                        "path": path,
+                        "sizeBytes": 0,
+                        "sha256": "a" * 64,
+                    }
+                ]
+            }
+        )
+        == {}
+    )
 
 
 @pytest.mark.parametrize("version", [True, 1.0, "1"])
 def test_runtime_registry_requires_integer_schema_version(tmp_path, version):
-    write_json(tmp_path / gate.RUNTIME_CONTRACT_REGISTRY_PATH, {
-        "schemaVersion": version, "kind": "dronedream-runtime-contract-registry",
-        "contractPaths": ["distribution/tools/contract.py"],
-    })
+    write_json(
+        tmp_path / gate.RUNTIME_CONTRACT_REGISTRY_PATH,
+        {
+            "schemaVersion": version,
+            "kind": "dronedream-runtime-contract-registry",
+            "contractPaths": ["distribution/tools/contract.py"],
+        },
+    )
     path = tmp_path / "distribution/tools/contract.py"
     path.parent.mkdir(parents=True)
     path.write_text("VALUE = 1\n", encoding="utf-8")

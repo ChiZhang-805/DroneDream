@@ -505,8 +505,8 @@ pub(crate) async fn agent_core_restart(
         shutdown_state(&app.state::<AgentCoreState>());
         launch_with_retry(&app)
     })
-        .await
-        .map_err(|error| format!("AGENT Core restart task failed: {error}"))?;
+    .await
+    .map_err(|error| format!("AGENT Core restart task failed: {error}"))?;
     match launch_result {
         Ok((info, child)) => {
             *state

@@ -1,4 +1,4 @@
-name: Runtime release
+name: 发布运行环境
 run-name: Runtime release - ${{ inputs.release_tag }}
 
 on:

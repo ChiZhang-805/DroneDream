@@ -70,8 +70,12 @@ class RuntimeManifestContractTests(unittest.TestCase):
 
     def test_source_package_versions_match_runtime_pins(self) -> None:
         pins = runtime_manifest.load_pins(RUNTIME / "pins.env")
-        backend = tomllib.loads((ROOT / "services" / "backend" / "pyproject.toml").read_text(encoding="utf-8"))
-        worker = tomllib.loads((ROOT / "services" / "worker" / "pyproject.toml").read_text(encoding="utf-8"))
+        backend = tomllib.loads(
+            (ROOT / "services" / "backend" / "pyproject.toml").read_text(encoding="utf-8")
+        )
+        worker = tomllib.loads(
+            (ROOT / "services" / "worker" / "pyproject.toml").read_text(encoding="utf-8")
+        )
         self.assertEqual(backend["project"]["version"], pins["BACKEND_VERSION"])
         self.assertEqual(worker["project"]["version"], pins["WORKER_VERSION"])
 
@@ -518,7 +522,9 @@ class SystemdContractTests(unittest.TestCase):
         )
         self.assertIn('--build-arg "DRONEDREAM_SOURCE_DATE_EPOCH=$source_date_epoch"', build_script)
         self.assertIn("ARG DRONEDREAM_SOURCE_DATE_EPOCH", dockerfile)
-        self.assertIn("/opt/dronedream/source/platform/engine-pack/tools/engine_pack.py", dockerfile)
+        self.assertIn(
+            "/opt/dronedream/source/platform/engine-pack/tools/engine_pack.py", dockerfile
+        )
         self.assertIn("/usr/lib/dronedream/engine-pack-manager.py", dockerfile)
         self.assertIn("--no-services", dockerfile)
         for required in (
@@ -575,12 +581,8 @@ class SystemdContractTests(unittest.TestCase):
 
     def test_runtime_image_prebuilds_the_same_px4_gazebo_target_used_by_smoke(self) -> None:
         dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
-        smoke = (RUNTIME / "scripts" / "px4-gazebo-smoke.py").read_text(
-            encoding="utf-8"
-        )
-        runtime_check = (RUNTIME / "scripts" / "runtime-check.sh").read_text(
-            encoding="utf-8"
-        )
+        smoke = (RUNTIME / "scripts" / "px4-gazebo-smoke.py").read_text(encoding="utf-8")
+        runtime_check = (RUNTIME / "scripts" / "runtime-check.sh").read_text(encoding="utf-8")
         self.assertIn("build/px4_sitl_default/bin/px4", dockerfile)
         self.assertIn("rootfs/etc/init.d-posix/rcS", dockerfile)
         self.assertIn("Tools/simulation/gz/models/x500/model.sdf", dockerfile)

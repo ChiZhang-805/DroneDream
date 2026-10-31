@@ -100,8 +100,11 @@ def _load_active_contract(active_engine_root: Path, filename: str, name: str) ->
             raise RuntimeEditionSafetyError("Runtime contract source is unavailable") from error
         digest = hashlib.sha256(source).hexdigest()
         cached = _CONTRACT_CACHE.get(name)
-        if (cached is not None and cached[:2] == (path, digest)
-                and sys.modules.get(name) is cached[2]):
+        if (
+            cached is not None
+            and cached[:2] == (path, digest)
+            and sys.modules.get(name) is cached[2]
+        ):
             return cached[2]
         spec = importlib.util.spec_from_file_location(name, path)
         if spec is None or spec.loader is None:
@@ -128,8 +131,11 @@ def _load_active_contract(active_engine_root: Path, filename: str, name: str) ->
 
 def _load_profile_contract(active_engine_root: Path) -> ModuleType:
     """Use the active profile's own validator, not a previously selected edition."""
-    return _load_active_contract(active_engine_root, "engine_pack_profile_contract.py",
-                                 "dronedream_runtime_engine_pack_profile_contract")
+    return _load_active_contract(
+        active_engine_root,
+        "engine_pack_profile_contract.py",
+        "dronedream_runtime_engine_pack_profile_contract",
+    )
 
 
 def _sim_profile_from_manifest(
@@ -230,8 +236,11 @@ def runtime_distribution_paths(
         "contractPaths",
     }:
         raise RuntimeEditionSafetyError("Runtime contract registry fields are invalid")
-    if (type(registry["schemaVersion"]) is not int or registry["schemaVersion"] != 1
-            or registry["kind"] != "dronedream-runtime-contract-registry"):
+    if (
+        type(registry["schemaVersion"]) is not int
+        or registry["schemaVersion"] != 1
+        or registry["kind"] != "dronedream-runtime-contract-registry"
+    ):
         raise RuntimeEditionSafetyError("Runtime contract registry identity is unsupported")
     paths = registry["contractPaths"]
     if (
@@ -280,14 +289,18 @@ def runtime_distribution_paths(
 
 def _load_contract(active_engine_root: Path) -> ModuleType:
     """Select the authorization validator from this exact active Engine Pack."""
-    return _load_active_contract(active_engine_root, "edition_safety_contract.py",
-                                 "dronedream_runtime_edition_safety_contract")
+    return _load_active_contract(
+        active_engine_root,
+        "edition_safety_contract.py",
+        "dronedream_runtime_edition_safety_contract",
+    )
 
 
 def _load_distribution_contract(active_engine_root: Path) -> ModuleType:
     """Select distribution validation with the same source-bound loading rule."""
-    return _load_active_contract(active_engine_root, "distribution_contract.py",
-                                 "dronedream_runtime_distribution_contract")
+    return _load_active_contract(
+        active_engine_root, "distribution_contract.py", "dronedream_runtime_distribution_contract"
+    )
 
 
 def _load_object(path: Path, label: str) -> dict[str, Any]:
@@ -347,6 +360,7 @@ class RuntimeTrustedObservation:
 @dataclass(frozen=True)
 class RuntimeLayerDecision:
     """Decision-only receipt; the caller still owns one-time action consumption."""
+
     decision: str
     reason_codes: tuple[str, ...]
     receipt: Mapping[str, Any]
@@ -369,8 +383,13 @@ def _manifest_records(document: Mapping[str, Any]) -> dict[str, Mapping[str, Any
         inner = PurePosixPath(path)
         # A manifest crosses Linux and Windows. Do not let normalization merge
         # aliases, reinterpret a drive/alternate stream, or change separators.
-        if (inner.is_absolute() or not inner.parts or ".." in inner.parts
-                or inner.as_posix() != path or any(char in path for char in "\\:\x00")):
+        if (
+            inner.is_absolute()
+            or not inner.parts
+            or ".." in inner.parts
+            or inner.as_posix() != path
+            or any(char in path for char in "\\:\x00")
+        ):
             return {}
         if type(size) is not int or size < 0:
             return {}
@@ -497,7 +516,9 @@ def _validate_active_catalog(
                 "active upstream source inventory",
             )
         )
-        capability_path = active_root / "release/distribution/capabilities/core-capabilities.v1.json"
+        capability_path = (
+            active_root / "release/distribution/capabilities/core-capabilities.v1.json"
+        )
         capability = distribution_contract.validate_capability_policy(
             _load_object(capability_path, "active capability policy")
         )
@@ -728,7 +749,9 @@ def evaluate_runtime_authorization(
     capability_path = (
         observed.active_engine_root / "release/distribution/capabilities/core-capabilities.v1.json"
     )
-    gate_path = observed.active_engine_root / "release/distribution/safety/edition-execution-gate.v1.json"
+    gate_path = (
+        observed.active_engine_root / "release/distribution/safety/edition-execution-gate.v1.json"
+    )
     capability_policy = _load_object(capability_path, "active capability policy")
     gate_policy = contract.validate_gate_policy(
         _load_object(gate_path, "active execution gate policy"),

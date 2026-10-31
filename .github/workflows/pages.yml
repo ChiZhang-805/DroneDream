@@ -1,4 +1,5 @@
-name: Deploy global product website
+name: 发布官网
+run-name: 发布官网
 
 on:
   push:

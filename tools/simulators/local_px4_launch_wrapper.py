@@ -3749,9 +3749,7 @@ def _resolve_real_launch_command(args: argparse.Namespace) -> tuple[str, str | N
     rootfs = autopilot_path / "build" / "px4_sitl_default" / "rootfs"
     executable = autopilot_path / "build" / "px4_sitl_default" / "bin" / "px4"
     if not rootfs.is_dir() or not executable.is_file():
-        raise ValueError(
-            "PX4_AUTOPILOT_DIR does not contain the bundled px4_sitl_default runtime"
-        )
+        raise ValueError("PX4_AUTOPILOT_DIR does not contain the bundled px4_sitl_default runtime")
 
     components: list[str] = []
     if setup_commands:

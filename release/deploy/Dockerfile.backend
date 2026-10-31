@@ -3,6 +3,7 @@ FROM python:3.12.13-slim-bookworm@sha256:d50fb7611f86d04a3b0471b46d7557818d88983
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PYTHONPATH=/srv/services/backend:/srv/services/worker \
     DATABASE_URL=sqlite:////srv/data/drone_dream.db \
     ARTIFACT_ROOT=/srv/artifacts \
     REAL_SIMULATOR_ARTIFACT_ROOT=/srv/artifacts
@@ -14,12 +15,15 @@ RUN python -m pip install --no-cache-dir --require-hashes \
         --requirement /tmp/requirements.backend.lock \
     && rm -f /tmp/requirements.backend.lock
 
-COPY services/backend /srv/backend
-COPY services/worker /srv/worker
+COPY services/backend /srv/services/backend
+COPY services/worker /srv/services/worker
 COPY tools /srv/tools
+COPY shared/contracts /srv/shared/contracts
+COPY shared/brand/report /srv/shared/brand/report
+COPY release/distribution /srv/release/distribution
 
 RUN python -m pip install --no-cache-dir --no-deps --no-build-isolation \
-        /srv/backend /srv/worker \
+        /srv/services/backend /srv/services/worker \
     && groupadd --gid 10001 dronedream \
     && useradd --uid 10001 --gid dronedream --no-create-home \
         --shell /usr/sbin/nologin dronedream \
@@ -29,7 +33,7 @@ RUN python -m pip install --no-cache-dir --no-deps --no-build-isolation \
 USER dronedream:dronedream
 
 FROM runtime AS api
-WORKDIR /srv/backend
+WORKDIR /srv/services/backend
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=3s --start-period=20s --retries=5 \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/live', timeout=2)"]

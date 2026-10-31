@@ -376,71 +376,123 @@ enum ProfileChange {
 }
 
 #[tauri::command]
-pub async fn update_account_profile(request: ProfileUpdateRequest) -> Result<serde_json::Value, String> {
+pub async fn update_account_profile(
+    request: ProfileUpdateRequest,
+) -> Result<serde_json::Value, String> {
     tauri::async_runtime::spawn_blocking(move || {
         update_account_profile_sync(request, "https://yggabfynndpzymlqvnim.supabase.co")
-    }).await.map_err(|_| "The profile save could not finish. Try again.".to_string())?
+    })
+    .await
+    .map_err(|_| "The profile save could not finish. Try again.".to_string())?
 }
 
 fn profile_response(response: reqwest::blocking::Response) -> Result<serde_json::Value, String> {
     let status = response.status();
-    let body: serde_json::Value = response.json()
-        .map_err(|_| "The account service returned an unreadable response. Try again.".to_string())?;
+    let body: serde_json::Value = response.json().map_err(|_| {
+        "The account service returned an unreadable response. Try again.".to_string()
+    })?;
     if !status.is_success() {
         return Err(if status == StatusCode::UNAUTHORIZED {
             "Your sign-in has expired. Sign in again before saving.".to_string()
         } else {
-            format!("The account change could not be saved (HTTP {}). Try again.", status.as_u16())
+            format!(
+                "The account change could not be saved (HTTP {}). Try again.",
+                status.as_u16()
+            )
         });
     }
     Ok(body)
 }
 
-fn update_account_profile_sync(request: ProfileUpdateRequest, origin: &str) -> Result<serde_json::Value, String> {
-    let client = Client::builder().redirect(Policy::none())
-        .connect_timeout(Duration::from_secs(30)).timeout(Duration::from_secs(120))
-        .build().map_err(|_| "Unable to initialize the account connection.".to_string())?;
-    let network_error = |_| "Could not reach the account service. Your changes have not been confirmed; try saving again.".to_string();
+fn update_account_profile_sync(
+    request: ProfileUpdateRequest,
+    origin: &str,
+) -> Result<serde_json::Value, String> {
+    let client = Client::builder()
+        .redirect(Policy::none())
+        .connect_timeout(Duration::from_secs(30))
+        .timeout(Duration::from_secs(120))
+        .build()
+        .map_err(|_| "Unable to initialize the account connection.".to_string())?;
+    let network_error = |_| {
+        "Could not reach the account service. Your changes have not been confirmed; try saving again.".to_string()
+    };
     let user_url = format!("{origin}/auth/v1/user");
-    let authorized = |method, url: &str| client.request(method, url)
-        .header("apikey", &request.publishable_key).bearer_auth(&request.access_token);
+    let authorized = |method, url: &str| {
+        client
+            .request(method, url)
+            .header("apikey", &request.publishable_key)
+            .bearer_auth(&request.access_token)
+    };
     let data = match request.change {
         ProfileChange::Name { value } => {
             let name = value.split_whitespace().collect::<Vec<_>>().join(" ");
             if name.is_empty() || name.chars().count() > 48 || name.chars().any(char::is_control) {
-                return Err("Username must contain between 1 and 48 readable characters.".to_string());
+                return Err(
+                    "Username must contain between 1 and 48 readable characters.".to_string(),
+                );
             }
             serde_json::json!({"display_name": name})
-        },
+        }
         ProfileChange::Avatar { value } => {
-            let user = profile_response(authorized(reqwest::Method::GET, &user_url).send().map_err(network_error)?)?;
+            let user = profile_response(
+                authorized(reqwest::Method::GET, &user_url)
+                    .send()
+                    .map_err(network_error)?,
+            )?;
             if user.get("id").and_then(|id| id.as_str()) != Some(request.user_id.as_str()) {
                 return Err("The account changed. Reopen your profile before saving.".to_string());
             }
-            let id = Uuid::parse_str(&request.user_id).map_err(|_| "Invalid account identity.".to_string())?;
+            let id = Uuid::parse_str(&request.user_id)
+                .map_err(|_| "Invalid account identity.".to_string())?;
             let object_url = format!("{origin}/storage/v1/object/profile-avatars/{id}/avatar.jpg");
             let avatar_url = if let Some(value) = value {
-                let encoded = value.strip_prefix("data:image/jpeg;base64,")
+                let encoded = value
+                    .strip_prefix("data:image/jpeg;base64,")
                     .ok_or_else(|| "The profile photo must be a JPEG image.".to_string())?;
-                if encoded.len() > 600_000 { return Err("The profile photo is too large.".to_string()); }
-                let bytes = BASE64_STANDARD.decode(encoded).map_err(|_| "The profile photo could not be read.".to_string())?;
-                if !bytes.starts_with(&[0xff, 0xd8, 0xff]) { return Err("The profile photo is not a JPEG image.".to_string()); }
-                profile_response(authorized(reqwest::Method::POST, &object_url)
-                    .header("Content-Type", "image/jpeg").header("x-upsert", "true")
-                    .body(bytes).send().map_err(network_error)?)?;
-                Some(format!("{origin}/storage/v1/object/public/profile-avatars/{id}/avatar.jpg?v={}", Utc::now().timestamp_millis()))
+                if encoded.len() > 600_000 {
+                    return Err("The profile photo is too large.".to_string());
+                }
+                let bytes = BASE64_STANDARD
+                    .decode(encoded)
+                    .map_err(|_| "The profile photo could not be read.".to_string())?;
+                if !bytes.starts_with(&[0xff, 0xd8, 0xff]) {
+                    return Err("The profile photo is not a JPEG image.".to_string());
+                }
+                profile_response(
+                    authorized(reqwest::Method::POST, &object_url)
+                        .header("Content-Type", "image/jpeg")
+                        .header("x-upsert", "true")
+                        .body(bytes)
+                        .send()
+                        .map_err(network_error)?,
+                )?;
+                Some(format!(
+                    "{origin}/storage/v1/object/public/profile-avatars/{id}/avatar.jpg?v={}",
+                    Utc::now().timestamp_millis()
+                ))
             } else {
-                let response = authorized(reqwest::Method::DELETE, &format!("{origin}/storage/v1/object/profile-avatars"))
-                    .json(&serde_json::json!({"prefixes": [format!("{id}/avatar.jpg")]}))
-                    .send().map_err(network_error)?;
-                if response.status() != StatusCode::NOT_FOUND { profile_response(response)?; }
+                let response = authorized(
+                    reqwest::Method::DELETE,
+                    &format!("{origin}/storage/v1/object/profile-avatars"),
+                )
+                .json(&serde_json::json!({"prefixes": [format!("{id}/avatar.jpg")]}))
+                .send()
+                .map_err(network_error)?;
+                if response.status() != StatusCode::NOT_FOUND {
+                    profile_response(response)?;
+                }
                 None
             };
             serde_json::json!({"dronedream_avatar_url": avatar_url})
-        },
+        }
     };
-    let user = profile_response(authorized(reqwest::Method::PUT, &user_url)
-        .json(&serde_json::json!({"data": data})).send().map_err(network_error)?)?;
+    let user = profile_response(
+        authorized(reqwest::Method::PUT, &user_url)
+            .json(&serde_json::json!({"data": data}))
+            .send()
+            .map_err(network_error)?,
+    )?;
     if user.get("id").and_then(|id| id.as_str()) != Some(request.user_id.as_str()) {
         return Err("The account changed. Reopen your profile before saving.".to_string());
     }
@@ -579,7 +631,8 @@ fn run_browser_auth(
                             continue;
                         }
                         let AuthorizationCallback::Authorized { code, .. } = callback else {
-                            let page = render_auth_error_page(&request.locale, identity, &attempt_id)?;
+                            let page =
+                                render_auth_error_page(&request.locale, identity, &attempt_id)?;
                             let _ = write_html_response(&mut stream, page.as_bytes(), &attempt_id);
                             return Err("Browser sign-in was denied or cancelled.".to_owned());
                         };
@@ -603,8 +656,11 @@ fn run_browser_auth(
                             {
                                 Ok(subject) => subject,
                                 Err(error) => {
-                                    let page =
-                                        render_auth_error_page(&request.locale, identity, &attempt_id)?;
+                                    let page = render_auth_error_page(
+                                        &request.locale,
+                                        identity,
+                                        &attempt_id,
+                                    )?;
                                     let _ = write_html_response(
                                         &mut stream,
                                         page.as_bytes(),
@@ -746,7 +802,7 @@ fn run_browser_auth(
                 let _ = window.set_focus();
             }
             Err(error)
-        },
+        }
     }
 }
 
@@ -797,46 +853,79 @@ fn pkce_challenge(code_verifier: &str) -> String {
 fn direct_provider_entry(authorize_url: &Url, provider: &str) -> Result<Url, String> {
     // Create the native PKCE authorization request before opening a browser.
     // The browser goes straight through Supabase's HTTP redirect to the provider.
-    let client = Client::builder().redirect(Policy::none())
-        .connect_timeout(TOKEN_REQUEST_TIMEOUT).timeout(TOKEN_REQUEST_TIMEOUT)
-        .build().map_err(|_| "Unable to prepare provider sign-in.".to_string())?;
-    let response = client.get(authorize_url.clone()).send()
+    let client = Client::builder()
+        .redirect(Policy::none())
+        .connect_timeout(TOKEN_REQUEST_TIMEOUT)
+        .timeout(TOKEN_REQUEST_TIMEOUT)
+        .build()
+        .map_err(|_| "Unable to prepare provider sign-in.".to_string())?;
+    let response = client
+        .get(authorize_url.clone())
+        .send()
         .map_err(|_| "Unable to reach the account service.".to_string())?;
     if !response.status().is_redirection() {
         return Err("The account service could not prepare desktop sign-in.".to_string());
     }
-    let location = response.headers().get(reqwest::header::LOCATION)
+    let location = response
+        .headers()
+        .get(reqwest::header::LOCATION)
         .and_then(|value| value.to_str().ok())
         .ok_or_else(|| "The account service did not return a sign-in request.".to_string())?;
     provider_entry_for_consent(location, provider, authorize_url)
 }
 
-fn provider_entry_for_consent(location: &str, provider: &str, authorize_url: &Url) -> Result<Url, String> {
+fn provider_entry_for_consent(
+    location: &str,
+    provider: &str,
+    authorize_url: &Url,
+) -> Result<Url, String> {
     let mut callback = Url::parse(location).map_err(|_| "Invalid sign-in callback.".to_string())?;
     let fields = callback.query_pairs().collect::<Vec<_>>();
     if callback.origin().ascii_serialization() != "https://getdronedream.com"
         || !matches!(callback.path(), "/oauth/consent" | "/oauth/consent/")
         || callback.fragment().is_some()
-        || fields.len() != 1 || fields[0].0 != "authorization_id"
-        || fields[0].1.len() < 8 || fields[0].1.len() > 512
-        || !fields[0].1.bytes().all(|c| c.is_ascii_alphanumeric() || b"._~-".contains(&c))
-        || !matches!(provider, "google" | "github" | "slack_oidc") {
+        || fields.len() != 1
+        || fields[0].0 != "authorization_id"
+        || fields[0].1.len() < 8
+        || fields[0].1.len() > 512
+        || !fields[0]
+            .1
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || b"._~-".contains(&c))
+        || !matches!(provider, "google" | "github" | "slack_oidc")
+    {
         return Err("The account service returned an unapproved sign-in callback.".to_string());
     }
     drop(fields);
     let native_fields = authorize_url.query_pairs().collect::<HashMap<_, _>>();
-    let redirect_uri = native_fields.get("redirect_uri").ok_or("Missing desktop callback.")?;
-    let state = native_fields.get("state").ok_or("Missing desktop authorization state.")?;
-    callback.query_pairs_mut().append_pair("desktop_provider_return", provider)
+    let redirect_uri = native_fields
+        .get("redirect_uri")
+        .ok_or("Missing desktop callback.")?;
+    let state = native_fields
+        .get("state")
+        .ok_or("Missing desktop authorization state.")?;
+    callback
+        .query_pairs_mut()
+        .append_pair("desktop_provider_return", provider)
         .append_pair("desktop_callback", redirect_uri)
         .append_pair("desktop_state", state);
     let mut entry = Url::parse("https://yggabfynndpzymlqvnim.supabase.co/auth/v1/authorize")
         .map_err(|_| "Invalid provider endpoint.".to_string())?;
-    entry.query_pairs_mut().append_pair("provider", provider)
+    entry
+        .query_pairs_mut()
+        .append_pair("provider", provider)
         .append_pair("redirect_to", callback.as_str());
     match provider {
-        "google" => { entry.query_pairs_mut().append_pair("prompt", "select_account consent"); }
-        "github" => { entry.query_pairs_mut().append_pair("prompt", "select_account"); }
+        "google" => {
+            entry
+                .query_pairs_mut()
+                .append_pair("prompt", "select_account consent");
+        }
+        "github" => {
+            entry
+                .query_pairs_mut()
+                .append_pair("prompt", "select_account");
+        }
         // Slack's documented OIDC flow owns its confirmation screen; do not
         // invent an unsupported reauthentication parameter or revoke its grant.
         _ => {}
@@ -1437,21 +1526,36 @@ mod tests {
     use super::*;
     use std::io::Cursor;
 
-    fn profile_server(responses: Vec<(&'static str, serde_json::Value)>) -> (String, thread::JoinHandle<Vec<String>>) {
+    fn profile_server(
+        responses: Vec<(&'static str, serde_json::Value)>,
+    ) -> (String, thread::JoinHandle<Vec<String>>) {
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
         let origin = format!("http://{}", listener.local_addr().unwrap());
         let handle = thread::spawn(move || {
             let mut requests = Vec::new();
             for (status, body) in responses {
                 let (mut socket, _) = listener.accept().unwrap();
-                socket.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+                socket
+                    .set_read_timeout(Some(Duration::from_secs(5)))
+                    .unwrap();
                 let mut bytes = Vec::new();
                 let mut byte = [0];
-                while !bytes.ends_with(b"\r\n\r\n") { socket.read_exact(&mut byte).unwrap(); bytes.push(byte[0]); }
+                while !bytes.ends_with(b"\r\n\r\n") {
+                    socket.read_exact(&mut byte).unwrap();
+                    bytes.push(byte[0]);
+                }
                 let header = String::from_utf8(bytes.clone()).unwrap();
-                let length = header.lines().find_map(|line| line.to_lowercase().strip_prefix("content-length: ").and_then(|v| v.parse::<usize>().ok())).unwrap_or(0);
+                let length = header
+                    .lines()
+                    .find_map(|line| {
+                        line.to_lowercase()
+                            .strip_prefix("content-length: ")
+                            .and_then(|v| v.parse::<usize>().ok())
+                    })
+                    .unwrap_or(0);
                 let mut body_bytes = vec![0; length];
-                socket.read_exact(&mut body_bytes).unwrap(); bytes.extend(body_bytes);
+                socket.read_exact(&mut body_bytes).unwrap();
+                bytes.extend(body_bytes);
                 requests.push(String::from_utf8_lossy(&bytes).to_string());
                 let body = body.to_string();
                 write!(socket, "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len()).unwrap();
@@ -1463,12 +1567,21 @@ mod tests {
 
     #[test]
     fn profile_name_round_trip_preserves_unicode_and_server_identity() {
-        let user = serde_json::json!({"id":"account", "user_metadata":{"display_name":"驰驰睡不醒"}});
+        let user =
+            serde_json::json!({"id":"account", "user_metadata":{"display_name":"驰驰睡不醒"}});
         let (origin, server) = profile_server(vec![("200 OK", user.clone())]);
-        let result = update_account_profile_sync(ProfileUpdateRequest {
-            access_token:"test-token".into(), publishable_key:"test-key".into(), user_id:"account".into(),
-            change:ProfileChange::Name{value:" 驰驰睡不醒 ".into()},
-        }, &origin).unwrap();
+        let result = update_account_profile_sync(
+            ProfileUpdateRequest {
+                access_token: "test-token".into(),
+                publishable_key: "test-key".into(),
+                user_id: "account".into(),
+                change: ProfileChange::Name {
+                    value: " 驰驰睡不醒 ".into(),
+                },
+            },
+            &origin,
+        )
+        .unwrap();
         assert_eq!(result, user);
         let requests = server.join().unwrap();
         assert!(requests[0].starts_with("PUT /auth/v1/user "));
@@ -1481,15 +1594,34 @@ mod tests {
         let id = "00000000-0000-4000-8000-000000000001";
         for upload in [true, false] {
             let user = serde_json::json!({"id":id,"user_metadata":{}});
-            let (origin, server) = profile_server(vec![("200 OK",user.clone()),("200 OK",serde_json::json!({})),("200 OK",user)]);
-            update_account_profile_sync(ProfileUpdateRequest {
-                access_token:"test-token".into(), publishable_key:"test-key".into(), user_id:id.into(),
-                change:ProfileChange::Avatar{value:upload.then(|| format!("data:image/jpeg;base64,{}", BASE64_STANDARD.encode([0xff,0xd8,0xff,0xd9])))},
-            }, &origin).unwrap();
+            let (origin, server) = profile_server(vec![
+                ("200 OK", user.clone()),
+                ("200 OK", serde_json::json!({})),
+                ("200 OK", user),
+            ]);
+            update_account_profile_sync(
+                ProfileUpdateRequest {
+                    access_token: "test-token".into(),
+                    publishable_key: "test-key".into(),
+                    user_id: id.into(),
+                    change: ProfileChange::Avatar {
+                        value: upload.then(|| {
+                            format!(
+                                "data:image/jpeg;base64,{}",
+                                BASE64_STANDARD.encode([0xff, 0xd8, 0xff, 0xd9])
+                            )
+                        }),
+                    },
+                },
+                &origin,
+            )
+            .unwrap();
             let requests = server.join().unwrap();
             assert!(requests[0].starts_with("GET /auth/v1/user "));
             if upload {
-                assert!(requests[1].starts_with(&format!("POST /storage/v1/object/profile-avatars/{id}/avatar.jpg ")));
+                assert!(requests[1].starts_with(&format!(
+                    "POST /storage/v1/object/profile-avatars/{id}/avatar.jpg "
+                )));
                 assert!(requests[2].contains("dronedream_avatar_url"));
             } else {
                 assert!(requests[1].starts_with("DELETE /storage/v1/object/profile-avatars "));
@@ -1572,14 +1704,25 @@ mod tests {
     fn provider_entry_opens_auth_service_without_website_interstitial() {
         for edition in ["universal", "sim", "lab", "field", "autonomy"] {
             let identity = desktop_auth_identity(edition).unwrap();
-            let authorize = build_authorize_url(identity, "public-client-id", "state-123",
-                "nonce-123", "challenge-123").unwrap();
+            let authorize = build_authorize_url(
+                identity,
+                "public-client-id",
+                "state-123",
+                "nonce-123",
+                "challenge-123",
+            )
+            .unwrap();
             for provider in ["google", "github", "slack_oidc"] {
                 let entry = provider_entry_for_consent(
                     "https://getdronedream.com/oauth/consent?authorization_id=request-123",
-                    provider, &authorize).unwrap();
-                assert_eq!(entry.origin().ascii_serialization(),
-                    "https://yggabfynndpzymlqvnim.supabase.co");
+                    provider,
+                    &authorize,
+                )
+                .unwrap();
+                assert_eq!(
+                    entry.origin().ascii_serialization(),
+                    "https://yggabfynndpzymlqvnim.supabase.co"
+                );
                 assert_eq!(entry.path(), "/auth/v1/authorize");
                 let query = entry.query_pairs().collect::<HashMap<_, _>>();
                 assert_eq!(query.get("provider").unwrap(), provider);
@@ -1591,7 +1734,10 @@ mod tests {
                 let callback = Url::parse(query.get("redirect_to").unwrap()).unwrap();
                 let fields = callback.query_pairs().collect::<HashMap<_, _>>();
                 assert_eq!(fields.get("authorization_id").unwrap(), "request-123");
-                assert_eq!(fields.get("desktop_callback").unwrap(), identity.redirect_uri);
+                assert_eq!(
+                    fields.get("desktop_callback").unwrap(),
+                    identity.redirect_uri
+                );
                 assert_eq!(fields.get("desktop_state").unwrap(), "state-123");
                 assert!(!entry.as_str().contains("code_verifier"));
                 assert!(!entry.as_str().contains("access_token"));
@@ -1601,8 +1747,14 @@ mod tests {
 
     #[test]
     fn provider_entry_rejects_unapproved_consent_targets() {
-        let authorize = build_authorize_url(desktop_auth_identity("universal").unwrap(),
-            "public-client-id", "state-123", "nonce-123", "challenge-123").unwrap();
+        let authorize = build_authorize_url(
+            desktop_auth_identity("universal").unwrap(),
+            "public-client-id",
+            "state-123",
+            "nonce-123",
+            "challenge-123",
+        )
+        .unwrap();
         for callback in [
             "http://getdronedream.com/oauth/consent?authorization_id=request-123",
             "https://example.com/oauth/consent?authorization_id=request-123",
@@ -1642,7 +1794,9 @@ mod tests {
         let address = listener.local_addr().unwrap();
         let reader = thread::spawn(move || {
             let mut client = TcpStream::connect(address).unwrap();
-            client.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+            client
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
             let mut response = String::new();
             client.read_to_string(&mut response).unwrap();
             response
@@ -1653,7 +1807,9 @@ mod tests {
         let response = reader.join().unwrap();
         let (headers, body) = response.split_once("\r\n\r\n").unwrap();
         assert!(headers.starts_with("HTTP/1.1 303 See Other\r\n"));
-        assert!(headers.lines().any(|line| line == "Location: https://getdronedream.com/"));
+        assert!(headers
+            .lines()
+            .any(|line| line == "Location: https://getdronedream.com/"));
         assert!(headers.contains("Cache-Control: no-store"));
         assert!(headers.contains("Referrer-Policy: no-referrer"));
         assert!(body.is_empty());

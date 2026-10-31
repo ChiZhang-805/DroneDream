@@ -57,7 +57,7 @@ class RetentionTests(unittest.TestCase):
             self.assertFalse(MODULE.unchanged_completed(original, dict(original, **changes)))
 
     def test_cleanup_uses_default_branch_and_does_not_trigger_itself(self):
-        workflow = (ROOT / ".github/workflows/actions-retention.yml").read_text()
+        workflow = (ROOT / ".github/workflows/actions-retention.yml").read_text(encoding="utf-8")
         self.assertIn("ref: ${{ github.event.repository.default_branch }}", workflow)
-        self.assertNotIn("- Actions retention", workflow)
-        self.assertNotIn("retain-latest-run:", (ROOT / ".github/workflows/desktop-installer.yml").read_text())
+        self.assertNotIn("- 清理旧记录", workflow)
+        self.assertNotIn("retain-latest-run:", (ROOT / ".github/workflows/desktop-installer.yml").read_text(encoding="utf-8"))

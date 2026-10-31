@@ -9,8 +9,8 @@ import datetime as dt
 import importlib.util
 import json
 import os
-import shutil
 import shlex
+import shutil
 import sqlite3
 import stat
 import subprocess
@@ -522,8 +522,16 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.repair_database_access:
-            if args.descriptor or args.archive or args.no_services or args.check_idle or args.capabilities:
-                raise EnginePackInstallError("database repair does not accept installation arguments")
+            if (
+                args.descriptor
+                or args.archive
+                or args.no_services
+                or args.check_idle
+                or args.capabilities
+            ):
+                raise EnginePackInstallError(
+                    "database repair does not accept installation arguments"
+                )
             repair_database_access()
             print(json.dumps({"databaseAccessRepaired": True}))
             return 0

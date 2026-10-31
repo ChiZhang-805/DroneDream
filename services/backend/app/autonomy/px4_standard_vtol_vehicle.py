@@ -12,11 +12,11 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 from .px4_x500_vehicle import (
-    MyDroneGazeboArtifact,
     STANDARD_GRAVITY_M_S2,
     TAKEOUT_PAYLOAD_MASS_KG,
     TAKEOUT_PAYLOAD_MAXIMUM_ATTACHMENT_ERROR_M,
     TAKEOUT_PAYLOAD_SIZE_M,
+    MyDroneGazeboArtifact,
     takeout_payload_sdf,
 )
 

@@ -1,4 +1,5 @@
-name: Desktop installer
+name: 构建安装包
+run-name: 构建安装包
 
 on:
   workflow_dispatch:

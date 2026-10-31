@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import school_map_px4_mission as support
+
 from app.autonomy.px4_standard_vtol_vehicle import export_standard_vtol_gazebo_artifact
 
 
@@ -25,7 +26,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-dir", required=True, type=Path)
     parser.add_argument("--px4-root", type=Path, default=Path("/opt/PX4-Autopilot"))
     parser.add_argument("--vehicle-package", type=Path)
-    parser.add_argument("--vehicle-model", choices=("x500-depth", "standard-vtol"), default="x500-depth")
+    parser.add_argument(
+        "--vehicle-model", choices=("x500-depth", "standard-vtol"), default="x500-depth"
+    )
     parser.add_argument("--velocity-m-s", type=float, default=5.0)
     parser.add_argument("--cruise-altitude-m", type=float, default=8.0)
     return parser.parse_args()
@@ -105,9 +108,12 @@ def grounded_model_root(
     return (
         float(spawn["x"]) - float(offset["x"]),
         float(spawn["y"]) - float(offset["y"]),
-        support_z - float(vehicle.get(
-            "model_root_to_contact_m", float(offset["z"]) - float(vehicle["body_height_m"]) / 2
-        )),
+        support_z
+        - float(
+            vehicle.get(
+                "model_root_to_contact_m", float(offset["z"]) - float(vehicle["body_height_m"]) / 2
+            )
+        ),
     )
 
 
@@ -215,8 +221,9 @@ def route_contract(
     return route, track, root, track["points"]
 
 
-def collision_count(samples: list[support.GazeboPoseSample], semantic: dict[str, Any],
-                    vehicle: dict[str, Any]) -> int:
+def collision_count(
+    samples: list[support.GazeboPoseSample], semantic: dict[str, Any], vehicle: dict[str, Any]
+) -> int:
     collisions = 0
     for sample in samples:
         for primitive in semantic["collision_primitives"]:
@@ -232,8 +239,11 @@ def collision_count(samples: list[support.GazeboPoseSample], semantic: dict[str,
                 and abs(local_y) <= float(primitive["size_y"]) / 2 + vehicle["body_radius_m"]
             )
             vertical = (
-                abs(sample.model_root_z + vehicle["collision_center_offset_model_m"]["z"]
-                    - float(primitive["center_z"]))
+                abs(
+                    sample.model_root_z
+                    + vehicle["collision_center_offset_model_m"]["z"]
+                    - float(primitive["center_z"])
+                )
                 <= (float(primitive["size_z"]) + vehicle["body_height_m"]) / 2
             )
             if horizontal and vertical:
@@ -253,7 +263,8 @@ def main() -> int:
         # Geometry envelope includes the full wing, camera and attached parcel.
         # These dimensions are candidate inputs, not measured flight capability.
         vehicle = {
-            "body_radius_m": 1.2, "body_height_m": 0.5,
+            "body_radius_m": 1.2,
+            "body_height_m": 0.5,
             "collision_center_offset_model_m": {"x": 0.0, "y": 0.0, "z": 0.3},
             "model_root_to_contact_m": 0.151,
         }
@@ -266,13 +277,15 @@ def main() -> int:
     route, track, spawn, points = route_contract(
         map_root, args.cruise_altitude_m, args.velocity_m_s, vehicle
     )
-    from dronedream_agent_core.contracts import GraphRoute
     from dronedream_agent_core.collision import validate_route_clearance
+    from dronedream_agent_core.contracts import GraphRoute
 
     clearance = validate_route_clearance(
-        GraphRoute.model_validate(route), map_root / "gazebo" / "semantic.json",
+        GraphRoute.model_validate(route),
+        map_root / "gazebo" / "semantic.json",
         vehicle_diameter_m=vehicle["body_radius_m"] * 2,
-        vehicle_height_m=vehicle["body_height_m"], sample_interval_m=0.05,
+        vehicle_height_m=vehicle["body_height_m"],
+        sample_interval_m=0.05,
     )
     write_json(run_dir / "clearance.json", clearance.model_dump(mode="json"))
     if not clearance.accepted or clearance.minimum_clearance_m < 0.79:

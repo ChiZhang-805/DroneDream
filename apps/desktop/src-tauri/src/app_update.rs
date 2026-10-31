@@ -1,15 +1,15 @@
 //! Same-display-version updater ordering for the 1.0.0 internal-test channel.
 
-use serde::Serialize;
 use base64::Engine;
+use serde::Serialize;
 use std::io::{Read, Write};
 use std::path::Path;
-use std::time::Instant;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Mutex,
 };
 use std::time::Duration;
+use std::time::Instant;
 use tauri::{Emitter, Manager};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
@@ -63,7 +63,9 @@ impl AppUpdateCoordinator {
             progress,
             attempt,
             error: None,
-            downloaded_bytes: 0, total_bytes: None, bytes_per_second: 0,
+            downloaded_bytes: 0,
+            total_bytes: None,
+            bytes_per_second: 0,
         };
         if let Ok(mut current) = self.progress.lock() {
             *current = Some(progress.clone());
@@ -71,24 +73,47 @@ impl AppUpdateCoordinator {
         let _ = app.emit(UPDATE_PROGRESS_EVENT, progress);
     }
 
-    fn publish_transfer(&self, app: &tauri::AppHandle, phase: &'static str, attempt: u32, downloaded: u64, total: Option<u64>, speed: u64) {
+    fn publish_transfer(
+        &self,
+        app: &tauri::AppHandle,
+        phase: &'static str,
+        attempt: u32,
+        downloaded: u64,
+        total: Option<u64>,
+        speed: u64,
+    ) {
         let progress = AppUpdateProgress {
-            phase, attempt, error: None,
-            progress: total.filter(|v| *v > 0).map(|v| (5 + downloaded.saturating_mul(94) / v).min(99) as u8).unwrap_or(5),
-            downloaded_bytes: downloaded, total_bytes: total, bytes_per_second: speed,
+            phase,
+            attempt,
+            error: None,
+            progress: total
+                .filter(|v| *v > 0)
+                .map(|v| (5 + downloaded.saturating_mul(94) / v).min(99) as u8)
+                .unwrap_or(5),
+            downloaded_bytes: downloaded,
+            total_bytes: total,
+            bytes_per_second: speed,
         };
-        if let Ok(mut current) = self.progress.lock() { *current = Some(progress.clone()); }
+        if let Ok(mut current) = self.progress.lock() {
+            *current = Some(progress.clone());
+        }
         let _ = app.emit(UPDATE_PROGRESS_EVENT, progress);
     }
 
     fn publish_failure(&self, app: &tauri::AppHandle, error: &str) {
-        let prepared = self.prepared.lock().map(|value| value.is_some()).unwrap_or(false);
+        let prepared = self
+            .prepared
+            .lock()
+            .map(|value| value.is_some())
+            .unwrap_or(false);
         let progress = AppUpdateProgress {
             phase: if prepared { "ready" } else { "failed" },
             progress: if prepared { 100 } else { 0 },
             attempt: 0,
             error: Some(error.to_string()),
-            downloaded_bytes: 0, total_bytes: None, bytes_per_second: 0,
+            downloaded_bytes: 0,
+            total_bytes: None,
+            bytes_per_second: 0,
         };
         if let Ok(mut current) = self.progress.lock() {
             *current = Some(progress.clone());
@@ -161,9 +186,15 @@ async fn download_update(
     coordinator: &AppUpdateCoordinator,
     install: bool,
 ) -> Result<(), String> {
-    let prepared = coordinator.prepared.lock().map_err(|e| e.to_string())?.is_some();
+    let prepared = coordinator
+        .prepared
+        .lock()
+        .map_err(|e| e.to_string())?
+        .is_some();
     if prepared {
-        if !install { return Ok(()); }
+        if !install {
+            return Ok(());
+        }
         return install_prepared_update(&app, &coordinator).await;
     }
 
@@ -178,35 +209,61 @@ async fn download_update(
         .await
         .map_err(|error| format!("Unable to refresh the signed update: {error}"))?
         .ok_or_else(|| "The signed update is no longer available.".to_string())?;
-    let cache = app.path().app_cache_dir().map_err(|e| e.to_string())?.join("app-update");
-    let public_key = app.config().plugins.0.get("updater")
-        .and_then(|config| config.get("pubkey")).and_then(|key| key.as_str())
-        .ok_or_else(|| "The update signing key is missing.".to_string())?.to_string();
+    let cache = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| e.to_string())?
+        .join("app-update");
+    let public_key = app
+        .config()
+        .plugins
+        .0
+        .get("updater")
+        .and_then(|config| config.get("pubkey"))
+        .and_then(|key| key.as_str())
+        .ok_or_else(|| "The update signing key is missing.".to_string())?
+        .to_string();
     let download_app = app.clone();
     let download = update.clone();
     let bytes = tauri::async_runtime::spawn_blocking(move || {
         let coordinator = download_app.state::<AppUpdateCoordinator>();
-        resumable_update(&download, &cache, &public_key, |phase, attempt, count, total, speed| {
-            coordinator.publish_transfer(&download_app, phase, attempt, count, total, speed);
-        })
-    }).await.map_err(|e| e.to_string())??;
+        resumable_update(
+            &download,
+            &cache,
+            &public_key,
+            |phase, attempt, count, total, speed| {
+                coordinator.publish_transfer(&download_app, phase, attempt, count, total, speed);
+            },
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())??;
 
     // The complete cached file has passed the updater signature verification. Keep the bytes native-owned;
     // downloading must never stop a mission or close the user's workspace.
     *coordinator.prepared.lock().map_err(|e| e.to_string())? = Some((update, bytes));
     coordinator.publish(&app, "ready", 100, 0);
-    if !install { return Ok(()); }
+    if !install {
+        return Ok(());
+    }
     install_prepared_update(&app, &coordinator).await
 }
 
 fn verify_update_bytes(bytes: &[u8], signature: &str, public_key: &str) -> Result<(), String> {
     let decode = |value: &str| -> Result<String, String> {
-        String::from_utf8(base64::engine::general_purpose::STANDARD.decode(value).map_err(|e| e.to_string())?)
-            .map_err(|e| e.to_string())
+        String::from_utf8(
+            base64::engine::general_purpose::STANDARD
+                .decode(value)
+                .map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())
     };
-    let key = minisign_verify::PublicKey::decode(&decode(public_key)?).map_err(|e| e.to_string())?;
-    let signature = minisign_verify::Signature::decode(&decode(signature)?).map_err(|e| e.to_string())?;
-    key.verify(bytes, &signature, true).map_err(|e| format!("Update signature verification failed: {e}"))
+    let key =
+        minisign_verify::PublicKey::decode(&decode(public_key)?).map_err(|e| e.to_string())?;
+    let signature =
+        minisign_verify::Signature::decode(&decode(signature)?).map_err(|e| e.to_string())?;
+    key.verify(bytes, &signature, true)
+        .map_err(|e| format!("Update signature verification failed: {e}"))
 }
 
 fn content_range(value: &str) -> Option<(u64, u64, u64)> {
@@ -217,33 +274,61 @@ fn content_range(value: &str) -> Option<(u64, u64, u64)> {
 }
 
 fn resumable_update(
-    update: &Update, cache: &Path, public_key: &str,
+    update: &Update,
+    cache: &Path,
+    public_key: &str,
     progress: impl FnMut(&'static str, u32, u64, Option<u64>, u64),
 ) -> Result<Vec<u8>, String> {
     let mut builder = reqwest::blocking::Client::builder()
-        .user_agent("DroneDream Updater").connect_timeout(Duration::from_secs(30))
+        .user_agent("DroneDream Updater")
+        .connect_timeout(Duration::from_secs(30))
         .timeout(Duration::from_secs(600));
-    if update.no_proxy { builder = builder.no_proxy(); }
-    else if let Some(proxy) = &update.proxy { builder = builder.proxy(reqwest::Proxy::all(proxy.as_str()).map_err(|e| e.to_string())?); }
+    if update.no_proxy {
+        builder = builder.no_proxy();
+    } else if let Some(proxy) = &update.proxy {
+        builder = builder.proxy(reqwest::Proxy::all(proxy.as_str()).map_err(|e| e.to_string())?);
+    }
     let client = builder.build().map_err(|e| e.to_string())?;
-    download_cached_installer(&client, update.download_url.as_str(), &update.headers,
-        &update.signature, updater_announced_size(&update.raw_json), cache, public_key, progress)
+    download_cached_installer(
+        &client,
+        update.download_url.as_str(),
+        &update.headers,
+        &update.signature,
+        updater_announced_size(&update.raw_json),
+        cache,
+        public_key,
+        progress,
+    )
 }
 
 fn download_cached_installer(
-    client: &reqwest::blocking::Client, url: &str, headers: &reqwest::header::HeaderMap,
-    signature: &str, mut total: Option<u64>, cache: &Path, public_key: &str,
+    client: &reqwest::blocking::Client,
+    url: &str,
+    headers: &reqwest::header::HeaderMap,
+    signature: &str,
+    mut total: Option<u64>,
+    cache: &Path,
+    public_key: &str,
     mut progress: impl FnMut(&'static str, u32, u64, Option<u64>, u64),
 ) -> Result<Vec<u8>, String> {
     std::fs::create_dir_all(cache).map_err(|e| e.to_string())?;
     let partial = cache.join("installer.part");
     let receipt = cache.join("download.json");
     // A stable cache is scoped to one immutable signed artifact, not to an expiring redirect URL.
-    let identity = serde_json::json!({"url": url, "signature": signature, "edition": COMPILED_EDITION_ID});
-    let previous = std::fs::read(&receipt).ok().and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok());
+    let identity =
+        serde_json::json!({"url": url, "signature": signature, "edition": COMPILED_EDITION_ID});
+    let previous = std::fs::read(&receipt)
+        .ok()
+        .and_then(|bytes| serde_json::from_slice::<serde_json::Value>(&bytes).ok());
     if previous.as_ref() != Some(&identity) {
-        if partial.exists() { std::fs::remove_file(&partial).map_err(|e| e.to_string())?; }
-        std::fs::write(&receipt, serde_json::to_vec(&identity).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+        if partial.exists() {
+            std::fs::remove_file(&partial).map_err(|e| e.to_string())?;
+        }
+        std::fs::write(
+            &receipt,
+            serde_json::to_vec(&identity).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
     }
     let mut attempt = 0u32;
     loop {
@@ -254,12 +339,19 @@ fn download_cached_installer(
             progress("verifying", attempt, offset, total, 0);
             match verify_update_bytes(&bytes, signature, public_key) {
                 Ok(()) => return Ok(bytes),
-                Err(error) => { std::fs::remove_file(&partial).map_err(|e| e.to_string())?; return Err(error); }
+                Err(error) => {
+                    std::fs::remove_file(&partial).map_err(|e| e.to_string())?;
+                    return Err(error);
+                }
             }
         }
-        let mut request = client.get(url).headers(headers.clone())
+        let mut request = client
+            .get(url)
+            .headers(headers.clone())
             .header("Accept-Encoding", "identity");
-        if offset > 0 { request = request.header("Range", format!("bytes={offset}-")); }
+        if offset > 0 {
+            request = request.header("Range", format!("bytes={offset}-"));
+        }
         progress("downloading", attempt, offset, total, 0);
         let response = request.send();
         let mut response = match response {
@@ -267,13 +359,20 @@ fn download_cached_installer(
             Ok(response) if response.status().as_u16() == 416 => {
                 // Unknown-size complete cache: only a valid release signature can finish it.
                 let bytes = std::fs::read(&partial).map_err(|e| e.to_string())?;
-                if verify_update_bytes(&bytes, signature, public_key).is_ok() { return Ok(bytes); }
+                if verify_update_bytes(&bytes, signature, public_key).is_ok() {
+                    return Ok(bytes);
+                }
                 std::fs::remove_file(&partial).map_err(|e| e.to_string())?;
                 continue;
-            },
-            Ok(response) if response.status().is_client_error() && response.status().as_u16() != 429 => {
-                return Err(format!("Update download returned HTTP {}.", response.status().as_u16()));
-            },
+            }
+            Ok(response)
+                if response.status().is_client_error() && response.status().as_u16() != 429 =>
+            {
+                return Err(format!(
+                    "Update download returned HTTP {}.",
+                    response.status().as_u16()
+                ));
+            }
             _ => {
                 progress("retrying", attempt, offset, total, 0);
                 std::thread::sleep(Duration::from_secs(2u64.pow(attempt.min(4))));
@@ -281,16 +380,31 @@ fn download_cached_installer(
             }
         };
         if response.status() == reqwest::StatusCode::PARTIAL_CONTENT {
-            let range = response.headers().get("Content-Range").and_then(|v| v.to_str().ok()).and_then(content_range);
-            let Some((start, _, length)) = range else { return Err("The download server returned an invalid byte range.".into()); };
-            if start != offset || total.is_some_and(|v| v != length) { return Err("The download server returned a different update range.".into()); }
+            let range = response
+                .headers()
+                .get("Content-Range")
+                .and_then(|v| v.to_str().ok())
+                .and_then(content_range);
+            let Some((start, _, length)) = range else {
+                return Err("The download server returned an invalid byte range.".into());
+            };
+            if start != offset || total.is_some_and(|v| v != length) {
+                return Err("The download server returned a different update range.".into());
+            }
             total = Some(length);
         } else if response.status() == reqwest::StatusCode::OK {
             offset = 0; // Server ignored Range: replace, never append a complete response.
             total = response.content_length().or(total);
-        } else { return Err("The download server did not return an installer.".into()); }
-        let mut file = std::fs::OpenOptions::new().create(true).write(true).append(offset > 0).truncate(offset == 0)
-            .open(&partial).map_err(|e| e.to_string())?;
+        } else {
+            return Err("The download server did not return an installer.".into());
+        }
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .append(offset > 0)
+            .truncate(offset == 0)
+            .open(&partial)
+            .map_err(|e| e.to_string())?;
         let started = Instant::now();
         let initial = offset;
         let mut published = Instant::now();
@@ -299,14 +413,17 @@ fn download_cached_installer(
             match response.read(&mut buffer) {
                 Ok(0) => break true,
                 Ok(length) => {
-                    file.write_all(&buffer[..length]).map_err(|e| e.to_string())?;
+                    file.write_all(&buffer[..length])
+                        .map_err(|e| e.to_string())?;
                     offset += length as u64;
                     if published.elapsed() >= Duration::from_millis(500) {
-                        let speed = ((offset - initial) as f64 / started.elapsed().as_secs_f64().max(0.001)) as u64;
+                        let speed = ((offset - initial) as f64
+                            / started.elapsed().as_secs_f64().max(0.001))
+                            as u64;
                         progress("downloading", attempt, offset, total, speed);
                         published = Instant::now();
                     }
-                },
+                }
                 Err(_) => break false,
             }
         };
@@ -332,12 +449,18 @@ async fn install_prepared_update(
 ) -> Result<(), String> {
     ensure_update_idle_allowing_legacy_runtime()?;
     coordinator.publish(app, "installing", 100, 0);
-    if let Err(error) = crate::runtime_keepalive::stop_runtime_for_exit(app.clone(), app.state()).await {
+    if let Err(error) =
+        crate::runtime_keepalive::stop_runtime_for_exit(app.clone(), app.state()).await
+    {
         coordinator.publish(app, "ready", 100, 0);
         return Err(error);
     }
-    let (update, bytes) = coordinator.prepared.lock().map_err(|e| e.to_string())?
-        .take().ok_or_else(|| "No verified update is ready to install.".to_string())?;
+    let (update, bytes) = coordinator
+        .prepared
+        .lock()
+        .map_err(|e| e.to_string())?
+        .take()
+        .ok_or_else(|| "No verified update is ready to install.".to_string())?;
     if let Err(error) = update.install(&bytes) {
         *coordinator.prepared.lock().map_err(|e| e.to_string())? = Some((update, bytes));
         coordinator.publish(app, "ready", 100, 0);
@@ -414,12 +537,18 @@ mod tests {
     // Public test vector from minisign-verify; no production signing material.
     fn download_fixture() -> (String, String) {
         let encode = |s: &str| base64::engine::general_purpose::STANDARD.encode(s);
-        (encode("untrusted comment: minisign public key E7620F1842B4E81F
-RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3"),
-         encode("untrusted comment: signature from minisign secret key
+        (
+            encode(
+                "untrusted comment: minisign public key E7620F1842B4E81F
+RWQf6LRCGA9i53mlYecO4IzT51TGPpvWucNSCh1CBM0QTaLn73Y7GFO3",
+            ),
+            encode(
+                "untrusted comment: signature from minisign secret key
 RWQf6LRCGA9i59SLOFxz6NxvASXDJeRtuZykwQepbDEGt87ig1BNpWaVWuNrm73YiIiJbq71Wi+dP9eKL8OC351vwIasSSbXxwA=
 trusted comment: timestamp:1555779966	file:test
-QtKMXWyYcwdpZAlPF7tE2ENJkRd1ujvKjlj1m9RtHTBnZPa5WKU5uWRs5GoP5M/VqE81QFuMKI5k/SfNQUaOAA=="))
+QtKMXWyYcwdpZAlPF7tE2ENJkRd1ujvKjlj1m9RtHTBnZPa5WKU5uWRs5GoP5M/VqE81QFuMKI5k/SfNQUaOAA==",
+            ),
+        )
     }
 
     #[test]
@@ -429,27 +558,65 @@ QtKMXWyYcwdpZAlPF7tE2ENJkRd1ujvKjlj1m9RtHTBnZPa5WKU5uWRs5GoP5M/VqE81QFuMKI5k/SfN
             let listener = TcpListener::bind("127.0.0.1:0").unwrap();
             let url = format!("http://{}/installer", listener.local_addr().unwrap());
             let (key, signature) = download_fixture();
-            let cache = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../../Caches/updater-tests").join(uuid::Uuid::new_v4().to_string());
+            let cache = Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../../../Caches/updater-tests")
+                .join(uuid::Uuid::new_v4().to_string());
             std::fs::create_dir_all(&cache).unwrap();
             std::fs::write(cache.join("installer.part"), b"te").unwrap();
             std::fs::write(cache.join("download.json"), serde_json::to_vec(&serde_json::json!({"url":url,"signature":signature,"edition":COMPILED_EDITION_ID})).unwrap()).unwrap();
             let server = std::thread::spawn(move || {
                 let (mut socket, _) = listener.accept().unwrap();
-                socket.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+                socket
+                    .set_read_timeout(Some(Duration::from_secs(5)))
+                    .unwrap();
                 let mut request = Vec::new();
                 let mut byte = [0];
-                while !request.ends_with(b"\r\n\r\n") { socket.read_exact(&mut byte).unwrap(); request.push(byte[0]); }
-                assert!(String::from_utf8(request).unwrap().to_lowercase().contains("range: bytes=2-"));
-                let response = if ignore_range { "HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\ntest" }
-                    else { "HTTP/1.1 206 Partial Content\r\nContent-Length: 2\r\nContent-Range: bytes 2-3/4\r\nConnection: close\r\n\r\nst" };
+                while !request.ends_with(b"\r\n\r\n") {
+                    socket.read_exact(&mut byte).unwrap();
+                    request.push(byte[0]);
+                }
+                assert!(String::from_utf8(request)
+                    .unwrap()
+                    .to_lowercase()
+                    .contains("range: bytes=2-"));
+                let response = if ignore_range {
+                    "HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\ntest"
+                } else {
+                    "HTTP/1.1 206 Partial Content\r\nContent-Length: 2\r\nContent-Range: bytes 2-3/4\r\nConnection: close\r\n\r\nst"
+                };
                 socket.write_all(response.as_bytes()).unwrap();
             });
-            let client = reqwest::blocking::Client::builder().no_proxy().build().unwrap();
-            let result = download_cached_installer(&client, &url, &Default::default(), &signature, Some(4), &cache, &key, |_,_,_,_,_| {});
+            let client = reqwest::blocking::Client::builder()
+                .no_proxy()
+                .build()
+                .unwrap();
+            let result = download_cached_installer(
+                &client,
+                &url,
+                &Default::default(),
+                &signature,
+                Some(4),
+                &cache,
+                &key,
+                |_, _, _, _, _| {},
+            );
             server.join().unwrap();
             assert_eq!(result.unwrap(), b"test");
             // Reopening reuses the verified complete file with the server now offline.
-            assert_eq!(download_cached_installer(&client, &url, &Default::default(), &signature, Some(4), &cache, &key, |_,_,_,_,_| {}).unwrap(), b"test");
+            assert_eq!(
+                download_cached_installer(
+                    &client,
+                    &url,
+                    &Default::default(),
+                    &signature,
+                    Some(4),
+                    &cache,
+                    &key,
+                    |_, _, _, _, _| {}
+                )
+                .unwrap(),
+                b"test"
+            );
             std::fs::remove_file(cache.join("installer.part")).unwrap();
             std::fs::remove_file(cache.join("download.json")).unwrap();
             std::fs::remove_dir(&cache).unwrap();
@@ -461,7 +628,7 @@ QtKMXWyYcwdpZAlPF7tE2ENJkRd1ujvKjlj1m9RtHTBnZPa5WKU5uWRs5GoP5M/VqE81QFuMKI5k/SfN
         let (key, signature) = download_fixture();
         assert!(verify_update_bytes(b"test", &signature, &key).is_ok());
         assert!(verify_update_bytes(b"Test", &signature, &key).is_err());
-        assert_eq!(content_range("bytes 2-3/4"), Some((2,3,4)));
+        assert_eq!(content_range("bytes 2-3/4"), Some((2, 3, 4)));
         for invalid in ["bytes 4-3/4", "bytes 0-4/4", "bytes */4", "unknown"] {
             assert!(content_range(invalid).is_none());
         }
