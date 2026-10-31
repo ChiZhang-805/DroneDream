@@ -1,6 +1,7 @@
 """Retain useful Actions runs and remove superseded completed history."""
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import json
 from pathlib import Path
 import re
@@ -71,6 +72,14 @@ def unchanged_completed(original, current):
     )
 
 
+def delete_completed(root, run):
+    endpoint = f"{root}/runs/{run['id']}"
+    if not unchanged_completed(run, api(endpoint)):
+        return 0
+    api(endpoint, "--method", "DELETE")
+    return 1
+
+
 def collection(endpoint, key=None):
     pages = api(endpoint, "--paginate", "--slurp")
     return [item for page in pages for item in (page[key] if key else page)]
@@ -107,16 +116,12 @@ def main():
     if not args.apply:
         return
     deleted = 0
-    for index, run in enumerate(obsolete):
-        if index % 25 == 0 and release_identity(release_inventory(args.repository)) != release_identity(releases):
-            print("Release inventory changed; remaining cleanup will use the next run's fresh inventory.", flush=True)
-            break
-        current = api(f"{root}/runs/{run['id']}")
-        if not unchanged_completed(run, current):
-            continue
-        api(f"{root}/runs/{run['id']}", "--method", "DELETE")
-        deleted += 1
-        if deleted % 25 == 0:
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        for index in range(0, len(obsolete), 25):
+            if release_identity(release_inventory(args.repository)) != release_identity(releases):
+                print("Release inventory changed; remaining cleanup will use the next run's fresh inventory.", flush=True)
+                break
+            deleted += sum(pool.map(lambda run: delete_completed(root, run), obsolete[index:index + 25]))
             print(f"Deleted {deleted}/{len(obsolete)} obsolete runs", flush=True)
     remaining = collection(endpoint, "workflow_runs")
     missing = set(kept) - {r["id"] for r in remaining}
