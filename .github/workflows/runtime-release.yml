@@ -1,5 +1,5 @@
 name: 发布运行环境
-run-name: Runtime release - ${{ inputs.release_tag }}
+run-name: 发布运行环境 - ${{ inputs.release_tag }}
 
 on:
   workflow_dispatch:

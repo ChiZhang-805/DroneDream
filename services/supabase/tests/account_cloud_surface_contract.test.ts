@@ -1,6 +1,6 @@
 import { assert, assertStringIncludes } from "jsr:@std/assert@1";
 
-const repoRoot = new URL("../../", import.meta.url);
+const repoRoot = new URL("../../../", import.meta.url);
 
 Deno.test("model usage returns the authoritative account billing boundary", async () => {
   const gateway = await Deno.readTextFile(

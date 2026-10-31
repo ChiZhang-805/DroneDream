@@ -15,7 +15,7 @@ dependencies = [
     "drone-dream-backend",
     "pydantic>=2.6,<3.0",
     "pydantic-settings>=2.2,<3.0",
-    "sqlalchemy>=2.0,<3.0",
+    "sqlalchemy>=2.0,<2.1",
 ]
 
 [project.optional-dependencies]

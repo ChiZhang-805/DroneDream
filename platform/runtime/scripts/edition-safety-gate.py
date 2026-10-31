@@ -116,7 +116,7 @@ def _load_active_contract(active_engine_root: Path, filename: str, name: str) ->
         # become the next successful load. Avoid timestamp-based .pyc reuse.
         sys.modules[name] = module
         try:
-            exec(compile(source, str(path), "exec"), module.__dict__)
+            exec(compile(source, str(path), "exec"), module.__dict__)  # noqa: S102 - load exact bytes of the installed contract module.
         except BaseException as error:
             if previous is None:
                 sys.modules.pop(name, None)

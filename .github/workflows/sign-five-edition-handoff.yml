@@ -1,5 +1,5 @@
 name: 签名更新包
-run-name: Sign five-edition handoff - ${{ inputs.release_tag }}
+run-name: 签名更新包 - ${{ inputs.release_tag }}
 
 on:
   workflow_dispatch:

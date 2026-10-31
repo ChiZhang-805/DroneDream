@@ -2,7 +2,7 @@ function assert(value: unknown, message: string): asserts value {
   if (!value) throw new Error(message);
 }
 
-const repoRoot = new URL("../../", import.meta.url);
+const repoRoot = new URL("../../../", import.meta.url);
 const requiredEdgeFunctions = [
   "admin-console",
   "assistant-orchestrator",
@@ -38,7 +38,7 @@ Deno.test("every frontend cloud endpoint has a checked-in Edge Function", async 
     new URL("services/supabase/config.toml", repoRoot),
   );
   for (const name of requiredEdgeFunctions) {
-    const functionRoot = new URL(`supabase/functions/${name}/`, repoRoot);
+    const functionRoot = new URL(`services/supabase/functions/${name}/`, repoRoot);
     await Deno.stat(new URL("index.ts", functionRoot));
     await Deno.stat(new URL("index.test.ts", functionRoot));
     assert(
@@ -62,7 +62,7 @@ Deno.test("every frontend cloud endpoint has a checked-in Edge Function", async 
     ),
   );
   for (const name of referenced) {
-    await Deno.stat(new URL(`supabase/functions/${name}/index.ts`, repoRoot));
+    await Deno.stat(new URL(`services/supabase/functions/${name}/index.ts`, repoRoot));
   }
 });
 

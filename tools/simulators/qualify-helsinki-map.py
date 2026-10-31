@@ -376,7 +376,7 @@ def main() -> int:
         (run_dir / "pose.stderr.log").open("w", encoding="utf-8") as pose_stderr,
     ):
         try:
-            gazebo = subprocess.Popen(
+            gazebo = subprocess.Popen(  # noqa: S603 - resolved Gazebo executable, fixed argv, no shell.
                 [gz_binary, "sim", "-r", "-s", str(map_root / "gazebo" / "world.physics.sdf")],
                 env=env,
                 stdout=gazebo_log,
@@ -397,7 +397,7 @@ def main() -> int:
                 gz_binary, env, run_dir / "gazebo_pose_samples.csv", pose_stderr
             )
             recorder.start()
-            px4 = subprocess.Popen(
+            px4 = subprocess.Popen(  # noqa: S603 - resolved PX4 executable, fixed argv, no shell.
                 [str(px4_executable), "-d", "-w", str(trial_rootfs), str(trial_rootfs)],
                 cwd=trial_rootfs,
                 env=env,
@@ -420,7 +420,7 @@ def main() -> int:
                 route_distance / max(0.5, args.velocity_m_s) * 3.0 + 180.0,
                 len(points) * 8.0 + 180.0,
             )
-            executor = subprocess.Popen(
+            executor = subprocess.Popen(  # noqa: S603 - repository executor, fixed argv, no shell.
                 [
                     sys.executable,
                     str(executor_path),

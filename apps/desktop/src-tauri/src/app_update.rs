@@ -195,11 +195,11 @@ async fn download_update(
         if !install {
             return Ok(());
         }
-        return install_prepared_update(&app, &coordinator).await;
+        return install_prepared_update(app, coordinator).await;
     }
 
-    coordinator.publish(&app, "preflight", 0, 0);
-    coordinator.publish(&app, "preflight", 5, 0);
+    coordinator.publish(app, "preflight", 0, 0);
+    coordinator.publish(app, "preflight", 5, 0);
 
     let updater = app
         .updater()
@@ -242,11 +242,11 @@ async fn download_update(
     // The complete cached file has passed the updater signature verification. Keep the bytes native-owned;
     // downloading must never stop a mission or close the user's workspace.
     *coordinator.prepared.lock().map_err(|e| e.to_string())? = Some((update, bytes));
-    coordinator.publish(&app, "ready", 100, 0);
+    coordinator.publish(app, "ready", 100, 0);
     if !install {
         return Ok(());
     }
-    install_prepared_update(&app, &coordinator).await
+    install_prepared_update(app, coordinator).await
 }
 
 fn verify_update_bytes(bytes: &[u8], signature: &str, public_key: &str) -> Result<(), String> {
@@ -301,6 +301,8 @@ fn resumable_update(
     )
 }
 
+// Keep the signed artifact inputs explicit for both the updater and HTTP-resume tests.
+#[allow(clippy::too_many_arguments)]
 fn download_cached_installer(
     client: &reqwest::blocking::Client,
     url: &str,

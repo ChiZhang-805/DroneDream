@@ -8,6 +8,7 @@
 *.sha256 text eol=lf
 *.log text eol=lf
 *.md text eol=lf
+*.txt text eol=lf
 *.ts text eol=lf
 *.tsx text eol=lf
 *.js text eol=lf
