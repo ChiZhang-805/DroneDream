@@ -54,7 +54,7 @@ foreach ($requiredText in @(
     'progress: Mutex<Option<AppUpdateProgress>>',
     'pub(crate) fn get_app_update_progress',
     'running: self.running.load(Ordering::Acquire)',
-    'coordinator.publish(&app, "preflight", 0, 0)'
+    'coordinator.publish(app, "preflight", 0, 0)'
 )) {
     Assert-Contract ($updateSource.Contains($requiredText)) `
         "The native updater is missing its process-owned resumable progress contract: $requiredText"
