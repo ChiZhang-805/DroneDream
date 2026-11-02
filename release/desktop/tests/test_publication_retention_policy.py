@@ -15,7 +15,7 @@ def test_pages_workflow_keeps_only_the_latest_successful_deployment() -> None:
     for fragment in (
         "Verify Pages deployment retention",
         "node --test apps/website/scripts/prune-github-pages-deployments.test.mjs",
-        "Retain latest Pages deployment",
+        "Retain website and Actions history",
         "needs: deploy",
         "deployments: write",
         "DRONEDREAM_DEPLOYMENT_ENVIRONMENT: github-pages",
@@ -25,6 +25,23 @@ def test_pages_workflow_keeps_only_the_latest_successful_deployment() -> None:
     assert workflow.index("needs: deploy") < workflow.index(
         "node apps/website/scripts/prune-github-pages-deployments.mjs"
     )
+
+
+def test_all_four_workflows_retain_only_four_repository_runs() -> None:
+    workflows = sorted((ROOT / ".github" / "workflows").glob("*.yml"))
+    assert [path.name for path in workflows] == [
+        "pages.yml",
+        "quality-gate.yml",
+        "release-software.yml",
+        "runtime-release.yml",
+    ]
+    for workflow in workflows:
+        assert "retain-workflow-runs.sh" in workflow.read_text(encoding="utf-8")
+
+    retention = read(".github/scripts/retain-workflow-runs.sh")
+    assert "readonly keep_count=4" in retention
+    assert 'if [[ "$status" == "completed" ]]' in retention
+    assert "actions/runs/${run_id}" in retention
 
 
 def test_release_publisher_requires_release_and_tag_set_equality() -> None:
