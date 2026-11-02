@@ -124,6 +124,8 @@ Go to the building where the computer science labs are and collect the package.
 
 GitHub Actions 只保留四项职责：`Check code` 自动验证应用、Runtime 和仓库结构，`Deploy website` 部署官网，`Release Software` 统一签名并发布五款软件，`Release runtime` 构建并发布 WSL 镜像。运行记录不是源码分支；旧分支的失败应先在当前源码复现和修复，不盲目重跑历史提交。
 
+每次用户任务的最终交付都必须运行上述四个工作流，不能以其中一个成功替代另外三个。软件发布必须同步完成五版构建、签名、不可变 Release、五个更新渠道、网站下载、本机五版更新和公开地址验证；Runtime 工作流也必须实际完成构建、发布和产品可用性核对。外部审批或专用构建器不可用时，明确保留为未完成阻塞，不得把已提交源码或通过检查描述为完整交付。
+
 `Release runtime` 需要带 `dronedream-runtime-builder` 标签的专用 Linux x64 runner；触发之前确认该机器在线。没有注册机器时应恢复构建机器，不能以跳过镜像构建或仿真验证的方式制造成功记录。上传失败先检查现有发布资产是否完整，再决定恢复上传或重新构建，不覆盖已经公开的不可变版本。
 
 - 源码事实以审查后的提交为准；本地构建目录不是发布事实源。
