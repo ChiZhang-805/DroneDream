@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
     [string]$Installer,
     [ValidateSet("English", "SimpChinese")]
@@ -22,7 +22,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 if ([string]::IsNullOrWhiteSpace($RecoveryControlExecutable)) {
-    $RecoveryControlExecutable = Join-Path $PSScriptRoot "..\src-tauri\target\x86_64-pc-windows-gnullvm\release\drone-dream-desktop.exe"
+    $RecoveryControlExecutable = Join-Path $PSScriptRoot "..\src\target\x86_64-pc-windows-gnullvm\release\drone-dream-desktop.exe"
 }
 
 Add-Type @"

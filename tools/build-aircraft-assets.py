@@ -13,7 +13,7 @@ from pathlib import Path
 import subprocess
 
 SOURCE_REVISION = next(source["pin"]["commit"] for source in json.loads(
-    (Path(__file__).resolve().parents[1] / "release/distribution/upstream-sources.v1.json").read_text(encoding="utf-8"))["sources"]
+    (Path(__file__).resolve().parents[1] / "release/desktop/config/upstream-sources.v1.json").read_text(encoding="utf-8"))["sources"]
     if source["id"] == "px4-gazebo-models")
 MODELS = ("x500_depth", "x500_flow", "x500_lidar_down", "x500_lidar_front",
           "x500_mono_cam", "x500_mono_cam_down", "x500_lidar_2d", "x500_vision",

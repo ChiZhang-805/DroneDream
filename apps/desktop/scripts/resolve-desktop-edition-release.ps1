@@ -1,8 +1,7 @@
-param(
+﻿param(
     [string]$ReleaseTag,
     [ValidateSet("universal", "sim", "lab", "field", "autonomy")]
     [string]$ValidationEditionId = "universal",
-    [string]$PullRequestBaseBranch,
     [string]$GitHubOutputPath
 )
 
@@ -11,11 +10,11 @@ Set-StrictMode -Version Latest
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
 $version = [string](
-    Get-Content -LiteralPath (Join-Path $repoRoot "apps\desktop\src-tauri\tauri.conf.json") `
+    Get-Content -LiteralPath (Join-Path $repoRoot "apps\desktop\src\tauri.conf.json") `
         -Raw -Encoding UTF8 |
         ConvertFrom-Json
 ).version
-$familyPath = Join-Path $repoRoot "release\distribution\desktop\edition-runtime-update-families.v1.json"
+$familyPath = Join-Path $repoRoot "release\desktop\config\updates\edition-runtime-update-families.v1.json"
 $families = Get-Content -LiteralPath $familyPath -Raw -Encoding UTF8 | ConvertFrom-Json
 
 $isRelease = -not [string]::IsNullOrWhiteSpace($ReleaseTag)
@@ -35,26 +34,7 @@ if ($isRelease) {
         throw "Desktop release tag version $tagVersion does not match product version $version."
     }
 } else {
-    # Pull requests exercise the real edition owned by their target product
-    # branch. Manual runs have no base branch and retain the explicit edition
-    # selector. Keeping the mapping here makes the workflow and local tests use
-    # one source of truth instead of five independently maintained identities.
-    if ([string]::IsNullOrWhiteSpace($PullRequestBaseBranch)) {
-        $editionId = $ValidationEditionId
-    } else {
-        $editionByBranch = @{
-            "main" = "universal"
-            "software" = "universal"
-            "software-sim" = "sim"
-            "software-lab" = "lab"
-            "software-field" = "field"
-            "software-agent" = "autonomy"
-        }
-        if (-not $editionByBranch.ContainsKey($PullRequestBaseBranch)) {
-            throw "Desktop pull request target branch does not own a product edition: $PullRequestBaseBranch"
-        }
-        $editionId = [string]$editionByBranch[$PullRequestBaseBranch]
-    }
+    $editionId = $ValidationEditionId
     $buildNumberText = (& git -C $repoRoot rev-list --count HEAD).Trim()
     if ($LASTEXITCODE -ne 0 -or $buildNumberText -notmatch '^[1-9][0-9]*$') {
         throw "Unable to resolve the validation build number."
@@ -67,7 +47,8 @@ if ($matches.Count -ne 1) {
     throw "Desktop edition must resolve to exactly one updater family."
 }
 $family = $matches[0]
-$configRelativePath = "apps/desktop/src-tauri/tauri.$editionId.conf.json"
+$configName = if ($editionId -ceq "autonomy") { "agent" } else { $editionId }
+$configRelativePath = "apps/desktop/editions/$configName.json"
 $configPath = Join-Path $repoRoot $configRelativePath.Replace('/', '\')
 $config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
 

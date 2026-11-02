@@ -1,10 +1,10 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
     [string]$GeneratedNsi
 )
 
 $ErrorActionPreference = "Stop"
-$config = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\src-tauri\tauri.conf.json") -Raw | ConvertFrom-Json
+$config = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\src\tauri.conf.json") -Raw | ConvertFrom-Json
 if ($config.bundle.windows.webviewInstallMode.type -cne "embedBootstrapper") {
     throw "WebView2 bootstrapper must be embedded."
 }
@@ -12,7 +12,7 @@ if ($config.bundle.windows.nsis.installerHooks -cne "nsis/webview2-health.nsh") 
     throw "The WebView2 NSIS health hook is not configured."
 }
 
-$hook = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\src-tauri\nsis\webview2-health.nsh") -Raw
+$hook = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\src\nsis\webview2-health.nsh") -Raw
 foreach ($required in @(
     '"pv"',
     '"location"',

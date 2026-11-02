@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const desktopRoot = fileURLToPath(new URL("../", import.meta.url));
-const frontendRoot = fileURLToPath(new URL("../../frontend/", import.meta.url));
+const frontendRoot = fileURLToPath(new URL("../../web/", import.meta.url));
 const providerConfig = JSON.parse(readFileSync(
   new URL("../production-auth-providers.json", import.meta.url), "utf8",
 ));

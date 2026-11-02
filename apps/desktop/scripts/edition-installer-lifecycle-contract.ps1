@@ -1,4 +1,4 @@
-function ConvertTo-DroneDreamWindowsPathIdentity {
+﻿function ConvertTo-DroneDreamWindowsPathIdentity {
     param(
         [Parameter(Mandatory = $true)]
         [string]$Path

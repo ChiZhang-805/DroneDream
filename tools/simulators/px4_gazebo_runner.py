@@ -43,7 +43,7 @@ from typing import Any
 # otherwise be invisible unless callers manually set PYTHONPATH.  Resolve the
 # checkout/runtime layout here to keep local, CI, and bundled WSL launches
 # identical.
-_BACKEND_ROOT = Path(__file__).resolve().parents[2] / "services" / "backend"
+_BACKEND_ROOT = Path(__file__).resolve().parents[2] / "server" / "api"
 if _BACKEND_ROOT.is_dir() and str(_BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(_BACKEND_ROOT))
 
@@ -377,8 +377,8 @@ def _engine_pack_profile_identity(manifest: dict[str, Any], schema_version: int)
     ):
         raise RunnerError("Engine Pack editionProfile fields are invalid")
     expected = {
-        "field-lightweight": (False, ["services/backend/app/simulator", "tools/simulators"]),
-        "sim-only": (True, ["services/backend/app/distribution_safety.py"]),
+        "field-lightweight": (False, ["server/api/app/simulator", "tools/simulators"]),
+        "sim-only": (True, ["server/api/app/distribution_safety.py"]),
         "unified-sim-lab": (True, []),
         "autonomy-full": (True, []),
     }.get(profile_id)
@@ -387,7 +387,7 @@ def _engine_pack_profile_identity(manifest: dict[str, Any], schema_version: int)
     if profile_id == "sim-only" and (
         profile.get("profileVersion") != "1.0.0"
         or profile.get("profileManifestPath")
-        != "release/distribution/engine-pack-profiles/sim-only.v1.json"
+        != "release/desktop/config/engine-pack-profiles/sim-only.v1.json"
         or not isinstance(profile.get("profileManifestSha256"), str)
         or not _SHA256_HEX.fullmatch(profile["profileManifestSha256"])
     ):

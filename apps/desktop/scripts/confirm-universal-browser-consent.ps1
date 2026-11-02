@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)][string]$OutputReceipt,
     [ValidateRange(5, 120)][int]$TimeoutSeconds = 90,
     [switch]$Execute

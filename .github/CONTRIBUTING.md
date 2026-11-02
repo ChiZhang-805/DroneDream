@@ -5,7 +5,7 @@ the root README.
 
 ## Before opening a pull request
 
-1. Start from the long-lived branch that owns the change.
+1. Start from `main`; use a short-lived feature branch only when review needs it.
 2. Keep credentials, generated builds, Runtime images, and user data outside
    the repository.
 3. Update tests when behavior or a public contract changes.
@@ -17,19 +17,19 @@ the root README.
 
 ```bash
 python tools/check-repository.py
-python -m ruff check services/backend services/worker tools/simulators
-python -m mypy services/backend/app services/worker/drone_dream_worker
-python -m pytest services/backend/tests -q
-python -m pytest shared/brand/tests release/distribution/tests platform/engine-pack/tests platform/runtime/tests -q
-npm --prefix apps/frontend run lint
-npm --prefix apps/frontend run typecheck
-npm --prefix apps/frontend run test
-npm --prefix apps/frontend run build
+python -m ruff check server/api server/worker tools/simulators
+python -m mypy server/api/app server/worker/drone_dream_worker
+python -m pytest server/api/tests -q
+python -m pytest shared/brand/tests release/desktop/tests runtime/engine/tests runtime/tests -q
+npm --prefix apps/web run lint
+npm --prefix apps/web run typecheck
+npm --prefix apps/web run test
+npm --prefix apps/web run build
 ```
 
 Desktop and Runtime changes also require the checks in
 [apps/desktop/README.md](../apps/desktop/README.md) and
-[docs/guides/14-runtime-release.md](../docs/guides/14-runtime-release.md).
+[docs/development/14-runtime-release.md](../docs/development/14-runtime-release.md).
 
 ## Pull request description
 

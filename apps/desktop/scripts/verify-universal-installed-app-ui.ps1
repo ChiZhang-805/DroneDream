@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
     [string]$Installer,
     [Parameter(Mandatory = $true)]
@@ -40,8 +40,8 @@ $receiptPath = Join-Path $executionRoot "receipt.json"
 $screenshotRoot = Join-Path $executionRoot "screenshots"
 $caseReceiptRoot = Join-Path $executionRoot "cases"
 $webViewProfileRoot = Join-Path $executionRoot "webview2-profile"
-$nodeVerifier = Join-Path $repoRoot "apps\frontend\scripts\verify-installed-universal-ui.mjs"
-$coexistenceContractPath = Join-Path $repoRoot "release\distribution\desktop\edition-coexistence.v1.json"
+$nodeVerifier = Join-Path $repoRoot "apps\web\scripts\verify-installed-universal-ui.mjs"
+$coexistenceContractPath = Join-Path $repoRoot "release\desktop\config\updates\edition-coexistence.v1.json"
 $installDirectory = Join-Path $env:LOCALAPPDATA "DroneDream-Universal"
 $applicationPath = Join-Path $installDirectory "drone-dream-desktop.exe"
 $uninstallerPath = Join-Path $installDirectory "uninstall.exe"
@@ -455,7 +455,7 @@ if ($actualLayoutSha256 -cne $ExpectedOfflineLayoutReceiptSha256) {
     throw "Offline layout receipt drifted."
 }
 if (-not (Test-Path -LiteralPath $nodeVerifier -PathType Leaf) -or
-    -not (Test-Path -LiteralPath (Join-Path $repoRoot "apps\frontend\node_modules\playwright") -PathType Container)) {
+    -not (Test-Path -LiteralPath (Join-Path $repoRoot "apps\web\node_modules\playwright") -PathType Container)) {
     throw "The tracked installed-app verifier or pinned Playwright dependency is unavailable."
 }
 $validationRootFull = [IO.Path]::GetFullPath($validationRoot).TrimEnd('\') + '\'

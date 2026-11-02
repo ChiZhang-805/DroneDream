@@ -209,7 +209,7 @@ $boundReceipt = $frozenReceipt.Receipt
     --repository $coreRoot --expected-commit $coreCommit --verify `
     --expected-receipt-sha256 $boundReceiptHash
 if ($LASTEXITCODE -ne 0) { throw 'Core build receipt verification failed; existing staged output preserved.' }
-$sourceReference = Get-Content -LiteralPath (Join-Path $repoRoot 'docs\guides\agent-core-public-source.json') -Raw | ConvertFrom-Json
+$sourceReference = Get-Content -LiteralPath (Join-Path $repoRoot 'shared\contracts\agent-core-source.json') -Raw | ConvertFrom-Json
 if ($sourceReference.commit -cne $coreCommit -or
     $boundReceipt.source_commit -cne $coreCommit -or
     $boundReceipt.source_repository -cne $sourceReference.repository) {
@@ -266,13 +266,13 @@ if (@($runtimePaths | Where-Object {
     throw "The AGENT Core Runtime manifest contains a Python cache."
 }
 
-$targetBinaryRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "apps\desktop\src-tauri\binaries"))
-$targetResourceRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "apps\desktop\src-tauri\agent-core-resources"))
-$allowedParent = [IO.Path]::GetFullPath((Join-Path $repoRoot "apps\desktop\src-tauri"))
+$targetBinaryRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "apps\desktop\src\binaries"))
+$targetResourceRoot = [IO.Path]::GetFullPath((Join-Path $repoRoot "apps\desktop\src\agent-core-resources"))
+$allowedParent = [IO.Path]::GetFullPath((Join-Path $repoRoot "apps\desktop\src"))
 $allowedPrefix = $allowedParent.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
 foreach ($target in @($targetBinaryRoot, $targetResourceRoot)) {
     if (-not $target.StartsWith($allowedPrefix, [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Refusing to stage outside apps/desktop/src-tauri: $target"
+        throw "Refusing to stage outside apps/desktop/src: $target"
     }
     if (Test-Path -LiteralPath $target) {
         $item = Get-Item -LiteralPath $target -Force

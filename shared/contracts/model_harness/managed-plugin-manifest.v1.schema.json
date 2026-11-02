@@ -41,7 +41,7 @@
           "type": "string"
         },
         "source_path": {
-          "pattern": "^services/backend/app(?:/[a-z][a-z0-9_]*)+\\.py$",
+          "pattern": "^server/api/app(?:/[a-z][a-z0-9_]*)+\\.py$",
           "title": "Source Path",
           "type": "string"
         },

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)][string]$Installer,
     [Parameter(Mandatory = $true)][ValidatePattern("^[0-9a-f]{40}$")][string]$ProductSourceCommit,
     [Parameter(Mandatory = $true)][ValidatePattern("^[0-9a-f]{64}$")][string]$ExpectedSha256,
@@ -38,9 +38,9 @@ $uiCaseRoot = Join-Path $executionRoot "authenticated-ui-cases"
 $uiScreenshotRoot = Join-Path $executionRoot "authenticated-ui-screenshots"
 $exitConfirmationReceiptPath = Join-Path $executionRoot "exit-confirmation.json"
 $webViewProfileRoot = Join-Path $executionRoot "webview2-profile"
-$nodeVerifier = Join-Path $repoRoot "apps\frontend\scripts\verify-installed-universal-oauth.mjs"
-$uiVerifier = Join-Path $repoRoot "apps\frontend\scripts\verify-installed-universal-ui.mjs"
-$exitVerifier = Join-Path $repoRoot "apps\frontend\scripts\confirm-installed-universal-exit.mjs"
+$nodeVerifier = Join-Path $repoRoot "apps\web\scripts\verify-installed-universal-oauth.mjs"
+$uiVerifier = Join-Path $repoRoot "apps\web\scripts\verify-installed-universal-ui.mjs"
+$exitVerifier = Join-Path $repoRoot "apps\web\scripts\confirm-installed-universal-exit.mjs"
 $browserConsentVerifier = Join-Path $PSScriptRoot "confirm-universal-browser-consent.ps1"
 $installDirectory = Join-Path $env:LOCALAPPDATA "DroneDream-Universal"
 $applicationPath = Join-Path $installDirectory "drone-dream-desktop.exe"

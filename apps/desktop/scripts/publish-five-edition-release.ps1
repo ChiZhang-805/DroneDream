@@ -1,4 +1,4 @@
-[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = "High")]
+﻿[CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = "High")]
 param(
     [Parameter(Mandatory = $true)]
     [string]$HandoffRoot,
@@ -70,7 +70,7 @@ function Assert-ExactStringSet {
     }
 }
 
-$familyContractPath = Join-Path $repoRoot "release\distribution\desktop\edition-runtime-update-families.v1.json"
+$familyContractPath = Join-Path $repoRoot "release\desktop\config\updates\edition-runtime-update-families.v1.json"
 $familyContract = Get-Content -LiteralPath $familyContractPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $version = [string]$familyContract.productDisplayVersion
 $editionIds = @("universal", "sim", "lab", "field", "autonomy")
@@ -343,21 +343,13 @@ try {
             )
             Assert-ExactStringSet -Label "GitHub Release inventory" -Actual $finalReleaseTags -Expected $expectedPublicTags
             Assert-ExactStringSet -Label "GitHub Tag inventory" -Actual $remoteTags -Expected $expectedPublicTags
-            $expectedBranches = @(
-                "main",
-                "software",
-                "software-agent",
-                "software-field",
-                "software-lab",
-                "software-sim",
-                "website"
-            )
+            $expectedBranches = @("main")
             $remoteBranchOutput = Invoke-GitHubCli -Arguments @(
                 "api", "--paginate", "repos/$Repository/branches?per_page=100",
                 "--jq", ".[].name"
             )
             $remoteBranches = @($remoteBranchOutput -split "`r?`n" | Where-Object { $_ })
-            Assert-ExactStringSet -Label "GitHub long-lived branch inventory" -Actual $remoteBranches -Expected $expectedBranches
+            Assert-ExactStringSet -Label "GitHub permanent branch inventory" -Actual $remoteBranches -Expected $expectedBranches
         }
     }
 

@@ -59,7 +59,7 @@
             "height": {"const": 64}
           }
         },
-        "canonicalOutputPath": {"const": "apps/frontend/public/drone-favicon.png"},
+        "canonicalOutputPath": {"const": "apps/web/public/drone-favicon.png"},
         "approvalBasis": {"const": "mainland-preview-approved-v1"}
       }
     },

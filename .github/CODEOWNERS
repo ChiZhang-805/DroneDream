@@ -7,5 +7,5 @@
 /.github/SECURITY.md @ChiZhang-805
 /docs/release/versioning.md @ChiZhang-805
 /apps/desktop/scripts/ @ChiZhang-805
-/apps/desktop/src-tauri/ @ChiZhang-805
-/release/website/scripts/ @ChiZhang-805
+/apps/desktop/src/ @ChiZhang-805
+/apps/website/scripts/ @ChiZhang-805

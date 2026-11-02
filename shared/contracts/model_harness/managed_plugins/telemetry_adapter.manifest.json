@@ -7,7 +7,7 @@
   "implementation": {
     "entrypoint": "compile_telemetry_semantic_contract",
     "module": "app.simulator.telemetry_evidence",
-    "source_path": "services/backend/app/simulator/telemetry_evidence.py",
+    "source_path": "server/api/app/simulator/telemetry_evidence.py",
     "source_sha256": "5a10c8d0754dce9a0231dcfd4d0aac99af0d586e6bef8377d2afa394836d7d4b"
   },
   "plugin_id": "dronedream.managed.telemetry-adapter",

@@ -13,7 +13,7 @@
     "sourcePath": "shared/brand/source/approved/website-favicon-64.png",
     "sourceSha256": "39f1c9e1bec804cb5834b12514408c9673b3a954d5c75544a5f92802387f2ea7",
     "dimensions": {"width": 64, "height": 64},
-    "canonicalOutputPath": "apps/frontend/public/drone-favicon.png",
+    "canonicalOutputPath": "apps/web/public/drone-favicon.png",
     "approvalBasis": "mainland-preview-approved-v1"
   },
   "font": {

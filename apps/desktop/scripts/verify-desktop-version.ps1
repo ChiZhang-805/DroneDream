@@ -1,11 +1,11 @@
-param(
+﻿param(
     [string]$ReleaseTag
 )
 
 $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
-$tauriConfig = Get-Content -LiteralPath (Join-Path $repoRoot "apps\desktop\src-tauri\tauri.conf.json") -Raw |
+$tauriConfig = Get-Content -LiteralPath (Join-Path $repoRoot "apps\desktop\src\tauri.conf.json") -Raw |
     ConvertFrom-Json
 $package = Get-Content -LiteralPath (Join-Path $repoRoot "apps\desktop\package.json") -Raw |
     ConvertFrom-Json
@@ -23,14 +23,14 @@ if (-not $packageLockMatch.Success) {
 }
 
 $cargoManifestMatch = [regex]::Match(
-    (Get-Content -LiteralPath (Join-Path $repoRoot "apps\desktop\src-tauri\Cargo.toml") -Raw),
+    (Get-Content -LiteralPath (Join-Path $repoRoot "apps\desktop\src\Cargo.toml") -Raw),
     '(?ms)^\[package\]\s*.*?^version\s*=\s*"([^"]+)"\s*$'
 )
 if (-not $cargoManifestMatch.Success) {
     throw "Desktop Cargo package version was not found."
 }
 $cargoLockMatch = [regex]::Match(
-    (Get-Content -LiteralPath (Join-Path $repoRoot "apps\desktop\src-tauri\Cargo.lock") -Raw),
+    (Get-Content -LiteralPath (Join-Path $repoRoot "apps\desktop\src\Cargo.lock") -Raw),
     '(?ms)^\[\[package\]\]\s*^name\s*=\s*"drone-dream-desktop"\s*^version\s*=\s*"([^"]+)"\s*$'
 )
 if (-not $cargoLockMatch.Success) {
@@ -57,7 +57,7 @@ if ($mismatches.Count -gt 0) {
 # The launcher exposes the installed desktop build. Keep both localized labels
 # tied to the bundled version instead of allowing a stale marketing string to
 # survive a deliberately approved package bump.
-$i18nPath = Join-Path $repoRoot "apps\frontend\src\i18n\I18nProvider.tsx"
+$i18nPath = Join-Path $repoRoot "apps\web\src\i18n\I18nProvider.tsx"
 $i18n = Get-Content -LiteralPath $i18nPath -Raw -Encoding UTF8
 $previewMatches = [regex]::Matches(
     $i18n,

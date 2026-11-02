@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
     [string]$Installer,
     [Parameter(Mandatory = $true)]
@@ -228,15 +228,15 @@ function Assert-UniversalInstalled {
     foreach ($required in @(
         $application,
         (Join-Path $installDirectory "uninstall.exe"),
-        (Join-Path $installDirectory "release\distribution\universal-build-profile.v1.json"),
-        (Join-Path $installDirectory "release\distribution\editions\sim.v1.json"),
-        (Join-Path $installDirectory "release\distribution\editions\lab.v1.json"),
-        (Join-Path $installDirectory "release\distribution\editions\field.v1.json"),
-        (Join-Path $installDirectory "release\distribution\desktop\edition-coexistence.v1.json"),
-        (Join-Path $installDirectory "release\distribution\desktop\edition-browser-auth.v1.json"),
-        (Join-Path $installDirectory "release\distribution\desktop\edition-runtime-update-families.v1.json"),
-        (Join-Path $installDirectory "release\distribution\safety\edition-execution-gate.v1.json"),
-        (Join-Path $installDirectory "release\distribution\vehicle-packs\registry.v1.json"),
+        (Join-Path $installDirectory "release\desktop\config\universal-build-profile.v1.json"),
+        (Join-Path $installDirectory "release\desktop\config\editions\sim.v1.json"),
+        (Join-Path $installDirectory "release\desktop\config\editions\lab.v1.json"),
+        (Join-Path $installDirectory "release\desktop\config\editions\field.v1.json"),
+        (Join-Path $installDirectory "distribution\desktop\edition-coexistence.v1.json"),
+        (Join-Path $installDirectory "distribution\desktop\edition-browser-auth.v1.json"),
+        (Join-Path $installDirectory "distribution\desktop\edition-runtime-update-families.v1.json"),
+        (Join-Path $installDirectory "release\desktop\config\safety\edition-execution-gate.v1.json"),
+        (Join-Path $installDirectory "release\desktop\config\vehicle-packs\registry.v1.json"),
         (Join-Path $installDirectory "brand\editions.json"),
         (Join-Path $installDirectory "icons\DroneDream.ico"),
         (Join-Path $installDirectory "WebView2Loader.dll")
@@ -281,7 +281,7 @@ function Assert-UniversalInstalled {
         throw "$Stage did not remain app-only or did not establish protocol 2."
     }
 
-    $registry = Get-Content -LiteralPath (Join-Path $installDirectory "release\distribution\vehicle-packs\registry.v1.json") -Raw | ConvertFrom-Json
+    $registry = Get-Content -LiteralPath (Join-Path $installDirectory "release\desktop\config\vehicle-packs\registry.v1.json") -Raw | ConvertFrom-Json
     if ($registry.kind -cne "dronedream-vehicle-pack-registry" -or @($registry.packs).Count -eq 0) {
         throw "$Stage installed an invalid or empty Vehicle Pack registry."
     }
@@ -293,14 +293,14 @@ function Assert-UniversalInstalled {
     if ($validatedCount -ne 0) {
         throw "$Stage unexpectedly contains validated hardware Vehicle Packs."
     }
-    $profile = Get-Content -LiteralPath (Join-Path $installDirectory "release\distribution\universal-build-profile.v1.json") -Raw | ConvertFrom-Json
+    $profile = Get-Content -LiteralPath (Join-Path $installDirectory "release\desktop\config\universal-build-profile.v1.json") -Raw | ConvertFrom-Json
     if ($profile.capabilityAuthority.frontendCanAuthorize -ne $false -or
         $profile.capabilityAuthority.hardwareActionDecision -cne "deny") {
         throw "$Stage does not preserve Universal capability denial."
     }
-    $coexistencePath = Join-Path $installDirectory "release\distribution\desktop\edition-coexistence.v1.json"
-    $browserAuthPath = Join-Path $installDirectory "release\distribution\desktop\edition-browser-auth.v1.json"
-    $runtimeFamiliesPath = Join-Path $installDirectory "release\distribution\desktop\edition-runtime-update-families.v1.json"
+    $coexistencePath = Join-Path $installDirectory "distribution\desktop\edition-coexistence.v1.json"
+    $browserAuthPath = Join-Path $installDirectory "distribution\desktop\edition-browser-auth.v1.json"
+    $runtimeFamiliesPath = Join-Path $installDirectory "distribution\desktop\edition-runtime-update-families.v1.json"
     $coexistence = Get-Content -LiteralPath $coexistencePath -Raw | ConvertFrom-Json
     $browserAuth = Get-Content -LiteralPath $browserAuthPath -Raw | ConvertFrom-Json
     $runtimeFamilies = Get-Content -LiteralPath $runtimeFamiliesPath -Raw | ConvertFrom-Json

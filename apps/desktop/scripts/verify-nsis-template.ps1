@@ -1,17 +1,17 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
-$templatePath = Join-Path $repoRoot "apps\desktop\src-tauri\nsis\installer.nsi"
-$runtimeModePath = Join-Path $repoRoot "apps\desktop\src-tauri\nsis\runtime-mode.nsh"
-$pathGuardPath = Join-Path $repoRoot "apps\desktop\src-tauri\nsis\path-guard.nsh"
-$editionIdentityPath = Join-Path $repoRoot "apps\desktop\src-tauri\nsis\edition-identity.nsh"
-$installerLanguagesPath = Join-Path $repoRoot "apps\desktop\src-tauri\nsis\installer-languages.nsh"
-$englishLanguagePath = Join-Path $repoRoot "apps\desktop\src-tauri\nsis\languages\English.nsh"
-$chineseLanguagePath = Join-Path $repoRoot "apps\desktop\src-tauri\nsis\languages\SimpChinese.nsh"
-$installerHookPath = Join-Path $repoRoot "apps\desktop\src-tauri\nsis\webview2-health.nsh"
+$templatePath = Join-Path $repoRoot "apps\desktop\src\nsis\installer.nsi"
+$runtimeModePath = Join-Path $repoRoot "apps\desktop\src\nsis\runtime-mode.nsh"
+$pathGuardPath = Join-Path $repoRoot "apps\desktop\src\nsis\path-guard.nsh"
+$editionIdentityPath = Join-Path $repoRoot "apps\desktop\src\nsis\edition-identity.nsh"
+$installerLanguagesPath = Join-Path $repoRoot "apps\desktop\src\nsis\installer-languages.nsh"
+$englishLanguagePath = Join-Path $repoRoot "apps\desktop\src\nsis\languages\English.nsh"
+$chineseLanguagePath = Join-Path $repoRoot "apps\desktop\src\nsis\languages\SimpChinese.nsh"
+$installerHookPath = Join-Path $repoRoot "apps\desktop\src\nsis\webview2-health.nsh"
 $packageLockPath = Join-Path $repoRoot "apps\desktop\package-lock.json"
-$tauriConfigPath = Join-Path $repoRoot "apps\desktop\src-tauri\tauri.conf.json"
-$universalOverlayPath = Join-Path $repoRoot "apps\desktop\src-tauri\tauri.universal.conf.json"
+$tauriConfigPath = Join-Path $repoRoot "apps\desktop\src\tauri.conf.json"
+$universalOverlayPath = Join-Path $repoRoot "apps\desktop\editions\universal.json"
 
 $packageLock = Get-Content -LiteralPath $packageLockPath -Raw
 $cliMatch = [regex]::Match(

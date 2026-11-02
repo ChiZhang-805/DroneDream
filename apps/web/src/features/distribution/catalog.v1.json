@@ -1,0 +1,460 @@
+{
+  "schemaVersion": 1,
+  "kind": "dronedream-frontend-distribution-catalog",
+  "catalogVersion": "1.0.0",
+  "productDisplayVersion": "1.0.0",
+  "sourceBindings": {
+    "editionManifests": {
+      "sim": {
+        "path": "release/desktop/config/editions/sim.v1.json",
+        "sha256": "6c6604126237ca0e051792e3ba6f231fea237bf34c9fbe4d8bf92560b20b249a"
+      },
+      "lab": {
+        "path": "release/desktop/config/editions/lab.v1.json",
+        "sha256": "3724ddbf9139a4f2920bba2f6d15750ae34b481bbc5e4f1b1cc06c32b488fd18"
+      },
+      "field": {
+        "path": "release/desktop/config/editions/field.v1.json",
+        "sha256": "15183d231ed96a825c38e3804f4c3d48bbc7b3596fdb94ad234d5a746cc08cd4"
+      }
+    },
+    "vehiclePackRegistry": {
+      "path": "release/desktop/config/vehicle-packs/registry.v1.json",
+      "sha256": "feb5470690bd1e75d1be341c0dec6a6bae8d62106f3fae78181438974813cad0"
+    }
+  },
+  "editions": [
+    {
+      "editionId": "sim",
+      "editionVersion": "1.0.0",
+      "displayName": {
+        "en": "DroneDream Sim",
+        "zh-CN": "DroneDream 纯仿真版"
+      },
+      "description": {
+        "en": "PX4 SITL, Gazebo, and Harness workflows with physical hardware actions denied below the UI.",
+        "zh-CN": "运行 PX4 SITL、Gazebo 与 Harness；真机和 HITL 操作在前端以下强制拒绝。"
+      },
+      "implementationStatus": "integrated-contract",
+      "validationTier": "sim-runtime-contract",
+      "artifactBaseName": "DroneDream-Sim-1.0.0.exe",
+      "requiredModules": [
+        "desktop-core",
+        "engine-pack",
+        "runtime-core",
+        "runtime-simulation",
+        "simulator-gazebo-harmonic",
+        "simulator-px4-sitl",
+        "vehicle-pack-sim",
+        "vehicle-pack-validation"
+      ],
+      "optionalModules": [],
+      "forbiddenModules": [
+        "hardware-bridge",
+        "qgroundcontrol-external",
+        "vehicle-pack-hardware"
+      ],
+      "includesLargeSimulator": true,
+      "downloadEstimateBytes": null,
+      "downloadEstimateState": "pending-build-plan"
+    },
+    {
+      "editionId": "lab",
+      "editionVersion": "1.0.0",
+      "displayName": {
+        "en": "DroneDream Lab",
+        "zh-CN": "DroneDream 实验室版"
+      },
+      "description": {
+        "en": "Unified simulation, HITL, and hardware workflows behind native, Runtime, and backend safety fences.",
+        "zh-CN": "统一提供仿真、HITL 与真机实验，但真机能力必须通过 native、Runtime 与后端三层安全门。"
+      },
+      "implementationStatus": "contract-only",
+      "validationTier": "contract-only",
+      "artifactBaseName": "DroneDream-Lab-1.0.0.exe",
+      "requiredModules": [
+        "desktop-core",
+        "engine-pack",
+        "hardware-bridge",
+        "runtime-core",
+        "runtime-simulation",
+        "simulator-gazebo-harmonic",
+        "simulator-px4-sitl",
+        "vehicle-pack-hardware",
+        "vehicle-pack-sim",
+        "vehicle-pack-validation"
+      ],
+      "optionalModules": [
+        "qgroundcontrol-external"
+      ],
+      "forbiddenModules": [],
+      "includesLargeSimulator": true,
+      "downloadEstimateBytes": null,
+      "downloadEstimateState": "pending-build-plan"
+    },
+    {
+      "editionId": "field",
+      "editionVersion": "1.0.0",
+      "displayName": {
+        "en": "DroneDream Field",
+        "zh-CN": "DroneDream 真机轻量版"
+      },
+      "description": {
+        "en": "A lightweight hardware and ground-station edition that omits Gazebo but retains qualification and preflight gates.",
+        "zh-CN": "不安装大型 Gazebo 的轻量真机与地面站版本，同时保留资格回执和安全预检。"
+      },
+      "implementationStatus": "contract-only",
+      "validationTier": "contract-only",
+      "artifactBaseName": "DroneDream-Field-1.0.0.exe",
+      "requiredModules": [
+        "desktop-core",
+        "engine-pack",
+        "hardware-bridge",
+        "runtime-core",
+        "vehicle-pack-hardware",
+        "vehicle-pack-validation"
+      ],
+      "optionalModules": [
+        "qgroundcontrol-external"
+      ],
+      "forbiddenModules": [
+        "runtime-simulation",
+        "simulator-gazebo-harmonic",
+        "simulator-px4-sitl",
+        "vehicle-pack-sim"
+      ],
+      "includesLargeSimulator": false,
+      "downloadEstimateBytes": null,
+      "downloadEstimateState": "pending-build-plan"
+    }
+  ],
+  "vehiclePacks": [
+    {
+      "packId": "px4-gazebo-x500-reference",
+      "packVersion": "1.0.0",
+      "displayName": {
+        "en": "PX4 Gazebo X500 Reference",
+        "zh-CN": "PX4 Gazebo X500 参考机型"
+      },
+      "manufacturer": "PX4 simulation reference",
+      "vehicleClass": "multicopter-research",
+      "supportRegions": [
+        "cn",
+        "global"
+      ],
+      "supportedEditions": [
+        "sim",
+        "lab",
+        "autonomy"
+      ],
+      "validationStatus": "contract-only",
+      "validationTier": "contract-only",
+      "autopilotFamily": "px4",
+      "adapterStatus": "integrated-contract",
+      "controllers": [],
+      "segments": [
+        "simulation-reference",
+        "research"
+      ],
+      "goldenCandidate": true,
+      "productAvailability": "simulation-only",
+      "manifestSha256": "e3d0150a25a38238f997a91c4839f0cb5c4b20041b4addcbc5183af24c8c161b"
+    },
+    {
+      "packId": "holybro-x500-v2-pixhawk6",
+      "packVersion": "1.0.0",
+      "displayName": {
+        "en": "Holybro X500 v2 with Pixhawk 6",
+        "zh-CN": "Holybro X500 v2 + Pixhawk 6"
+      },
+      "manufacturer": "Holybro",
+      "vehicleClass": "multicopter-research",
+      "supportRegions": [
+        "global"
+      ],
+      "supportedEditions": [
+        "sim",
+        "lab",
+        "field",
+        "autonomy"
+      ],
+      "validationStatus": "contract-only",
+      "validationTier": "contract-only",
+      "autopilotFamily": "px4",
+      "adapterStatus": "integrated-contract",
+      "controllers": [
+        {
+          "vendor": "Holybro",
+          "model": "Pixhawk 6C",
+          "status": "contract-only",
+          "regions": [
+            "global"
+          ]
+        },
+        {
+          "vendor": "Holybro",
+          "model": "Pixhawk 6X",
+          "status": "contract-only",
+          "regions": [
+            "global"
+          ]
+        }
+      ],
+      "segments": [
+        "research"
+      ],
+      "goldenCandidate": true,
+      "productAvailability": "listed-available",
+      "manifestSha256": "9dec4d5a041482fa69f2ccb270afb0402e3726c3b8e727f16692842b2c240f6e"
+    },
+    {
+      "packId": "holybro-s500-v2-pixhawk6c",
+      "packVersion": "1.0.0",
+      "displayName": {
+        "en": "Holybro S500 v2 with Pixhawk 6C",
+        "zh-CN": "Holybro S500 v2 + Pixhawk 6C"
+      },
+      "manufacturer": "Holybro",
+      "vehicleClass": "multicopter-medium",
+      "supportRegions": [
+        "global"
+      ],
+      "supportedEditions": [
+        "lab",
+        "field",
+        "autonomy"
+      ],
+      "validationStatus": "contract-only",
+      "validationTier": "contract-only",
+      "autopilotFamily": "px4",
+      "adapterStatus": "integrated-contract",
+      "controllers": [
+        {
+          "vendor": "Holybro",
+          "model": "Pixhawk 6C",
+          "status": "contract-only",
+          "regions": [
+            "global"
+          ]
+        }
+      ],
+      "segments": [
+        "student",
+        "research"
+      ],
+      "goldenCandidate": true,
+      "productAvailability": "listed-available",
+      "manifestSha256": "4771dd061cde8988610966f3484d16deb0dbfe209ab86a485201e5c3e899a069"
+    },
+    {
+      "packId": "holybro-qav250-pixhawk6c-mini",
+      "packVersion": "1.0.0",
+      "displayName": {
+        "en": "Holybro QAV250 with Pixhawk 6C Mini",
+        "zh-CN": "Holybro QAV250 + Pixhawk 6C Mini"
+      },
+      "manufacturer": "Holybro",
+      "vehicleClass": "multicopter-small",
+      "supportRegions": [
+        "global"
+      ],
+      "supportedEditions": [
+        "lab",
+        "field",
+        "autonomy"
+      ],
+      "validationStatus": "contract-only",
+      "validationTier": "contract-only",
+      "autopilotFamily": "px4",
+      "adapterStatus": "integrated-contract",
+      "controllers": [
+        {
+          "vendor": "Holybro",
+          "model": "Pixhawk 6C Mini",
+          "status": "contract-only",
+          "regions": [
+            "global"
+          ]
+        }
+      ],
+      "segments": [
+        "student",
+        "racing"
+      ],
+      "goldenCandidate": false,
+      "productAvailability": "variant-limited",
+      "manifestSha256": "e81312ee2eda1aa8c2a84dfc8a30e42b1e9debabc4b654f73e30efafa209769b"
+    },
+    {
+      "packId": "holybro-x650-pixhawk6",
+      "packVersion": "1.0.0",
+      "displayName": {
+        "en": "Holybro X650 with Pixhawk 6",
+        "zh-CN": "Holybro X650 + Pixhawk 6"
+      },
+      "manufacturer": "Holybro",
+      "vehicleClass": "multicopter-research",
+      "supportRegions": [
+        "global"
+      ],
+      "supportedEditions": [
+        "lab",
+        "field",
+        "autonomy"
+      ],
+      "validationStatus": "contract-only",
+      "validationTier": "contract-only",
+      "autopilotFamily": "px4",
+      "adapterStatus": "integrated-contract",
+      "controllers": [
+        {
+          "vendor": "Holybro",
+          "model": "Pixhawk 6C",
+          "status": "contract-only",
+          "regions": [
+            "global"
+          ]
+        },
+        {
+          "vendor": "Holybro",
+          "model": "Pixhawk 6X",
+          "status": "contract-only",
+          "regions": [
+            "global"
+          ]
+        }
+      ],
+      "segments": [
+        "research"
+      ],
+      "goldenCandidate": false,
+      "productAvailability": "listed-sold-out",
+      "manifestSha256": "a5fd1f40b08ab8bc29adb4ab5206e52f14a5251a70bb7458f8614bade4459ff4"
+    },
+    {
+      "packId": "amovlab-p450-px4",
+      "packVersion": "1.0.0",
+      "displayName": {
+        "en": "Amovlab P450 PX4 Research Platform",
+        "zh-CN": "阿木实验室 P450 PX4 科研平台"
+      },
+      "manufacturer": "Amovlab",
+      "vehicleClass": "multicopter-research",
+      "supportRegions": [
+        "cn"
+      ],
+      "supportedEditions": [
+        "lab",
+        "field",
+        "autonomy"
+      ],
+      "validationStatus": "planned",
+      "validationTier": "planned",
+      "autopilotFamily": "px4",
+      "adapterStatus": "planned",
+      "controllers": [
+        {
+          "vendor": "Amovlab",
+          "model": "Allspark V6C",
+          "status": "planned",
+          "regions": [
+            "cn"
+          ]
+        }
+      ],
+      "segments": [
+        "research"
+      ],
+      "goldenCandidate": false,
+      "productAvailability": "documentation-only",
+      "manifestSha256": "b0c5b8f51ca6b6cb2ed226174295a401209d448c40c5e511988b81f26d63d6d1"
+    },
+    {
+      "packId": "amovlab-mfp450-pixhawk6c",
+      "packVersion": "1.0.0",
+      "displayName": {
+        "en": "Amovlab MFP450 with Pixhawk 6C",
+        "zh-CN": "阿木实验室 MFP450 + Pixhawk 6C"
+      },
+      "manufacturer": "Amovlab",
+      "vehicleClass": "multicopter-medium",
+      "supportRegions": [
+        "cn"
+      ],
+      "supportedEditions": [
+        "lab",
+        "field",
+        "autonomy"
+      ],
+      "validationStatus": "planned",
+      "validationTier": "planned",
+      "autopilotFamily": "px4",
+      "adapterStatus": "planned",
+      "controllers": [
+        {
+          "vendor": "Holybro",
+          "model": "Pixhawk 6C",
+          "status": "planned",
+          "regions": [
+            "cn"
+          ]
+        },
+        {
+          "vendor": "Amovlab",
+          "model": "ICF5",
+          "status": "planned",
+          "regions": [
+            "cn"
+          ]
+        }
+      ],
+      "segments": [
+        "student",
+        "research"
+      ],
+      "goldenCandidate": false,
+      "productAvailability": "documentation-only",
+      "manifestSha256": "2c2bf062f29b606ff5d8a29807514ebeed2020de46356e10164d769721514528"
+    },
+    {
+      "packId": "bitcraze-crazyflie-2-1-plus",
+      "packVersion": "1.0.0",
+      "displayName": {
+        "en": "Bitcraze Crazyflie 2.1+",
+        "zh-CN": "Bitcraze Crazyflie 2.1+ 教学微型机"
+      },
+      "manufacturer": "Bitcraze",
+      "vehicleClass": "multicopter-small",
+      "supportRegions": [
+        "global"
+      ],
+      "supportedEditions": [
+        "lab",
+        "field",
+        "autonomy"
+      ],
+      "validationStatus": "planned",
+      "validationTier": "planned",
+      "autopilotFamily": "crazyflie",
+      "adapterStatus": "planned",
+      "controllers": [
+        {
+          "vendor": "Bitcraze",
+          "model": "Crazyflie 2.1+",
+          "status": "planned",
+          "regions": [
+            "global"
+          ]
+        }
+      ],
+      "segments": [
+        "student",
+        "teaching",
+        "research"
+      ],
+      "goldenCandidate": false,
+      "productAvailability": "listed-available",
+      "manifestSha256": "8b9f8f35cc2d0ac15e29fda861286df030f451d5bfc29f1c739f3cd9a3ee7994"
+    }
+  ]
+}

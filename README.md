@@ -64,24 +64,24 @@ must not be committed.
 Frontend:
 
 ```bash
-npm ci --prefix apps/frontend
-npm --prefix apps/frontend run dev
+npm ci --prefix apps/web
+npm --prefix apps/web run dev
 ```
 
 Backend:
 
 ```bash
-python -m venv services/backend/.venv
-services/backend/.venv/Scripts/python -m pip install -e "services/backend[dev]"
-services/backend/.venv/Scripts/python -m uvicorn app.main:app --reload --app-dir services/backend
+python -m venv server/api/.venv
+server/api/.venv/Scripts/python -m pip install -e "server/api[dev]"
+server/api/.venv/Scripts/python -m uvicorn app.main:app --reload --app-dir server/api
 ```
 
 Worker:
 
 ```bash
-python -m venv services/worker/.venv
-services/worker/.venv/Scripts/python -m pip install -e services/backend -e "services/worker[dev]"
-services/worker/.venv/Scripts/python -m drone_dream_worker.main
+python -m venv server/worker/.venv
+server/worker/.venv/Scripts/python -m pip install -e server/api -e "server/worker[dev]"
+server/worker/.venv/Scripts/python -m drone_dream_worker.main
 ```
 
 Desktop:
@@ -98,29 +98,26 @@ Use the platform-specific executable form (`python` or `python3`, `Scripts` or
 
 ```bash
 python tools/check-repository.py
-python -m pytest services/backend/tests -q
-python -m pytest shared/brand/tests release/distribution/tests platform/engine-pack/tests platform/runtime/tests -q
-npm --prefix apps/frontend run typecheck
-npm --prefix apps/frontend run lint
-npm --prefix apps/frontend run test
-npm --prefix apps/frontend run build
+python -m pytest server/api/tests -q
+python -m pytest shared/brand/tests release/desktop/tests runtime/engine/tests runtime/tests -q
+npm --prefix apps/web run typecheck
+npm --prefix apps/web run lint
+npm --prefix apps/web run test
+npm --prefix apps/web run build
 ```
 
 The complete Windows installer, Runtime image, and deployment checks run in
 GitHub Actions. Local details are in the
-[engineering guides](docs/guides/README.md),
+[engineering guides](docs/README.md),
 [desktop guide](apps/desktop/README.md), and
-[Runtime release guide](docs/guides/14-runtime-release.md).
+[Runtime release guide](docs/development/14-runtime-release.md).
 
-## Source and release branches
+## Source branch
 
-`main` is the authoritative integrated source for Universal, SIM, LAB, FIELD,
-and AGENT. The edition and website branches are publication and review channels,
-not independent product source trees. Long-lived branches are limited to `main`, `software`,
-`software-agent`, `software-field`, `software-lab`, `software-sim`, and `website`.
-Feature work uses short-lived branches and returns to
-`main` after review; publication channels must not accumulate their own directory
-layouts or private copies of shared product code.
+`main` is the only permanent branch and the authoritative source for Universal,
+SIM, LAB, FIELD, AGENT, and the website. Temporary feature branches may be used
+for review, but they must return to `main` and be removed after merging. Editions
+remain separate build outputs, not separate source trees.
 
 DroneDream is licensed under the [MIT License](LICENSE). Do not place
 credentials, user projects, generated installers, Runtime images, or local

@@ -15,12 +15,12 @@ if [[ -f "$ROOT_DIR/.env" ]]; then
   set +a
 fi
 
-VENV="services/backend/.venv"
+VENV="server/api/.venv"
 if [[ ! -d "$VENV" ]]; then
   echo "[dev-backend] creating virtualenv at $VENV"
   python3 -m venv "$VENV"
   "$VENV/bin/pip" install --upgrade pip >/dev/null
-  "$VENV/bin/pip" install -e 'services/backend[dev]'
+  "$VENV/bin/pip" install -e 'server/api[dev]'
 fi
 
 # Phase 8: pin the SQLite path to an absolute file under the repo root so
@@ -33,6 +33,6 @@ fi
 
 exec "$VENV/bin/uvicorn" app.main:app \
   --reload \
-  --app-dir services/backend \
+  --app-dir server/api \
   --host "${BACKEND_HOST:-127.0.0.1}" \
   --port "${BACKEND_PORT:-8000}"

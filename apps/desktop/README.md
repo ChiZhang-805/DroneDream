@@ -2,13 +2,13 @@
 
 This directory builds the `1.0.0` Windows installer and a
 Tauri 2 shell around the existing React/Vite application
-in `../frontend`. It does not copy or fork the business UI, and the normal web
-commands under `apps/frontend/` continue to work unchanged.
+in `../web`. It does not copy or fork the business UI, and the normal web
+commands under `apps/web/` continue to work unchanged.
 
 ## Current scope
 
 - A Windows desktop window that loads the existing Vite development server or
-  its production `apps/frontend/dist` output.
+  its production `apps/web/dist` output.
 - A read-only `probe_system_prerequisites` Tauri command. It reports Windows
   version, registered WSL distributions, physical/available memory, fixed-disk
   free space, and display adapters as structured JSON.
@@ -34,7 +34,7 @@ commands under `apps/frontend/` continue to work unchanged.
 - A manifest-verified runtime installation workflow exposed through
   `start_runtime_install`, `get_runtime_install_progress`, and
   `cancel_runtime_install`. It downloads the fixed beta channel selected at
-  build time in `apps/frontend/.env.production`, verifies the detached Ed25519
+  build time in `apps/web/.env.production`, verifies the detached Ed25519
   signature, streams and verifies split artifacts with resume support, imports
   only the dedicated `DroneDreamRuntime` distribution, and reports each stage
   to the setup page. A valid fresh-install handoff invokes the same workflow
@@ -122,14 +122,14 @@ The validated report path is shown in the error dialog and lives under
 `X:\DroneDream.download-cache\diagnostics`; it therefore survives rollback and
 ordinary desktop uninstall together with the resumable download cache. Reports
 are capped at 512 KiB each, ten files, and 5 MiB total, with credential-like
-lines redacted. See `../../docs/guides/14-runtime-release.md` for the complete ownership
+lines redacted. See `../../docs/development/14-runtime-release.md` for the complete ownership
 and retention contract.
 
 The desktop installer and installer-driven runtime workflow consume the
 separately built, smoke-tested, Ed25519-signed runtime manifest and split
 rootfs assets whose hashes are covered by that manifest
 from the desktop binary's compiled beta channel. The manual frontend flow pins
-the same release in `apps/frontend/.env.production`. If those assets are unavailable
+the same release in `apps/web/.env.production`. If those assets are unavailable
 or fail verification, installation stops without importing a distribution.
 The runtime image, rather than the small NSIS package, supplies the FastAPI
 backend, worker, PX4, and Gazebo. Neither install mode ever reuses, moves,
@@ -197,7 +197,7 @@ install-plan request asks the native probe to choose the fixed NTFS drive using
 the non-system-first safety policy above. The desktop setup page adopts that
 recommendation, then sends an explicit `X:\DroneDream` path after the user
 chooses a disk. The release URL is not user-entered; production builds take it
-from `VITE_RUNTIME_RELEASE_MANIFEST_URL` in `apps/frontend/.env.production` and reject
+from `VITE_RUNTIME_RELEASE_MANIFEST_URL` in `apps/web/.env.production` and reject
 missing, credential-bearing, or non-HTTPS values.
 
 ## Developer prerequisites (Windows)
@@ -255,8 +255,8 @@ for NSIS, and inspects both PE import tables so the installer cannot accidentall
 depend on toolchain DLLs from the developer's machine. GitHub Actions and public
 releases continue to use the standard MSVC toolchain. The pinned MSVC installer
 is written below
-`src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis`; the LLVM fallback
-uses `src-tauri/target/x86_64-pc-windows-gnullvm/release/bundle/nsis`.
+`src/target/x86_64-pc-windows-msvc/release/bundle/nsis`; the LLVM fallback
+uses `src/target/x86_64-pc-windows-gnullvm/release/bundle/nsis`.
 
 The LLVM fallback also verifies the pinned NSIS template and the generated
 WebView2 health gate, then rewrites the SHA-256 file for the exact configured
@@ -279,8 +279,8 @@ installer asset, so the application can update without mixing products or
 rewriting historical binaries. Public installer names are
 `DroneDream-<Edition>-<version>.exe`; raw Tauri bundle names remain internal to
 the build. See `../../docs/release/code-signing.md`,
-`../../release/distribution/desktop/edition-runtime-update-families.v1.json`, and
-`../../docs/guides/signpath-foundation-application.md` for the contracts.
+`../../release/desktop/config/updates/edition-runtime-update-families.v1.json`, and
+`../../docs/release/signpath.md` for the contracts.
 
 For this 16 GB development machine, keep `CARGO_BUILD_JOBS=4` and never compile
 PX4 while a Gazebo GUI simulation is running. The initial beta runtime target is

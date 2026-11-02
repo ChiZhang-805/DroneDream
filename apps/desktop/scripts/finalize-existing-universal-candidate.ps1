@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern("^[0-9a-f]{40}$")]
     [string]$ProductSourceCommit,
@@ -48,8 +48,8 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
 $branch = Invoke-GitText @("branch", "--show-current")
 $toolHead = Invoke-GitText @("rev-parse", "--verify", "HEAD")
 $sourceStatus = Invoke-GitText @("status", "--porcelain=v1", "--untracked-files=all")
-if ($branch -cne "software" -or $sourceStatus) {
-    throw "Universal candidate finalization requires clean software."
+if ($branch -cne "main" -or $sourceStatus) {
+    throw "Universal candidate finalization requires a clean main checkout."
 }
 & git -C $repoRoot cat-file -e "$ProductSourceCommit`^{commit}"
 if ($LASTEXITCODE -ne 0) {
@@ -60,9 +60,9 @@ if ($LASTEXITCODE -ne 0) {
     throw "The finalizer head does not descend from the Universal product source."
 }
 foreach ($inputPath in @(
-    "release/distribution/build-profiles/universal-1.0.0.v1.json",
-    "apps/desktop/src-tauri/tauri.universal.conf.json",
-    "release/distribution/universal/release/website-exact-exe-handoff.v1.json"
+    "release/desktop/config/build-profiles/universal-1.0.0.v1.json",
+    "apps/desktop/editions/universal.json",
+    "release/desktop/config/universal/release/website-exact-exe-handoff.v1.json"
 )) {
     Assert-UnchangedFromProductSource $inputPath
 }
@@ -135,18 +135,16 @@ if ($engineManifestMatches.Count -eq 0) {
 $engineManifest = $engineManifestMatches[0]
 $enginePaths = @($engineManifest.Document.files.path)
 $requiredEnginePaths = @(
-    "release/distribution/editions/field.v1.json",
-    "release/distribution/editions/lab.v1.json",
-    "release/distribution/editions/sim.v1.json",
-    "release/distribution/safety/edition-execution-gate.v1.json",
-    "release/distribution/vehicle-packs/registry.v1.json"
+    "release/desktop/config/editions/field.v1.json",
+    "release/desktop/config/editions/lab.v1.json",
+    "release/desktop/config/editions/sim.v1.json",
+    "release/desktop/config/safety/edition-execution-gate.v1.json",
+    "release/desktop/config/vehicle-packs/registry.v1.json"
 )
 if (@($requiredEnginePaths | Where-Object { $_ -notin $enginePaths }).Count -gt 0 -or
     @($enginePaths | Where-Object {
-        $_ -eq "release/distribution/build-plans" -or
-        $_.StartsWith("release/distribution/build-plans/", [StringComparison]::Ordinal) -or
-        $_ -eq "release/distribution/tests" -or
-        $_.StartsWith("release/distribution/tests/", [StringComparison]::Ordinal)
+        $_ -eq "release/desktop/tests" -or
+        $_.StartsWith("release/desktop/tests/", [StringComparison]::Ordinal)
     }).Count -gt 0) {
     throw "The preserved candidate Engine Pack payload contract failed closed."
 }

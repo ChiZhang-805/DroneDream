@@ -1,4 +1,4 @@
-Set-StrictMode -Version Latest
+﻿Set-StrictMode -Version Latest
 
 function Invoke-CheckedNativeCommand {
     [CmdletBinding()]
@@ -69,13 +69,13 @@ function Resolve-EditionGeneratedFrontendContract {
     $repoRootFull = [IO.Path]::GetFullPath($RepoRoot).TrimEnd('\', '/')
     $baseConfigFull = (Resolve-Path -LiteralPath $BaseConfigPath -ErrorAction Stop).Path
     $expectedBaseConfig = [IO.Path]::GetFullPath(
-        (Join-Path $repoRootFull "apps\desktop\src-tauri\tauri.conf.json")
+        (Join-Path $repoRootFull "apps\desktop\src\tauri.conf.json")
     )
     if (-not $baseConfigFull.Equals(
         $expectedBaseConfig,
         [StringComparison]::OrdinalIgnoreCase
     )) {
-        throw "The canonical Tauri base config must be apps/desktop/src-tauri/tauri.conf.json."
+        throw "The canonical Tauri base config must be apps/desktop/src/tauri.conf.json."
     }
     $baseConfig = Get-Content -LiteralPath $baseConfigFull -Raw -Encoding UTF8 |
         ConvertFrom-Json
@@ -130,11 +130,11 @@ function Resolve-EditionGeneratedFrontendContract {
     # Sim/Lab overlays; no arbitrary config path is a source-cleanliness
     # exemption.
     $allowedRelativePaths = switch ($EditionId) {
-        "universal" { @("apps/frontend/dist") }
-        "sim" { @("apps/frontend/dist", "apps/frontend/sim-dist") }
-        "lab" { @("apps/frontend/dist", "apps/frontend/lab-dist") }
-        "field" { @("apps/frontend/dist") }
-        "autonomy" { @("apps/frontend/dist") }
+        "universal" { @("apps/web/dist") }
+        "sim" { @("apps/web/dist", "apps/web/sim-dist") }
+        "lab" { @("apps/web/dist", "apps/web/lab-dist") }
+        "field" { @("apps/web/dist") }
+        "autonomy" { @("apps/web/dist") }
     }
     if ($frontendDistRelative -cnotin $allowedRelativePaths) {
         throw (
@@ -159,7 +159,7 @@ function Test-PostBuildSourceStatus {
     )
 
     $allowedPath = $AllowedGeneratedPath.TrimEnd('/').Replace('\', '/')
-    if ($allowedPath -notmatch '^apps/frontend/(?:dist|sim-dist|lab-dist|field-dist|autonomy-dist)$') {
+    if ($allowedPath -notmatch '^apps/web/(?:dist|sim-dist|lab-dist|field-dist|autonomy-dist)$') {
         throw "The generated frontend path is not an approved release-build path."
     }
 

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateSet('all', 'universal', 'sim', 'lab', 'field', 'autonomy')]
     [string]$Edition = 'all',
     [Parameter(Mandatory = $true)][string]$OutputRoot

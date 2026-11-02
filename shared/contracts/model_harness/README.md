@@ -14,8 +14,8 @@ tests fail when a runtime table drifts from this checked-in contract.
 The schemas are generated from the strict runtime Pydantic models by:
 
 ```powershell
-python services/backend/scripts/export_model_harness_contracts.py
-python services/backend/scripts/export_model_harness_contracts.py --check
+python server/api/scripts/export_model_harness_contracts.py
+python server/api/scripts/export_model_harness_contracts.py --check
 ```
 
 A receipt selects content-bound plugins and immutable/effective budgets. It

@@ -79,7 +79,7 @@ test("unsupported editions and scripts cannot use this production entrypoint", (
 
 test("default and direct Tauri builds share the provisioned frontend entrypoint", () => {
   const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
-  const tauri = JSON.parse(readFileSync(new URL("../src-tauri/tauri.conf.json", import.meta.url), "utf8"));
+  const tauri = JSON.parse(readFileSync(new URL("../src/tauri.conf.json", import.meta.url), "utf8"));
   assert.equal(tauri.build.beforeBuildCommand, "npm run frontend:build");
   assert.equal(packageJson.scripts["frontend:build"], "node scripts/build-desktop-frontend.mjs build");
   assert.equal(packageJson.scripts["frontend:field-build"], "node scripts/build-desktop-frontend.mjs field:build");

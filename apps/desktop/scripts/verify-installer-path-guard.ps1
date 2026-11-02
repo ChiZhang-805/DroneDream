@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$MakeNsis
 )
 
@@ -8,7 +8,7 @@ if (-not $MakeNsis) {
     $MakeNsis = Join-Path $env:LOCALAPPDATA "tauri\NSIS\makensis.exe"
 }
 $makeNsisPath = (Resolve-Path -LiteralPath $MakeNsis).Path
-$pathGuardSource = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\src-tauri\nsis\path-guard.nsh")).Path
+$pathGuardSource = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..\src\nsis\path-guard.nsh")).Path
 $tempRoot = [IO.Path]::GetFullPath($env:TEMP).TrimEnd('\', '/')
 $sandbox = Join-Path $tempRoot ("DroneDream-Path-Guard-" + [guid]::NewGuid().ToString("N"))
 $sandboxFull = [IO.Path]::GetFullPath($sandbox)

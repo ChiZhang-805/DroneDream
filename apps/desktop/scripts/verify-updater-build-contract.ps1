@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 function Assert-Contract([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
@@ -6,13 +6,13 @@ function Assert-Contract([bool]$Condition, [string]$Message) {
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
 $config = Get-Content -LiteralPath (
-    Join-Path $repoRoot "apps\desktop\src-tauri\tauri.conf.json"
+    Join-Path $repoRoot "apps\desktop\src\tauri.conf.json"
 ) -Raw | ConvertFrom-Json
 $universalConfig = Get-Content -LiteralPath (
-    Join-Path $repoRoot "apps\desktop\src-tauri\tauri.universal.conf.json"
+    Join-Path $repoRoot "apps\desktop\editions\universal.json"
 ) -Raw | ConvertFrom-Json
 $familyContract = Get-Content -LiteralPath (
-    Join-Path $repoRoot "release\distribution\desktop\edition-runtime-update-families.v1.json"
+    Join-Path $repoRoot "release\desktop\config\updates\edition-runtime-update-families.v1.json"
 ) -Raw | ConvertFrom-Json
 Assert-Contract ($config.version -ceq "1.0.0") `
     "The user-visible internal-test version must remain 1.0.0."
@@ -29,10 +29,10 @@ Assert-Contract (
 ) "The Universal updater endpoint must be exact and edition-scoped."
 
 $buildScript = Get-Content -LiteralPath (
-    Join-Path $repoRoot "apps\desktop\src-tauri\build.rs"
+    Join-Path $repoRoot "apps\desktop\src\build.rs"
 ) -Raw -Encoding UTF8
 $updateSource = Get-Content -LiteralPath (
-    Join-Path $repoRoot "apps\desktop\src-tauri\src\app_update.rs"
+    Join-Path $repoRoot "apps\desktop\src\src\app_update.rs"
 ) -Raw -Encoding UTF8
 $llvmBuildScript = Get-Content -LiteralPath (
     Join-Path $repoRoot "apps\desktop\scripts\build-windows-llvm.ps1"

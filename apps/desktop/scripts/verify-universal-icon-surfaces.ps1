@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
     [string]$Installer,
     [Parameter(Mandatory = $true)]
@@ -42,8 +42,8 @@ if ((Split-Path -Leaf $installerPath) -cne "DroneDream-Universal-1.0.0.exe") {
     throw "Unexpected Universal Website handoff filename."
 }
 
-$canonicalIcon = Join-Path $repoRoot "apps\desktop\src-tauri\gen\brand\universal\windows\icon.ico"
-$canonicalPng = Join-Path $repoRoot "apps\desktop\src-tauri\gen\brand\universal\windows\32x32.png"
+$canonicalIcon = Join-Path $repoRoot "apps\desktop\src\gen\brand\universal\windows\icon.ico"
+$canonicalPng = Join-Path $repoRoot "apps\desktop\src\gen\brand\universal\windows\32x32.png"
 $canonicalIconSha256 = (Get-FileHash -LiteralPath $canonicalIcon -Algorithm SHA256).Hash.ToLowerInvariant()
 $canonicalPngSha256 = (Get-FileHash -LiteralPath $canonicalPng -Algorithm SHA256).Hash.ToLowerInvariant()
 if ($canonicalIconSha256 -cne "d607a304ef09156ec7041744726791dedc9f96625f081676ace654e652536090" -or

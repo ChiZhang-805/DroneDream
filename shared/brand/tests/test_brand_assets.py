@@ -180,11 +180,11 @@ def test_no_tracked_retired_brand_image_roots() -> None:
         "brand/source/",
         "frontend/src/assets/brand/",
         "frontend/src/assets/drone-dream-",
-        "apps/desktop/src-tauri/icons/",
+        "apps/desktop/src/icons/",
     )
     banned_exact = {
-        "apps/desktop/src-tauri/app-icon.png",
-        "apps/desktop/src-tauri/icon-source.svg",
+        "apps/desktop/src/app-icon.png",
+        "apps/desktop/src/icon-source.svg",
         "frontend/public/drone-favicon.svg",
         "docs/assets/drone-dream-icon.png",
         "docs/assets/drone-dream-logo-source.png",

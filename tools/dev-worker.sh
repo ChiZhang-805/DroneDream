@@ -8,7 +8,7 @@
 # run locally. Both read DATABASE_URL from the environment, and both default
 # to ``sqlite:///./drone_dream.db`` when it is unset. Because that default is
 # resolved relative to the *current* working directory, we must launch the
-# worker from the repo root (not the services/worker/ subdirectory) so its relative
+# worker from the repo root (not the server/worker/ subdirectory) so its relative
 # path matches the backend's. If DATABASE_URL is unset, we additionally pin
 # it to an absolute path under the repo root so nothing depends on cwd.
 set -euo pipefail
@@ -26,13 +26,13 @@ if [[ -f "$ROOT_DIR/.env" ]]; then
   set +a
 fi
 
-VENV="services/worker/.venv"
+VENV="server/worker/.venv"
 if [[ ! -d "$VENV" ]]; then
   echo "[dev-worker] creating virtualenv at $VENV"
   python3 -m venv "$VENV"
   "$VENV/bin/pip" install --upgrade pip >/dev/null
-  "$VENV/bin/pip" install -e services/backend
-  "$VENV/bin/pip" install -e services/worker
+  "$VENV/bin/pip" install -e server/api
+  "$VENV/bin/pip" install -e server/worker
 fi
 
 if [[ -z "${DATABASE_URL:-}" ]]; then

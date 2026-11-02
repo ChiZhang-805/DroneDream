@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateSet("Process", "User")]
     [string]$EnvironmentTarget = "User"
 )

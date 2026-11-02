@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [string]$MakensisPath
 )
@@ -6,7 +6,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
-$identityPath = Join-Path $repoRoot "apps\desktop\src-tauri\nsis\edition-identity.nsh"
+$identityPath = Join-Path $repoRoot "apps\desktop\src\nsis\edition-identity.nsh"
 if (-not (Test-Path -LiteralPath $identityPath -PathType Leaf)) {
     throw "The canonical edition identity include is unavailable."
 }

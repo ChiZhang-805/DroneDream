@@ -48,7 +48,7 @@ function decodedJwtRole(value) {
   }
 }
 
-const tauriConfigUrl = new URL("../src-tauri/tauri.conf.json", import.meta.url);
+const tauriConfigUrl = new URL("../src/tauri.conf.json", import.meta.url);
 const tauriConfig = JSON.parse(readFileSync(fileURLToPath(tauriConfigUrl), "utf8"));
 for (const policyName of ["csp", "devCsp"]) {
   const policy = tauriConfig?.app?.security?.[policyName];

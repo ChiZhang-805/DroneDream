@@ -260,7 +260,7 @@ async function connectToDesktop(cdpUrl) {
   if (!/^http:\/\/127\.0\.0\.1:[0-9]{2,5}$/.test(cdpUrl)) {
     fail("desktop CDP endpoint must be an explicit loopback URL");
   }
-  const { chromium } = require("../../frontend/node_modules/playwright");
+  const { chromium } = require("../../web/node_modules/playwright");
   const browser = await chromium.connectOverCDP(cdpUrl);
   const pages = browser.contexts().flatMap((context) => context.pages());
   const matching = pages.filter((page) => page.url().startsWith("http://tauri.localhost"));

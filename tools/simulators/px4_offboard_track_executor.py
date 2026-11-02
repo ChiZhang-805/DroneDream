@@ -625,7 +625,7 @@ def _load_scenario_effect_engine() -> Any:
     try:
         from app.simulator import scenario_effects as engine
     except ModuleNotFoundError:
-        backend_root = Path(__file__).resolve().parents[2] / "services" / "backend"
+        backend_root = Path(__file__).resolve().parents[2] / "server" / "api"
         if not backend_root.is_dir():
             raise RuntimeError(
                 "DroneDream backend package is required for flight-timed scenario effects"

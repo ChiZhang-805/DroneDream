@@ -1,4 +1,4 @@
-param(
+﻿param(
     [ValidateSet("all", "universal", "sim", "lab", "field", "autonomy")]
     [string]$Edition = "all",
     [ValidateSet("msvc", "gnullvm")]
@@ -242,14 +242,14 @@ function Remove-ExactExternalTree {
 
 function Remove-GeneratedSourceOutputs {
     $paths = @(
-        "apps/frontend/dist",
-        "apps/frontend/field-dist",
-        "apps/frontend/tsconfig.tsbuildinfo",
-        "apps/frontend/public/drone-favicon.png",
-        "apps/desktop/src-tauri/gen",
-        "apps/desktop/src-tauri/target/llvm-bundle",
-        "apps/desktop/src-tauri/binaries",
-        "apps/desktop/src-tauri/agent-core-resources"
+        "apps/web/dist",
+        "apps/web/field-dist",
+        "apps/web/tsconfig.tsbuildinfo",
+        "apps/web/public/drone-favicon.png",
+        "apps/desktop/src/gen",
+        "apps/desktop/src/target/llvm-bundle",
+        "apps/desktop/src/binaries",
+        "apps/desktop/src/agent-core-resources"
     )
     $trackedPaths = @($paths | Where-Object {
         @(& git -C $repoRoot ls-files -- $_ 2>$null).Count -gt 0
@@ -362,7 +362,7 @@ function Import-FrontendPublicBuildEnvironment {
     })
     if ($missingNames.Count -eq 0) { return }
 
-    $envPath = Join-Path $repoRoot "apps\frontend\.env.production"
+    $envPath = Join-Path $repoRoot "apps\web\.env.production"
     if (-not (Test-Path -LiteralPath $envPath -PathType Leaf)) {
         throw "The approved frontend production environment file is unavailable."
     }
@@ -476,7 +476,7 @@ if (-not $AllowUnsignedUpdater -and
 }
 
 $version = [string](Get-Content -LiteralPath (
-    Join-Path $repoRoot "apps\desktop\src-tauri\tauri.conf.json"
+    Join-Path $repoRoot "apps\desktop\src\tauri.conf.json"
 ) -Raw -Encoding UTF8 | ConvertFrom-Json).version
 if ($version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') {
     throw "The canonical desktop version is invalid."
@@ -484,27 +484,27 @@ if ($version -notmatch '^[0-9]+\.[0-9]+\.[0-9]+$') {
 
 $contracts = [ordered]@{
     universal = [ordered]@{
-        config = "apps\desktop\src-tauri\tauri.universal.conf.json"
+        config = "apps\desktop\editions\universal.json"
         product = "DroneDream-Universal"
         profile = "unified-sim-lab"
     }
     sim = [ordered]@{
-        config = "apps\desktop\src-tauri\tauri.sim.conf.json"
+        config = "apps\desktop\editions\sim.json"
         product = "DroneDream-Sim"
         profile = "sim-only"
     }
     lab = [ordered]@{
-        config = "apps\desktop\src-tauri\tauri.lab.conf.json"
+        config = "apps\desktop\editions\lab.json"
         product = "DroneDream-Lab"
         profile = "unified-sim-lab"
     }
     field = [ordered]@{
-        config = "apps\desktop\src-tauri\tauri.field.conf.json"
+        config = "apps\desktop\editions\field.json"
         product = "DroneDream-Field"
         profile = "field-lightweight"
     }
     autonomy = [ordered]@{
-        config = "apps\desktop\src-tauri\tauri.autonomy.conf.json"
+        config = "apps\desktop\editions\agent.json"
         product = "DroneDream-Agent"
         profile = "autonomy-full"
     }
@@ -571,11 +571,11 @@ try {
             $brandMarkBinding = Get-SourceFileBinding `
                 -RelativePath ([string]$brandEdition.Value.mark.path)
             $expectedBrandOutputs = @(
-                "apps/desktop/src-tauri/gen/brand/$editionId/windows/32x32.png",
-                "apps/desktop/src-tauri/gen/brand/$editionId/windows/128x128.png",
-                "apps/desktop/src-tauri/gen/brand/$editionId/windows/128x128@2x.png",
-                "apps/desktop/src-tauri/gen/brand/$editionId/windows/icon.ico",
-                "apps/frontend/public/drone-favicon.png"
+                "apps/desktop/src/gen/brand/$editionId/windows/32x32.png",
+                "apps/desktop/src/gen/brand/$editionId/windows/128x128.png",
+                "apps/desktop/src/gen/brand/$editionId/windows/128x128@2x.png",
+                "apps/desktop/src/gen/brand/$editionId/windows/icon.ico",
+                "apps/web/public/drone-favicon.png"
             )
             foreach ($expectedBrandOutput in $expectedBrandOutputs) {
                 if (-not (Test-Path -LiteralPath (

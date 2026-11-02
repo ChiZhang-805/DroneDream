@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$ApplicationPath = "$env:LOCALAPPDATA\DroneDream-Agent\drone-dream-desktop.exe",
     [string]$OutputRoot = "Q:\CodexData\Temp\dronedream-updater-minimized",
     [ValidateRange(49152, 65500)]
@@ -10,7 +10,7 @@ $PSNativeCommandUseErrorActionPreference = $true
 Set-StrictMode -Version Latest
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
-$frontendRoot = Join-Path $repoRoot "apps\frontend"
+$frontendRoot = Join-Path $repoRoot "apps\web"
 $driverPath = Join-Path $frontendRoot "scripts\verify-installed-updater-flow.mjs"
 $applicationFull = [IO.Path]::GetFullPath($ApplicationPath)
 $outputRootFull = [IO.Path]::GetFullPath($OutputRoot)

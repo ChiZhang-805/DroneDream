@@ -40,7 +40,7 @@ const readme = readText("README.md");
 const llvmBuildScript = readText("apps/desktop/scripts/build-windows-llvm.ps1");
 const msvcBuildScript = readText("apps/desktop/scripts/build-windows-msvc.ps1");
 const updaterSignerScript = readText("apps/desktop/scripts/invoke-tauri-updater-signer.ps1");
-const desktopReleaseWorkflow = readText(".github/workflows/desktop-installer.yml");
+const desktopReleaseWorkflow = readText(".github/workflows/release-software.yml");
 for (const requiredText of [
   "Free code signing provided by [SignPath.io]",
   "certificate by [SignPath Foundation]",
@@ -144,7 +144,7 @@ const cargoMetadata = JSON.parse(execFileSync("cargo", [
   "--format-version",
   "1",
   "--manifest-path",
-  resolve(repositoryRoot, "apps", "desktop", "src-tauri", "Cargo.toml"),
+  resolve(repositoryRoot, "apps", "desktop", "src", "Cargo.toml"),
 ], {
   cwd: repositoryRoot,
   encoding: "utf8",
@@ -169,7 +169,7 @@ if (missingRustLicenses.length > 0) {
   fail(`Cargo dependencies without declared licenses: ${missingRustLicenses.slice(0, 10).map((entry) => entry.name).join(", ")}`);
 }
 
-const tauriConfig = JSON.parse(readText("apps/desktop/src-tauri/tauri.conf.json"));
+const tauriConfig = JSON.parse(readText("apps/desktop/src/tauri.conf.json"));
 const editionConfig = editionConfigPath
   ? JSON.parse(readFileSync(
     isAbsolute(editionConfigPath)
@@ -195,7 +195,7 @@ if (mainWindow.backgroundColor !== "#ffffff") {
   fail("main application window must define the white first-paint background");
 }
 const desktopCapability = JSON.parse(
-  readText("apps/desktop/src-tauri/capabilities/default.json"),
+  readText("apps/desktop/src/capabilities/default.json"),
 );
 for (const requiredPermission of [
   "core:window:allow-destroy",
@@ -234,7 +234,7 @@ const inventory = {
   repositoryLicense: "MIT",
   trackedSourceFiles: trackedFiles.length,
   dependencies: {
-    frontendNpm: npmInventory("apps/frontend/package-lock.json"),
+    frontendNpm: npmInventory("apps/web/package-lock.json"),
     desktopNpm: npmInventory("apps/desktop/package-lock.json"),
     rust: rustPackages.sort((left, right) => (
       left.name.localeCompare(right.name) || left.version.localeCompare(right.version)

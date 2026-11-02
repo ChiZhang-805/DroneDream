@@ -11,8 +11,8 @@ REPO = Path(__file__).resolve().parents[1]
 CONTRACT_PATH = REPO / "shared" / "brand" / "editions.json"
 ICON_DIR = REPO / "shared" / "brand" / "icons"
 WEBSITE_FAVICON_PATH = ICON_DIR / "website-favicon-64.png"
-DEFAULT_DERIVATIVE_ROOT = REPO / "apps" / "desktop" / "src-tauri" / "gen" / "brand"
-DEFAULT_FAVICON_PATH = REPO / "apps" / "frontend" / "public" / "drone-favicon.png"
+DEFAULT_DERIVATIVE_ROOT = REPO / "apps" / "desktop" / "src" / "gen" / "brand"
+DEFAULT_FAVICON_PATH = REPO / "apps" / "web" / "public" / "drone-favicon.png"
 EDITION_IDS = ("universal", "sim", "lab", "field", "autonomy")
 ICO_SIZES = (16, 20, 24, 32, 40, 48, 64, 128, 256)
 

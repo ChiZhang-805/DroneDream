@@ -41,7 +41,7 @@ from typing import Any
 # installed package may import successfully while missing the checkout's newer
 # simulator contracts. Prefer the backend adjacent to this exact wrapper before
 # importing any ``app`` module, matching px4_gazebo_runner.py's source binding.
-_BACKEND_ROOT = Path(__file__).resolve().parents[2] / "services" / "backend"
+_BACKEND_ROOT = Path(__file__).resolve().parents[2] / "server" / "api"
 if _BACKEND_ROOT.is_dir():
     _backend_root_text = str(_BACKEND_ROOT)
     while _backend_root_text in sys.path:
@@ -452,7 +452,7 @@ def _load_parameter_engine() -> Any:
     try:
         from app.simulator import px4_parameters as engine
     except ModuleNotFoundError:
-        backend_root = Path(__file__).resolve().parents[2] / "services" / "backend"
+        backend_root = Path(__file__).resolve().parents[2] / "server" / "api"
         if not backend_root.is_dir():
             raise RuntimeError(
                 "DroneDream backend package is required for PX4 parameter application"
@@ -468,7 +468,7 @@ def _load_scenario_effect_engine() -> Any:
     try:
         from app.simulator import scenario_effects as engine
     except ModuleNotFoundError:
-        backend_root = Path(__file__).resolve().parents[2] / "services" / "backend"
+        backend_root = Path(__file__).resolve().parents[2] / "server" / "api"
         if not backend_root.is_dir():
             raise RuntimeError(
                 "DroneDream backend package is required for scenario-effect evidence"

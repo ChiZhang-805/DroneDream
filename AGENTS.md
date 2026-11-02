@@ -1,7 +1,7 @@
 # DroneDream project context
 
-Read `docs/guides/PROJECT_MEMORY.md` before product, UI, mission, acceptance, or
-release work, and the shared principles in `docs/guides/product-principles.md`.
+Read `docs/product/PROJECT_MEMORY.md` before product, UI, mission, acceptance, or
+release work, and the shared principles in `docs/product/product-principles.md`.
 The only normal source checkouts are this repository and the sibling
 `Agent-Core` repository. Update these in place; do not create dated, audit, or
 per-task copies of the application. Retired workspace material belongs in the

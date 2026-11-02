@@ -54,37 +54,37 @@ else
 fi
 
 # ---- Backend ----
-if [[ -x services/backend/.venv/bin/python ]]; then
+if [[ -x server/api/.venv/bin/python ]]; then
   section "Backend: ruff"
-  run_or_skip "ruff" services/backend/.venv/bin/ruff check services/backend
+  run_or_skip "ruff" server/api/.venv/bin/ruff check server/api
   section "Backend: mypy"
-  run_or_skip "mypy" services/backend/.venv/bin/mypy services/backend/app
+  run_or_skip "mypy" server/api/.venv/bin/mypy server/api/app
   section "Backend: pytest"
-  run_or_skip "pytest" services/backend/.venv/bin/pytest services/backend
+  run_or_skip "pytest" server/api/.venv/bin/pytest server/api
 else
-  missing "backend" "run 'python3 -m venv services/backend/.venv && services/backend/.venv/bin/pip install -e services/backend[dev]'"
+  missing "backend" "run 'python3 -m venv server/api/.venv && server/api/.venv/bin/pip install -e server/api[dev]'"
 fi
 
 # ---- Worker ----
-if [[ -x services/worker/.venv/bin/ruff ]]; then
+if [[ -x server/worker/.venv/bin/ruff ]]; then
   section "Worker: ruff"
-  run_or_skip "ruff" services/worker/.venv/bin/ruff check services/worker
+  run_or_skip "ruff" server/worker/.venv/bin/ruff check server/worker
 else
-  missing "worker ruff" "run 'python3 -m venv services/worker/.venv && services/worker/.venv/bin/pip install -e services/backend && services/worker/.venv/bin/pip install -e services/worker[dev]'"
+  missing "worker ruff" "run 'python3 -m venv server/worker/.venv && server/worker/.venv/bin/pip install -e server/api && server/worker/.venv/bin/pip install -e server/worker[dev]'"
 fi
 
 # ---- Frontend ----
-if [[ -d apps/frontend/node_modules ]]; then
+if [[ -d apps/web/node_modules ]]; then
   section "Frontend: typecheck"
-  run_or_skip "typecheck" npm --prefix apps/frontend run -s typecheck
+  run_or_skip "typecheck" npm --prefix apps/web run -s typecheck
   section "Frontend: lint"
-  run_or_skip "lint" npm --prefix apps/frontend run -s lint
+  run_or_skip "lint" npm --prefix apps/web run -s lint
   section "Frontend: build"
-  run_or_skip "build" npm --prefix apps/frontend run -s build
+  run_or_skip "build" npm --prefix apps/web run -s build
   section "Frontend: test"
-  run_or_skip "test" npm --prefix apps/frontend run -s test
+  run_or_skip "test" npm --prefix apps/web run -s test
 else
-  missing "frontend" "run 'cd apps/frontend && npm install'"
+  missing "frontend" "run 'cd apps/web && npm install'"
 fi
 
 exit "$status"

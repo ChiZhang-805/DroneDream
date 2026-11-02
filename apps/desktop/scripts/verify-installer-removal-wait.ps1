@@ -1,8 +1,8 @@
-param()
+﻿param()
 
 $ErrorActionPreference = "Stop"
 $waitScript = Join-Path $PSScriptRoot "wait-path-removal.ps1"
-$workflow = Join-Path $PSScriptRoot "..\..\..\.github\workflows\desktop-installer.yml"
+$workflow = Join-Path $PSScriptRoot "..\..\..\.github\workflows\release-software.yml"
 
 if (-not (Test-Path -LiteralPath $waitScript -PathType Leaf)) {
     throw "Installer path-removal wait helper is missing: $waitScript"

@@ -1,8 +1,8 @@
-param([Parameter(Mandatory=$true)][string]$OutputRoot)
+﻿param([Parameter(Mandatory=$true)][string]$OutputRoot)
 $ErrorActionPreference='Stop'
 $repoRoot=(Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
-$helper=Join-Path $repoRoot 'desktop/src-tauri/nsis/installed-app-process.ps1'
-foreach($template in Get-ChildItem (Join-Path $repoRoot 'desktop/src-tauri/nsis') -File | Where-Object Extension -in @('.nsh','.nsi')) {
+$helper=Join-Path $repoRoot 'desktop/src/nsis/installed-app-process.ps1'
+foreach($template in Get-ChildItem (Join-Path $repoRoot 'desktop/src/nsis') -File | Where-Object Extension -in @('.nsh','.nsi')) {
     if((Get-Content $template.FullName -Raw) -match '!insertmacro\s+CheckIfAppIsRunning\b'){
         throw "Process-name-wide shutdown remains in $($template.Name)"
     }

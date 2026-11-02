@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
     [string]$ManifestPath,
     [Parameter(Mandatory = $true)]
@@ -135,7 +135,7 @@ function Get-ActualInventory {
     $array
 }
 
-$schemaPath = Join-Path $PSScriptRoot "..\..\..\release\distribution\schemas\desktop-node-dependency-bundle.schema.json"
+$schemaPath = Join-Path $PSScriptRoot "..\..\..\release\desktop\config\schemas\desktop-node-dependency-bundle.schema.json"
 if (-not (Test-Path -LiteralPath $schemaPath -PathType Leaf)) {
     throw "The detached dependency schema is missing."
 }
@@ -209,7 +209,7 @@ if ($dependencyGitExitCode -eq 0 -and $dependencyGitRoot) {
 
 $sourceInputNames = @(
     "apps/desktop/package.json", "apps/desktop/package-lock.json",
-    "apps/frontend/package.json", "apps/frontend/package-lock.json"
+    "apps/web/package.json", "apps/web/package-lock.json"
 )
 if (@($manifest.sourceInputs).Count -ne 4) {
     throw "Exactly four package and lock source inputs are required."
@@ -260,7 +260,7 @@ process.stdout.write(JSON.stringify({
 '@
 $lockContractJson = ($lockProbe | & node.exe - `
     (Join-Path $repoRootFull "apps\desktop\package-lock.json") `
-    (Join-Path $repoRootFull "apps\frontend\package-lock.json") | Out-String).Trim()
+    (Join-Path $repoRootFull "apps\web\package-lock.json") | Out-String).Trim()
 if ($LASTEXITCODE -ne 0 -or -not $lockContractJson) {
     throw "The exact package locks could not be parsed."
 }

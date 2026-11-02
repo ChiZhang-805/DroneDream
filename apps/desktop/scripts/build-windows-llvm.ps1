@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$AdditionalConfigPath,
     [string]$CargoTargetDir,
     [string]$LlvmRoot,
@@ -131,7 +131,7 @@ if (-not $env:CARGO_BUILD_JOBS) {
     $env:CARGO_BUILD_JOBS = "4"
 }
 
-$defaultCargoTarget = Join-Path $PSScriptRoot "..\src-tauri\target"
+$defaultCargoTarget = Join-Path $PSScriptRoot "..\src\target"
 $cargoTargetRoot = if ($CargoTargetDir) {
     [IO.Path]::GetFullPath($CargoTargetDir)
 } elseif ($env:CARGO_TARGET_DIR) {
@@ -156,8 +156,8 @@ $env:RUSTFLAGS = "-C target-feature=+crt-static"
 # webview2-com intentionally links WebView2Loader dynamically for non-MSVC
 # targets. Locate the exact locked crate instead of relying on a user-specific
 # Cargo registry path, then stage the redistributable loader for the NSIS
-# resource map in tauri.llvm.conf.json.
-$manifest = Join-Path $PSScriptRoot "..\src-tauri\Cargo.toml"
+# resource map in config/llvm.json.
+$manifest = Join-Path $PSScriptRoot "..\src\Cargo.toml"
 $metadataJson = (& rustup.exe run $toolchain cargo metadata `
     --locked `
     --format-version 1 `
@@ -182,12 +182,12 @@ $webViewLoaderSource = Join-Path $webViewPackageRoot "x64\WebView2Loader.dll"
 if (-not (Test-Path -LiteralPath $webViewLoaderSource -PathType Leaf)) {
     throw "The locked WebView2Loader.dll was not found at $webViewLoaderSource"
 }
-$loaderStageDirectory = Join-Path $PSScriptRoot "..\src-tauri\target\llvm-bundle"
+$loaderStageDirectory = Join-Path $PSScriptRoot "..\src\target\llvm-bundle"
 $webViewLoaderStaged = Join-Path $loaderStageDirectory "WebView2Loader.dll"
 New-Item -ItemType Directory -Force -Path $loaderStageDirectory | Out-Null
 Copy-Item -LiteralPath $webViewLoaderSource -Destination $webViewLoaderStaged -Force
 
-$llvmBundleConfig = Join-Path $PSScriptRoot "..\src-tauri\tauri.llvm.conf.json"
+$llvmBundleConfig = Join-Path $PSScriptRoot "..\config\llvm.json"
 if (-not (Test-Path -LiteralPath $llvmBundleConfig -PathType Leaf)) {
     throw "The LLVM bundle configuration was not found at $llvmBundleConfig"
 }
@@ -206,7 +206,7 @@ if ($AdditionalConfigPath) {
 }
 $frontendDistContract = Resolve-EditionGeneratedFrontendContract `
     -RepoRoot $repoRoot `
-    -BaseConfigPath (Join-Path $PSScriptRoot "..\src-tauri\tauri.conf.json") `
+    -BaseConfigPath (Join-Path $PSScriptRoot "..\src\tauri.conf.json") `
     -AdditionalConfigPath $additionalConfig `
     -EditionId $EditionId
 if ($DetachedNodeDependencyManifest) {
@@ -228,7 +228,7 @@ if ($DetachedNodeDependencyManifest) {
     $env:npm_config_update_notifier = "false"
 }
 $runtimeUpdateFamilies = Get-Content -LiteralPath (
-    Join-Path $repoRoot "release\distribution\desktop\edition-runtime-update-families.v1.json"
+    Join-Path $repoRoot "release\desktop\config\updates\edition-runtime-update-families.v1.json"
 ) -Raw -Encoding UTF8 | ConvertFrom-Json
 $editionFamilies = @($runtimeUpdateFamilies.editions | Where-Object {
     $_.editionId -ceq $EditionId
@@ -254,7 +254,7 @@ if (-not $AdditionalConfigPath -and -not $AllowUnsignedUpdater) {
 & (Join-Path $PSScriptRoot "verify-nsis-template.ps1")
 
 Write-Host "Building DroneDream Desktop with $toolchain"
-$tauriConfig = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\src-tauri\tauri.conf.json") -Raw |
+$tauriConfig = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\src\tauri.conf.json") -Raw |
     ConvertFrom-Json
 $expectedInstaller = Join-Path $installerBundleRoot (
     "${ExpectedProductName}_$($tauriConfig.version)_x64-setup.exe"
@@ -299,7 +299,7 @@ Invoke-CheckedNativeCommand `
     -FilePath "node.exe" `
     -DisplayName "$EditionId frontend ownership verification" `
     -ArgumentList @(
-        (Join-Path $repoRoot "apps\frontend\scripts\verify-edition-build-boundaries.mjs"),
+        (Join-Path $repoRoot "apps\web\scripts\verify-edition-build-boundaries.mjs"),
         "--edition", $EditionId,
         "--dist", $frontendDistContract.absolutePath
     )

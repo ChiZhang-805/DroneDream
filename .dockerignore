@@ -22,7 +22,7 @@
 artifacts
 dist
 coverage
-platform/runtime/out
+runtime/installer/out
 tmp
 .agents
 .codex

@@ -22,28 +22,19 @@ $ErrorActionPreference = "Stop"
 function Read-VerifiedUiEvidence([string]$Path, [string]$ExpectedSha256) {
     $item = Get-Item -LiteralPath $Path
     if ($ExpectedSha256 -cnotmatch '^[0-9a-f]{64}$' -or $item.PSIsContainer -or
-        ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -or
+        $item.Length -eq 0 -or $item.Length -gt 4MB) {
         throw "Invalid UI evidence file or digest."
     }
-    $stream = [IO.File]::Open($item.FullName, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
-    try {
-        $buffer = New-Object byte[] (4MB + 1)
-        $count = 0
-        while ($count -lt $buffer.Length) {
-            $read = $stream.Read($buffer, $count, $buffer.Length - $count)
-            if ($read -eq 0) { break }
-            $count += $read
-        }
-        if ($count -eq 0 -or $count -gt 4MB) { throw "UI evidence exceeds its size bound." }
-        $algorithm = [Security.Cryptography.SHA256]::Create()
-        try {
-            $digest = ([BitConverter]::ToString($algorithm.ComputeHash($buffer, 0, $count))).Replace('-', '').ToLowerInvariant()
-        } finally { $algorithm.Dispose() }
-        if ($digest -cne $ExpectedSha256) { throw "Universal shared UI visual evidence hash drifted." }
-        $content = [Text.UTF8Encoding]::new($false, $true).GetString($buffer, 0, $count)
-        $receipt = $content | ConvertFrom-Json
-        return $receipt
-    } finally { $stream.Dispose() }
+    $contentBytes = [IO.File]::ReadAllBytes($item.FullName)
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    $digestBytes = $algorithm.ComputeHash($contentBytes)
+    $algorithm.Dispose()
+    $digest = [BitConverter]::ToString($digestBytes).Replace('-', '')
+    if ($digest -ine $ExpectedSha256) {
+        throw "Universal shared UI visual evidence hash drifted."
+    }
+    return [Text.Encoding]::UTF8.GetString($contentBytes) | ConvertFrom-Json
 }
 
 function Invoke-GitText([string[]]$Arguments) {
@@ -95,19 +86,19 @@ if ($Build -and -not $ExpectedSourceCommit) {
     throw "Universal builds require an explicit -ExpectedSourceCommit pin."
 }
 $branch = Invoke-GitText @("branch", "--show-current")
-if ($branch -cne "software") {
-    throw "Universal builds must run from software."
+if ($branch -cne "main") {
+    throw "Universal builds must run from main."
 }
 $sourceStatus = Invoke-GitText @("status", "--porcelain=v1", "--untracked-files=all")
 if ($sourceStatus) {
     throw "Universal builds require an exact clean source tree."
 }
 
-$profilePath = Join-Path $repoRoot "release\distribution\build-profiles\universal-1.0.0.v1.json"
-$overlayPath = Join-Path $repoRoot "apps\desktop\src-tauri\tauri.universal.conf.json"
-$coexistencePath = Join-Path $repoRoot "release\distribution\desktop\edition-coexistence.v1.json"
-$browserAuthPath = Join-Path $repoRoot "release\distribution\desktop\edition-browser-auth.v1.json"
-$runtimeFamiliesPath = Join-Path $repoRoot "release\distribution\desktop\edition-runtime-update-families.v1.json"
+$profilePath = Join-Path $repoRoot "release\desktop\config\build-profiles\universal-1.0.0.v1.json"
+$overlayPath = Join-Path $repoRoot "apps\desktop\editions\universal.json"
+$coexistencePath = Join-Path $repoRoot "release\desktop\config\updates\edition-coexistence.v1.json"
+$browserAuthPath = Join-Path $repoRoot "release\desktop\config\updates\edition-browser-auth.v1.json"
+$runtimeFamiliesPath = Join-Path $repoRoot "release\desktop\config\updates\edition-runtime-update-families.v1.json"
 $profile = Get-Content -LiteralPath $profilePath -Raw -Encoding UTF8 | ConvertFrom-Json
 $overlay = Get-Content -LiteralPath $overlayPath -Raw -Encoding UTF8 | ConvertFrom-Json
 $coexistence = Get-Content -LiteralPath $coexistencePath -Raw -Encoding UTF8 | ConvertFrom-Json
@@ -139,9 +130,9 @@ if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     $profile.build.targetTriple -cne "x86_64-pc-windows-msvc" -or
     $profile.build.fallbackScript -cne "apps/desktop/scripts/build-windows-llvm.ps1" -or
     $profile.build.fallbackTargetTriple -cne "x86_64-pc-windows-gnullvm" -or
-    $profile.desktopContracts.coexistence -cne "release/distribution/desktop/edition-coexistence.v1.json" -or
-    $profile.desktopContracts.browserAuth -cne "release/distribution/desktop/edition-browser-auth.v1.json" -or
-    $profile.desktopContracts.runtimeAndUpdaterFamilies -cne "release/distribution/desktop/edition-runtime-update-families.v1.json" -or
+    $profile.desktopContracts.coexistence -cne "release/desktop/config/updates/edition-coexistence.v1.json" -or
+    $profile.desktopContracts.browserAuth -cne "release/desktop/config/updates/edition-browser-auth.v1.json" -or
+    $profile.desktopContracts.runtimeAndUpdaterFamilies -cne "release/desktop/config/updates/edition-runtime-update-families.v1.json" -or
     $profile.releaseGates.installerLifecycleReceiptRequired -ne $true -or
     $profile.releaseGates.exactEditionBrowserAuthReceiptRequired -ne $true -or
     $profile.releaseGates.crossEditionSessionReuseAllowed -ne $false -or
@@ -165,7 +156,7 @@ if ($profile.artifactFileName -cne "DroneDream-Universal-1.0.0.exe" -or
     $sharedUi.grantsHardwareAuthority -ne $false -or
     $sharedUi.fieldLightweightEntryIntegrationStatus -cne "integrated-in-universal" -or
     $integratedUi.contractId -cne "dronedream-universal-integrated-workspaces/v2" -or
-    $integratedUi.manifest -cne "release/distribution/universal/integrated-workspaces.v2.json" -or
+    $integratedUi.manifest -cne "release/desktop/config/universal/integrated-workspaces.v2.json" -or
     $integratedUi.sha256 -cnotmatch "^[0-9a-f]{64}$" -or
     $integratedUi.sourceFileCount -ne 12 -or
     (@($integratedUi.workspaceModes) -join ",") -cne "sim,lab,field,autonomy" -or
@@ -183,7 +174,7 @@ if (-not $CurrentUiEvidencePath -or $CurrentUiEvidenceSha256 -cnotmatch '^[0-9a-
 }
 $sharedUiSourceRefs = @()
 foreach ($expectedRef in @($sharedUi.sourceFiles)) {
-    if ($expectedRef.path -cnotmatch "^apps/frontend/src/" -or
+    if ($expectedRef.path -cnotmatch "^apps/web/src/" -or
         $expectedRef.sha256 -cnotmatch "^[0-9a-f]{64}$") {
         throw "Universal shared UI source binding is malformed."
     }
@@ -253,7 +244,7 @@ if ($integratedUiManifest.kind -cne "dronedream-universal-integrated-workspaces"
 }
 $integratedUiSourceRefs = @()
 foreach ($expectedRef in @($integratedUiManifest.sourceFiles)) {
-    if ($expectedRef.path -cnotmatch "^apps/frontend/(scripts|src)/" -or
+    if ($expectedRef.path -cnotmatch "^apps/web/(scripts|src)/" -or
         $expectedRef.sha256 -cnotmatch "^[0-9a-f]{64}$" -or
         $expectedRef.donorBlob -cnotmatch "^[0-9a-f]{40}$" -or
         $expectedRef.integration -cnotmatch "^(byte-exact|semantic-[a-z0-9-]+)$") {
@@ -277,7 +268,7 @@ if ($integratedUiSourceRefs.Count -ne [int]$integratedUi.sourceFileCount) {
 $externalAssetQualificationTargets = @($externalAssetQualification.shareTargets)
 if ($externalAssetQualification.ownerEdition -cne "autonomy" -or
     $externalAssetQualification.productSourceCommit -cnotmatch "^[0-9a-f]{40}$" -or
-    $externalAssetQualification.contract -cne "release/distribution/shared/external-asset-qualification.v1.json" -or
+    $externalAssetQualification.contract -cne "release/desktop/config/shared/external-asset-qualification.v1.json" -or
     $externalAssetQualification.transport -cne "agent-core-asset-ir-and-receipts" -or
     (@($externalAssetQualification.routes) -join ",") -cne "/autonomy/maps,/autonomy/aircraft" -or
     (@($externalAssetQualification.sourceKinds) -join ",") -cne "file,directory,direct_url,git" -or
@@ -294,7 +285,7 @@ if ($externalAssetQualification.ownerEdition -cne "autonomy" -or
 Invoke-GitText @("merge-base", "--is-ancestor", [string]$externalAssetQualification.productSourceCommit, $sourceCommit) | Out-Null
 $externalAssetQualificationSourceRefs = @()
 foreach ($expectedRef in @($externalAssetQualification.sourceFiles)) {
-    if ($expectedRef.path -cnotmatch "^(apps/frontend/src/|services/backend/app/|apps/desktop/src-tauri/src/|docs/|services/supabase/migrations/|release/distribution/shared/)" -or
+    if ($expectedRef.path -cnotmatch "^(apps/web/src/|server/api/app/|apps/desktop/src/src/|docs/|server/database/migrations/|release/desktop/config/shared/)" -or
         $expectedRef.sha256 -cnotmatch "^[0-9a-f]{64}$") {
         throw "Shared external asset qualification source binding is malformed."
     }
@@ -337,7 +328,7 @@ if (-not $CargoTargetDir) {
     $CargoTargetDir = Join-Path $env:LOCALAPPDATA "DroneDream\codex-cache\universal-cargo-target"
 }
 $cargoTargetFull = [IO.Path]::GetFullPath($CargoTargetDir)
-$repositoryTargetFull = [IO.Path]::GetFullPath((Join-Path $repoRoot "apps\desktop\src-tauri\target"))
+$repositoryTargetFull = [IO.Path]::GetFullPath((Join-Path $repoRoot "apps\desktop\src\target"))
 if ($cargoTargetFull.StartsWith($repositoryTargetFull, [StringComparison]::OrdinalIgnoreCase)) {
     throw "Universal builds must not write the large Cargo target into the repository."
 }
@@ -366,13 +357,13 @@ if (-not $Build) {
         artifactFileName = $artifactName
         compilerFamily = $toolchainContract.compilerFamily
         targetTriple = $toolchainContract.targetTriple
-        profile = New-RepoFileRef "release\distribution\build-profiles\universal-1.0.0.v1.json"
-        overlay = New-RepoFileRef "apps\desktop\src-tauri\tauri.universal.conf.json"
-        websiteHandoff = New-RepoFileRef "release\distribution\universal\release\website-exact-exe-handoff.v1.json"
+        profile = New-RepoFileRef "release\desktop\config\build-profiles\universal-1.0.0.v1.json"
+        overlay = New-RepoFileRef "apps\desktop\editions\universal.json"
+        websiteHandoff = New-RepoFileRef "release\desktop\config\universal\release\website-exact-exe-handoff.v1.json"
         desktopContracts = [ordered]@{
-            coexistence = New-RepoFileRef "release\distribution\desktop\edition-coexistence.v1.json"
-            browserAuth = New-RepoFileRef "release\distribution\desktop\edition-browser-auth.v1.json"
-            runtimeAndUpdaterFamilies = New-RepoFileRef "release\distribution\desktop\edition-runtime-update-families.v1.json"
+            coexistence = New-RepoFileRef "release\desktop\config\updates\edition-coexistence.v1.json"
+            browserAuth = New-RepoFileRef "release\desktop\config\updates\edition-browser-auth.v1.json"
+            runtimeAndUpdaterFamilies = New-RepoFileRef "release\desktop\config\updates\edition-runtime-update-families.v1.json"
         }
         sharedUi = [ordered]@{
             contractId = [string]$sharedUi.contractId
@@ -522,25 +513,21 @@ if ($engineManifestDigests.Count -ne 1) {
 $engineManifestMatch = $matchingEngineManifests[0]
 $enginePayloadPaths = @($engineManifestMatch.Document.files.path)
 $requiredEnginePayloadPaths = @(
-    "release/distribution/editions/field.v1.json",
-    "release/distribution/editions/lab.v1.json",
-    "release/distribution/editions/sim.v1.json",
-    "release/distribution/desktop/edition-coexistence.v1.json",
-    "release/distribution/desktop/edition-browser-auth.v1.json",
-    "release/distribution/desktop/edition-runtime-update-families.v1.json",
-    "release/distribution/safety/edition-execution-gate.v1.json",
-    "release/distribution/vehicle-packs/registry.v1.json"
+    "release/desktop/config/editions/field.v1.json",
+    "release/desktop/config/editions/lab.v1.json",
+    "release/desktop/config/editions/sim.v1.json",
+    "release/desktop/config/updates/edition-coexistence.v1.json",
+    "release/desktop/config/updates/edition-browser-auth.v1.json",
+    "release/desktop/config/updates/edition-runtime-update-families.v1.json",
+    "release/desktop/config/safety/edition-execution-gate.v1.json",
+    "release/desktop/config/vehicle-packs/registry.v1.json"
 )
 $missingEnginePayloadPaths = @($requiredEnginePayloadPaths | Where-Object {
     $_ -notin $enginePayloadPaths
 })
 $forbiddenEnginePayloadPaths = @($enginePayloadPaths | Where-Object {
-    $_ -eq "release/distribution/build-planning" -or
-    $_.StartsWith("release/distribution/build-planning/", [StringComparison]::Ordinal) -or
-    $_ -eq "release/distribution/build-plans" -or
-    $_.StartsWith("release/distribution/build-plans/", [StringComparison]::Ordinal) -or
-    $_ -eq "release/distribution/tests" -or
-    $_.StartsWith("release/distribution/tests/", [StringComparison]::Ordinal)
+    $_ -eq "release/desktop/tests" -or
+    $_.StartsWith("release/desktop/tests/", [StringComparison]::Ordinal)
 })
 if ($missingEnginePayloadPaths.Count -gt 0 -or $forbiddenEnginePayloadPaths.Count -gt 0) {
     throw "The Universal Engine Pack payload contract failed closed."
@@ -589,8 +576,8 @@ $buildReceipt = [ordered]@{
         channel = "desktop-universal-channel"
         fileName = "latest-universal.json"
     }
-    profile = New-RepoFileRef "release\distribution\build-profiles\universal-1.0.0.v1.json"
-    overlay = New-RepoFileRef "apps\desktop\src-tauri\tauri.universal.conf.json"
+    profile = New-RepoFileRef "release\desktop\config\build-profiles\universal-1.0.0.v1.json"
+    overlay = New-RepoFileRef "apps\desktop\editions\universal.json"
     brand = New-RepoFileRef "brand\editions.json"
     sharedUi = [ordered]@{
         contractId = [string]$sharedUi.contractId
@@ -631,9 +618,9 @@ $buildReceipt = [ordered]@{
         grantsHardwareAuthority = $false
     }
     desktopContracts = [ordered]@{
-        coexistence = New-RepoFileRef "release\distribution\desktop\edition-coexistence.v1.json"
-        browserAuth = New-RepoFileRef "release\distribution\desktop\edition-browser-auth.v1.json"
-        runtimeAndUpdaterFamilies = New-RepoFileRef "release\distribution\desktop\edition-runtime-update-families.v1.json"
+        coexistence = New-RepoFileRef "release\desktop\config\updates\edition-coexistence.v1.json"
+        browserAuth = New-RepoFileRef "release\desktop\config\updates\edition-browser-auth.v1.json"
+        runtimeAndUpdaterFamilies = New-RepoFileRef "release\desktop\config\updates\edition-runtime-update-families.v1.json"
         appAuthClientId = $expectedAppAuthClientId
         providerOAuthClientIdSha256 = $providerOAuthClientIdSha256
         browserAuthStatus = "pending-exact-headed-roundtrip-validation"

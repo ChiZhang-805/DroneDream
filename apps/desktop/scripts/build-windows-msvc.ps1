@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$AdditionalConfigPath,
     [string]$CargoTargetDir,
     [string]$DetachedNodeDependencyManifest,
@@ -181,7 +181,7 @@ if ($env:RUSTFLAGS -or $env:CARGO_ENCODED_RUSTFLAGS) {
     throw "Clear custom RUSTFLAGS and CARGO_ENCODED_RUSTFLAGS before using the MSVC release build."
 }
 
-$defaultCargoTarget = Join-Path $PSScriptRoot "..\src-tauri\target"
+$defaultCargoTarget = Join-Path $PSScriptRoot "..\src\target"
 $cargoTargetRoot = if ($CargoTargetDir) {
     [IO.Path]::GetFullPath($CargoTargetDir)
 } elseif ($env:CARGO_TARGET_DIR) {
@@ -209,7 +209,7 @@ if ($AdditionalConfigPath) {
 }
 $frontendDistContract = Resolve-EditionGeneratedFrontendContract `
     -RepoRoot $repoRoot `
-    -BaseConfigPath (Join-Path $PSScriptRoot "..\src-tauri\tauri.conf.json") `
+    -BaseConfigPath (Join-Path $PSScriptRoot "..\src\tauri.conf.json") `
     -AdditionalConfigPath $additionalConfig `
     -EditionId $EditionId
 if ($DetachedNodeDependencyManifest) {
@@ -232,7 +232,7 @@ if ($DetachedNodeDependencyManifest) {
 }
 
 $runtimeUpdateFamilies = Get-Content -LiteralPath (
-    Join-Path $repoRoot "release\distribution\desktop\edition-runtime-update-families.v1.json"
+    Join-Path $repoRoot "release\desktop\config\updates\edition-runtime-update-families.v1.json"
 ) -Raw -Encoding UTF8 | ConvertFrom-Json
 $editionFamilies = @($runtimeUpdateFamilies.editions | Where-Object {
     $_.editionId -ceq $EditionId
@@ -261,7 +261,7 @@ Write-Host (
     "Building DroneDream Desktop with $toolchain, $pythonExecutable, " +
     "and MSVC from $visualStudioRoot"
 )
-$tauriConfig = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\src-tauri\tauri.conf.json") -Raw |
+$tauriConfig = Get-Content -LiteralPath (Join-Path $PSScriptRoot "..\src\tauri.conf.json") -Raw |
     ConvertFrom-Json
 $expectedInstaller = Join-Path $installerBundleRoot (
     "${ExpectedProductName}_$($tauriConfig.version)_x64-setup.exe"
@@ -310,7 +310,7 @@ Invoke-CheckedNativeCommand `
     -FilePath "node.exe" `
     -DisplayName "$EditionId frontend ownership verification" `
     -ArgumentList @(
-        (Join-Path $repoRoot "apps\frontend\scripts\verify-edition-build-boundaries.mjs"),
+        (Join-Path $repoRoot "apps\web\scripts\verify-edition-build-boundaries.mjs"),
         "--edition", $EditionId,
         "--dist", $frontendDistContract.absolutePath
     )

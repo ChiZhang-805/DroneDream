@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
     [string]$BundleDirectory,
     [string]$Repository = "ChiZhang-805/DroneDream",
@@ -20,12 +20,12 @@ if (-not (Test-Path -LiteralPath $bundleDirectoryFull -PathType Container)) {
 }
 
 $tauriConfig = Get-Content -LiteralPath (
-    Join-Path $PSScriptRoot "..\src-tauri\tauri.conf.json"
+    Join-Path $PSScriptRoot "..\src\tauri.conf.json"
 ) -Raw | ConvertFrom-Json
 $version = [string]$tauriConfig.version
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..\..")).Path
 $familyContractPath = Join-Path $repoRoot (
-    "release\distribution\desktop\edition-runtime-update-families.v1.json"
+    "release\desktop\config\updates\edition-runtime-update-families.v1.json"
 )
 $familyContract = Get-Content -LiteralPath $familyContractPath -Raw -Encoding UTF8 |
     ConvertFrom-Json

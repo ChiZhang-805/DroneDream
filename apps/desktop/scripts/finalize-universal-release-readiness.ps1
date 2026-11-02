@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)][ValidatePattern("^[0-9a-f]{40}$")][string]$ProductSourceCommit,
     [Parameter(Mandatory = $true)][string]$Installer,
     [Parameter(Mandatory = $true)][ValidatePattern("^[0-9a-f]{64}$")][string]$ExpectedSha256,
@@ -89,16 +89,16 @@ $branch = Get-GitText @("branch", "--show-current")
 $toolHead = Get-GitText @("rev-parse", "HEAD")
 $upstream = Get-GitText @("rev-parse", "@{u}")
 $status = Get-GitText @("status", "--porcelain=v1", "--untracked-files=all")
-if ($branch -cne "software" -or $toolHead -cne $upstream -or $status) {
-    throw "Final readiness requires clean, upstream-exact software."
+if ($branch -cne "main" -or $toolHead -cne $upstream -or $status) {
+    throw "Final readiness requires a clean, upstream-exact main checkout."
 }
 & git -C $repoRoot merge-base --is-ancestor $ProductSourceCommit $toolHead
 if ($LASTEXITCODE -ne 0) { throw "Finalizer tool source does not descend from the product source." }
 foreach ($path in @(
-    "release/distribution/build-profiles/universal-1.0.0.v1.json",
-    "apps/desktop/src-tauri/tauri.universal.conf.json",
+    "release/desktop/config/build-profiles/universal-1.0.0.v1.json",
+    "apps/desktop/editions/universal.json",
     "shared/brand/editions.json",
-    "apps/desktop/src-tauri/gen/brand/universal/windows/icon.ico"
+    "apps/desktop/src/gen/brand/universal/windows/icon.ico"
 )) {
     & git -C $repoRoot diff --quiet $ProductSourceCommit -- $path
     if ($LASTEXITCODE -ne 0) { throw "Product input drifted after the frozen build: $path" }
