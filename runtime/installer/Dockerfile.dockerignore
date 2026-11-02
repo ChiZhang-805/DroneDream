@@ -9,6 +9,10 @@
 !platform/
 !runtime/installer/**
 !runtime/engine/**
+!runtime/config/
+!runtime/config/**
+!runtime/scripts/
+!runtime/scripts/**
 !shared/
 !release/
 !release/desktop/config/**
