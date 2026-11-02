@@ -31,7 +31,8 @@ const COMPILED_DESKTOP_EDITION_ID: &str = env!("DRONEDREAM_DESKTOP_EDITION_ID");
 const COMPILED_EDITION_PROFILE: &str = env!("DRONEDREAM_EDITION_PROFILE");
 const DEFAULT_RELEASE_MANIFEST_URL: &str =
     env!("DRONEDREAM_PRODUCTION_RUNTIME_RELEASE_MANIFEST_URL");
-const TRUSTED_KEYRING: &str = include_str!("../../../../runtime/installer/release-public-keys.json");
+const TRUSTED_KEYRING: &str =
+    include_str!("../../../../runtime/installer/release-public-keys.json");
 const MAX_MANIFEST_BYTES: u64 = 1024 * 1024;
 const MAX_SIGNATURE_BYTES: u64 = 64 * 1024;
 const MAX_SMOKE_REPORT_BYTES: u64 = 4 * 1024 * 1024;
@@ -6982,9 +6983,8 @@ mod tests {
 
     #[test]
     fn jcs_matches_the_shared_release_fixture() {
-        let input = include_str!(
-            "../../../../runtime/tests/fixtures/jcs-release-vector.input.json"
-        );
+        let input =
+            include_str!("../../../../runtime/tests/fixtures/jcs-release-vector.input.json");
         let value: serde_json::Value = serde_json::from_str(input).unwrap();
         let canonical = serde_jcs::to_vec(&value).unwrap();
         assert_eq!(
@@ -7005,8 +7005,7 @@ mod tests {
 
     #[test]
     fn beta_release_fixture_verifies_with_the_compiled_trust_anchor() {
-        let manifest =
-            include_bytes!("../../../../runtime/tests/fixtures/runtime-release.json");
+        let manifest = include_bytes!("../../../../runtime/tests/fixtures/runtime-release.json");
         let signature =
             include_bytes!("../../../../runtime/tests/fixtures/runtime-release.json.sig");
         let verified = parse_and_verify_manifest(manifest, signature, TRUSTED_KEYRING).unwrap();

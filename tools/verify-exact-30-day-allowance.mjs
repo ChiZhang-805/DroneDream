@@ -6,8 +6,8 @@ import { fileURLToPath } from "node:url";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const migrationPath = path.join(
   root,
-  "services",
-  "supabase",
+  "server",
+  "database",
   "migrations",
   "20260821010000_use_exact_30_day_allowance_cycles.sql",
 );

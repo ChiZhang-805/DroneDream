@@ -455,9 +455,7 @@ def _active_inventory_reasons(
     if not records:
         reasons.append("runtime.engine-pack.file-inventory-invalid")
         return reasons
-    forbidden_prefixes = (
-        "release/desktop/tests/",
-    )
+    forbidden_prefixes = ("release/desktop/tests/",)
     if any(path.startswith(forbidden_prefixes) for path in records):
         reasons.append("runtime.engine-pack.planned-artifact-present")
     if not profile_valid:
@@ -634,7 +632,9 @@ def _catalog_reasons(
         "capability": root / "release/desktop/config/capabilities/core-capabilities.v1.json",
         "gate": root / "release/desktop/config/safety/edition-execution-gate.v1.json",
         "edition": root / f"release/desktop/config/editions/{request['editionId']}.v1.json",
-        "pack": root / f"release/desktop/config/vehicle-packs/{request['vehicle']['packId']}.v1.json",
+        "pack": (
+            root / f"release/desktop/config/vehicle-packs/{request['vehicle']['packId']}.v1.json"
+        ),
     }
     expected_hashes = {
         "capability": request["policy"]["capabilityPolicySha256"],
@@ -745,7 +745,8 @@ def evaluate_runtime_authorization(
 
     contract = _load_contract(observed.active_engine_root)
     capability_path = (
-        observed.active_engine_root / "release/desktop/config/capabilities/core-capabilities.v1.json"
+        observed.active_engine_root
+        / "release/desktop/config/capabilities/core-capabilities.v1.json"
     )
     gate_path = (
         observed.active_engine_root / "release/desktop/config/safety/edition-execution-gate.v1.json"

@@ -521,9 +521,7 @@ class SystemdContractTests(unittest.TestCase):
         )
         self.assertIn('--build-arg "DRONEDREAM_SOURCE_DATE_EPOCH=$source_date_epoch"', build_script)
         self.assertIn("ARG DRONEDREAM_SOURCE_DATE_EPOCH", dockerfile)
-        self.assertIn(
-            "/opt/dronedream/source/runtime/engine/tools/engine_pack.py", dockerfile
-        )
+        self.assertIn("/opt/dronedream/source/runtime/engine/tools/engine_pack.py", dockerfile)
         self.assertIn("/usr/lib/dronedream/engine-pack-manager.py", dockerfile)
         self.assertIn("--no-services", dockerfile)
         for required in (
