@@ -2,51 +2,22 @@
   <img src="shared/brand/icons/universal-lockup.png" alt="DroneDream" width="560" />
 </p>
 
-## 🚁 Product
+## Introduction
 
-DroneDream is a workspace for natural-language drone missions. It brings maps,
-aircraft, model-assisted planning, PX4 and Gazebo simulation, tuning, Runtime
-management, and flight evidence into one connected project.
+DroneDream is a unified workspace for natural-language drone missions and PX4 parameter tuning. Its five software editions share one product source while providing the maps, aircraft, Runtime, simulation, evidence, and operational capabilities appropriate to each environment.
 
-## 🧭 Mission workflow
+## Flight Agent
 
-An operator describes the goal instead of writing a flight script. DroneDream
-uses the selected map, aircraft, and project context to clarify missing facts,
-prepare a reviewable plan, and preserve mission continuity through execution,
-replanning, return, and landing. Model reasoning works alongside deterministic
-flight and safety boundaries rather than replacing them.
+The Flight Agent interprets a natural-language command, builds the task, and lets the LLM select one to four route-planning algorithms that are actually available for the current map, aircraft, geometry, risk, and time budget. Dijkstra, A*, Weighted A*, Bidirectional Dijkstra, 3D A*, and 3D Theta* produce candidates; deterministic clearance, collision, trajectory, and execution gates retain final veto authority before mandatory PX4 and Gazebo simulation or flight.
 
-## 🎛️ Software editions
+<p align="center">
+  <img src="shared/brand/readme/flight-agent.png" alt="DroneDream Flight Agent framework" width="100%" />
+</p>
 
-One `main` branch produces Universal, SIM, LAB, FIELD, and AGENT, as well as the
-public website. The five desktop editions share the same product source and are
-separated only by their configuration, branding, capabilities, installation
-identity, and update channel.
+## Parameter Tuning
 
-## 🗂️ Source layout
+Parameter Tuning turns an objective and bounded PX4 parameter space into an evidence-driven search. The LLM Harness selects eligible optimizer tools, each candidate runs through PX4 and Gazebo, telemetry is scored against tracking, speed, smoothness, and robustness objectives, and the resulting evidence updates the search until a profile satisfies the validation contract.
 
-`apps` contains the desktop, web, and website applications; `server` contains
-the API, worker, and database services; `runtime` contains the engine and WSL
-installation lifecycle; `shared` contains brand assets and contracts; `release`
-contains publication configuration; and `docs` and `tools` contain the maintained
-guidance and development utilities.
-
-## 🧠 Agent Core
-
-The natural-language flight core is maintained in the
-[DroneDream Agent Core](https://github.com/ChiZhang-805/DroneDream-Agent-Core)
-repository and is staged into software releases through the product build
-process.
-
-## 🛠️ Development and release
-
-Begin with the [local setup guide](docs/development/04-local-setup.md), then use
-the [development and release guide](docs/development/development-and-release.md)
-for validation, packaging, installation, and evidence requirements. GitHub
-Actions is intentionally limited to `Check code`, `Deploy website`,
-`Release Software`, and `Release runtime`.
-
-## 📄 License
-
-DroneDream is available under the [MIT License](LICENSE). Product, engineering,
-release, privacy, and legal documentation is maintained in [`docs`](docs/README.md).
+<p align="center">
+  <img src="shared/brand/readme/parameter-tuning.png" alt="DroneDream Parameter Tuning framework" width="100%" />
+</p>
