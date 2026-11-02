@@ -771,7 +771,7 @@ def _frontend_geometry(buildings: list[Building]) -> dict[str, Any]:
         # only after the selected model calls the planner for the current goal.
         "nodes": [],
         "edges": [],
-        "texture_url": "asset-previews/maps/kumpula-campus-source.jpg",
+        "texture_url": "assets/maps/images/kumpula-campus-source.jpg",
     }
 
 
@@ -880,7 +880,7 @@ def export_runtime_preview(package: Path, geometry_path: Path, preview_path: Pat
                             "size_x": x1-x0, "size_y": y1-y0, "size_z": .2, "yaw_rad": 0., "semantic": "terrain"},
                            *[p for p in semantic["collision_primitives"] if p.get("semantic") not in {"building", "terrain"}]],
             "nodes": graph["nodes"], "edges": graph["edges"],
-            "texture_url": "asset-previews/maps/kumpula-campus-source.jpg"}
+            "texture_url": "assets/maps/images/kumpula-campus-source.jpg"}
         _write_text(geometry_path, json.dumps(geometry, ensure_ascii=False, separators=(",", ":")) + "\n")
         photo = Image.open(io.BytesIO(read(semantic["live_map"]["image_path"]))).convert("RGB")
         preview_path.parent.mkdir(parents=True, exist_ok=True)

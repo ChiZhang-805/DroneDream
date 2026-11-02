@@ -350,22 +350,6 @@ describe("AuthContext account profile", () => {
     window.sessionStorage.clear();
   });
 
-  it("uses a local preview identity only in desktop visual-QA mode", async () => {
-    vi.stubEnv("VITE_DESKTOP_VISUAL_QA", "true");
-    window.__TAURI__ = { core: { invoke: vi.fn() } };
-
-    render(
-      <AuthProvider>
-        <AccountProbe />
-      </AuthProvider>,
-    );
-
-    expect(await screen.findByLabelText("username"))
-      .toHaveTextContent("DroneDream Pilot");
-    expect(screen.getByLabelText("email")).toHaveTextContent("pilot@example.com");
-    expect(authMock.getSession).not.toHaveBeenCalled();
-  });
-
   it("defaults to the email prefix and lets the user save a custom username", async () => {
     vi.spyOn(Date, "now").mockReturnValue(1_777_777_777_777);
     render(

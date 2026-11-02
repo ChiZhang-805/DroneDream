@@ -153,7 +153,7 @@ export function catalogAssetPresentation(
   return {
     key: definition.key,
     name: chinese ? definition.zh : definition.en,
-    previewUrl: `${import.meta.env.BASE_URL}asset-previews/${kind === "map" ? "maps" : "vehicles"}/${definition.key}.webp`,
+    previewUrl: `${import.meta.env.BASE_URL}assets/${kind === "map" ? "maps/images" : "aircraft/images"}/${definition.key}.webp`,
   };
 }
 

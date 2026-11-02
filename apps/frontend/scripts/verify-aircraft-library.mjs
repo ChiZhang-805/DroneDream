@@ -44,7 +44,7 @@ try {
   });
   const cards = page.locator('.autonomy-repository-grid article');
   assert.equal(await cards.count(), 6);
-  const catalog = JSON.parse(await readFile(path.join(root, 'public/asset-geometry/vehicles/catalog.json'), 'utf8'));
+  const catalog = JSON.parse(await readFile(path.join(root, 'public/assets/aircraft/catalog.json'), 'utf8'));
   const models = [];
   for (let i = 0; i < 6; i++) {
     const name = (await cards.nth(i).innerText()).trim();
@@ -92,7 +92,7 @@ try {
   assert.deepEqual(errors, []);
   assert.equal(catalog.models.length, 13);
   assert(catalog.models.every(model => model.invalid_inertia_links.length === 0));
-  const writePreviews = process.argv.includes('--write-previews');
+  const writeAssets = process.argv.includes('--write-assets');
   for (const model of catalog.models) {
     const key = model.preview_key;
     await page.goto(`http://127.0.0.1:5205/__aircraft-preview?key=${key}`, { waitUntil: 'networkidle' });
@@ -102,7 +102,7 @@ try {
     await page.waitForTimeout(300);
     assert.deepEqual(await canvas.evaluate(element => [element.clientWidth, element.clientHeight]), [960, 560]);
     const png = await canvas.screenshot({ path: path.join(output, `${key}-source.png`) });
-    if (writePreviews) {
+    if (writeAssets) {
       const encoded = await page.evaluate(async base64 => {
         const image = new Image();
         image.src = `data:image/png;base64,${base64}`;
@@ -112,17 +112,17 @@ try {
         canvas.getContext('2d').drawImage(image, 0, 0);
         return canvas.toDataURL('image/webp', 0.9).split(',')[1];
       }, png.toString('base64'));
-      await writeFile(path.join(root, `public/asset-previews/vehicles/${key}.webp`), Buffer.from(encoded, 'base64'));
+      await writeFile(path.join(root, `public/assets/aircraft/images/${key}.webp`), Buffer.from(encoded, 'base64'));
     }
   }
   assert.deepEqual(errors, []);
-  if (writePreviews) {
-    const manifestPath = path.join(root, 'public/asset-previews/manifest.json');
+  if (writeAssets) {
+    const manifestPath = path.join(root, 'public/assets/manifest.json');
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-    manifest.sources.vehicles.commit = catalog.revision;
-    manifest.sources.vehicles.generator = 'scripts/verify-aircraft-library.mjs --write-previews';
+    manifest.sources.aircraft.commit = catalog.revision;
+    manifest.sources.aircraft.generator = 'scripts/verify-aircraft-library.mjs --write-assets';
     for (const file of manifest.files) {
-      const bytes = await readFile(path.join(root, 'public/asset-previews', file.path));
+      const bytes = await readFile(path.join(root, 'public/assets', file.path));
       file.bytes = bytes.length;
       file.sha256 = createHash('sha256').update(bytes).digest('hex');
     }

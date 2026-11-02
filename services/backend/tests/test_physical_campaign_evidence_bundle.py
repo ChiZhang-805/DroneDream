@@ -8,12 +8,12 @@ from app.simulator.physical_campaign_evidence import (
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 _EVIDENCE_ROOT = (
-    _REPOSITORY_ROOT / "artifacts" / "technical-report" / "px4-physical-campaign-v1-5f0f62c"
+    _REPOSITORY_ROOT / "artifacts" / "test-runs" / "px4-physical-campaign-v1-5f0f62c"
 )
 
 pytestmark = pytest.mark.skipif(
     not _EVIDENCE_ROOT.is_dir(),
-    reason="requires frozen technical-report physical-campaign evidence assets",
+    reason="requires frozen physical-campaign evidence assets",
 )
 
 

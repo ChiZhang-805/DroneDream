@@ -202,7 +202,6 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
         self.assertIn("receipt.sourceCommit", release_builder)
         self.assertIn("receipt.sourceTree", release_builder)
         self.assertIn("receipt.buildNumber", release_builder)
-        self.assertIn("receipt.desktopVisualQa", release_builder)
         self.assertIn("receipt.installer.sha256", release_builder)
         self.assertIn("The release website requires one exact clean source commit", release_builder)
         self.assertIn("tauriBundleInstallerFileName", release_builder)

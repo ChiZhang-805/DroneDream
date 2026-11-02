@@ -2,143 +2,143 @@
   "files": [
     {
       "bytes": 759399,
-      "path": "maps/kalasatama-waterfront-source.jpg",
+      "path": "maps/images/kalasatama-waterfront-source.jpg",
       "sha256": "f238ec7938709ae1ff68bfde9e2c5ebaa997afae0ee9112618bc1ec085f87f22"
     },
     {
       "bytes": 141680,
-      "path": "maps/kalasatama-waterfront.webp",
+      "path": "maps/images/kalasatama-waterfront.webp",
       "sha256": "ffde4a8edd61f03b97e04565f842c21b66d304ef6106984af0e09d43065e6ed8"
     },
     {
       "bytes": 1896807,
-      "path": "maps/kumpula-campus-source.jpg",
+      "path": "maps/images/kumpula-campus-source.jpg",
       "sha256": "5d106fef489139e68b6adaa21e4a34074f14667d077d1c1ff048b048a00243b7"
     },
     {
       "bytes": 140796,
-      "path": "maps/kumpula-campus.webp",
+      "path": "maps/images/kumpula-campus.webp",
       "sha256": "04e60e3426988ff85f51f34fd0bb761a641b4bae8875a91c294899542c0a191f"
     },
     {
       "bytes": 975823,
-      "path": "maps/meilahti-hospital-campus-source.jpg",
+      "path": "maps/images/meilahti-hospital-campus-source.jpg",
       "sha256": "51dea11c4329ff73d4dadc6e2fd6ec524b3aa1a7f99182655bd2897cb481d401"
     },
     {
       "bytes": 156844,
-      "path": "maps/meilahti-hospital-campus.webp",
+      "path": "maps/images/meilahti-hospital-campus.webp",
       "sha256": "7df5b0bdeaa5dc60897528b4a37f150174a78fe4659e14536710e54884d21abf"
     },
     {
       "bytes": 771756,
-      "path": "maps/suomenlinna-sea-fortress-source.jpg",
+      "path": "maps/images/suomenlinna-sea-fortress-source.jpg",
       "sha256": "26fa385660207d7a41747261bd67f293950361f697bc63f0527d1902354bdb8a"
     },
     {
       "bytes": 133904,
-      "path": "maps/suomenlinna-sea-fortress.webp",
+      "path": "maps/images/suomenlinna-sea-fortress.webp",
       "sha256": "f1d2d5be3ac9b78147107d947cc4c5b49f79e6459a7629f2429868e61278bfc9"
     },
     {
       "bytes": 704639,
-      "path": "maps/uutela-coastal-forest-source.jpg",
+      "path": "maps/images/uutela-coastal-forest-source.jpg",
       "sha256": "9941ca06e11c368e69a69b8751c1f80696102331f184ae546705b743ee5a284d"
     },
     {
       "bytes": 114662,
-      "path": "maps/uutela-coastal-forest.webp",
+      "path": "maps/images/uutela-coastal-forest.webp",
       "sha256": "3435498fdcbbad71bf64dd3280ec059094be2aa1a2d00380986603c3a92e1f0d"
     },
     {
       "bytes": 889155,
-      "path": "maps/vuosaari-harbour-source.jpg",
+      "path": "maps/images/vuosaari-harbour-source.jpg",
       "sha256": "e908f5f97efca6f79393a1f691740929e177418581d2f6158c8b37d54b3d826a"
     },
     {
       "bytes": 137914,
-      "path": "maps/vuosaari-harbour.webp",
+      "path": "maps/images/vuosaari-harbour.webp",
       "sha256": "30ab50685b9859bb3b509d3b1f8a8c32f98e57a6d605aaa20fa4488d3cebc3f1"
     },
     {
       "bytes": 6700,
-      "path": "vehicles/quadtailsitter.webp",
+      "path": "aircraft/images/quadtailsitter.webp",
       "sha256": "d12384be457937775566040142b6092e2ee41351530d1d1ff32ccaaccdc9512e"
     },
     {
       "bytes": 7068,
-      "path": "vehicles/standard-vtol.webp",
+      "path": "aircraft/images/standard-vtol.webp",
       "sha256": "a36ba57c47e1cc0ce5bb56e238b44357869074ea8a5241c38ed4f86faabc5f67"
     },
     {
       "bytes": 6688,
-      "path": "vehicles/tiltrotor.webp",
+      "path": "aircraft/images/tiltrotor.webp",
       "sha256": "eb4d2d1da6b7eb5dcea421a090ec7e5147c74b7f57caea3aeb503e415167f331"
     },
     {
       "bytes": 12308,
-      "path": "vehicles/x500-depth.webp",
+      "path": "aircraft/images/x500-depth.webp",
       "sha256": "4a9087300118a89ecbbf3fea5ea73f2d4150e28dd716380aa3687fe624c5c2a4"
     },
     {
       "bytes": 12318,
-      "path": "vehicles/x500-flow.webp",
+      "path": "aircraft/images/x500-flow.webp",
       "sha256": "cc7e53a19bc31ad8b469424d61623508108b25d907a50227590cdb1e59ecfc4d"
     },
     {
       "bytes": 12762,
-      "path": "vehicles/x500-gimbal.webp",
+      "path": "aircraft/images/x500-gimbal.webp",
       "sha256": "35ced2f856b51a7a4df6ad44e83fc18939fb755a6120a1c8470e309fecb7f390"
     },
     {
       "bytes": 12676,
-      "path": "vehicles/x500-lidar-2d.webp",
+      "path": "aircraft/images/x500-lidar-2d.webp",
       "sha256": "b758637bb5cfec6a5fb95458dbbeac7b0729e644d57e28d4c36f8a1f4afe8bcf"
     },
     {
       "bytes": 12294,
-      "path": "vehicles/x500-lidar-down.webp",
+      "path": "aircraft/images/x500-lidar-down.webp",
       "sha256": "f2b85ba082b0ca5c1c6966b6c4971e6a97025e0fb42817f68be6f7d86d8374c3"
     },
     {
       "bytes": 12260,
-      "path": "vehicles/x500-lidar-front.webp",
+      "path": "aircraft/images/x500-lidar-front.webp",
       "sha256": "af46d08020bbbafa991c40902f8131d34d8c087806054413288c77f4c28c2c0c"
     },
     {
       "bytes": 12354,
-      "path": "vehicles/x500-mono-down.webp",
+      "path": "aircraft/images/x500-mono-down.webp",
       "sha256": "979a68b01d9e3b352033515ab72598b94726ca74c28abbbbfcc61b3f3f90c607"
     },
     {
       "bytes": 12340,
-      "path": "vehicles/x500-mono-front.webp",
+      "path": "aircraft/images/x500-mono-front.webp",
       "sha256": "2894c6bbf8703cf7944ba9a1b51fae6c8c2604ec7f8cabf3dc2d81d9e3afb44a"
     },
     {
       "bytes": 12302,
-      "path": "vehicles/x500-vision.webp",
+      "path": "aircraft/images/x500-vision.webp",
       "sha256": "5b7c367ef8ea15ed12114a232622f3df6bdb294221577835d2cf78951623a6f5"
     },
     {
       "bytes": 12302,
-      "path": "vehicles/x500.webp",
+      "path": "aircraft/images/x500.webp",
       "sha256": "5b7c367ef8ea15ed12114a232622f3df6bdb294221577835d2cf78951623a6f5"
     }
   ],
   "generator": "tools/build-helsinki-maps.py",
-  "schema_version": "dronedream.resource-card-previews.v1",
+  "schema_version": "dronedream.assets.v1",
   "sources": {
     "maps": {
       "license": "CC-BY-4.0",
       "project": "City of Helsinki Open Data",
       "retrieved_at": "2026-10-27"
     },
-    "vehicles": {
+    "aircraft": {
       "commit": "e05f4312d3f28aa621157610584a4870406cb6d3",
       "license": "BSD-3-Clause",
       "project": "PX4/PX4-gazebo-models",
-      "generator": "scripts/verify-aircraft-library.mjs --write-previews"
+      "generator": "scripts/verify-aircraft-library.mjs --write-assets"
     }
   }
 }

@@ -468,14 +468,6 @@ foreach ($name in @("VITE_SUPABASE_URL", "VITE_SUPABASE_PUBLISHABLE_KEY")) {
         throw "Set the approved public $name before building."
     }
 }
-$desktopVisualQa = [Environment]::GetEnvironmentVariable(
-    "VITE_DESKTOP_VISUAL_QA",
-    "Process"
-) -ceq "true"
-if ($desktopVisualQa -and -not $AllowUnsignedUpdater) {
-    throw "Desktop visual-QA mode is forbidden for signed updater builds."
-}
-
 $defaultUpdaterKey = Join-Path $env:USERPROFILE ".tauri\dronedream-updater.key"
 if (-not $AllowUnsignedUpdater -and
     -not $env:TAURI_SIGNING_PRIVATE_KEY_PATH -and
@@ -682,7 +674,6 @@ try {
             buildNumber = [UInt64]$sourceBuildNumber
             sourceCommit = $sourceCommit
             sourceTree = $sourceTree
-            desktopVisualQa = $desktopVisualQa
             compilerFamily = $toolchainContract.compilerFamily
             targetTriple = $toolchainContract.targetTriple
             brand = [ordered]@{

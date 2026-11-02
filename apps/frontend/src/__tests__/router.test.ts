@@ -102,20 +102,6 @@ describe("environment-aware routing", () => {
     router.dispose();
   });
 
-  it("opens runtime-backed routes only in an explicit desktop visual-QA build", async () => {
-    vi.stubEnv("VITE_DESKTOP_VISUAL_QA", "true");
-    installDesktopBridge({ ...readyRuntime, ready: false });
-    window.history.replaceState(null, "", "/#/dashboard");
-    vi.resetModules();
-    const { router } = await import("../router");
-
-    await router.navigate("/jobs/new");
-    expect(router.state.location.pathname).toBe("/jobs/new");
-    expect(router.state.location.search).toBe("");
-
-    router.dispose();
-  });
-
   it("guards runtime-backed routes while keeping preview and static pages open", async () => {
     installDesktopBridge();
     window.history.replaceState(null, "", "/#/desktop/setup");

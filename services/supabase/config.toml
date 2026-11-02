@@ -21,8 +21,5 @@ verify_jwt = false
 [functions.organization-console]
 verify_jwt = false
 
-[functions.product-events]
-verify_jwt = false
-
 [functions.account-self-service]
 verify_jwt = false

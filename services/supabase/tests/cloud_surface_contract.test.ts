@@ -9,7 +9,6 @@ const requiredEdgeFunctions = [
   "billing-checkout",
   "model-gateway",
   "organization-console",
-  "product-events",
 ] as const;
 
 async function filesBelow(

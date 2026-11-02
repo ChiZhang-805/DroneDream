@@ -16,19 +16,18 @@ EXPECTED = {
     "software-field": ("long-lived-product", "field"),
     "software-agent": ("long-lived-product", "autonomy"),
     "website": ("long-lived-delivery", "website"),
-    "technical-report": ("long-lived-delivery", "technical-report"),
 }
 
 
-def test_public_repository_has_one_exact_eight_branch_contract() -> None:
+def test_public_repository_has_one_exact_seven_branch_contract() -> None:
     topology = json.loads(TOPOLOGY.read_text(encoding="utf-8"))
     schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
     assert schema["$schema"] == "https://json-schema.org/draft/2020-12/schema"
     assert schema["additionalProperties"] is False
     assert topology["schemaVersion"] == 1
     assert topology["kind"] == "dronedream-public-branch-topology"
-    assert topology["topologyVersion"] == "1.1.0"
-    assert topology["requiredBranchCount"] == 8
+    assert topology["topologyVersion"] == "1.2.0"
+    assert topology["requiredBranchCount"] == 7
     observed = {
         branch["name"]: (branch["role"], branch["productId"]) for branch in topology["branches"]
     }

@@ -102,7 +102,7 @@ function disposeScene(scene: THREE.Object3D): void {
 
 function catalogMapUrl(previewKey: string): string {
   const base = import.meta.env.BASE_URL.endsWith("/") ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
-  return `${base}asset-geometry/maps/${encodeURIComponent(previewKey)}.json`;
+  return `${base}assets/maps/geometry/${encodeURIComponent(previewKey)}.json`;
 }
 
 function numberedBuildingFootprints(footprints: CatalogBuildingFootprint[]): Array<CatalogBuildingFootprint & { number: string }> {
@@ -476,7 +476,7 @@ export function RepositoryAsset3DView({ kind, previewKey, name, chinese, onBuild
     if (kind === "vehicle" && previewKey) {
       setLoading(true);
       const base = import.meta.env.BASE_URL.endsWith("/") ? import.meta.env.BASE_URL : `${import.meta.env.BASE_URL}/`;
-      void new GLTFLoader().loadAsync(`${base}asset-geometry/vehicles/${encodeURIComponent(previewKey)}.glb`)
+      void new GLTFLoader().loadAsync(`${base}assets/aircraft/${encodeURIComponent(previewKey)}.glb`)
         .then(({ scene: model }) => {
           if (cancelled) { disposeScene(model); return; }
           onVehicleMetadataRef.current?.(model.userData.catalogVehicle ?? null);

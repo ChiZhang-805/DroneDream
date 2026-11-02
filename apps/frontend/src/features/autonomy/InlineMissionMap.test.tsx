@@ -24,7 +24,7 @@ describe("InlineMissionMap", () => {
         updated_at_unix_ms: 1,
       }}
       bounds={{ x: 500, y: 500, z: 35 }}
-      previewUrl="/asset-previews/maps/kumpula-campus-orthophoto.jpg"
+      previewUrl="/assets/maps/images/kumpula-campus-orthophoto.jpg"
     />);
 
     expect(screen.getByRole("img", { name: "二维任务地图" })).toBeVisible();

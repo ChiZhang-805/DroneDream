@@ -96,7 +96,7 @@
       ],
       "noticeObligations": [
         "Retain the BSD notice for distributed models and review model-specific assets before adding new Vehicle Packs.",
-        "Desktop-derived GLB previews retain the original notice at apps/frontend/public/asset-geometry/vehicles/LICENSE.txt."
+        "Desktop-derived GLB assets retain the original notice at apps/frontend/public/assets/aircraft/LICENSE.txt."
       ],
       "validationTier": "integrated-contract",
       "validationNotes": [

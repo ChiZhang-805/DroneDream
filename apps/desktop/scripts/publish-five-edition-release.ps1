@@ -350,7 +350,6 @@ try {
                 "software-field",
                 "software-lab",
                 "software-sim",
-                "technical-report",
                 "website"
             )
             $remoteBranchOutput = Invoke-GitHubCli -Arguments @(

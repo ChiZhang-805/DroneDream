@@ -2578,7 +2578,7 @@ function RepositoryPendingCard({ kind, index, chinese }: { kind: CatalogAssetKin
   const name = kind === "map"
     ? (chinese ? "地图待添加" : "Map Pending")
     : (chinese ? "无人机待添加" : "Aircraft Pending");
-  const previewUrl = `${import.meta.env.BASE_URL}asset-previews/${kind === "map" ? "maps/kumpula-campus-source.jpg" : "vehicles/x500-depth.webp"}`;
+  const previewUrl = `${import.meta.env.BASE_URL}assets/${kind === "map" ? "maps/images/kumpula-campus-source.jpg" : "aircraft/images/x500-depth.webp"}`;
   return <article className="autonomy-repository-pending" aria-disabled="true" data-pending-slot={index}>
     <div className="autonomy-repository-card-surface" aria-label={`${name} ${index}`}>
       <RepositoryAssetPreview kind={kind} previewUrl={previewUrl} previewKey={null} name={`${name} ${index}`} />
@@ -3179,7 +3179,7 @@ function InlineSimulationViewer({
     return source.kind === "simulation" ? (chinese ? "仿真" : "Simulation") : source.label;
   };
   const previewUrl = workspace.mapPack.agentCoreAssetId === "dronedream.school-map.v1" || workspace.mapPack.id === "map-school"
-    ? "/asset-previews/maps/kumpula-campus-orthophoto.jpg"
+    ? "/assets/maps/images/kumpula-campus-orthophoto.jpg"
     : null;
 
   const livePath = sourceId

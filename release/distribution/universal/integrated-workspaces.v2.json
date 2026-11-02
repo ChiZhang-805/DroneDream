@@ -108,7 +108,7 @@
     },
     {
       "path": "apps/frontend/src/pages/ExperimentAssistant.tsx",
-      "sha256": "a93179e89f20525e7e1c24bf734705f3bcde0425839bea8dc609591d75bb6f94",
+      "sha256": "b1db3423a83b2f0a2e17ce1370e94f8324839f4631fc7428c796506c3c6f038e",
       "donorEdition": "lab",
       "donorBlob": "c0bcfc6042582014a35e28ce2ff1f01bde3f44ad",
       "integration": "semantic-active-universal-workspace-theme"
@@ -129,7 +129,7 @@
     },
     {
       "path": "apps/frontend/src/router.tsx",
-      "sha256": "d813e75c3a9b97fe8288bf0d88c58b70e0b3f991db2de311d6dc9f624b834ea0",
+      "sha256": "270a7181e8642def111a21a74678283a04aa509c7b81998fea259912414aae11",
       "donorEdition": "universal",
       "donorBlob": "307f4e0784ff125f883031daefe7d2c1cd4ea7dc",
       "integration": "semantic-universal-workspace-routing-and-shared-locale"

@@ -46,7 +46,7 @@ describe("asset card presentation", () => {
     expect(catalogAssetPresentation("map", "dronedream-school-map", "School Map", true)).toEqual({
       key: "kumpula-campus",
       name: "赫尔辛基大学昆普拉校区",
-      previewUrl: "/asset-previews/maps/kumpula-campus.webp",
+      previewUrl: "/assets/maps/images/kumpula-campus.webp",
     });
     expect(catalogAssetPresentation("vehicle", "px4-x500-lidar-front", "x500", false).name).toBe("X500 Front LiDAR");
   });
@@ -70,11 +70,11 @@ describe("asset card presentation", () => {
   });
 
   it("ships every reviewed preview referenced by the presentation catalog", () => {
-    const manifestPath = join(process.cwd(), "public", "asset-previews", "manifest.json");
+    const manifestPath = join(process.cwd(), "public", "assets", "manifest.json");
     const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { files: Array<{ path: string }> };
     expect(manifest.files).toHaveLength(25);
     for (const entry of manifest.files) {
-      expect(existsSync(join(process.cwd(), "public", "asset-previews", entry.path))).toBe(true);
+      expect(existsSync(join(process.cwd(), "public", "assets", entry.path))).toBe(true);
     }
   });
 });

@@ -59,7 +59,6 @@ async function requestWindowClose(): Promise<void> {
 
 describe("desktop direct close", () => {
   beforeEach(() => {
-    vi.stubEnv("VITE_DESKTOP_VISUAL_QA", "true");
     window.localStorage.clear();
     window.sessionStorage.clear();
     window.localStorage.setItem("drone-dream:locale", "en");

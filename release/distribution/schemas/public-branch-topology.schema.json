@@ -8,21 +8,21 @@
   "properties": {
     "schemaVersion": {"const": 1},
     "kind": {"const": "dronedream-public-branch-topology"},
-    "topologyVersion": {"const": "1.1.0"},
-    "requiredBranchCount": {"const": 8},
+    "topologyVersion": {"const": "1.2.0"},
+    "requiredBranchCount": {"const": 7},
     "branches": {
       "type": "array",
-      "minItems": 8,
-      "maxItems": 8,
+      "minItems": 7,
+      "maxItems": 7,
       "uniqueItems": true,
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["name", "role", "productId"],
         "properties": {
-          "name": {"enum": ["main", "software", "software-sim", "software-lab", "software-field", "software-agent", "website", "technical-report"]},
+          "name": {"enum": ["main", "software", "software-sim", "software-lab", "software-field", "software-agent", "website"]},
           "role": {"enum": ["protected-integration", "long-lived-product", "long-lived-delivery"]},
-          "productId": {"type": ["string", "null"], "enum": [null, "universal", "sim", "lab", "field", "autonomy", "website", "technical-report"]}
+          "productId": {"type": ["string", "null"], "enum": [null, "universal", "sim", "lab", "field", "autonomy", "website"]}
         }
       }
     },

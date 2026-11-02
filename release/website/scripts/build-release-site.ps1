@@ -111,7 +111,6 @@ if ([int]$receipt.schemaVersion -ne 1 -or
     [UInt64]$receipt.buildNumber -ne [UInt64]$currentBuildNumber -or
     [string]$receipt.sourceCommit -cne $currentSourceCommit -or
     [string]$receipt.sourceTree -cne $currentSourceTree -or
-    [bool]$receipt.desktopVisualQa -or
     [string]$receipt.compilerFamily -cne "msvc" -or
     [string]$receipt.targetTriple -cne "x86_64-pc-windows-msvc" -or
     [string]$receipt.installer.fileName -cne $bundleInstallerName -or

@@ -985,7 +985,7 @@ def frontend_geometry(
         "nodes": graph["nodes"],
         "edges": graph["edges"],
         "ecological_regions": forests,
-        "texture_url": f"asset-previews/maps/{config['key']}-source.jpg",
+        "texture_url": f"assets/maps/images/{config['key']}-source.jpg",
     }
 
 
@@ -1348,10 +1348,10 @@ def build_map(config: dict[str, Any], args: argparse.Namespace) -> dict[str, Any
         "Unknown heights remain explicit proxies. No indoor geometry or unverified doorway "
         "location is claimed.\n",
     )
-    geometry_path = args.frontend_public / "asset-geometry" / "maps" / f"{config['key']}.json"
-    preview_path = args.frontend_public / "asset-previews" / "maps" / f"{config['key']}.webp"
+    geometry_path = args.frontend_public / "assets" / "maps" / "geometry" / f"{config['key']}.json"
+    preview_path = args.frontend_public / "assets" / "maps" / "images" / f"{config['key']}.webp"
     source_preview = (
-        args.frontend_public / "asset-previews" / "maps" / f"{config['key']}-source.jpg"
+        args.frontend_public / "assets" / "maps" / "images" / f"{config['key']}-source.jpg"
     )
     geometry = frontend_geometry(config, buildings, trees, forests, graph)
     geometry["metadata"] = {"bounds_m": semantic["bounds_m"], "coordinate_frame": "ENU",
@@ -1436,17 +1436,17 @@ def catalog_resource(item: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def update_preview_manifest(public_root: Path, resources: list[dict[str, Any]]) -> None:
-    path = public_root / "asset-previews" / "manifest.json"
+def update_asset_manifest(public_root: Path, resources: list[dict[str, Any]]) -> None:
+    path = public_root / "assets" / "manifest.json"
     manifest = (json.loads(path.read_text(encoding="utf-8")) if path.is_file()
-                else {"schema_version": "dronedream.asset-previews.v1", "sources": {}, "files": []})
-    generated_paths = {f"maps/{resource['key']}.webp" for resource in resources} | {
-        f"maps/{resource['key']}-source.jpg" for resource in resources
+                else {"schema_version": "dronedream.assets.v1", "sources": {}, "files": []})
+    generated_paths = {f"maps/images/{resource['key']}.webp" for resource in resources} | {
+        f"maps/images/{resource['key']}-source.jpg" for resource in resources
     }
     retained = [entry for entry in manifest["files"] if entry["path"] not in generated_paths]
     generated = []
     for relative in sorted(generated_paths):
-        candidate = public_root / "asset-previews" / relative
+        candidate = public_root / "assets" / relative
         generated.append(
             {
                 "path": relative,
@@ -1485,7 +1485,7 @@ def main() -> None:
             "resources": sorted(catalog, key=lambda item: item["resource_id"]),
         },
     )
-    update_preview_manifest(args.frontend_public, selected)
+    update_asset_manifest(args.frontend_public, selected)
     print(
         json.dumps(
             {

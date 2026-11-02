@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "kind": "dronedream-public-branch-topology",
-  "topologyVersion": "1.1.0",
-  "requiredBranchCount": 8,
+  "topologyVersion": "1.2.0",
+  "requiredBranchCount": 7,
   "branches": [
     {"name": "main", "role": "protected-integration", "productId": null},
     {"name": "software", "role": "long-lived-product", "productId": "universal"},
@@ -10,8 +10,7 @@
     {"name": "software-lab", "role": "long-lived-product", "productId": "lab"},
     {"name": "software-field", "role": "long-lived-product", "productId": "field"},
     {"name": "software-agent", "role": "long-lived-product", "productId": "autonomy"},
-    {"name": "website", "role": "long-lived-delivery", "productId": "website"},
-    {"name": "technical-report", "role": "long-lived-delivery", "productId": "technical-report"}
+    {"name": "website", "role": "long-lived-delivery", "productId": "website"}
   ],
   "policy": {
     "featureBranchesTemporary": true,

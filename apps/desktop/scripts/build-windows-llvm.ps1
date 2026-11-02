@@ -61,29 +61,6 @@ if ($LASTEXITCODE -ne 0 -or $releaseSourceStatus) {
 }
 $env:DRONEDREAM_RELEASE_SOURCE_COMMIT = $releaseSourceCommit
 $env:DRONEDREAM_RELEASE_BUILD_NUMBER = $releaseBuildNumber
-$desktopVisualQa = [Environment]::GetEnvironmentVariable(
-    "VITE_DESKTOP_VISUAL_QA",
-    "Process"
-) -ceq "true"
-if ($desktopVisualQa -and -not $AllowUnsignedUpdater) {
-    throw "Desktop visual-QA mode is forbidden for signed updater builds."
-}
-$visualQaConfig = if ($desktopVisualQa) {
-    $candidate = Join-Path $PSScriptRoot (
-        "..\src-tauri\visual-qa\tauri.$EditionId.visual-qa.conf.json"
-    )
-    $resolved = Resolve-Path -LiteralPath $candidate -ErrorAction Stop
-    $config = Get-Content -LiteralPath $resolved.Path -Raw -Encoding UTF8 |
-        ConvertFrom-Json
-    $expectedIdentifier = "io.dronedream.desktop.$EditionId.visual-qa"
-    if ([string]$config.identifier -cne $expectedIdentifier) {
-        throw "Desktop visual-QA config must use isolated identifier $expectedIdentifier."
-    }
-    $resolved.Path
-} else {
-    $null
-}
-
 $cargoBin = Join-Path $env:USERPROFILE ".cargo\bin"
 if (Test-Path -LiteralPath $cargoBin) {
     $env:PATH = "$cargoBin;$env:PATH"
@@ -303,9 +280,6 @@ if ($additionalConfig) {
         "--config", $additionalConfig,
         "--config", $llvmBundleConfig
     )
-    if ($visualQaConfig) {
-        $tauriConfigArguments += @("--config", $visualQaConfig)
-    }
     Invoke-CheckedNativeCommand `
         -FilePath "npm.cmd" `
         -DisplayName "Tauri desktop build" `

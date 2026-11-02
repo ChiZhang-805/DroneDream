@@ -134,7 +134,6 @@ def test_shared_msvc_build_is_pinned_native_and_fail_closed() -> None:
         "VsDevCmd.bat",
         "buildNumber = [UInt64]$releaseBuildNumber",
         "sourceTree = $releaseSourceTree",
-        "desktopVisualQa = $desktopVisualQa",
         'targetTriple = "x86_64-pc-windows-msvc"',
         '"cl.exe", "link.exe", "rc.exe", "dumpbin.exe"',
         "dumpbin.exe /dependents $application",

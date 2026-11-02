@@ -71,7 +71,7 @@ try {
     await page.waitForFunction(() => !document.querySelector('.autonomy-repository-3d-loading'));
     await page.waitForTimeout(500);
     if (candidatePublic) {
-      const geometry = JSON.parse(await readFile(path.join(candidatePublic, 'asset-geometry/maps',
+      const geometry = JSON.parse(await readFile(path.join(candidatePublic, 'assets/maps/geometry',
         `${name.toLowerCase().replaceAll(' ', '-')}.json`), 'utf8'));
       const metadata = geometry.metadata;
       const row = label => mapDialog.locator('.autonomy-repository-dialog-copy > dl > div')
@@ -131,7 +131,7 @@ try {
   assert.equal(await page.getByRole('menuitemradio', { name: 'Kumpula Campus', exact: true }).count(), 0, 'Deleted maps must not remain in Select Map');
   if (candidatePublic) {
     for (const name of mapNames) {
-      const url = `/asset-geometry/maps/${name.toLowerCase().replaceAll(' ', '-')}.json`;
+      const url = `/assets/maps/geometry/${name.toLowerCase().replaceAll(' ', '-')}.json`;
       assert(servedCandidates.has(url), `${name}: candidate geometry was not served`);
       const response = await page.request.get(`http://127.0.0.1:5204/console${url}`);
       assert.deepEqual(await response.body(), await readFile(path.join(candidatePublic, url.slice(1))));

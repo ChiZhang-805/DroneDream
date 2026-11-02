@@ -19,10 +19,8 @@ import {
 } from "./edition";
 
 function appRoutes(desktopRuntime: boolean): RouteObject[] {
-  const desktopVisualQa = desktopRuntime
-    && import.meta.env.VITE_DESKTOP_VISUAL_QA === "true";
   const requireDesktopReadiness = (feature: "experiment" | "job") =>
-    desktopRuntime && !desktopVisualQa
+    desktopRuntime
       ? () => getDesktopStartupGateSession().status === "ready"
         ? null
         : redirect(`/desktop/setup?required=${feature}`)

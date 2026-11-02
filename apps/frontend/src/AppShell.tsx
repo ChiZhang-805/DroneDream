@@ -4391,7 +4391,7 @@ function AppShellContent() {
     </div>
   ) : null;
 
-  if (desktopRuntime && !launcherMode && import.meta.env.VITE_DESKTOP_VISUAL_QA !== "true"
+  if (desktopRuntime && !launcherMode
       && (coreStartup !== "ready" || startupGate.status !== "ready")) {
     return <Navigate to="/desktop/setup" replace />;
   }

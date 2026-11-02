@@ -117,8 +117,8 @@ GitHub Actions. Local details are in the
 `main` is the authoritative integrated source for Universal, SIM, LAB, FIELD,
 and AGENT. The edition and website branches are publication and review channels,
 not independent product source trees. Long-lived branches are limited to `main`, `software`,
-`software-agent`, `software-field`, `software-lab`, `software-sim`, `website`,
-and `technical-report`. Feature work uses short-lived branches and returns to
+`software-agent`, `software-field`, `software-lab`, `software-sim`, and `website`.
+Feature work uses short-lived branches and returns to
 `main` after review; publication channels must not accumulate their own directory
 layouts or private copies of shared product code.
 

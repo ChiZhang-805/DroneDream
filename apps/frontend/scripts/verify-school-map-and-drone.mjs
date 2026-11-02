@@ -89,7 +89,7 @@ try {
   if (await mapDialog.getByText("No verified 3D geometry is available", { exact: false }).count()) {
     throw new Error("Kumpula Campus failed to load its verified 3D geometry.");
   }
-  const geometryResponse = await page.request.get(`${origin}/console/asset-geometry/maps/kumpula-campus.json`);
+  const geometryResponse = await page.request.get(`${origin}/console/assets/maps/geometry/kumpula-campus.json`);
   const geometry = await geometryResponse.json();
   if (geometry.building_footprints?.length !== 42) throw new Error("Kumpula Campus must expose all 42 verified building footprints.");
   for (const building of geometry.building_footprints) {
@@ -137,7 +137,7 @@ try {
     if (await dialog.getByText("No verified 3D geometry is available", { exact: false }).count()) {
       throw new Error(`${mapName} failed to load its generated 3D geometry.`);
     }
-    const response = await page.request.get(`${origin}/console/asset-geometry/maps/${geometryKey}.json`);
+    const response = await page.request.get(`${origin}/console/assets/maps/geometry/${geometryKey}.json`);
     if (!response.ok()) throw new Error(`${mapName} geometry request failed.`);
     const generatedGeometry = await response.json();
     if (generatedGeometry.building_footprints?.length !== buildingCount) {

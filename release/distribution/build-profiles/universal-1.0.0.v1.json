@@ -36,7 +36,7 @@
     "sourceFiles": [
       {
         "path": "apps/frontend/src/AppShell.tsx",
-        "sha256": "7bebd2b004ae0f8734e2e7819b03f98c8ed9b93dec5162190600c803b86ff98c"
+        "sha256": "d85bbf3747df3df4498162251613b300f69b40abb4a50991629f11614c46f632"
       },
       {
         "path": "apps/frontend/src/components/EditionSettingsSurface.tsx",
@@ -90,7 +90,7 @@
   "integratedWorkspaceUiContract": {
     "contractId": "dronedream-universal-integrated-workspaces/v2",
     "manifest": "release/distribution/universal/integrated-workspaces.v2.json",
-    "sha256": "267c0294cca5a3dd0d51e623330eec9e591176e42cb97ce389f5434b4ec6876d",
+    "sha256": "e230fccede7ccbe0521affa410184d1422cf31b1db5e7bd64855d40787c0e29a",
     "sourceFileCount": 12,
     "workspaceModes": ["sim", "lab", "field", "autonomy"],
     "createsCrossEditionHarnessOrchestrator": false,
@@ -116,7 +116,7 @@
       "grantsHardwareAuthority": false,
       "sourceFilesPurpose": "current-build-inputs-not-visual-qualification",
       "sourceFiles": [
-        {"path": "apps/frontend/src/pages/AutonomyPlatform.tsx", "sha256": "d0250eb16cc8ede729c24e0ee02fdf67588a01d90f2ad2411bab85e5d20875d7"},
+        {"path": "apps/frontend/src/pages/AutonomyPlatform.tsx", "sha256": "0af08898ac2186c1f7efaedfd355005a06261d3be9ce7cf0ae5ea9da3b290a36"},
         {"path": "apps/frontend/src/features/autonomy/agentCore.ts", "sha256": "1ead2a8e441eedd9cc028821d6cdfe58d9280c9458cb96d253584f8f5af5d80f"},
         {"path": "apps/frontend/src/features/autonomy/agentCorePlanning.ts", "sha256": "77b3eedd15ebe5d0bb5e347d66632c1b8ee4b6ef799c2569864d54cca32e1a50"},
         {"path": "apps/frontend/src/features/autonomy/assetLibraryStore.ts", "sha256": "1b39f98d3b255a689e685e3aad70150b4f989a98a2c6e08ba2d80935f3cd8836"},

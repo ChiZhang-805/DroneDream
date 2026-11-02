@@ -167,7 +167,7 @@ class UpstreamSourceInventoryTests(unittest.TestCase):
         self.assertEqual(copied, ["px4-gazebo-models"])
         source = self.sources[copied[0]]
         self.assertEqual(source["distributionMode"], "desktop-and-runtime")
-        assets = ROOT / "apps/frontend/public/asset-geometry/vehicles"
+        assets = ROOT / "apps/frontend/public/assets/aircraft"
         catalog = _load_json(assets / "catalog.json")
         self.assertEqual(catalog["revision"], source["pin"]["commit"])
         self.assertEqual(hashlib.sha256((assets / "LICENSE.txt").read_bytes()).hexdigest(),

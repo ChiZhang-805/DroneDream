@@ -19,7 +19,6 @@ COPY services/backend /srv/services/backend
 COPY services/worker /srv/services/worker
 COPY tools /srv/tools
 COPY shared/contracts /srv/shared/contracts
-COPY shared/brand/report /srv/shared/brand/report
 COPY release/distribution /srv/release/distribution
 
 RUN python -m pip install --no-cache-dir --no-deps --no-build-isolation \

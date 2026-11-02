@@ -2,7 +2,6 @@ import { ArrowRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
-import { recordProductEvent } from "../features/analytics/productEvents";
 import { ExperienceTrackPreview } from "../features/experiment/ExperienceTrackPreview";
 import {
   FIXED_SCENARIO_TEMPLATES,
@@ -196,12 +195,6 @@ export function FixedScenarios() {
               <Link
                 className="btn btn-primary fixed-scenario-use"
                 to={`/jobs/new?scenario=${encodeURIComponent(template.key)}`}
-                onClick={() => {
-                  void recordProductEvent("fixed_scenario_selected", {
-                    template_key: template.key,
-                    difficulty: definition.difficulty,
-                  });
-                }}
               >
                 {t("scenarioLibrary.use")}
                 <ArrowRight aria-hidden="true" />

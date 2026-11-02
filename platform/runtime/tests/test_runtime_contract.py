@@ -268,7 +268,6 @@ class ThirdPartyNoticeContractTests(unittest.TestCase):
         self.assertIn("!LICENSE", dockerignore)
         self.assertIn("!platform/runtime/**", dockerignore)
         self.assertNotIn("platform/runtime/THIRD_PARTY_NOTICES.md", dockerignore)
-        self.assertIn("!shared/brand/report/**", dockerignore)
         self.assertIn(
             "chmod 0644 /etc/systemd/system/*.service /etc/systemd/system/*.timer",
             dockerfile,

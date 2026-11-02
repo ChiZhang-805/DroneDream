@@ -14,7 +14,6 @@ import { TrackEditor2D } from "../components/TrackEditor2D";
 import { apiClient, ApiClientError } from "../api/client";
 import { openAppSettings } from "../appSettings";
 import { publicDemoConsole } from "../features/demo/publicDemo";
-import { recordProductEvent } from "../features/analytics/productEvents";
 import {
   EXPERIMENTAL_OPTIMIZER_STRATEGIES,
   HARNESS_OPTIMIZER_STRATEGIES,
@@ -2011,11 +2010,6 @@ export function NewJob() {
         }, workspaceEdition);
       }
       clearExperimentDraft(workspaceId);
-      void recordProductEvent("job_created", {
-        source: lastAppliedTemplateKey ? "fixed_scenario" : "manual_or_assistant",
-        template_key: lastAppliedTemplateKey,
-        used_legacy_api: false,
-      });
       navigate(`/jobs/${created.id}`, { replace: false });
     } catch (error) {
       setSubmitError(

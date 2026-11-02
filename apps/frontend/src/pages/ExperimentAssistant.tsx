@@ -38,7 +38,6 @@ import {
 import { apiClient, ApiClientError } from "../api/client";
 import { openAppSettings } from "../appSettings";
 import { isDesktopRuntime } from "../desktop/bridge";
-import { recordProductEvent } from "../features/analytics/productEvents";
 import {
   applyAssistantTurn,
   assistantCurrentParameters,
@@ -1058,27 +1057,8 @@ export function ExperimentAssistant() {
       setReferenceFiles((current) => current.filter(
         (file) => !submittedReferenceFileIds.has(file.id),
       ));
-      void recordProductEvent("assistant_turn_succeeded", {
-        access_mode: modelAccess.accessMode,
-        provider: modelAccess.accessMode === "platform"
-          ? selectedManagedModel?.provider ?? modelAccess.managedProvider
-          : modelAccess.provider,
-        model: modelAccess.accessMode === "platform"
-          ? selectedManagedModel?.model ?? modelAccess.managedModel
-          : modelAccess.model,
-        has_reference_files: referenceFiles.length > 0,
-      });
     } catch (reason) {
       setError(assistantErrorMessage(reason, copy, interfaceLocale));
-      void recordProductEvent("assistant_turn_failed", {
-        access_mode: modelAccess.accessMode,
-        provider: modelAccess.accessMode === "platform"
-          ? selectedManagedModel?.provider ?? modelAccess.managedProvider
-          : modelAccess.provider,
-        model: modelAccess.accessMode === "platform"
-          ? selectedManagedModel?.model ?? modelAccess.managedModel
-          : modelAccess.model,
-      });
     } finally {
       pendingRef.current = false;
       setPending(false);

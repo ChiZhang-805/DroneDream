@@ -112,7 +112,7 @@ Kumpula 同一高程的已观测道路、空地先求并集，再计算净空，
 
 机型目录、资源哈希和桌面三维模型统一使用实际 Runtime 的 PX4 Gazebo 子模块提交 `e05f4312d3f28aa621157610584a4870406cb6d3`。桌面 GLB 从该提交的真实 SDF、网格、纹理和解析后的位姿生成，不能以手工拼装机翼或通用四旋翼替代真实模型。详情中的模型尺寸、干质量来自同一资产元数据；尺寸不是旋翼扫掠包络或飞行安全包络。全部 13 个来源包已核对依赖和摘要、关节连接及正定惯量，并经过 Gazebo 场景加载和桌面 GLB 重新导入检查；这不证明传感器数据流、飞控控制、载荷和任务飞行均通过。
 
-生成工具为 `tools/build-aircraft-previews.py` 与 `tools/export-gazebo-mesh.cc`。先在具备 Gazebo SDFormat 和 MeshManager 的开发环境解析原始模型，再用 `tools/requirements-aircraft.txt` 中的开发依赖导出；缓存统一放在工作区 `Caches/aircraft`。源提交从正式上游来源清单读取。`apps/frontend/scripts/verify-aircraft-library.mjs --write-previews` 使用实际详情组件检查全部目录模型并生成同源缩略图；公共资产附带原始许可证与摘要。工具不得修改产品 Runtime 安装。
+生成工具为 `tools/build-aircraft-assets.py` 与 `tools/export-gazebo-mesh.cc`。先在具备 Gazebo SDFormat 和 MeshManager 的开发环境解析原始模型，再用 `tools/requirements-aircraft.txt` 中的开发依赖导出；缓存统一放在工作区 `Caches/aircraft`。源提交从正式上游来源清单读取。`apps/frontend/scripts/verify-aircraft-library.mjs --write-assets` 使用实际详情组件检查全部目录模型并生成同源缩略图；公共资产附带原始许可证与摘要。工具不得修改产品 Runtime 安装。
 
 地图路线资格绑定具体机型。六图共 11,011 条候选路段通过 X500 的 0.76 × 0.6 米包络和 0.8 米额外净空检查；以 2.4 米直径、0.7 米高度的较大静态包络做敏感性检查时，其中 5,658 条不再满足净空。该测试尺寸并非任何 VTOL 的已认证动态包络，尤其不能证明转换、巡航转弯和回收空间。换机型必须按实际能力重新规划和仿真，不能继承多旋翼路线或回执。
 
