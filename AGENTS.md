@@ -8,6 +8,14 @@ per-task copies of the application. Retired workspace material belongs in the
 single workspace `Pending-User-Deletion` directory and is not a build input.
 Keep check results in the conversation; do not create audit or scan reports.
 
+Keep `main` as the authoritative integrated product source. Preserve the small
+top-level layout documented in `README.md`; do not create per-edition source
+trees because Universal, SIM, LAB, FIELD, and AGENT differ through manifests,
+branding, capabilities, and build inputs. Do not add fail-fast guards whose
+only purpose is to terminate trusted internal flow. Add a rejecting boundary
+only when it protects external input, security, account isolation, user data,
+release integrity, or flight safety; use ordinary branching for real choices.
+
 The user expects ordinary, incomplete natural language such as “帮我拿个东西”.
 The Agent must use context and tools, ask concise questions for missing essential
 information, and produce a complete confirmable mission. Do not require users to

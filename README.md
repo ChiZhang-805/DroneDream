@@ -50,7 +50,10 @@ docs/
 tools/            Repository checks, development helpers, and simulators
 ```
 
-Every top-level directory has one purpose. Generated builds, release staging,
+This is the complete product source layout on `main`; the five desktop editions
+do not get separate source directories. Edition differences stay in manifests,
+branding, capability policy, installer identity, and update configuration.
+Generated builds, release staging,
 and test results live outside the checkout under
 `Q:\DroneDream-Workspace\Build` and `Q:\DroneDream-Workspace\TestRuns` on the
 managed Windows workspace. Repository-local `artifacts/` output is ignored and
@@ -109,13 +112,15 @@ GitHub Actions. Local details are in the
 [desktop guide](apps/desktop/README.md), and
 [Runtime release guide](docs/guides/14-runtime-release.md).
 
-## Products and branches
+## Source and release branches
 
-DroneDream ships Universal, SIM, LAB, FIELD, and AGENT editions from one source
-layout. Long-lived branches are limited to `main`, `software`,
+`main` is the authoritative integrated source for Universal, SIM, LAB, FIELD,
+and AGENT. The edition and website branches are publication and review channels,
+not independent product source trees. Long-lived branches are limited to `main`, `software`,
 `software-agent`, `software-field`, `software-lab`, `software-sim`, `website`,
 and `technical-report`. Feature work uses short-lived branches and returns to
-the appropriate long-lived branch after review.
+`main` after review; publication channels must not accumulate their own directory
+layouts or private copies of shared product code.
 
 DroneDream is licensed under the [MIT License](LICENSE). Do not place
 credentials, user projects, generated installers, Runtime images, or local
