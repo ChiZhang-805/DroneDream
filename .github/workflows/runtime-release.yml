@@ -240,7 +240,7 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
   retain-runs:
-    name: Retain four workflow runs
+    name: Retain latest run per workflow
     if: ${{ always() }}
     needs: build-smoke-sign
     runs-on: ubuntu-24.04
@@ -253,7 +253,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Delete workflow runs older than the latest four
+      - name: Retain the latest run of each workflow
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/retain-workflow-runs.sh

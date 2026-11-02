@@ -440,7 +440,7 @@ jobs:
     secrets: inherit
 
   retain-runs:
-    name: Retain four workflow runs
+    name: Retain latest run per workflow
     if: ${{ always() }}
     needs:
       - backend
@@ -461,7 +461,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Delete workflow runs older than the latest four
+      - name: Retain the latest run of each workflow
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/retain-workflow-runs.sh

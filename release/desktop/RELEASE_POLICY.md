@@ -31,7 +31,7 @@ The `Retain website and Actions history` job prunes Pages deployments only after
 the newest deployment succeeds. It verifies the newest `github-pages`
 deployment state, marks every older record inactive, deletes those records, and
 then verifies that exactly the newest deployment remains. The same job always
-applies the repository-wide four-run Actions retention rule.
+applies the repository-wide one-latest-run-per-workflow Actions retention rule.
 
 An installed older build checks only its permanent edition channel. It may update
 directly to the newest build without the intermediate build releases remaining
@@ -81,9 +81,9 @@ queued, pending, waiting, or in progress.
 
 Deployment records are operational history, not Releases, Tags, immutable site
 artifacts, or additional live websites. GitHub Actions exposes exactly four
-workflow definitions and retains only the four most recent repository-wide runs.
-Each workflow deletes completed runs after the newest four; queued and active
-runs remain until completion, then the same rule converges the history to four.
+workflow definitions and retains only the newest run of each workflow. Each
+workflow deletes its older completed runs; queued and active runs remain until
+completion, then the same rule converges the history to one run per workflow.
 
 ## Publishing
 

@@ -100,7 +100,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: node apps/website/scripts/prune-github-pages-deployments.mjs
 
-      - name: Delete workflow runs older than the latest four
+      - name: Retain the latest run of each workflow
         env:
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/retain-workflow-runs.sh
