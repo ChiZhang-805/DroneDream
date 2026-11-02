@@ -431,9 +431,37 @@ jobs:
       - desktop-rust
       - deployment-images
     permissions:
+      actions: write
       contents: read
       deployments: write
       id-token: write
       pages: write
     uses: ./.github/workflows/pages.yml
     secrets: inherit
+
+  retain-runs:
+    name: Retain four workflow runs
+    if: ${{ always() }}
+    needs:
+      - backend
+      - frontend
+      - supabase-contracts
+      - repository-contracts
+      - runtime-contract
+      - desktop-rust
+      - deployment-images
+      - deploy-website
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Check out retention policy
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Delete workflow runs older than the latest four
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/retain-workflow-runs.sh

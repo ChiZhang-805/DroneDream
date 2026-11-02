@@ -238,3 +238,22 @@ jobs:
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           echo "$GITHUB_WORKSPACE/runtime/installer/out/release/$RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  retain-runs:
+    name: Retain four workflow runs
+    if: ${{ always() }}
+    needs: build-smoke-sign
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Check out retention policy
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Delete workflow runs older than the latest four
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/scripts/retain-workflow-runs.sh

@@ -27,10 +27,11 @@ Git commit count is the update build number.
   publish. Superseded inactive Deployment records are deleted only after the
   newest record is verified successful.
 
-The `Retain latest Pages deployment` job runs only after the Pages deployment
-completes successfully. It verifies the newest `github-pages`
+The `Retain website and Actions history` job prunes Pages deployments only after
+the newest deployment succeeds. It verifies the newest `github-pages`
 deployment state, marks every older record inactive, deletes those records, and
-then verifies that exactly the newest deployment remains.
+then verifies that exactly the newest deployment remains. The same job always
+applies the repository-wide four-run Actions retention rule.
 
 An installed older build checks only its permanent edition channel. It may update
 directly to the newest build without the intermediate build releases remaining
@@ -79,8 +80,10 @@ changing anything if the newest record is not successful or an older record is
 queued, pending, waiting, or in progress.
 
 Deployment records are operational history, not Releases, Tags, immutable site
-artifacts, or additional live websites. Workflow runs and their independently
-configured log/artifact retention are outside this one-record Pages policy.
+artifacts, or additional live websites. GitHub Actions exposes exactly four
+workflow definitions and retains only the four most recent repository-wide runs.
+Each workflow deletes completed runs after the newest four; queued and active
+runs remain until completion, then the same rule converges the history to four.
 
 ## Publishing
 
