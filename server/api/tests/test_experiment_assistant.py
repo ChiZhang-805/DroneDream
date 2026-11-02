@@ -19,7 +19,7 @@ def test_registered_fields_cover_shared_form_contract() -> None:
     form_source = (
         Path(__file__).resolve().parents[3]
         / "apps"
-        / "frontend"
+        / "web"
         / "src"
         / "features"
         / "experiment"

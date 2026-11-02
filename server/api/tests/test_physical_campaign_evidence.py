@@ -249,7 +249,6 @@ def test_runtime_release_fixture_binds_campaign_firmware() -> None:
     repository_root = Path(__file__).resolve().parents[3]
     release_path = (
         repository_root
-        / "platform"
         / "runtime"
         / "tests"
         / "fixtures"

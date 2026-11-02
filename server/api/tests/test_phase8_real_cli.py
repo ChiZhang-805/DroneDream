@@ -2350,7 +2350,12 @@ def test_shared_root_isolation_uses_current_environment_when_settings_reference_
 
 
 def test_real_cli_artifact_schema_doc_exists() -> None:
-    doc = Path(__file__).resolve().parents[3] / "docs" / "guides" / "REAL_CLI_ARTIFACT_SCHEMA.md"
+    doc = (
+        Path(__file__).resolve().parents[3]
+        / "docs"
+        / "development"
+        / "REAL_CLI_ARTIFACT_SCHEMA.md"
+    )
     assert doc.exists()
 
 

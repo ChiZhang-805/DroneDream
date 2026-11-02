@@ -3,24 +3,24 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 MIGRATION = (
     REPOSITORY_ROOT
-    / "services"
-    / "supabase"
+    / "server"
+    / "database"
     / "migrations"
     / "20260726060000_create_model_access_billing.sql"
 )
 SUPABASE_CONFIG = REPOSITORY_ROOT / "server" / "database" / "config.toml"
 MODEL_GATEWAY = (
     REPOSITORY_ROOT
-    / "services"
-    / "supabase"
+    / "server"
+    / "database"
     / "functions"
     / "model-gateway"
     / "index.ts"
 )
 BILLING_CHECKOUT = (
     REPOSITORY_ROOT
-    / "services"
-    / "supabase"
+    / "server"
+    / "database"
     / "functions"
     / "billing-checkout"
     / "index.ts"

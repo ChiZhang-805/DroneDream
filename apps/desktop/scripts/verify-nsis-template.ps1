@@ -29,6 +29,7 @@ if ($cliVersion -cne "2.11.4") {
 
 $config = Get-Content -LiteralPath $tauriConfigPath -Raw | ConvertFrom-Json
 $universalIcon = "gen/brand/universal/windows/icon.ico"
+$universalOverlayIcon = "../src/gen/brand/universal/windows/icon.ico"
 if ($config.bundle.windows.nsis.template -cne "nsis/installer.nsi") {
     throw "Tauri config does not select the vendored NSIS template"
 }
@@ -44,9 +45,9 @@ if ($universalIcon -cnotin @($config.bundle.icon)) {
     throw "The desktop executable must embed the generated Universal icon"
 }
 $universalOverlay = Get-Content -LiteralPath $universalOverlayPath -Raw | ConvertFrom-Json
-if ($universalIcon -cnotin @($universalOverlay.bundle.icon) -or
-    $universalOverlay.bundle.windows.nsis.installerIcon -cne $universalIcon -or
-    $universalOverlay.bundle.windows.nsis.uninstallerIcon -cne $universalIcon) {
+if ($universalOverlayIcon -cnotin @($universalOverlay.bundle.icon) -or
+    $universalOverlay.bundle.windows.nsis.installerIcon -cne $universalOverlayIcon -or
+    $universalOverlay.bundle.windows.nsis.uninstallerIcon -cne $universalOverlayIcon) {
     throw "Universal executable, installer, and uninstaller must embed the generated icon"
 }
 

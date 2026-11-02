@@ -246,7 +246,6 @@ def test_runtime_reconciler_rejects_custom_or_duplicate_service_paths(
 def test_runtime_env_reconciler_matches_fresh_runtime_template() -> None:
     template_path = (
         Path(__file__).resolve().parents[3]
-        / "platform"
         / "runtime"
         / "config"
         / "runtime.env.default"
