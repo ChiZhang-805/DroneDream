@@ -8,6 +8,7 @@ import heapq
 import json
 import math
 import os
+import re
 import subprocess
 import sys
 import time
@@ -431,10 +432,13 @@ def main() -> int:
     )
 
     world_path = map_root / "gazebo" / "world.physics.sdf"
-    world = ElementTree.parse(world_path).getroot().find("world")
-    if world is None or not world.get("name"):
+    world_match = re.search(
+        r"<world\s+name=[\"']([A-Za-z0-9._-]+)[\"']",
+        world_path.read_text(encoding="utf-8"),
+    )
+    if world_match is None:
         raise ValueError(f"Gazebo world has no name: {world_path}")
-    support.WORLD_NAME = str(world.get("name"))
+    support.WORLD_NAME = world_match.group(1)
     support.DEFAULT_POSE_TOPIC = f"/world/{support.WORLD_NAME}/dynamic_pose/info"
     support.VEHICLE_ENTITY = "my_drone"
     gz_binary = support._require_executable("gz")
