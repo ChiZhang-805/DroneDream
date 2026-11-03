@@ -59,21 +59,21 @@
     },
     {
       "path": "apps/web/tests/FieldAssistantWorkspace.test.tsx",
-      "sha256": "4a070cc76aec8ec2cc4fe504903d139b89d21bfb4c93230cd06ebc820bbce393",
+      "sha256": "f31641855e02fec0be3fd69a1c76728830def3719dfcf17e80cf6a8a37da4ba9",
       "donorEdition": "field",
       "donorBlob": "1311d713f1b5909e8731d99946706e069b83f93c",
       "integration": "semantic-universal-auth-and-workflow-adaptation"
     },
     {
       "path": "apps/web/src/field/FieldAssistantWorkspace.tsx",
-      "sha256": "5fb1a7b2f4523966f0ecd884aec291fdbabad1794084108e52586670b810dc3e",
+      "sha256": "cdc9d1fbd3ca04b2cd3ea700cc213902a8bab297f53147f572a97f6a3f0bb8c3",
       "donorEdition": "field",
       "donorBlob": "17aef3e57559c652b080b1c37e675816d24de118",
       "integration": "semantic-universal-auth-and-workflow-adaptation"
     },
     {
       "path": "apps/web/src/field/field.css",
-      "sha256": "ce0f4b033501be57e17b95f8a3aee7b45914db0de432679221f617f7da1e52c5",
+      "sha256": "122fc3f26889d6446c8305eeda09c95a0c77d1db76bf733735b8b979824431fe",
       "donorEdition": "field",
       "donorBlob": "49d715fd854354277352be5f77dfd2db5d06b51a",
       "integration": "semantic-field-settings-and-responsive-chrome"
