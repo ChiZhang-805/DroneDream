@@ -3445,29 +3445,6 @@ body:has(.field-app),
   opacity: 0.36;
 }
 
-.field-assistant-consent {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--field-soft-line);
-  font-size: 11px;
-}
-
-.field-assistant-consent span {
-  flex: 1;
-  color: var(--field-muted);
-}
-
-.field-assistant-consent button {
-  padding: 5px 8px;
-  border: 1px solid var(--field-line);
-  border-radius: 4px;
-  background: #ffffff;
-  cursor: pointer;
-}
-
 .field-assistant-error {
   margin: 8px 2px 0;
   color: var(--field-danger);

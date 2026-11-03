@@ -62,9 +62,6 @@ const COPY = {
     clear: "New conversation",
     listen: "Voice input",
     stop: "Stop voice input",
-    voiceConsent: "Allow Windows speech input for this message? Audio is not stored by DroneDream.",
-    allow: "Allow",
-    cancel: "Cancel",
     voiceUnavailable: "Voice input is unavailable. Continue typing.",
     plan: "Experiment plan",
     conversation: "Chat",
@@ -103,9 +100,6 @@ const COPY = {
     clear: "新建对话",
     listen: "语音输入",
     stop: "停止语音输入",
-    voiceConsent: "允许 Windows 为本条消息进行语音转写吗？DroneDream 不保存音频。",
-    allow: "允许",
-    cancel: "取消",
     voiceUnavailable: "当前无法使用语音输入，请继续打字。",
     plan: "实验方案",
     conversation: "对话",
@@ -285,7 +279,6 @@ export function FieldAssistantWorkspace({
   const [plan, setPlan] = useState<FieldAssistantPlan | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [voiceConsent, setVoiceConsent] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<"chat" | "plan">("chat");
   const pendingRef = useRef(false);
   const voice = useVoiceInput({
@@ -503,7 +496,7 @@ export function FieldAssistantWorkspace({
               onClick={() => {
                 if (voice.state === "listening") voice.stop();
                 else if (!voice.supported) setError(copy.voiceUnavailable);
-                else setVoiceConsent(true);
+                else void voice.start();
               }}
             ><Mic aria-hidden="true" /></button>
             <button
@@ -514,13 +507,6 @@ export function FieldAssistantWorkspace({
               aria-label={copy.send}
             ><ArrowUp aria-hidden="true" /></button>
           </div>
-          {voiceConsent ? (
-            <div className="field-assistant-consent" role="note">
-              <span>{copy.voiceConsent}</span>
-              <button type="button" onClick={() => { setVoiceConsent(false); void voice.start(); }}>{copy.allow}</button>
-              <button type="button" onClick={() => setVoiceConsent(false)}>{copy.cancel}</button>
-            </div>
-          ) : null}
           {error ? <p className="field-assistant-error" role="alert">{error}</p> : null}
         </form>
       </section>

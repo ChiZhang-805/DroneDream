@@ -63,6 +63,48 @@ function mockCatalog() {
 describe("Field Chatting workspace", () => {
   afterEach(() => vi.restoreAllMocks());
 
+  it("starts voice input directly without an application confirmation", async () => {
+    mockCatalog();
+    const stopTrack = vi.fn();
+    const getUserMedia = vi.fn().mockResolvedValue({
+      getTracks: () => [{ stop: stopTrack }],
+    });
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia },
+    });
+    const startRecognition = vi.fn();
+    class FakeSpeechRecognition {
+      lang = "";
+      continuous = false;
+      interimResults = false;
+      maxAlternatives = 0;
+      onresult = null;
+      onerror = null;
+      onend = null;
+      start = startRecognition;
+      stop = vi.fn();
+      abort = vi.fn();
+    }
+    Object.defineProperty(window, "SpeechRecognition", {
+      configurable: true,
+      value: FakeSpeechRecognition,
+    });
+
+    render(<FieldApp initialLocale="en" />);
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "Model" })).toBeEnabled());
+    expect(getUserMedia).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Voice input" }));
+
+    await waitFor(() => {
+      expect(getUserMedia).toHaveBeenCalledWith({ audio: true });
+      expect(startRecognition).toHaveBeenCalledTimes(1);
+    });
+    expect(stopTrack).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/Allow Windows speech input/)).not.toBeInTheDocument();
+  });
+
   it("switches the compact chat and plan panels without changing authority", async () => {
     mockCatalog();
     const { container } = render(<FieldApp initialLocale="en" />);
