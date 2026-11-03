@@ -10,7 +10,7 @@ import { registerExperimentWorkspace, updateExperimentWorkspace } from "../src/f
 import { I18nProvider } from "../src/i18n/I18nProvider";
 import { AutonomyLive, AutonomyMaps, AutonomyOverview, AutonomyPlatform } from "../src/pages/AutonomyPlatform";
 
-const mocks = vi.hoisted(() => ({ plan: vi.fn(), reconcile: vi.fn(), bindCatalog: vi.fn(), boundThread: vi.fn(), runtime: vi.fn(), setup: vi.fn(), execute: vi.fn(), sources: vi.fn(), frame: vi.fn(), telemetry: vi.fn(), owner: null as null | { id: string } }));
+const mocks = vi.hoisted(() => ({ plan: vi.fn(), reconcile: vi.fn(), bindCatalog: vi.fn(), boundThread: vi.fn(), runtime: vi.fn(), setup: vi.fn(), execute: vi.fn(), sources: vi.fn(), frame: vi.fn(), telemetry: vi.fn(), voiceStart: vi.fn(), voiceStop: vi.fn(), owner: null as null | { id: string } }));
 vi.mock("../src/features/auth/AuthContext", () => ({ useOptionalAuth: () => ({ account: mocks.owner }) }));
 vi.mock("../src/theme/EditionThemeProvider", () => ({ useEditionTheme: () => ({ id: "autonomy" }) }));
 vi.mock("../src/features/settings/ModelAccessContext", () => ({ useModelAccess: () => ({
@@ -18,7 +18,7 @@ vi.mock("../src/features/settings/ModelAccessContext", () => ({ useModelAccess: 
   profiles: [], selectAccessMode: vi.fn(), selectManagedModel: vi.fn(), selectProfile: vi.fn(),
 }) }));
 vi.mock("../src/components/AssistantModelPicker", () => ({ AssistantModelPicker: () => <span>Test model picker</span> }));
-vi.mock("../src/features/experiment/useVoiceInput", () => ({ useVoiceInput: () => ({ state: "idle", cancel: vi.fn() }) }));
+vi.mock("../src/features/experiment/useVoiceInput", () => ({ useVoiceInput: () => ({ state: "idle", supported: true, start: mocks.voiceStart, stop: mocks.voiceStop, cancel: vi.fn() }) }));
 vi.mock("../src/features/settings/cloudModelAccess", async (original) => ({
   ...await original<typeof import("../src/features/settings/cloudModelAccess")>(),
   DEFAULT_MANAGED_MODEL_CATALOG: [{ provider: "kimi", model: "kimi-test", available: true }],
@@ -123,6 +123,8 @@ beforeEach(() => {
   mocks.sources.mockReset().mockResolvedValue({ sources: [] });
   mocks.frame.mockReset().mockResolvedValue(new Blob(["test frame"], { type: "image/png" }));
   mocks.telemetry.mockReset().mockResolvedValue({ schema_version: "dronedream.live-telemetry.v1", mode: "simulation", coordinate_frame: "gazebo-enu", east_m: 2, north_m: 3, up_m: 4, updated_at_unix_ms: 1 });
+  mocks.voiceStart.mockReset();
+  mocks.voiceStop.mockReset();
 });
 
 describe("autonomy conversation persistence", () => {
@@ -281,6 +283,7 @@ describe("Chatbot to independent conversation", () => {
 
   it("uses one-line cascading mission context menus without duplicate asset links", async () => {
     renderWorkspace();
+    expect(screen.queryByRole("button", { name: "Office pickup" })).toBeNull();
     fireEvent.click(await screen.findByRole("button", { name: "Mission context" }));
     const menu = screen.getByRole("menu", { name: "Mission context" });
     expect(within(menu).getByRole("menuitem", { name: "Attach mission files" })).toBeVisible();
@@ -301,6 +304,17 @@ describe("Chatbot to independent conversation", () => {
     expect(within(menu).getByRole("menuitem", { name: "Kumpula Campus" })).toBeVisible();
     expect(within(menu).queryByRole("link", { name: "Select aircraft" })).toBeNull();
     expect(within(menu).queryByRole("link", { name: "Select map" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Plan on Kumpula Campus" }));
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value)
+      .toContain("X500 Depth on Kumpula Campus");
+  });
+
+  it("starts voice input directly without an application confirmation", async () => {
+    renderWorkspace();
+    fireEvent.click(await screen.findByRole("button", { name: "Use voice input" }));
+    expect(mocks.voiceStart).toHaveBeenCalledOnce();
+    expect(screen.queryByText("Allow and start")).toBeNull();
   });
 
   it.each(["failed", "completed"])("terminal %s state overrides an accepted start receipt", async (state) => {

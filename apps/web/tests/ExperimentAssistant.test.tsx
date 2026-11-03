@@ -307,7 +307,7 @@ describe("conversational experiment drafting", () => {
     );
   });
 
-  it("does not request microphone permission until the user clicks the voice button", async () => {
+  it("starts microphone input directly from the user's voice-button click", async () => {
     const stopTrack = vi.fn();
     const getUserMedia = vi.fn().mockResolvedValue({
       getTracks: () => [{ stop: stopTrack }],
@@ -339,11 +339,6 @@ describe("conversational experiment drafting", () => {
     expect(getUserMedia).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: "Use voice input" }));
-    expect(getUserMedia).not.toHaveBeenCalled();
-    expect(
-      screen.getByText(/browser may send microphone audio to its speech service/i),
-    ).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Allow and start" }));
 
     await waitFor(() => {
       expect(getUserMedia).toHaveBeenCalledWith({ audio: true });
@@ -418,14 +413,14 @@ describe("conversational experiment drafting", () => {
   it("inserts only a template body and keeps its heading out of the prompt", () => {
     renderAssistant();
 
-    fireEvent.click(screen.getByRole("button", { name: /Circular Track/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Horizontal Tracking/ }));
 
     const composer = screen.getByLabelText("Describe your experiment…");
     expect(composer).toHaveValue(
-      "Tune an x500 on a 5 m circular track at 3 m altitude, balancing tracking accuracy, wind robustness, and repeatable trials.",
+      "Using PX4 SITL and Gazebo on X500, tune MPC_XY_VEL_P_ACC, MPC_XY_VEL_I_ACC, MPC_XY_VEL_D_ACC, and MPC_XY_P on a circular track. Minimize RMSE and worst-case error without violating overshoot or stability constraints, then verify the final candidate on holdout trials.",
     );
     expect((composer as HTMLTextAreaElement).value).not.toContain(
-      "Circular Track",
+      "Horizontal Tracking",
     );
   });
 

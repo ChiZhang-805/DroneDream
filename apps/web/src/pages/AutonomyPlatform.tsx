@@ -213,6 +213,71 @@ function QuadcopterIcon(props: SVGProps<SVGSVGElement>) {
   </svg>;
 }
 
+type AutonomyPromptSuggestion = Readonly<{ title: string; body: string }>;
+
+function autonomyPromptSuggestions(
+  chinese: boolean,
+  aircraftName: string | null,
+  mapName: string | null,
+): readonly [AutonomyPromptSuggestion, AutonomyPromptSuggestion, AutonomyPromptSuggestion] {
+  if (aircraftName && mapName) {
+    return chinese ? [
+      {
+        title: `在${mapName}规划航线`,
+        body: `使用${aircraftName}在${mapName}执行任务。如果缺少起点或目的地，请先简短询问；信息齐全后规划满足净空的三维航线，飞行中持续监测，必要时重新规划，最后安全返航或降落。`,
+      },
+      {
+        title: "取物并返航",
+        body: `使用${aircraftName}在${mapName}完成一次取物并返航任务。优先利用当前地图语义；取物地点或物品不明确时再询问我，并在计划中检查载荷、电量、净空、取物确认和安全返程。`,
+      },
+      {
+        title: "航线变更与恢复",
+        body: `使用${aircraftName}在${mapName}执行任务，并在我中途更改目的地时先进入安全等待，保留已发生的任务事实，验证新航线后继续执行；新航线不可行时保持等待或安全返航。`,
+      },
+    ] : [
+      {
+        title: `Plan on ${mapName}`,
+        body: `Use ${aircraftName} on ${mapName}. If the start or destination is missing, ask me briefly; once the mission is clear, plan a clearance-valid 3D route, monitor the flight, replan when needed, and finish with a safe return or landing.`,
+      },
+      {
+        title: "Pickup and Return",
+        body: `Use ${aircraftName} on ${mapName} for a pickup-and-return mission. Reuse the current map context, ask only when the pickup place or item is still missing, and check payload, battery, clearance, pickup confirmation, and the safe return route in the plan.`,
+      },
+      {
+        title: "Route Change Recovery",
+        body: `Use ${aircraftName} on ${mapName}. If I change the destination during the mission, enter a safe hold, preserve completed task facts, validate a replacement route, and continue only after it is feasible; otherwise remain in hold or return safely.`,
+      },
+    ];
+  }
+  return chinese ? [
+    {
+      title: "选择已验收的资产",
+      body: "根据我的任务，只从已完成仿真配对验收的地图和无人机中选择。先利用当前上下文，只询问仍然缺少的目的地或工作内容，然后生成可审阅的三维任务计划。",
+    },
+    {
+      title: "取物并返航",
+      body: "帮我完成一次取物并返航任务。只选择已验收的地图与无人机配对；先利用地图语义，取物地点或物品仍不明确时再简短询问我。",
+    },
+    {
+      title: "区域巡检并返航",
+      body: "对我指定的区域进行巡检并返航。只使用已验收的地图、无人机和当前可用的传感器；区域或巡检目标不明确时先询问我，不要虚构地点或能力。",
+    },
+  ] : [
+    {
+      title: "Choose Qualified Assets",
+      body: "Choose only an aircraft-map pair that has completed simulation qualification for my task. Reuse the current context, ask only for a still-missing destination or job, and then produce a reviewable 3D mission plan.",
+    },
+    {
+      title: "Pickup and Return",
+      body: "Help me complete a pickup-and-return mission. Use only a qualified aircraft-map pair, reuse map semantics first, and ask me briefly if the pickup place or item is still missing.",
+    },
+    {
+      title: "Inspect and Return",
+      body: "Inspect an area I name and return safely. Use only qualified assets and currently available sensors; ask me if the area or inspection target is missing, and do not invent locations or capabilities.",
+    },
+  ];
+}
+
 type AutonomySectionId = "overview" | "aircraft" | "maps" | "plugins" | "live";
 
 const SECTION_ICONS = {
@@ -1547,8 +1612,6 @@ export function AutonomyOverview() {
   const [selectedContextAircraftId, setSelectedContextAircraftId] = useState<string | null>(null);
   const [selectedContextMapId, setSelectedContextMapId] = useState<string | null>(null);
   const [assetPairCatalog, setAssetPairCatalog] = useState<AgentCoreAssetPairCatalog>(FALLBACK_ASSET_PAIR_CATALOG);
-  const [voiceConsentPending, setVoiceConsentPending] = useState(false);
-  const [voiceConsentGranted, setVoiceConsentGranted] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [managedModels, setManagedModels] = useState(
     auth?.account
@@ -1631,20 +1694,12 @@ export function AutonomyOverview() {
     stopVoice: "停止语音输入",
     requestingVoice: "正在请求麦克风权限…",
     listening: "正在聆听…",
-    voiceConsent: "浏览器可能使用语音服务转写麦克风音频；音频不会写入任务合同。",
-    startVoice: "允许并开始",
-    cancelVoice: "取消",
     voiceUnavailable: "当前环境无法使用语音输入，你仍可继续输入文字。",
     tooLong: "任务描述不能超过 2,000 个字符。",
     modelUnavailable: "请先选择可用于任务规划的模型。",
     modelFallback: "模型推理暂时不可用；系统已使用确定性安全编译器生成可审阅计划。",
     followUpPlaceholder: "继续补充地点、载荷、路线或安全要求…",
     deterministicPlanReply: "我已根据当前绑定的无人机、地图和安全约束生成可审阅的任务计划。你可以继续提出修改，我会在同一对话中更新任务合同与执行任务树。",
-    examples: [
-      { title: "办公室取物", body: "从办公室起飞，避开走廊和楼梯中的人员，前往取物点，确认载荷后安全返航。" },
-      { title: "视觉巡检", body: "沿指定区域自主巡检，使用实时视觉识别目标与动态障碍，并报告每个检查点的进度。" },
-      { title: "未知环境探索", body: "只给定起点和终点，边飞行边建立局部地图，规划安全航迹并在环境变化时实时重规划。" },
-    ],
   } : {
     question: "What should your drone do?",
     placeholder: "Describe the goal, waypoints, environment, and work to complete…",
@@ -1676,20 +1731,12 @@ export function AutonomyOverview() {
     stopVoice: "Stop voice input",
     requestingVoice: "Requesting microphone access…",
     listening: "Listening…",
-    voiceConsent: "Your browser may use a speech service to transcribe microphone audio. Audio is not written to the mission contract.",
-    startVoice: "Allow and start",
-    cancelVoice: "Cancel",
     voiceUnavailable: "Voice input is unavailable here. You can keep typing.",
     tooLong: "The mission description must stay within 2,000 characters.",
     modelUnavailable: "Choose an available planning model before continuing.",
     modelFallback: "Model reasoning was unavailable; the deterministic safety compiler generated a reviewable plan.",
     followUpPlaceholder: "Add a location, payload, route, or safety requirement…",
     deterministicPlanReply: "I generated a reviewable mission plan from the bound aircraft, map, and safety constraints. Continue with any changes and I will update the mission contract and execution graph in this conversation.",
-    examples: [
-      { title: "Office pickup", body: "Take off from the office, avoid people in the corridor and stairwell, collect the payload, and return safely." },
-      { title: "Visual inspection", body: "Inspect the assigned area with live vision, track dynamic obstacles, and report progress at every checkpoint." },
-      { title: "Unknown environment", body: "Use only the start and goal, build a local map in flight, plan a safe route, and replan as the world changes." },
-    ],
   };
   const availableMapCatalog = useMemo(() => ({ ...assetPairCatalog, pairs: assetPairCatalog.pairs.filter(pair => {
     const assetId = pair.qualified_map_asset_id ?? (pair.map_resource_id === "dronedream-school-map" ? "dronedream.school-map.v1" : pair.map_resource_id);
@@ -1707,6 +1754,11 @@ export function AutonomyOverview() {
   );
   const selectedAircraftChoice = allAircraftChoices.find((choice) => choice.resourceId === selectedContextAircraftId) ?? null;
   const selectedMapChoice = allMapChoices.find((choice) => choice.resourceId === selectedContextMapId) ?? null;
+  const promptSuggestions = useMemo(() => autonomyPromptSuggestions(
+    chinese,
+    selectedAircraftChoice?.name[chinese ? "zh-CN" : "en-US"] ?? null,
+    selectedMapChoice?.name[chinese ? "zh-CN" : "en-US"] ?? null,
+  ), [chinese, selectedAircraftChoice, selectedMapChoice]);
   const contextSelectionComplete = (!selectedContextMapId && !selectedContextAircraftId)
     || isMissionReadyPair(selectedPair(availableMapCatalog, selectedContextMapId, selectedContextAircraftId));
   useEffect(() => {
@@ -2211,7 +2263,7 @@ export function AutonomyOverview() {
             </div>
             <h2>{copy.question}</h2>
             <div className="assistant-examples autonomy-command-examples">
-              {copy.examples.map((example, index) => (
+              {promptSuggestions.map((example, index) => (
                 <button
                   type="button"
                   key={example.title}
@@ -2428,14 +2480,6 @@ export function AutonomyOverview() {
                   voice.stop();
                   return;
                 }
-                if (!voice.supported) {
-                  void voice.start();
-                  return;
-                }
-                if (!voiceConsentGranted) {
-                  setVoiceConsentPending(true);
-                  return;
-                }
                 void voice.start();
               }}
             >
@@ -2451,17 +2495,6 @@ export function AutonomyOverview() {
               <ArrowUp aria-hidden="true" strokeWidth={2} />
             </button>
           </div>
-          {voiceConsentPending ? (
-            <div className="assistant-voice-consent" role="note">
-              <p>{copy.voiceConsent}</p>
-              <button type="button" className="btn btn-primary" onClick={() => {
-                setVoiceConsentPending(false);
-                setVoiceConsentGranted(true);
-                void voice.start();
-              }}>{copy.startVoice}</button>
-              <button type="button" className="btn" onClick={() => setVoiceConsentPending(false)}>{copy.cancelVoice}</button>
-            </div>
-          ) : null}
           {voiceStatus ? <p className="assistant-composer-status">{voiceStatus}</p> : null}
           {error || workspace.mission.planningError ? <p className="assistant-composer-error" role="alert">{error || workspace.mission.planningError}</p> : null}
         </form>

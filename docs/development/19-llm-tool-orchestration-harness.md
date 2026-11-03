@@ -6809,9 +6809,9 @@ The microphone is an optional input method for the same text composer:
 - raw audio is not persisted, attached to the draft, logged, or used to start a Job;
 - denial, missing device, timeout, unsupported recognition, and transcription failure
   return to ordinary typing without losing the draft;
-- the interface states whether transcription is on-device or sent to a named service
-  before recording begins; it never calls a browser recognition service without that
-  disclosure.
+- product privacy documentation identifies whether transcription is on-device or sent
+  to a named service; the composer does not add an application confirmation between the
+  user's microphone click and the operating-system/browser permission request.
 
 `SpeechRecognition` is not a portable production foundation. Microsoft documents that
 the stable Edge implementation can use Azure Cognitive Services and that captured
@@ -6819,8 +6819,8 @@ audio leaves the device; an enterprise policy can disable the API. The new on-de
 Edge recognition path cannot be a DroneDream 1.0.0 prerequisite because Microsoft's
 current instructions require Edge Canary or Dev 150 or newer plus an explicit feature
 flag. The implementation may therefore use Web Speech only as a capability-detected
-convenience path, with a named-service disclosure and positive confirmation before
-permission is requested. The reliable future desktop path records a bounded audio
+convenience path, with a named-service disclosure in product privacy documentation and
+the normal operating-system/browser permission boundary. The reliable future desktop path records a bounded audio
 stream after `getUserMedia({audio:true})` permission and sends it through a separately
 configured transcription profile; the app must not silently reuse the
 experiment-reasoning model or credential for transcription. WebView2 represents
@@ -7985,9 +7985,9 @@ already exists:
 - the default application route is the shared-draft conversation authoring page, while
   manual five-step creation remains available as an equal path;
 - the current voice convenience path calls no microphone API before a first explicit
-  click, names the possible WebView2/Microsoft remote transcription before a second
-  confirmation, stops its permission probe immediately, caps recognition at sixty
-  seconds, aborts on unmount, and leaves the transcript editable before send; it is
+  click, requests the normal WebView2/browser permission directly without a second
+  application confirmation, stops its permission probe immediately, caps recognition at
+  sixty seconds, aborts on unmount, and leaves the transcript editable before send; it is
   capability-detected and typing remains the fallback, so it is not yet the separate
   production transcription profile defined above; and
 - an assistant-route `404` from an older Runtime is translated only after an explicit

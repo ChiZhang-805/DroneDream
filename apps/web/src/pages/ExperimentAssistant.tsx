@@ -5,7 +5,6 @@ import {
   useState,
   type ChangeEvent,
   type FormEvent,
-  type PointerEvent as ReactPointerEvent,
 } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -37,7 +36,6 @@ import {
 
 import { apiClient, ApiClientError } from "../api/client";
 import { openAppSettings } from "../appSettings";
-import { isDesktopRuntime } from "../desktop/bridge";
 import {
   applyAssistantTurn,
   assistantCurrentParameters,
@@ -141,13 +139,6 @@ const COPY = {
     stopVoice: "Stop voice input",
     requestingVoice: "Requesting microphone access…",
     listening: "Listening…",
-    voiceConsentDesktop:
-      "Windows WebView2 may send microphone audio to Microsoft for speech transcription. Audio is not added to the experiment draft.",
-    voiceConsentWeb:
-      "Your browser may send microphone audio to its speech service for transcription. Audio is not added to the experiment draft.",
-    allowVoice: "Allow",
-    startVoice: "Allow and start",
-    cancelVoice: "Cancel",
     voiceUnsupported: "Voice input is unavailable here. You can keep typing.",
     voiceDenied: "Microphone access was not granted. You can keep typing.",
     voiceFailed: "Voice recognition stopped. You can keep typing.",
@@ -173,16 +164,16 @@ const COPY = {
       "Clear this conversation and discard its current experiment draft?",
     examples: [
       {
-        title: "Circular Track",
-        body: "Tune an x500 on a 5 m circular track at 3 m altitude, balancing tracking accuracy, wind robustness, and repeatable trials.",
+        title: "Hover Thrust",
+        body: "Using PX4 SITL and Gazebo on X500, tune MPC_THR_HOVER and the related thrust-authority parameters within the catalog safe bounds. Compare repeatable nominal and crosswind hover trials, then validate the final candidate on holdout seeds.",
       },
       {
-        title: "Wind Robustness",
-        body: "Build a robust windy experiment, compare trusted optimizers within 220 trials, and verify the best parameters.",
+        title: "Horizontal Tracking",
+        body: "Using PX4 SITL and Gazebo on X500, tune MPC_XY_VEL_P_ACC, MPC_XY_VEL_I_ACC, MPC_XY_VEL_D_ACC, and MPC_XY_P on a circular track. Minimize RMSE and worst-case error without violating overshoot or stability constraints, then verify the final candidate on holdout trials.",
       },
       {
-        title: "Harness Decisions",
-        body: "Use real PX4/Gazebo, tune horizontal control parameters, and let the Harness select tools from each evidence update.",
+        title: "Altitude Tracking",
+        body: "Using PX4 SITL and Gazebo on X500, tune MPC_Z_VEL_P_ACC, MPC_Z_VEL_I_ACC, MPC_Z_VEL_D_ACC, and MPC_Z_P. Evaluate climb, descent, and altitude hold in nominal and wind cases, then validate the final candidate on holdout seeds.",
       },
     ],
   },
@@ -215,13 +206,6 @@ const COPY = {
     stopVoice: "停止语音输入",
     requestingVoice: "正在请求麦克风权限…",
     listening: "正在聆听…",
-    voiceConsentDesktop:
-      "Windows WebView2 可能将麦克风音频发送给 Microsoft 完成语音转写，原始音频不会写入实验草稿。",
-    voiceConsentWeb:
-      "浏览器可能将麦克风音频发送给其语音服务完成转写，原始音频不会写入实验草稿。",
-    allowVoice: "允许",
-    startVoice: "允许并开始",
-    cancelVoice: "取消",
     voiceUnsupported: "当前环境不支持语音输入，你仍可继续打字。",
     voiceDenied: "未获得麦克风权限，你仍可继续打字。",
     voiceFailed: "语音识别已停止，你仍可继续打字。",
@@ -244,16 +228,16 @@ const COPY = {
     confirmClear: "确定清空这段对话并丢弃当前实验草稿吗？",
     examples: [
       {
-        title: "圆形航迹调优",
-        body: "让 x500 在 3 米高度沿半径 5 米的圆形轨迹飞行，并重点改善跟踪精度与抗风稳定性。",
+        title: "悬停推力调优",
+        body: "使用 X500、PX4 SITL 和 Gazebo，在参数目录的安全边界内调优 MPC_THR_HOVER 及相关推力控制参数。比较可重复的无风与侧风悬停场景，再用保留种子验证最终候选。",
       },
       {
-        title: "抗风鲁棒验证",
-        body: "创建强调鲁棒性的有风场景，在 220 次预算内比较优化工具并复验最佳参数组合。",
+        title: "水平航迹跟踪",
+        body: "使用 X500、PX4 SITL 和 Gazebo，在圆形航迹上调优 MPC_XY_VEL_P_ACC、MPC_XY_VEL_I_ACC、MPC_XY_VEL_D_ACC 和 MPC_XY_P。在不违反超调和稳定性约束的前提下降低 RMSE 与最坏误差，再完成保留场景验证。",
       },
       {
-        title: "智能工具决策",
-        body: "使用真实 PX4/Gazebo 调优水平控制参数，由 Harness 根据每轮证据选择算法。",
+        title: "高度跟踪",
+        body: "使用 X500、PX4 SITL 和 Gazebo，调优 MPC_Z_VEL_P_ACC、MPC_Z_VEL_I_ACC、MPC_Z_VEL_D_ACC 和 MPC_Z_P。评估爬升、下降和定高在无风与有风场景中的表现，再用保留种子验证最终候选。",
       },
     ],
   },
@@ -270,20 +254,7 @@ const EDITION_ASSISTANT_COPY: Record<BrandEditionId, EditionAssistantCopy> = {
   universal: {
     title: "What should DroneDream optimize with you?",
     openDraft: "Open optimization draft",
-    examples: [
-      {
-        title: "Tune Hover Stability",
-        body: "Tune the x500 hover controller with bounded parameter ranges, repeatable wind trials, and a validated final candidate.",
-      },
-      {
-        title: "Reduce Tracking Error",
-        body: "Optimize horizontal tracking parameters and let the Harness select algorithms from each round of simulation evidence.",
-      },
-      {
-        title: "Plan an Agent Mission",
-        body: "Switch to an Agent mission for a short campus delivery with route planning, live monitoring, and safe replanning.",
-      },
-    ],
+    examples: COPY.en.examples,
   },
   sim: {
     title: COPY.en.title,
@@ -331,16 +302,16 @@ const EDITION_ASSISTANT_COPY: Record<BrandEditionId, EditionAssistantCopy> = {
     openDraft: "Open mission workspace",
     examples: [
       {
-        title: "Campus Delivery",
-        body: "Plan a safe office-to-campus-gate round trip with explicit map, aircraft, payload, hold, replanning, and return-home requirements.",
+        title: "Choose Qualified Assets",
+        body: "Use only an aircraft-map pair that has completed simulation qualification. Reuse the current context, ask only for missing mission details, and then prepare a reviewable 3D plan.",
       },
       {
-        title: "Inspection Mission",
-        body: "Create a structured inspection plan that selects observation points, checks clearance and battery limits, and records acceptance evidence.",
+        title: "Pickup and Return",
+        body: "Prepare a pickup-and-return mission with qualified assets. Ask for the pickup place or item only if it is still missing, and check payload, battery, clearance, pickup confirmation, and the return route.",
       },
       {
-        title: "Live Route Change",
-        body: "Prepare an autonomous mission that enters a safe hold immediately when the operator changes the destination, then validates and adopts a replacement route.",
+        title: "Route Change Recovery",
+        body: "Prepare a mission that enters a safe hold when the destination changes, preserves completed task facts, validates a replacement route, and continues only when that route is feasible.",
       },
     ],
   },
@@ -641,8 +612,6 @@ export function ExperimentAssistant() {
   const [pending, setPending] = useState(false);
   const [runStage, setRunStage] = useState<AssistantRunStage | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [voiceConsentIntent, setVoiceConsentIntent] = useState<"toggle" | "hold" | null>(null);
-  const [voiceConsentGranted, setVoiceConsentGranted] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(false);
   const [selectedTaskType, setSelectedTaskType] = useState<AssistantTaskType | null>(() =>
     editionTheme.id === "autonomy" ? "mission_autonomy" : "control_tuning",
@@ -657,9 +626,6 @@ export function ExperimentAssistant() {
   const restoredWorkspaceRef = useRef<string | null>(null);
   const actionMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const voiceHoldTimerRef = useRef<number | null>(null);
-  const voiceHoldActiveRef = useRef(false);
-  const suppressVoiceClickRef = useRef(false);
 
   useEffect(() => {
     if (docsPreview) {
@@ -729,11 +695,6 @@ export function ExperimentAssistant() {
     continuous: true,
     maxDurationMs: 5 * 60_000,
   });
-  useEffect(() => () => {
-    if (voiceHoldTimerRef.current !== null) {
-      window.clearTimeout(voiceHoldTimerRef.current);
-    }
-  }, []);
   const messages = draft.conversation.messages;
   const taskOptions = assistantTaskOptions(editionTheme.id, interfaceLocale);
   const selectedTask = taskOptions.find(({ id }) => id === selectedTaskType) ?? null;
@@ -1070,58 +1031,12 @@ export function ExperimentAssistant() {
     setComposer(example);
   }
 
-  function requestVoiceStart(intent: "toggle" | "hold"): void {
-    if (!voice.supported) {
-      void voice.start();
-      return;
-    }
-    if (!voiceConsentGranted) {
-      setVoiceConsentIntent(intent);
-      return;
-    }
-    void voice.start();
-  }
-
   function toggleVoiceInput(): void {
     if (voice.state === "listening" || voice.state === "requesting") {
       voice.stop();
       return;
     }
-    requestVoiceStart("toggle");
-  }
-
-  function beginVoiceHold(event: ReactPointerEvent<HTMLButtonElement>): void {
-    if (event.pointerType === "mouse" && event.button !== 0) return;
-    if (voice.state === "listening" || voice.state === "requesting") return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    if (voiceHoldTimerRef.current !== null) {
-      window.clearTimeout(voiceHoldTimerRef.current);
-    }
-    voiceHoldActiveRef.current = false;
-    voiceHoldTimerRef.current = window.setTimeout(() => {
-      voiceHoldTimerRef.current = null;
-      voiceHoldActiveRef.current = true;
-      requestVoiceStart("hold");
-    }, 420);
-  }
-
-  function endVoiceHold(
-    event: ReactPointerEvent<HTMLButtonElement>,
-    cancelled = false,
-  ): void {
-    if (voiceHoldTimerRef.current !== null) {
-      window.clearTimeout(voiceHoldTimerRef.current);
-      voiceHoldTimerRef.current = null;
-    }
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    }
-    if (!voiceHoldActiveRef.current) return;
-    voiceHoldActiveRef.current = false;
-    suppressVoiceClickRef.current = !cancelled;
-    if (voice.state === "requesting" || voice.state === "listening") {
-      voice.stop();
-    }
+    void voice.start();
   }
 
   const voiceButtonLabel =
@@ -1132,9 +1047,6 @@ export function ExperimentAssistant() {
         : voice.state === "error"
           ? voiceMessage(voice.error, copy) ?? copy.microphone
           : copy.microphone;
-  const voiceConsentCopy = isDesktopRuntime()
-    ? copy.voiceConsentDesktop
-    : copy.voiceConsentWeb;
   const configuredLabels = latest
     ? acceptedFieldLabels(latest, locale)
     : [];
@@ -1446,17 +1358,7 @@ export function ExperimentAssistant() {
             aria-label={voiceButtonLabel}
             aria-pressed={voice.state === "listening"}
             title={voiceButtonLabel}
-            onPointerDown={beginVoiceHold}
-            onPointerUp={(event) => endVoiceHold(event)}
-            onPointerCancel={(event) => endVoiceHold(event, true)}
-            onContextMenu={(event) => event.preventDefault()}
-            onClick={() => {
-              if (suppressVoiceClickRef.current) {
-                suppressVoiceClickRef.current = false;
-                return;
-              }
-              toggleVoiceInput();
-            }}
+            onClick={toggleVoiceInput}
           >
             {voice.state === "requesting" ? (
               <LoaderCircle aria-hidden="true" strokeWidth={1.9} />
@@ -1478,30 +1380,6 @@ export function ExperimentAssistant() {
             <ArrowUp aria-hidden="true" strokeWidth={2} />
           </button>
         </div>
-        {voiceConsentIntent ? (
-          <div className="assistant-voice-consent" role="note">
-            <p>{voiceConsentCopy}</p>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => {
-                const shouldStart = voiceConsentIntent === "toggle";
-                setVoiceConsentIntent(null);
-                setVoiceConsentGranted(true);
-                if (shouldStart) void voice.start();
-              }}
-            >
-              {voiceConsentIntent === "toggle" ? copy.startVoice : copy.allowVoice}
-            </button>
-            <button
-              type="button"
-              className="btn"
-              onClick={() => setVoiceConsentIntent(null)}
-            >
-              {copy.cancelVoice}
-            </button>
-          </div>
-        ) : null}
         {error ? (
           <p className="assistant-composer-error" role="alert">
             {error}
