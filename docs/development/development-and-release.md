@@ -107,6 +107,10 @@ Go to the building where the computer science labs are and collect the package.
 
 这五条资格证明的是各自正式地图包、X500 Depth 精确包和对应代表性路线的物理可执行性，不等于 411 个建筑交接点、任意自然语言任务或全部动态障碍条件均已逐点飞行验证。
 
+2026-11-04 扩展六机型×六地图复核使用同样的真实 PX4 SITL、Gazebo Harmonic、实际机型 SDF、地图碰撞、遥测、返航和落地门槛。X500 Depth、X500 Front LiDAR、X500 Gimbal、Standard VTOL 均为 6/6，当前正式包共 24/36 个精确配对实飞通过并写入发布索引。Quadtailsitter 只在简化、非发布 Kumpula 候选上往返通过，不能继承给正式地图，且当前机型包没有任务感知来源；其余五图未满足返航门槛，Meilahti 另有危险碰撞。Tiltrotor 的 Vuosaari 基线未离地，其他五图未重复。机器可读总表在 `TestRuns/aircraft-map-matrix/matrix-summary.json`。
+
+本轮物理运行均明确记录 `natural_language_acceptance: false`。另用自然、略含糊的 `Go have a look near the Chemicum handoff and come back.` 调用真实规划链；插件隔离器和精确资产已进入运行，但 DroneDream 专用 DeepSeek 账户返回 HTTP 402，因此自然语言验收为阻塞而不是通过。不得用单元测试、确定性路线或其他项目的 Key 补写成功结论。
+
 这些证据支持当前 Kumpula 室外地图、X500 Depth、指定取送往返和已验证语言流程。它们不证明任意地图、室内走廊、动态人群、真实载荷、持续模型短时驾驶、硬件在环或真机已经通用可用。
 
 ## 6. 失败—修复—复验循环

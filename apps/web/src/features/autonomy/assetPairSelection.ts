@@ -57,18 +57,43 @@ const QUALIFIED_MAP_ASSET_IDS: Record<string, string> = {
 };
 
 const QUALIFICATION_IDS: Record<string, string> = {
-  "dronedream-school-map": "asset-qualification-e6b4e5d8d596851ee549d46a",
-  "dronedream-meilahti-hospital-map": "asset-qualification-6fb9cd6b77569fecb298c000",
-  "dronedream-kalasatama-waterfront-map": "asset-qualification-d2fb2947d03555333fc64ac4",
-  "dronedream-vuosaari-harbour-map": "asset-qualification-94994abb257e999e2f0805f6",
-  "dronedream-suomenlinna-map": "asset-qualification-49de1e9af06907248637e4be",
-  "dronedream-uutela-coastal-forest-map": "asset-qualification-23d9556be930ad2c8f3a4ce0",
+  "dronedream-school-map::px4-x500-depth": "asset-qualification-e6b4e5d8d596851ee549d46a",
+  "dronedream-school-map::px4-x500-lidar-front": "asset-qualification-c2530cfa922c9c29ee12f31f",
+  "dronedream-school-map::px4-x500-gimbal": "asset-qualification-08b97c5d290c35ef0270b265",
+  "dronedream-school-map::px4-standard-vtol": "asset-qualification-c09f82f7c90406604c5c3c1a",
+  "dronedream-meilahti-hospital-map::px4-x500-depth": "asset-qualification-6fb9cd6b77569fecb298c000",
+  "dronedream-meilahti-hospital-map::px4-x500-lidar-front": "asset-qualification-4ae75ac68327ba080dcc4a58",
+  "dronedream-meilahti-hospital-map::px4-x500-gimbal": "asset-qualification-9002f03b65a566fc7b808797",
+  "dronedream-meilahti-hospital-map::px4-standard-vtol": "asset-qualification-da07175de8153218eba99d51",
+  "dronedream-kalasatama-waterfront-map::px4-x500-depth": "asset-qualification-d2fb2947d03555333fc64ac4",
+  "dronedream-kalasatama-waterfront-map::px4-x500-lidar-front": "asset-qualification-13601718b345a7a23d44078c",
+  "dronedream-kalasatama-waterfront-map::px4-x500-gimbal": "asset-qualification-32847dfe7fd8412ad7743056",
+  "dronedream-kalasatama-waterfront-map::px4-standard-vtol": "asset-qualification-572ca435e901ce3f36650aa0",
+  "dronedream-vuosaari-harbour-map::px4-x500-depth": "asset-qualification-94994abb257e999e2f0805f6",
+  "dronedream-vuosaari-harbour-map::px4-x500-lidar-front": "asset-qualification-52a2e3eaf1c480b2073c5e59",
+  "dronedream-vuosaari-harbour-map::px4-x500-gimbal": "asset-qualification-c9f836104ffb2d326e681006",
+  "dronedream-vuosaari-harbour-map::px4-standard-vtol": "asset-qualification-fa690ccfacd75c5c9e137b97",
+  "dronedream-suomenlinna-map::px4-x500-depth": "asset-qualification-49de1e9af06907248637e4be",
+  "dronedream-suomenlinna-map::px4-x500-lidar-front": "asset-qualification-68960df62ecefafa71d95718",
+  "dronedream-suomenlinna-map::px4-x500-gimbal": "asset-qualification-1657d42dae17e60b699b65b4",
+  "dronedream-suomenlinna-map::px4-standard-vtol": "asset-qualification-976368484eaec9caaa675dbf",
+  "dronedream-uutela-coastal-forest-map::px4-x500-depth": "asset-qualification-23d9556be930ad2c8f3a4ce0",
+  "dronedream-uutela-coastal-forest-map::px4-x500-lidar-front": "asset-qualification-e70183b83c1fb286db869a22",
+  "dronedream-uutela-coastal-forest-map::px4-x500-gimbal": "asset-qualification-cf73ae68d2b91cf4d6b7f21a",
+  "dronedream-uutela-coastal-forest-map::px4-standard-vtol": "asset-qualification-0fcedc4ca736c8a730e785c9",
+};
+
+const QUALIFIED_VEHICLE_ASSET_IDS: Record<string, string> = {
+  "px4-x500-depth": "dronedream.my-drone.v1",
+  "px4-x500-lidar-front": "x500-lidar-front",
+  "px4-x500-gimbal": "x500-gimbal",
+  "px4-standard-vtol": "standard-vtol",
 };
 
 function fallbackPair(map: (typeof MAPS)[number], vehicle: (typeof VEHICLES)[number]): AgentCoreAssetPairCatalogEntry {
-  const qualifiedVtol = map.resourceId === "dronedream-vuosaari-harbour-map"
-    && vehicle.resourceId === "px4-standard-vtol";
-  const qualified = vehicle.resourceId === "px4-x500-depth" || qualifiedVtol;
+  const pairId = `${map.resourceId}::${vehicle.resourceId}`;
+  const qualificationId = QUALIFICATION_IDS[pairId];
+  const qualified = Boolean(qualificationId);
   const compatible = vehicle.vehicleClass !== "vtol" || OUTDOOR_VTOL_MAPS.has(map.resourceId);
   const status = qualified ? "qualified_builtin" as const
     : compatible ? "compatible_requires_qualification" as const : "incompatible" as const;
@@ -83,10 +108,9 @@ function fallbackPair(map: (typeof MAPS)[number], vehicle: (typeof VEHICLES)[num
     vehicle_class: vehicle.vehicleClass,
     status,
     compatible,
-    qualification_id: qualifiedVtol ? "asset-qualification-fa690ccfacd75c5c9e137b97"
-      : qualified ? QUALIFICATION_IDS[map.resourceId] : null,
+    qualification_id: qualificationId ?? null,
     qualified_map_asset_id: qualified ? QUALIFIED_MAP_ASSET_IDS[map.resourceId] : null,
-    qualified_vehicle_asset_id: qualifiedVtol ? "standard-vtol" : qualified ? "dronedream.my-drone.v1" : null,
+    qualified_vehicle_asset_id: qualified ? QUALIFIED_VEHICLE_ASSET_IDS[vehicle.resourceId] : null,
     qualification_scope: qualified ? "exact_builtin_normalized_package" : null,
     reasons: [],
     required_gates: status === "compatible_requires_qualification" ? ["aircraft_map_pair_qualification"] : [],

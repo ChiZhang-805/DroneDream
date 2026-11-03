@@ -14,10 +14,72 @@ import time
 import zipfile
 from pathlib import Path
 from typing import Any
+from xml.etree import ElementTree
 
 import school_map_px4_mission as support
 
 from app.autonomy.px4_standard_vtol_vehicle import export_standard_vtol_gazebo_artifact
+
+# These profiles bind the exact model and PX4 airframe shipped by the pinned
+# Runtime.  Collision envelopes are conservative circles around the resolved
+# SDF collision geometry, expressed in Gazebo's model frame.  They are inputs
+# to route clearance and post-flight collision checks, not marketing specs.
+VEHICLE_PROFILES: dict[str, dict[str, Any]] = {
+    "x500-depth": {
+        "source_model": "x500_depth",
+        "autopilot_model": "x500",
+        "autostart": "4001",
+        "body_radius_m": 0.38,
+        "body_height_m": 0.43,
+        "collision_center_offset_model_m": {"x": 0.0, "y": 0.0, "z": 0.228},
+        "model_root_to_contact_m": 0.013,
+    },
+    "x500-lidar-front": {
+        "source_model": "x500_lidar_front",
+        "autopilot_model": "x500_lidar_front",
+        "autostart": "4017",
+        "body_radius_m": 0.38,
+        "body_height_m": 0.288,
+        "collision_center_offset_model_m": {"x": 0.0, "y": 0.0, "z": 0.157},
+        "model_root_to_contact_m": 0.013,
+    },
+    "x500-gimbal": {
+        "source_model": "x500_gimbal",
+        "autopilot_model": "x500_gimbal",
+        "autostart": "4019",
+        "body_radius_m": 0.38,
+        "body_height_m": 0.288,
+        "collision_center_offset_model_m": {"x": 0.0, "y": 0.0, "z": 0.157},
+        "model_root_to_contact_m": 0.013,
+    },
+    "standard-vtol": {
+        "source_model": "standard_vtol",
+        "autopilot_model": "standard_vtol",
+        "autostart": "4004",
+        "body_radius_m": 1.2,
+        "body_height_m": 0.5,
+        "collision_center_offset_model_m": {"x": 0.0, "y": 0.0, "z": 0.3},
+        "model_root_to_contact_m": 0.151,
+    },
+    "tiltrotor": {
+        "source_model": "tiltrotor",
+        "autopilot_model": "tiltrotor",
+        "autostart": "4020",
+        "body_radius_m": 1.2,
+        "body_height_m": 0.178,
+        "collision_center_offset_model_m": {"x": 0.0, "y": 0.0, "z": 0.230},
+        "model_root_to_contact_m": 0.141,
+    },
+    "quadtailsitter": {
+        "source_model": "quadtailsitter",
+        "autopilot_model": "quadtailsitter",
+        "autostart": "4018",
+        "body_radius_m": 0.42,
+        "body_height_m": 0.287,
+        "collision_center_offset_model_m": {"x": 0.0, "y": 0.0, "z": 0.343},
+        "model_root_to_contact_m": 0.2,
+    },
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -26,9 +88,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-dir", required=True, type=Path)
     parser.add_argument("--px4-root", type=Path, default=Path("/opt/PX4-Autopilot"))
     parser.add_argument("--vehicle-package", type=Path)
-    parser.add_argument(
-        "--vehicle-model", choices=("x500-depth", "standard-vtol"), default="x500-depth"
-    )
+    parser.add_argument("--vehicle-model", choices=tuple(VEHICLE_PROFILES), default="x500-depth")
     parser.add_argument("--velocity-m-s", type=float, default=5.0)
     parser.add_argument("--cruise-altitude-m", type=float, default=8.0)
     return parser.parse_args()
@@ -74,12 +134,47 @@ def shortest_path(graph: dict[str, Any], start: str, goal: str) -> list[str]:
     return path
 
 
+def named_node(graph: dict[str, Any], aliases: tuple[str, ...], label: str) -> str:
+    """Resolve one canonical mission endpoint without guessing a location."""
+
+    named = graph["named_entities"]
+    for alias in aliases:
+        node_id = named.get(alias)
+        if isinstance(node_id, str) and node_id:
+            return node_id
+    raise ValueError(f"map has no reviewed {label} alias")
+
+
 def vehicle_contract(package: Path) -> dict[str, Any]:
     with zipfile.ZipFile(package) as bundle:
         value = json.loads(bundle.read("normalized/vehicle/vehicle.json"))
     if value.get("asset_id") != "dronedream.my-drone.v1":
         raise ValueError("qualification requires the bundled My Drone vehicle contract")
     return value
+
+
+def export_runtime_vehicle(output_directory: Path, source_model: str) -> None:
+    """Create a product-owned wrapper around one pinned PX4 Gazebo model."""
+
+    output_directory.mkdir(parents=True, exist_ok=True)
+    sdf = ElementTree.Element("sdf", {"version": "1.10"})
+    model = ElementTree.SubElement(sdf, "model", {"name": "my_drone"})
+    include = ElementTree.SubElement(model, "include", {"merge": "true"})
+    ElementTree.SubElement(include, "uri").text = f"model://{source_model}"
+    ElementTree.indent(sdf, space="  ")
+    (output_directory / "model.sdf").write_text(
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        + ElementTree.tostring(sdf, encoding="unicode")
+        + "\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    (output_directory / "model.config").write_text(
+        '<?xml version="1.0"?>\n<model><name>DroneDream qualification vehicle</name>'
+        '<version>1.0.0</version><sdf version="1.10">model.sdf</sdf></model>\n',
+        encoding="utf-8",
+        newline="\n",
+    )
 
 
 def grounded_model_root(
@@ -125,10 +220,20 @@ def route_contract(
 ) -> tuple[dict[str, Any], dict[str, Any], tuple[float, float, float], list[dict[str, Any]]]:
     graph = json.loads((map_root / "navigation-graph.json").read_text(encoding="utf-8"))
     semantic = json.loads((map_root / "gazebo" / "semantic.json").read_text(encoding="utf-8"))
-    start_id = graph["named_entities"]["launch"]
-    goal_id = graph["named_entities"]["outdoor_handoff"]
+    start_id = named_node(
+        graph,
+        ("launch", "launch-pad", "campus-south-launch-pad"),
+        "launch",
+    )
+    goal_id = named_node(
+        graph,
+        ("outdoor_handoff", "takeout-pickup", "chemicum-south-handoff-point"),
+        "outdoor handoff",
+    )
     nodes = {entry["node_id"]: entry for entry in graph["nodes"]}
-    from dronedream_agent_core.contracts import MapAsset, RouteQuery, Vector3
+    nodes[start_id]["position_m"]["z"] = altitude_m
+    nodes[goal_id]["position_m"]["z"] = altitude_m
+    from dronedream_agent_core.contracts import MapAsset, RouteQuery
     from dronedream_agent_core.known_map_planner import KnownMapMetricPlanner, MetricPlannerPolicy
 
     planner = KnownMapMetricPlanner(
@@ -136,13 +241,22 @@ def route_contract(
         semantic_path=map_root / "gazebo" / "semantic.json",
         vehicle_diameter_m=vehicle["body_radius_m"] * 2,
         vehicle_height_m=vehicle["body_height_m"],
-        policy=MetricPlannerPolicy(required_clearance_m=0.8),
+        policy=MetricPlannerPolicy(
+            resolution_m=0.6,
+            # Give the grid planner enough margin that the later 5 cm continuous
+            # proof still retains the product's 0.8 m operational clearance.
+            required_clearance_m=0.85,
+            maximum_expansions=2_000_000,
+            maximum_search_seconds=180.0,
+            allow_semantic_endpoint_projection=True,
+            maximum_semantic_endpoint_projection_m=2.5,
+        ),
     )
-    outward = planner.plan_positions(
-        RouteQuery(start_node=start_id, goal_node=goal_id),
-        start_position_m=Vector3(**{**nodes[start_id]["position_m"], "z": altitude_m}),
-        goal_position_m=Vector3(**{**nodes[goal_id]["position_m"], "z": altitude_m}),
-    )
+    query = RouteQuery(start_node=start_id, goal_node=goal_id)
+    # Use the product planner entry point so an imprecise semantic destination
+    # may resolve to a nearby safe action pose. The qualified launch binding
+    # remains exact and therefore still proves a real return-to-launch mission.
+    outward = planner.plan(query)
     outward_ids = outward.node_ids
     root = grounded_model_root(semantic, vehicle)
     offset_value = vehicle["collision_center_offset_model_m"]
@@ -259,21 +373,14 @@ def main() -> int:
     px4_root = args.px4_root.resolve()
     run_dir.mkdir(parents=True, exist_ok=False)
     semantic = json.loads((map_root / "gazebo" / "semantic.json").read_text(encoding="utf-8"))
-    if args.vehicle_model == "standard-vtol":
-        # Geometry envelope includes the full wing, camera and attached parcel.
-        # These dimensions are candidate inputs, not measured flight capability.
-        vehicle = {
-            "body_radius_m": 1.2,
-            "body_height_m": 0.5,
-            "collision_center_offset_model_m": {"x": 0.0, "y": 0.0, "z": 0.3},
-            "model_root_to_contact_m": 0.151,
-        }
-        autopilot_model, autostart = "standard_vtol", "4004"
-    else:
+    profile = VEHICLE_PROFILES[args.vehicle_model]
+    vehicle = dict(profile)
+    if args.vehicle_model == "x500-depth":
         if args.vehicle_package is None:
             raise ValueError("X500 qualification needs --vehicle-package")
-        vehicle = vehicle_contract(args.vehicle_package.resolve())
-        autopilot_model, autostart = "x500", "4001"
+        vehicle.update(vehicle_contract(args.vehicle_package.resolve()))
+    autopilot_model = str(profile["autopilot_model"])
+    autostart = str(profile["autostart"])
     route, track, spawn, points = route_contract(
         map_root, args.cruise_altitude_m, args.velocity_m_s, vehicle
     )
@@ -323,7 +430,11 @@ def main() -> int:
         },
     )
 
-    support.WORLD_NAME = f"{semantic['scene_id']}-world"
+    world_path = map_root / "gazebo" / "world.physics.sdf"
+    world = ElementTree.parse(world_path).getroot().find("world")
+    if world is None or not world.get("name"):
+        raise ValueError(f"Gazebo world has no name: {world_path}")
+    support.WORLD_NAME = str(world.get("name"))
     support.DEFAULT_POSE_TOPIC = f"/world/{support.WORLD_NAME}/dynamic_pose/info"
     support.VEHICLE_ENTITY = "my_drone"
     gz_binary = support._require_executable("gz")
@@ -331,6 +442,8 @@ def main() -> int:
     vehicle_dir = run_dir / "my-drone"
     if args.vehicle_model == "standard-vtol":
         export_standard_vtol_gazebo_artifact(vehicle_dir)
+    elif args.vehicle_model != "x500-depth":
+        export_runtime_vehicle(vehicle_dir, str(profile["source_model"]))
     else:
         support.export_my_drone_gazebo_artifact(vehicle_dir)
     partition = f"dronedream_{semantic['scene_id'].replace('-', '_')}_{os.getpid()}"
@@ -377,7 +490,7 @@ def main() -> int:
     ):
         try:
             gazebo = subprocess.Popen(  # noqa: S603 - resolved Gazebo executable, fixed argv, no shell.
-                [gz_binary, "sim", "-r", "-s", str(map_root / "gazebo" / "world.physics.sdf")],
+                [gz_binary, "sim", "-r", "-s", str(world_path)],
                 env=env,
                 stdout=gazebo_log,
                 stderr=subprocess.STDOUT,

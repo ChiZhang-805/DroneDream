@@ -26,21 +26,24 @@ describe("asset pair selection", () => {
     expect(compatibleMapChoices(FALLBACK_ASSET_PAIR_CATALOG, null)).toHaveLength(6);
     expect(compatibleAircraftChoices(FALLBACK_ASSET_PAIR_CATALOG, null)).toHaveLength(6);
     expect(FALLBACK_ASSET_PAIR_CATALOG.pair_count).toBe(36);
-    expect(FALLBACK_ASSET_PAIR_CATALOG.counts).toEqual({ qualified_builtin: 7, compatible_requires_qualification: 29, incompatible: 0 });
+    expect(FALLBACK_ASSET_PAIR_CATALOG.counts).toEqual({ qualified_builtin: 24, compatible_requires_qualification: 12, incompatible: 0 });
   });
 
   it("allows only the qualified aircraft after selecting the campus", () => {
     const aircraft = compatibleAircraftChoices(FALLBACK_ASSET_PAIR_CATALOG, "dronedream-school-map");
-    expect(aircraft).toHaveLength(1);
+    expect(aircraft).toHaveLength(4);
     expect(aircraft.filter((choice) => choice.qualifiedPairCount > 0).map((choice) => choice.resourceId)).toEqual([
       "px4-x500-depth",
+      "px4-x500-lidar-front",
+      "px4-x500-gimbal",
+      "px4-standard-vtol",
     ]);
   });
 
-  it("allows only the harbour after selecting Standard VTOL", () => {
+  it("allows all six qualified maps after selecting Standard VTOL", () => {
     const maps = compatibleMapChoices(FALLBACK_ASSET_PAIR_CATALOG, "px4-standard-vtol");
-    expect(maps.map((choice) => choice.resourceId)).toEqual(["dronedream-vuosaari-harbour-map"]);
-    expect(maps[0].qualifiedPairCount).toBe(1);
+    expect(maps).toHaveLength(6);
+    expect(maps.every((choice) => choice.qualifiedPairCount === 1)).toBe(true);
   });
 
   it("reports the default qualified map and aircraft pair", () => {
@@ -64,13 +67,17 @@ describe("asset pair selection", () => {
 
   it("restricts hospital selection in both directions and leaves display-only aircraft unavailable", () => {
     expect(compatibleAircraftChoices(FALLBACK_ASSET_PAIR_CATALOG, "dronedream-meilahti-hospital-map")
-      .map((choice) => choice.resourceId)).toEqual(["px4-x500-depth"]);
+      .map((choice) => choice.resourceId)).toEqual([
+        "px4-x500-depth", "px4-x500-lidar-front", "px4-x500-gimbal", "px4-standard-vtol",
+      ]);
     expect(compatibleAircraftChoices(FALLBACK_ASSET_PAIR_CATALOG, "dronedream-vuosaari-harbour-map")
-      .map((choice) => choice.resourceId)).toEqual(["px4-x500-depth", "px4-standard-vtol"]);
+      .map((choice) => choice.resourceId)).toEqual([
+        "px4-x500-depth", "px4-x500-lidar-front", "px4-x500-gimbal", "px4-standard-vtol",
+      ]);
     expect(compatibleMapChoices(FALLBACK_ASSET_PAIR_CATALOG, "px4-tiltrotor")).toEqual([]);
     expect(compatibleAircraftChoices(FALLBACK_ASSET_PAIR_CATALOG, null)
       .filter((choice) => choice.qualifiedPairCount > 0).map((choice) => choice.resourceId))
-      .toEqual(["px4-x500-depth", "px4-standard-vtol"]);
+      .toEqual(["px4-x500-depth", "px4-x500-lidar-front", "px4-x500-gimbal", "px4-standard-vtol"]);
   });
 
   it("does not enable a pair based on its status label without receipt and asset bindings", () => {
@@ -85,7 +92,7 @@ describe("asset pair selection", () => {
 
   it("clears an invalid aircraft after a catalog change without silently choosing a replacement", () => {
     expect(reconcilePairSelection(FALLBACK_ASSET_PAIR_CATALOG,
-      "dronedream-meilahti-hospital-map", "px4-standard-vtol"))
+      "dronedream-meilahti-hospital-map", "px4-quadtailsitter"))
       .toEqual({ mapId: "dronedream-meilahti-hospital-map", vehicleId: null });
     expect(reconcilePairSelection(FALLBACK_ASSET_PAIR_CATALOG, null, "px4-standard-vtol"))
       .toEqual({ mapId: null, vehicleId: "px4-standard-vtol" });
@@ -95,6 +102,6 @@ describe("asset pair selection", () => {
     const removed = { ...FALLBACK_ASSET_PAIR_CATALOG, pairs: FALLBACK_ASSET_PAIR_CATALOG.pairs
       .filter((pair) => pair.map_resource_id !== "dronedream-vuosaari-harbour-map") };
     expect(reconcilePairSelection(removed, "dronedream-vuosaari-harbour-map", "px4-standard-vtol"))
-      .toEqual({ mapId: null, vehicleId: null });
+      .toEqual({ mapId: null, vehicleId: "px4-standard-vtol" });
   });
 });
