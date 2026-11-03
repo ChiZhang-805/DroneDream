@@ -108,7 +108,7 @@
     },
     {
       "path": "apps/web/src/pages/ExperimentAssistant.tsx",
-      "sha256": "b1db3423a83b2f0a2e17ce1370e94f8324839f4631fc7428c796506c3c6f038e",
+      "sha256": "5d50315191b1e57e1e0d63e68e8bddfcbc45c3fb67e4471f0f45b8b63ff2d3da",
       "donorEdition": "lab",
       "donorBlob": "c0bcfc6042582014a35e28ce2ff1f01bde3f44ad",
       "integration": "semantic-active-universal-workspace-theme"

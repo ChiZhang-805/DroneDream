@@ -104,7 +104,7 @@
   "integratedWorkspaceUiContract": {
     "contractId": "dronedream-universal-integrated-workspaces/v2",
     "manifest": "release/desktop/config/universal/integrated-workspaces.v2.json",
-    "sha256": "f55d4522eca8ef43dc56e522b0953938d0cd57ee4914b2c0059d10384b8d2c1f",
+    "sha256": "27bb89cc11b14066b8ebd62722d6cda150217994487fb917058ed4dd72fa7345",
     "sourceFileCount": 12,
     "workspaceModes": [
       "sim",
@@ -160,7 +160,7 @@
       "sourceFiles": [
         {
           "path": "apps/web/src/pages/AutonomyPlatform.tsx",
-          "sha256": "0af08898ac2186c1f7efaedfd355005a06261d3be9ce7cf0ae5ea9da3b290a36"
+        "sha256": "dbe387d7dc7587766d305e89eb18322cdeb0c13494efe2ff9792cdbc77f13f05"
         },
         {
           "path": "apps/web/src/features/autonomy/agentCore.ts",
