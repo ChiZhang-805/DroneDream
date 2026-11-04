@@ -112,6 +112,7 @@ struct EnginePackManifestIdentity {
     kind: String,
     pack_id: String,
     source: EnginePackManifestSource,
+    runtime_compatibility: EnginePackRuntimeCompatibility,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
@@ -119,6 +120,13 @@ struct EnginePackManifestIdentity {
 struct EnginePackManifestSource {
     git_commit: String,
     source_date_epoch: u64,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct EnginePackRuntimeCompatibility {
+    runtime_product_id: String,
+    runtime_version: String,
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
@@ -135,6 +143,7 @@ struct ManagerCapabilities {
 pub(crate) struct EnginePackStatus {
     supported: bool,
     update_required: bool,
+    startup_required: bool,
     runtime_base_upgrade_available: bool,
     embedded_pack_id: String,
     embedded_source_commit: String,
@@ -305,6 +314,19 @@ fn embedded_update_required(
         );
     }
     Ok(embedded.source.source_date_epoch > installed.source.source_date_epoch)
+}
+
+fn runtime_version_compatible(
+    embedded: &EnginePackManifestIdentity,
+    installed_runtime_version: &str,
+) -> bool {
+    embedded.runtime_compatibility.runtime_product_id == "DroneDreamRuntime"
+        && !embedded
+            .runtime_compatibility
+            .runtime_version
+            .trim()
+            .is_empty()
+        && embedded.runtime_compatibility.runtime_version == installed_runtime_version
 }
 
 #[cfg(target_os = "windows")]
@@ -480,6 +502,7 @@ fn status() -> Result<EnginePackStatus, String> {
         return Ok(EnginePackStatus {
             supported: true,
             update_required: false,
+            startup_required: false,
             runtime_base_upgrade_available: false,
             embedded_pack_id: embedded.pack_id,
             embedded_source_commit: embedded.source_commit,
@@ -494,6 +517,34 @@ fn status() -> Result<EnginePackStatus, String> {
     }
     let (runtime_build_id, runtime_version) =
         crate::runtime::validate_installed_runtime_ownership()?;
+    let receipt = installed_receipt()?;
+    let installed_pack_id = receipt.as_ref().map(|value| value.current_pack_id.clone());
+    let installed_source_commit = receipt.as_ref().map(|value| value.source_commit.clone());
+    let startup_required = receipt.is_none();
+    if !runtime_version_compatible(&embedded_identity, &runtime_version) {
+        let upgrade = runtime_base_upgrade_action(
+            &format!(
+                "This Engine Pack requires DroneDreamRuntime {}, but Runtime {runtime_version} is installed.",
+                embedded_identity.runtime_compatibility.runtime_version,
+            ),
+            crate::runtime_installer::runtime_upgrade_candidate_available(
+                &runtime_build_id,
+                &runtime_version,
+            ),
+        );
+        return Ok(EnginePackStatus {
+            supported: false,
+            update_required: true,
+            startup_required,
+            runtime_base_upgrade_available: upgrade.available,
+            embedded_pack_id: embedded.pack_id,
+            embedded_source_commit: embedded.source_commit,
+            installed_pack_id,
+            installed_source_commit,
+            pack_update_required: true,
+            message: Some(upgrade.message),
+        });
+    }
     if !manager_available() {
         let upgrade = runtime_base_upgrade_action(
             "The installed Runtime Base predates Engine Pack updates and must be upgraded once.",
@@ -505,11 +556,12 @@ fn status() -> Result<EnginePackStatus, String> {
         return Ok(EnginePackStatus {
             supported: false,
             update_required: true,
+            startup_required,
             runtime_base_upgrade_available: upgrade.available,
             embedded_pack_id: embedded.pack_id,
             embedded_source_commit: embedded.source_commit,
-            installed_pack_id: None,
-            installed_source_commit: None,
+            installed_pack_id,
+            installed_source_commit,
             pack_update_required: true,
             message: Some(upgrade.message),
         });
@@ -525,18 +577,16 @@ fn status() -> Result<EnginePackStatus, String> {
         return Ok(EnginePackStatus {
             supported: false,
             update_required: true,
+            startup_required,
             runtime_base_upgrade_available: upgrade.available,
             embedded_pack_id: embedded.pack_id,
             embedded_source_commit: embedded.source_commit,
-            installed_pack_id: None,
-            installed_source_commit: None,
+            installed_pack_id,
+            installed_source_commit,
             pack_update_required: true,
             message: Some(upgrade.message),
         });
     }
-    let receipt = installed_receipt()?;
-    let installed_pack_id = receipt.as_ref().map(|value| value.current_pack_id.clone());
-    let installed_source_commit = receipt.as_ref().map(|value| value.source_commit.clone());
     let execution_paths_current = runtime_execution_paths_current();
     let mut installed_is_newer = false;
     let pack_update_required = match receipt.as_ref() {
@@ -553,6 +603,7 @@ fn status() -> Result<EnginePackStatus, String> {
     Ok(EnginePackStatus {
         supported: true,
         update_required: pack_update_required || !execution_paths_current,
+        startup_required,
         runtime_base_upgrade_available: false,
         embedded_pack_id: embedded.pack_id,
         embedded_source_commit: embedded.source_commit,
@@ -577,6 +628,7 @@ fn status() -> Result<EnginePackStatus, String> {
     Ok(EnginePackStatus {
         supported: false,
         update_required: false,
+        startup_required: false,
         runtime_base_upgrade_available: false,
         embedded_pack_id: embedded.pack_id,
         embedded_source_commit: embedded.source_commit,
@@ -912,7 +964,24 @@ mod tests {
                 git_commit: source_commit.to_string(),
                 source_date_epoch,
             },
+            runtime_compatibility: EnginePackRuntimeCompatibility {
+                runtime_product_id: "DroneDreamRuntime".to_string(),
+                runtime_version: "0.1.2".to_string(),
+            },
         }
+    }
+
+    #[test]
+    fn rejects_engine_pack_before_activation_when_runtime_version_differs() {
+        let embedded = release_identity(
+            ENGINE_PACK_SCHEMA_VERSION,
+            &format!("sha256:{}", "a".repeat(64)),
+            &"b".repeat(40),
+            100,
+        );
+
+        assert!(runtime_version_compatible(&embedded, "0.1.2"));
+        assert!(!runtime_version_compatible(&embedded, "0.1.1"));
     }
 
     #[test]

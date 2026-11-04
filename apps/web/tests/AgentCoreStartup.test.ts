@@ -51,4 +51,35 @@ describe("Agent Core startup", () => {
     expect(startup.getAgentCoreStartupState()).toBe("ready");
     expect(bridge.restart).toHaveBeenCalledTimes(1);
   });
+
+  it("stops at a visible failure state instead of waiting at 90 percent forever", async () => {
+    bridge.status.mockResolvedValue({ restarting: false, available: false });
+    bridge.restart.mockResolvedValue({ restarting: false, available: false });
+    const startup = await import("../src/desktop/agentCoreStartup");
+    const check = startup.checkAgentCoreStartup();
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    await check;
+
+    expect(startup.getAgentCoreStartupState()).toBe("failed");
+    expect(bridge.restart).toHaveBeenCalledTimes(2);
+  });
+
+  it("allows an explicit retry after a bounded startup failure", async () => {
+    bridge.status.mockResolvedValue({ restarting: false, available: false });
+    bridge.restart
+      .mockResolvedValueOnce({ restarting: false, available: false })
+      .mockResolvedValueOnce({ restarting: false, available: false })
+      .mockResolvedValueOnce({ restarting: false, available: true });
+    const startup = await import("../src/desktop/agentCoreStartup");
+    const first = startup.checkAgentCoreStartup();
+    await vi.advanceTimersByTimeAsync(2_000);
+    await first;
+    expect(startup.getAgentCoreStartupState()).toBe("failed");
+
+    await startup.checkAgentCoreStartup(true);
+
+    expect(startup.getAgentCoreStartupState()).toBe("ready");
+    expect(bridge.restart).toHaveBeenCalledTimes(3);
+  });
 });

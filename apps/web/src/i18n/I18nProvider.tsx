@@ -105,6 +105,7 @@ const enTranslations = {
     "settings.updates.packsError": "Pack updates could not finish.",
     "settings.updates.runtimeBaseHint": "Open Environment to install the compatible Runtime Base, then return here.",
     "settings.updates.installApp": "Install update",
+    "settings.updates.installEngine": "Update Engine Pack",
     "settings.updates.installPacks": "Install pack updates",
     "settings.updates.retry": "Retry",
     "settings.updates.openRuntimeBase": "Open Runtime Base upgrade",
@@ -323,6 +324,8 @@ const enTranslations = {
     "launcher.status.pausing": "Pausing setup",
     "launcher.errorTitle": "Setup needs attention",
     "launcher.errorHint": "DroneDream could not continue. Retry now or open the error information.",
+    "launcher.error.agentCore":
+      "Flight Agent Core did not become ready after two automatic restart attempts.",
     "launcher.error.runtimeServiceTitle": "Runtime services did not start",
     "launcher.error.runtimeServiceHint":
       "The runtime started, but its internal API did not become healthy.",
@@ -1760,6 +1763,7 @@ const zhTranslations = {
     "settings.updates.packsError": "组件包更新未能完成。",
     "settings.updates.runtimeBaseHint": "请打开运行环境安装兼容的 Runtime Base，然后返回此处。",
     "settings.updates.installApp": "安装更新",
+    "settings.updates.installEngine": "更新 Engine Pack",
     "settings.updates.installPacks": "安装组件包更新",
     "settings.updates.retry": "重试",
     "settings.updates.openRuntimeBase": "打开 Runtime Base 升级",
@@ -1967,6 +1971,7 @@ const zhTranslations = {
     "launcher.status.pausing": "正在暂停安装",
     "launcher.errorTitle": "安装遇到问题",
     "launcher.errorHint": "DroneDream 暂时无法继续。你可以重试，或查看报错信息。",
+    "launcher.error.agentCore": "Flight Agent Core 连续两次自动重启后仍未就绪。",
     "launcher.error.runtimeServiceTitle": "运行环境服务未启动",
     "launcher.error.runtimeServiceHint": "运行环境已启动，但内部 API 未能通过健康检查。",
     "launcher.error.hostConnectivityTitle": "Windows 无法连接运行环境",

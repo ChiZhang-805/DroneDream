@@ -458,6 +458,7 @@ export function DesktopSetup() {
       !installerHandoffState.discardResult.discarded),
   );
   const launcherErrorDetails = [
+    coreStartup === "failed" ? t("launcher.error.agentCore") : null,
     ...state.issues.map((issue) => `${issue.command}: ${localeSafeError(issue.message, locale, { zh: "环境检查失败。", en: "Environment check failed." })}`),
     installState.commandError ? localizedDesktopDiagnostic(installState.commandError, locale, { zh: "运行环境安装命令失败。", en: "Runtime installation command failed." }) : null,
     installState.snapshot?.error
@@ -1629,6 +1630,8 @@ export function DesktopSetup() {
               setDismissedLauncherError("");
               if (installerHandoffNeedsAttention || automaticStartPending) {
                 retryInstallerHandoff();
+              } else if (coreStartup === "failed") {
+                void checkAgentCoreStartup(true);
               } else {
                 void refresh(
                   automaticStartPending

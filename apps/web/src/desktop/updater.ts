@@ -28,12 +28,14 @@ export type AppUpdateStatus =
   | "downloading"
   | "installing"
   | "reconcilingEngine"
+  | "engineAvailable"
   | "engineUpdateDeferred"
   | "engineError"
   | "componentAvailable"
   | "installingComponents"
   | "componentUpdateDeferred"
   | "componentError"
+  | "runtimeBaseAvailable"
   | "runtimeBaseRequired"
   | "error";
 
@@ -361,34 +363,59 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
 
   const ensureEnginePackCurrent = useCallback(async (
     generation?: number,
+    activateRoutineUpdate = false,
+    quiet = false,
   ): Promise<EnginePackStatus | null> => {
     if (!desktopRuntime || import.meta.env.MODE === "test") return null;
-    setState((current) => ({
-      ...current,
-      status: "reconcilingEngine",
-      progress: null,
-      error: null,
-    }));
+    if (!quiet) {
+      setState((current) => ({
+        ...current,
+        status: "reconcilingEngine",
+        progress: null,
+        error: null,
+      }));
+    }
     try {
       const observed = await getEnginePackStatus();
       if (generation !== undefined && generation !== checkGenerationRef.current) return null;
+      const startupRequired = observed.startupRequired ?? observed.installedPackId === null;
       if (!observed.supported) {
         const runtimeBaseUpgradeAvailable =
           observed.runtimeBaseUpgradeAvailable !== false;
-        if (!runtimeBaseUpgradeAvailable) {
+        if (!startupRequired && !runtimeBaseUpgradeAvailable) {
           setState({ ...CURRENT_STATE, enginePack: observed });
-          return observed;
+          return null;
         }
         setState({
-          status: "runtimeBaseRequired",
+          status: startupRequired ? "runtimeBaseRequired" : "runtimeBaseAvailable",
           availableVersion: null,
-          updateRequired: true,
+          updateRequired: startupRequired,
           progress: null,
           error: observed.message,
           enginePack: observed,
           componentUpdates: null,
         });
         return null;
+      }
+      if (observed.updateRequired && !startupRequired && !activateRoutineUpdate) {
+        setState({
+          status: "engineAvailable",
+          availableVersion: null,
+          updateRequired: false,
+          progress: null,
+          error: null,
+          enginePack: observed,
+          componentUpdates: null,
+        });
+        return null;
+      }
+      if (observed.updateRequired && quiet) {
+        setState((current) => ({
+          ...current,
+          status: "reconcilingEngine",
+          progress: null,
+          error: null,
+        }));
       }
       const current = observed.updateRequired
         ? await installEmbeddedEnginePack()
@@ -411,7 +438,7 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
   }, [desktopRuntime]);
 
   const reconcileEnginePack = useCallback(async (generation?: number) => {
-    const current = await ensureEnginePackCurrent(generation);
+    const current = await ensureEnginePackCurrent(generation, true);
     if (!current) return;
     await reconcileComponentPacks(generation, current);
   }, [ensureEnginePackCurrent, reconcileComponentPacks]);
@@ -497,7 +524,10 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
         await update?.close();
         return;
       }
-      if (!update) return;
+      if (!update) {
+        await ensureEnginePackCurrent(generation, false, true);
+        return;
+      }
       await updateRef.current?.close();
       updateRef.current = update;
       setState({
@@ -523,7 +553,7 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
       // Scheduled checks are deliberately invisible. The next six-hour poll,
       // an explicit settings check, or the next authenticated launch retries.
     }
-  }, [applyNativeAppUpdateProgress, desktopRuntime, enabled, restoreNativeAppUpdate]);
+  }, [applyNativeAppUpdateProgress, desktopRuntime, enabled, ensureEnginePackCurrent, restoreNativeAppUpdate]);
 
   const installAvailableUpdate = useCallback(async () => {
     const prepared = state.status === "ready";

@@ -95,6 +95,22 @@ describe("Field settings update center", () => {
     expect(screen.getByRole("alert")).toBeVisible();
   });
 
+  it("never exposes an Engine Pack traceback in the settings panel", () => {
+    updaterState.current = {
+      ...updaterState.current,
+      status: "engineError",
+      error: "Traceback (most recent call last):\n  File \"/mnt/c/Users/example/engine-pack-manager.py\", line 404, in install_pack\nEnginePackError: incompatible payload",
+    };
+    renderSettings();
+    fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "The update could not be completed. Retry, or update Runtime Base if the problem continues.",
+    );
+    expect(screen.queryByText(/Traceback/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/engine-pack-manager\.py/)).not.toBeInTheDocument();
+  });
+
   it("offers the signed application installer from the standalone Field surface", () => {
     updaterState.current = {
       ...updaterState.current,
@@ -112,6 +128,20 @@ describe("Field settings update center", () => {
     fireEvent.click(screen.getByRole("button", { name: "Install update" }));
 
     expect(updaterState.current.installAvailableUpdate).toHaveBeenCalledOnce();
+  });
+
+  it("offers a routine Engine Pack update from inside the workspace", () => {
+    updaterState.current = {
+      ...updaterState.current,
+      status: "engineAvailable",
+      updateRequired: false,
+    };
+    renderSettings();
+    fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Update Engine Pack" }));
+
+    expect(updaterState.current.reconcileEnginePack).toHaveBeenCalledOnce();
   });
 
   it("starts the native Runtime Base upgrade with Simplified Chinese feedback", async () => {

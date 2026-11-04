@@ -425,7 +425,7 @@ describe("useAppUpdater", () => {
     });
   });
 
-  it("reconciles the embedded Engine Pack after confirming the app is current", async () => {
+  it("offers a routine Engine Pack update inside the workspace before activation", async () => {
     const pendingPack = {
       supported: true,
       updateRequired: true,
@@ -441,15 +441,14 @@ describe("useAppUpdater", () => {
     installEmbeddedEnginePackMock.mockResolvedValue(installedPack);
 
     const hook = renderHook(() => useAppUpdater());
-    await waitFor(() => expect(checkMock).toHaveBeenCalledOnce());
-    await act(async () => hook.result.current.checkForUpdates());
-    await waitFor(() => expect(hook.result.current.status).toBe("current"));
+    await waitFor(() => expect(hook.result.current.status).toBe("engineAvailable"));
 
+    expect(installEmbeddedEnginePackMock).not.toHaveBeenCalled();
+    expect(checkMock).toHaveBeenCalledOnce();
     expect(getEnginePackStatusMock).toHaveBeenCalledOnce();
+    await act(async () => hook.result.current.reconcileEnginePack());
+    await waitFor(() => expect(hook.result.current.status).toBe("current"));
     expect(installEmbeddedEnginePackMock).toHaveBeenCalledOnce();
-    expect(checkMock.mock.invocationCallOrder[1]).toBeLessThan(
-      getEnginePackStatusMock.mock.invocationCallOrder[0],
-    );
     expect(hook.result.current.enginePack).toEqual(installedPack);
     hook.unmount();
   });
@@ -483,8 +482,8 @@ describe("useAppUpdater", () => {
     );
 
     const hook = renderHook(() => useAppUpdater());
-    await waitFor(() => expect(checkMock).toHaveBeenCalledOnce());
-    await act(async () => hook.result.current.checkForUpdates());
+    await waitFor(() => expect(hook.result.current.status).toBe("engineAvailable"));
+    await act(async () => hook.result.current.reconcileEnginePack());
     await waitFor(() => expect(hook.result.current.status).toBe("engineUpdateDeferred"));
 
     expect(hook.result.current.error).toContain("active experiments");
@@ -506,10 +505,30 @@ describe("useAppUpdater", () => {
     });
 
     const hook = renderHook(() => useAppUpdater());
-    await waitFor(() => expect(checkMock).toHaveBeenCalledOnce());
-    await act(async () => hook.result.current.checkForUpdates());
     await waitFor(() => expect(hook.result.current.status).toBe("runtimeBaseRequired"));
 
+    expect(installEmbeddedEnginePackMock).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
+  it("offers a Runtime Base upgrade inside the workspace when the active Engine Pack remains usable", async () => {
+    checkMock.mockResolvedValue(null);
+    getEnginePackStatusMock.mockResolvedValue({
+      supported: false,
+      updateRequired: true,
+      runtimeBaseUpgradeAvailable: true,
+      startupRequired: false,
+      embeddedPackId: `sha256:${"3".repeat(64)}`,
+      embeddedSourceCommit: "4".repeat(40),
+      installedPackId: `sha256:${"1".repeat(64)}`,
+      installedSourceCommit: "2".repeat(40),
+      message: "A newer Runtime Base is available for this Engine Pack.",
+    });
+
+    const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(hook.result.current.status).toBe("runtimeBaseAvailable"));
+
+    expect(hook.result.current.updateRequired).toBe(false);
     expect(installEmbeddedEnginePackMock).not.toHaveBeenCalled();
     hook.unmount();
   });
@@ -523,13 +542,15 @@ describe("useAppUpdater", () => {
       runtimeBaseUpgradeAvailable: false,
       embeddedPackId: `sha256:${"3".repeat(64)}`,
       embeddedSourceCommit: "4".repeat(40),
-      installedPackId: null,
-      installedSourceCommit: null,
+      installedPackId: `sha256:${"1".repeat(64)}`,
+      installedSourceCommit: "2".repeat(40),
       message: "The signed Runtime Base channel does not contain a newer build.",
     });
 
     const hook = renderHook(() => useAppUpdater());
     await waitFor(() => expect(checkMock).toHaveBeenCalledOnce());
+    getEnginePackStatusMock.mockClear();
+    checkComponentUpdatesMock.mockClear();
     await act(async () => hook.result.current.checkForUpdates());
     await waitFor(() => expect(hook.result.current.status).toBe("current"));
 
@@ -569,6 +590,8 @@ describe("useAppUpdater", () => {
 
     const hook = renderHook(() => useAppUpdater());
     await waitFor(() => expect(checkMock).toHaveBeenCalledOnce());
+    getEnginePackStatusMock.mockClear();
+    checkComponentUpdatesMock.mockClear();
     await act(async () => hook.result.current.checkForUpdates());
     await waitFor(() => expect(hook.result.current.status).toBe("componentAvailable"));
 

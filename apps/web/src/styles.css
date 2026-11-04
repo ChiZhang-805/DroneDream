@@ -25641,7 +25641,7 @@ body {
 .settings-runtime-module .settings-runtime-check-steps { display: grid; grid-auto-rows: minmax(2.75rem, 1fr); min-height: 0; margin: 0; overflow-y: auto; scrollbar-width: none; }
 .settings-runtime-module .settings-runtime-check-steps::-webkit-scrollbar { display: none; }
 .settings-runtime-module .settings-runtime-check-steps > li { padding-block: 4px; }
-.settings-runtime-module.settings-update-center { grid-template-rows: auto 4.5rem minmax(0, 1fr); gap: 6px; }
+.settings-runtime-module.settings-update-center { grid-template-rows: auto 4.5rem minmax(0, 1fr) auto; gap: 6px; }
 .settings-runtime-module .settings-runtime-status,
 .settings-runtime-module .settings-update-state {
   box-sizing: border-box;

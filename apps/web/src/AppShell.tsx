@@ -3868,6 +3868,7 @@ function AppShellContent() {
     "ready",
     "downloading",
     "installing",
+    "engineAvailable",
   ].includes(updater.status);
   const sidebarUpdateBusy = [
     "downloading",
@@ -3920,6 +3921,8 @@ function AppShellContent() {
   const handleSidebarUpdate = useCallback(() => {
     if (["available", "ready"].includes(updater.status)) {
       void updater.installAvailableUpdate();
+    } else if (updater.status === "engineAvailable") {
+      void updater.reconcileEnginePack();
     }
   }, [updater]);
   const openExternalNavigation = useCallback((

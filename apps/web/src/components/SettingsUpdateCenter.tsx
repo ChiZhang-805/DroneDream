@@ -12,6 +12,24 @@ import { localeSafeError, useI18n } from "../i18n/I18nProvider";
 
 type SettingsUpdateTone = "current" | "busy" | "attention" | "error";
 
+const INTERNAL_UPDATE_ERROR = /(?:Traceback \(most recent call last\)|\bFile ["'][^"']+["'], line \d+|(?:[A-Za-z]:\\|\/mnt\/)[^\s]+|\n\s*at\s+\S+)/mu;
+
+function safeUpdateError(
+  error: string | null,
+  locale: "en" | "zh-CN",
+): string | null {
+  if (!error) return null;
+  if (error.length > 320 || INTERNAL_UPDATE_ERROR.test(error)) {
+    return locale === "zh-CN"
+      ? "更新暂时无法完成。请重试；如果问题持续出现，请更新 Runtime Base。"
+      : "The update could not be completed. Retry, or update Runtime Base if the problem continues.";
+  }
+  return localeSafeError(error, locale, {
+    zh: "更新暂时无法完成。",
+    en: "The update could not be completed.",
+  });
+}
+
 export function SettingsUpdateCenter({
   onOpenRuntimeBase,
   runtimeBaseActionDisabled = false,
@@ -34,12 +52,7 @@ export function SettingsUpdateCenter({
     ? (locale === "zh-CN"
       ? "软件内置组件与已安装组件内容不同，但版本时间相同，无法安全判断更新顺序。已保留现有 Runtime，需要提供版本一致的构建。"
       : "The bundled and installed Engine Packs have different contents but the same version timestamp. The existing Runtime was preserved; a consistently versioned build is required.")
-    : updater.error
-    ? localeSafeError(updater.error, locale, {
-        zh: "更新暂时无法完成。",
-        en: "The update could not be completed.",
-      })
-    : null;
+    : safeUpdateError(updater.error, locale);
   const copy = locale === "zh-CN"
     ? {
         stateLabel: "软件版本状态：",
@@ -53,6 +66,8 @@ export function SettingsUpdateCenter({
         failed: "检查失败",
         engineFailed: "运行组件检查失败",
         componentFailed: "组件更新检查失败",
+        engineAvailable: "Engine Pack 可以更新",
+        runtimeAvailable: "Runtime Base 可以更新",
         runtimeRequired: "Runtime Base 需要更新",
       }
     : {
@@ -67,6 +82,8 @@ export function SettingsUpdateCenter({
         failed: "check failed",
         engineFailed: "Engine Pack check failed",
         componentFailed: "component update check failed",
+        engineAvailable: "Engine Pack update available",
+        runtimeAvailable: "Runtime Base update available",
         runtimeRequired: "Runtime Base update required",
       };
 
@@ -114,6 +131,12 @@ export function SettingsUpdateCenter({
     StatusIcon = RefreshCcw;
     actionLabel = null;
     action = null;
+  } else if (updater.status === "engineAvailable") {
+    stateValue = copy.engineAvailable;
+    tone = "attention";
+    StatusIcon = Download;
+    actionLabel = t("settings.updates.installEngine");
+    action = () => { void updater.reconcileEnginePack(); };
   } else if (updater.status === "engineUpdateDeferred") {
     stateValue = copy.deferred;
     tone = "attention";
@@ -152,13 +175,18 @@ export function SettingsUpdateCenter({
     StatusIcon = CircleAlert;
     actionLabel = t("settings.updates.retry");
     action = () => { void updater.checkForUpdates(); };
-  } else if (updater.status === "runtimeBaseRequired") {
-    stateValue = copy.runtimeRequired;
-    tone = "error";
+  } else if (
+    updater.status === "runtimeBaseAvailable" ||
+    updater.status === "runtimeBaseRequired"
+  ) {
+    stateValue = updater.status === "runtimeBaseRequired"
+      ? copy.runtimeRequired
+      : copy.runtimeAvailable;
+    tone = updater.status === "runtimeBaseRequired" ? "error" : "attention";
     StatusIcon = Download;
     actionLabel = t("settings.updates.openRuntimeBase");
     action = onOpenRuntimeBase;
-    actionPrimary = true;
+    actionPrimary = updater.status === "runtimeBaseRequired";
     actionDisabled = runtimeBaseActionDisabled;
   } else if (updater.status === "error") {
     stateValue = copy.failed;

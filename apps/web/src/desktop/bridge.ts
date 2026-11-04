@@ -84,6 +84,8 @@ export interface RuntimeStatusReport {
 export interface EnginePackStatus {
   supported: boolean;
   updateRequired: boolean;
+  /** True only when no trusted active Engine Pack is available for workspace use. */
+  startupRequired?: boolean | null;
   /**
    * False when Runtime compatibility is required but the configured signed
    * channel cannot currently advance the installed Runtime identity. Optional
@@ -2246,6 +2248,14 @@ function parseEnginePackStatus(value: unknown): EnginePackStatus {
   const status: EnginePackStatus = {
     supported: expectBoolean(record.supported, "enginePack.supported"),
     updateRequired: expectBoolean(record.updateRequired, "enginePack.updateRequired"),
+    ...(record.startupRequired === undefined
+      ? {}
+      : {
+        startupRequired: expectBoolean(
+          record.startupRequired,
+          "enginePack.startupRequired",
+        ),
+      }),
     ...(record.runtimeBaseUpgradeAvailable === undefined
       ? {}
       : {

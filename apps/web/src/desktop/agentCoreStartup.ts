@@ -1,10 +1,11 @@
 import { getAgentCoreStatus, restartAgentCore } from "../features/autonomy/agentCore";
 
-export type AgentCoreStartupState = "checking" | "ready";
+export type AgentCoreStartupState = "checking" | "ready" | "failed";
 let state: AgentCoreStartupState = "checking";
 let pending: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 const RETRY_DELAY_MS = 1_000;
+const MAX_RESTART_ATTEMPTS = 2;
 
 export const getAgentCoreStartupState = () => state;
 export function subscribeAgentCoreStartup(listener: () => void) {
@@ -21,7 +22,15 @@ export function checkAgentCoreStartup(restart = false): Promise<void> {
   publish("checking");
   pending = (async () => {
     let shouldRestart = restart;
+    let restartAttempts = 0;
     for (;;) {
+      if (shouldRestart) {
+        if (restartAttempts >= MAX_RESTART_ATTEMPTS) {
+          publish("failed");
+          return;
+        }
+        restartAttempts += 1;
+      }
       try {
         let status = shouldRestart ? await restartAgentCore() : await getAgentCoreStatus();
         // Poll only while the native host owns an active startup operation.
@@ -35,6 +44,10 @@ export function checkAgentCoreStartup(restart = false): Promise<void> {
         }
       } catch {
         // Keep the launcher visible while the next native start attempt begins.
+      }
+      if (shouldRestart && restartAttempts >= MAX_RESTART_ATTEMPTS) {
+        publish("failed");
+        return;
       }
       shouldRestart = true;
       await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));

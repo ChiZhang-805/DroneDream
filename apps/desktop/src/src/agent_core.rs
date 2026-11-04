@@ -9,7 +9,7 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc, Mutex,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tauri::{App, AppHandle, Manager};
 use tauri_plugin_shell::{
@@ -26,6 +26,8 @@ const MAX_ASSET_SOURCE_MEMBERS: usize = 20_000;
 const STARTUP_HEALTH_INTERVAL: Duration = Duration::from_millis(100);
 const STARTUP_LAUNCH_ATTEMPTS: usize = 2;
 const STARTUP_RETRY_DELAY: Duration = Duration::from_millis(500);
+const SHUTDOWN_GRACE_PERIOD: Duration = Duration::from_secs(6);
+const SHUTDOWN_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
 #[derive(Clone)]
 struct AgentCoreInfo {
@@ -37,6 +39,7 @@ pub(crate) struct AgentCoreState {
     info: Mutex<Option<AgentCoreInfo>>,
     startup_issue: Mutex<Option<&'static str>>,
     child: Mutex<Option<CommandChild>>,
+    terminated: Mutex<Option<Arc<AtomicBool>>>,
     restarting: AtomicBool,
 }
 
@@ -256,7 +259,7 @@ fn wait_until_ready(port: u16, terminated: &AtomicBool) -> Result<(), String> {
     }
 }
 
-fn launch(app: &AppHandle) -> Result<(AgentCoreInfo, CommandChild), String> {
+fn launch(app: &AppHandle) -> Result<(AgentCoreInfo, CommandChild, Arc<AtomicBool>), String> {
     let port = reserve_loopback_port()?;
     let token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
     let data_root = app
@@ -327,10 +330,13 @@ fn launch(app: &AppHandle) -> Result<(AgentCoreInfo, CommandChild), String> {
             token,
         },
         child,
+        terminated,
     ))
 }
 
-fn launch_with_retry(app: &AppHandle) -> Result<(AgentCoreInfo, CommandChild), String> {
+fn launch_with_retry(
+    app: &AppHandle,
+) -> Result<(AgentCoreInfo, CommandChild, Arc<AtomicBool>), String> {
     let mut last_error = None;
     for attempt in 1..=STARTUP_LAUNCH_ATTEMPTS {
         match launch(app) {
@@ -356,6 +362,7 @@ pub(crate) fn start(app: &mut App) {
         info: Mutex::new(None),
         startup_issue: Mutex::new(None),
         child: Mutex::new(None),
+        terminated: Mutex::new(None),
         restarting: AtomicBool::new(true),
     });
     let app = app.handle().clone();
@@ -363,9 +370,10 @@ pub(crate) fn start(app: &mut App) {
         let result = launch_with_retry(&app);
         let state = app.state::<AgentCoreState>();
         match result {
-            Ok((info, child)) => {
+            Ok((info, child, terminated)) => {
                 *state.info.lock().unwrap() = Some(info);
                 *state.child.lock().unwrap() = Some(child);
+                *state.terminated.lock().unwrap() = Some(terminated);
             }
             Err(error) => {
                 eprintln!("AGENT Core startup failed: {error}");
@@ -459,9 +467,17 @@ pub(crate) async fn agent_core_status(
     })
 }
 
+fn wait_for_termination(terminated: &AtomicBool, timeout: Duration) -> bool {
+    let deadline = Instant::now() + timeout;
+    while !terminated.load(Ordering::Acquire) && Instant::now() < deadline {
+        std::thread::sleep(SHUTDOWN_POLL_INTERVAL);
+    }
+    terminated.load(Ordering::Acquire)
+}
+
 fn shutdown_state(state: &AgentCoreState) {
     let info = state.info.lock().ok().and_then(|mut value| value.take());
-    if let Some(info) = info {
+    let shutdown_requested = if let Some(info) = info {
         let client = reqwest::blocking::Client::builder()
             .no_proxy()
             .connect_timeout(Duration::from_millis(300))
@@ -469,14 +485,31 @@ fn shutdown_state(state: &AgentCoreState) {
             .redirect(reqwest::redirect::Policy::none())
             .build();
         if let Ok(client) = client {
-            let _ = client
+            client
                 .post(format!("{}/shutdown", info.base_url))
                 .bearer_auth(&info.token)
-                .send();
+                .send()
+                .is_ok_and(|response| response.status().is_success())
+        } else {
+            false
         }
-    }
+    } else {
+        false
+    };
+    let terminated = state
+        .terminated
+        .lock()
+        .ok()
+        .and_then(|mut value| value.take());
     if let Ok(mut child) = state.child.lock() {
         if let Some(process) = child.take() {
+            let exited = shutdown_requested
+                && terminated
+                    .as_deref()
+                    .is_some_and(|flag| wait_for_termination(flag, SHUTDOWN_GRACE_PERIOD));
+            if exited {
+                return;
+            }
             let _ = process.kill();
         }
     }
@@ -508,7 +541,7 @@ pub(crate) async fn agent_core_restart(
     .await
     .map_err(|error| format!("AGENT Core restart task failed: {error}"))?;
     match launch_result {
-        Ok((info, child)) => {
+        Ok((info, child, terminated)) => {
             *state
                 .info
                 .lock()
@@ -517,6 +550,10 @@ pub(crate) async fn agent_core_restart(
                 .child
                 .lock()
                 .map_err(|_| "agent-core-state-poisoned".to_owned())? = Some(child);
+            *state
+                .terminated
+                .lock()
+                .map_err(|_| "agent-core-state-poisoned".to_owned())? = Some(terminated);
             *state
                 .startup_issue
                 .lock()
@@ -864,6 +901,12 @@ mod tests {
             wait_until_ready(9, &terminated).unwrap_err(),
             "AGENT Core exited before its health endpoint became ready."
         );
+    }
+
+    #[test]
+    fn graceful_shutdown_observes_an_already_terminated_sidecar() {
+        let terminated = AtomicBool::new(true);
+        assert!(wait_for_termination(&terminated, Duration::ZERO));
     }
 
     #[test]
