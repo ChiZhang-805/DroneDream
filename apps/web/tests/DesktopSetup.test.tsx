@@ -994,7 +994,7 @@ describe("DesktopSetup", () => {
     };
     vi.stubEnv(
       "VITE_RUNTIME_RELEASE_MANIFEST_URL",
-      "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.1-beta.1/runtime-release.json",
+      "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.2-beta.1/runtime-release.json",
     );
     window.__TAURI__ = { core: { invoke: vi.fn(async (command: string) => {
       if (command === "probe_system_prerequisites") return prerequisites;

@@ -132,6 +132,8 @@ GitHub Actions 只保留四项职责：`Check code` 自动验证应用、Runtime
 
 `Release runtime` 需要带 `dronedream-runtime-builder` 标签的专用 Linux x64 runner；触发之前确认该机器在线。没有注册机器时应恢复构建机器，不能以跳过镜像构建或仿真验证的方式制造成功记录。上传失败先检查现有发布资产是否完整，再决定恢复上传或重新构建，不覆盖已经公开的不可变版本。
 
+Runtime 内容发生变化时必须递增 `DRONEDREAM_RUNTIME_VERSION`，并在同一次产品提交中把桌面端生产清单地址指向该版本的不可变 Release。只增加 `beta.N` 标签而保持内部语义版本不变，产品管理器会正确拒绝将其视为升级；只发布新 Runtime 而不更新桌面清单地址，也不会让已安装软件发现新候选。
+
 - 源码事实以审查后的提交为准；本地构建目录不是发布事实源。
 - 发布暂存位于 `Build/Release-Staging`，只保留当前源提交和版本的完整五版本集合。
 - 正式发布以 GitHub Release 资产、摘要、签名和发布清单为准。
