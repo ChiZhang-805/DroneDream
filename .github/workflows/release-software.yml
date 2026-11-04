@@ -1267,6 +1267,8 @@ jobs:
       id-token: write
       pages: write
     uses: ./.github/workflows/pages.yml
+    with:
+      release_tag: ${{ inputs.release_tag }}
     secrets: inherit
 
   finish-software-release:

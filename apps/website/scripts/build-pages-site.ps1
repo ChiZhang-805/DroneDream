@@ -9,6 +9,78 @@ $codeSigningPolicyPath = Join-Path $repositoryRoot "docs/release/code-signing.md
 $privacyPolicyPath = Join-Path $repositoryRoot "docs/legal/privacy.md"
 $termsOfServicePath = Join-Path $repositoryRoot "docs/legal/terms.md"
 $release = Get-Content -LiteralPath $releaseConfigPath -Raw | ConvertFrom-Json
+$releaseEditionsOverride = $null
+if ($env:DRONEDREAM_RELEASE_TAG) {
+    $releaseTagOverride = [string]$env:DRONEDREAM_RELEASE_TAG
+    if ($releaseTagOverride -cnotmatch '^five-edition-v(?<version>\d+\.\d+\.\d+)-build-(?<build>[1-9][0-9]*)$') {
+        throw "Invalid synchronized release tag: $releaseTagOverride"
+    }
+    $releaseVersionOverride = [string]$Matches.version
+    $releaseBuildOverride = [long]$Matches.build
+    $repository = if ($env:GITHUB_REPOSITORY) { [string]$env:GITHUB_REPOSITORY } else { "ChiZhang-805/DroneDream" }
+    $releaseView = & gh release view $releaseTagOverride --repo $repository --json publishedAt,isDraft,assets
+    if ($LASTEXITCODE -ne 0) { throw "Unable to read synchronized release $releaseTagOverride" }
+    $publishedRelease = $releaseView | ConvertFrom-Json
+    if ($publishedRelease.isDraft) { throw "Synchronized release is still a draft: $releaseTagOverride" }
+    $publishedDate = ([DateTimeOffset]::Parse([string]$publishedRelease.publishedAt)).UtcDateTime.ToString('yyyy-MM-dd')
+    $assetBaseUrlOverride = "https://github.com/$repository/releases/download/$releaseTagOverride"
+    function Read-PublishedAssetText([string]$Uri) {
+        $content = (Invoke-WebRequest -Uri $Uri -UseBasicParsing).Content
+        if ($content -is [byte[]]) { return [Text.Encoding]::UTF8.GetString($content) }
+        return [string]$content
+    }
+    $assetByName = @{}
+    foreach ($asset in $publishedRelease.assets) { $assetByName[[string]$asset.name] = $asset }
+    $products = [ordered]@{
+        universal = "DroneDream-Universal"
+        sim = "DroneDream-Sim"
+        lab = "DroneDream-Lab"
+        field = "DroneDream-Field"
+        autonomy = "DroneDream-Agent"
+    }
+    $releaseEditionsOverride = [Collections.Generic.List[object]]::new()
+    foreach ($entry in $products.GetEnumerator()) {
+        $installerName = "$($entry.Value)_${releaseVersionOverride}_x64-setup.exe"
+        foreach ($requiredName in @($installerName, "$installerName.sha256", "$installerName.sig", "$installerName.receipt.json")) {
+            if (-not $assetByName.ContainsKey($requiredName)) { throw "Synchronized release asset is missing: $requiredName" }
+        }
+        $checksum = ((Read-PublishedAssetText "$assetBaseUrlOverride/$installerName.sha256").Trim() -split '\s+')[0].ToLowerInvariant()
+        $receipt = Read-PublishedAssetText "$assetBaseUrlOverride/$installerName.receipt.json" | ConvertFrom-Json
+        if ($checksum -notmatch '^[a-f0-9]{64}$' -or
+            [long]$receipt.buildNumber -ne $releaseBuildOverride -or
+            [string]$receipt.sourceCommit -notmatch '^[a-f0-9]{40}$') {
+            throw "Synchronized release metadata is invalid for $installerName"
+        }
+        $editionMetadata = [ordered]@{
+            id = [string]$entry.Key
+            status = "published"
+            version = $releaseVersionOverride
+            fileName = $installerName
+            downloadUrl = "$assetBaseUrlOverride/$installerName"
+            checksumUrl = "$assetBaseUrlOverride/$installerName.sha256"
+            signatureUrl = "$assetBaseUrlOverride/$installerName.sig"
+            receiptUrl = "$assetBaseUrlOverride/$installerName.receipt.json"
+            sizeBytes = [long]$assetByName[$installerName].size
+            sha256 = $checksum
+            sourceCommit = [string]$receipt.sourceCommit
+            publishedAt = $publishedDate
+        }
+        if ($entry.Key -ceq 'universal') {
+            $release = [pscustomobject]@{
+                edition = "universal"
+                buildNumber = $releaseBuildOverride
+                version = $releaseVersionOverride
+                fileName = $installerName
+                releaseTag = $releaseTagOverride
+                sha256 = $checksum
+                sizeBytes = [long]$assetByName[$installerName].size
+                publishedAt = $publishedDate
+            }
+        } else {
+            $releaseEditionsOverride.Add($editionMetadata)
+        }
+    }
+}
 $tauriConfig = Get-Content -LiteralPath $tauriConfigPath -Raw | ConvertFrom-Json
 $codeSigningPolicy = Get-Content -LiteralPath $codeSigningPolicyPath -Raw
 $privacyPolicy = Get-Content -LiteralPath $privacyPolicyPath -Raw
@@ -158,6 +230,18 @@ if (-not (Test-Path -LiteralPath $organizationHtml -PathType Leaf)) {
 $editionAvailabilityJson = Join-Path $outputDirectory "downloads\editions.json"
 if (-not (Test-Path -LiteralPath $editionAvailabilityJson -PathType Leaf)) {
     throw "The site build completed without producing edition download availability metadata."
+}
+if ($null -ne $releaseEditionsOverride) {
+    $editionCatalog = [ordered]@{
+        schemaVersion = 1
+        generatedAt = $publishedDate
+        editions = @($releaseEditionsOverride)
+    }
+    [IO.File]::WriteAllText(
+        $editionAvailabilityJson,
+        ($editionCatalog | ConvertTo-Json -Depth 5) + [Environment]::NewLine,
+        [Text.UTF8Encoding]::new($false)
+    )
 }
 $oauthConsentHtml = Join-Path $outputDirectory "oauth\consent\index.html"
 if (-not (Test-Path -LiteralPath $oauthConsentHtml -PathType Leaf)) {
