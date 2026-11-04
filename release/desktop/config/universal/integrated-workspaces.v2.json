@@ -115,7 +115,7 @@
     },
     {
       "path": "apps/web/src/styles.css",
-      "sha256": "2af3a1a003a8e13c20e46de67be7c354e902d078089fc177ff50026ba95866f5",
+      "sha256": "b03f89c5d52986b2898deb9e5eb65c6219c14eefa42e34f7b9cb814b3a8df2c4",
       "donorEdition": "lab",
       "donorBlob": "96deedb311f92dc2b7a058f9a61324509f9dd702",
       "integration": "semantic-universal-workspaces-and-canonical-navigation-theme"
