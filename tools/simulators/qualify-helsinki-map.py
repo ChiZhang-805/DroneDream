@@ -33,7 +33,6 @@ VEHICLE_PROFILES: dict[str, dict[str, Any]] = {
         "body_radius_m": 0.38,
         "body_height_m": 0.43,
         "collision_center_offset_model_m": {"x": 0.0, "y": 0.0, "z": 0.228},
-        "model_root_to_contact_m": 0.013,
     },
     "x500-lidar-front": {
         "source_model": "x500_lidar_front",
@@ -42,7 +41,6 @@ VEHICLE_PROFILES: dict[str, dict[str, Any]] = {
         "body_radius_m": 0.38,
         "body_height_m": 0.288,
         "collision_center_offset_model_m": {"x": 0.0, "y": 0.0, "z": 0.157},
-        "model_root_to_contact_m": 0.013,
     },
     "x500-gimbal": {
         "source_model": "x500_gimbal",
@@ -51,25 +49,29 @@ VEHICLE_PROFILES: dict[str, dict[str, Any]] = {
         "body_radius_m": 0.38,
         "body_height_m": 0.288,
         "collision_center_offset_model_m": {"x": 0.0, "y": 0.0, "z": 0.157},
-        "model_root_to_contact_m": 0.013,
     },
     "standard-vtol": {
         "source_model": "standard_vtol",
         "autopilot_model": "standard_vtol",
         "autostart": "4004",
         "body_radius_m": 1.2,
-        "body_height_m": 0.5,
+        "body_height_m": 0.298,
         "collision_center_offset_model_m": {"x": 0.0, "y": 0.0, "z": 0.3},
-        "model_root_to_contact_m": 0.151,
     },
     "tiltrotor": {
         "source_model": "tiltrotor",
         "autopilot_model": "tiltrotor",
-        "autostart": "4020",
+        # Official map missions keep the nacelles vertical and use the proven
+        # quadplane multicopter allocator. Fixed-wing transition remains a
+        # separate qualification target.
+        "autostart": "4004",
         "body_radius_m": 1.2,
         "body_height_m": 0.178,
         "collision_center_offset_model_m": {"x": 0.0, "y": 0.0, "z": 0.230},
-        "model_root_to_contact_m": 0.141,
+        "cruise_speed_m_s": 3.0,
+        "accel_limit_m_s2": 0.5,
+        "waypoint_hold_seconds": 1.0,
+        "perception_payload": True,
     },
     "quadtailsitter": {
         "source_model": "quadtailsitter",
@@ -78,7 +80,10 @@ VEHICLE_PROFILES: dict[str, dict[str, Any]] = {
         "body_radius_m": 0.42,
         "body_height_m": 0.287,
         "collision_center_offset_model_m": {"x": 0.0, "y": 0.0, "z": 0.343},
-        "model_root_to_contact_m": 0.2,
+        "cruise_speed_m_s": 3.0,
+        "accel_limit_m_s2": 0.5,
+        "waypoint_hold_seconds": 2.0,
+        "perception_payload": True,
     },
 }
 
@@ -154,7 +159,12 @@ def vehicle_contract(package: Path) -> dict[str, Any]:
     return value
 
 
-def export_runtime_vehicle(output_directory: Path, source_model: str) -> None:
+def export_runtime_vehicle(
+    output_directory: Path,
+    source_model: str,
+    *,
+    perception_payload: bool = False,
+) -> None:
     """Create a product-owned wrapper around one pinned PX4 Gazebo model."""
 
     output_directory.mkdir(parents=True, exist_ok=True)
@@ -162,6 +172,49 @@ def export_runtime_vehicle(output_directory: Path, source_model: str) -> None:
     model = ElementTree.SubElement(sdf, "model", {"name": "my_drone"})
     include = ElementTree.SubElement(model, "include", {"merge": "true"})
     ElementTree.SubElement(include, "uri").text = f"model://{source_model}"
+    if perception_payload:
+        sensor_link = ElementTree.SubElement(model, "link", {"name": "dronedream_perception"})
+        ElementTree.SubElement(
+            sensor_link, "pose", {"relative_to": "base_link"}
+        ).text = "0.25 0 -0.05 0 0 0"
+        inertial = ElementTree.SubElement(sensor_link, "inertial")
+        ElementTree.SubElement(inertial, "mass").text = "0.01"
+        inertia = ElementTree.SubElement(inertial, "inertia")
+        for name, value in (
+            ("ixx", "1e-6"),
+            ("iyy", "1e-6"),
+            ("izz", "1e-6"),
+            ("ixy", "0"),
+            ("ixz", "0"),
+            ("iyz", "0"),
+        ):
+            ElementTree.SubElement(inertia, name).text = value
+        joint = ElementTree.SubElement(
+            model, "joint", {"name": "dronedream_perception_joint", "type": "fixed"}
+        )
+        ElementTree.SubElement(joint, "parent").text = "base_link"
+        ElementTree.SubElement(joint, "child").text = "dronedream_perception"
+        for sensor_name, sensor_type, topic in (
+            ("forward_camera", "camera", "/dronedream/perception/camera"),
+            ("forward_depth", "depth_camera", "/dronedream/perception/depth"),
+        ):
+            sensor = ElementTree.SubElement(
+                sensor_link,
+                "sensor",
+                {"name": sensor_name, "type": sensor_type},
+            )
+            ElementTree.SubElement(sensor, "always_on").text = "true"
+            ElementTree.SubElement(sensor, "update_rate").text = "15"
+            ElementTree.SubElement(sensor, "topic").text = topic
+            camera = ElementTree.SubElement(sensor, "camera")
+            ElementTree.SubElement(camera, "horizontal_fov").text = "1.047"
+            image = ElementTree.SubElement(camera, "image")
+            ElementTree.SubElement(image, "width").text = "640"
+            ElementTree.SubElement(image, "height").text = "480"
+            ElementTree.SubElement(image, "format").text = "R8G8B8"
+            clip = ElementTree.SubElement(camera, "clip")
+            ElementTree.SubElement(clip, "near").text = "0.1"
+            ElementTree.SubElement(clip, "far").text = "100"
     ElementTree.indent(sdf, space="  ")
     (output_directory / "model.sdf").write_text(
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -204,12 +257,7 @@ def grounded_model_root(
     return (
         float(spawn["x"]) - float(offset["x"]),
         float(spawn["y"]) - float(offset["y"]),
-        support_z
-        - float(
-            vehicle.get(
-                "model_root_to_contact_m", float(offset["z"]) - float(vehicle["body_height_m"]) / 2
-            )
-        ),
+        support_z + float(vehicle["body_height_m"]) / 2 - float(offset["z"]),
     )
 
 
@@ -317,7 +365,7 @@ def route_contract(
         "schema_version": "dronedream.px4-track.v2",
         "track_type": "custom",
         "stop_at_waypoints": True,
-        "waypoint_hold_seconds": 0.35,
+        "waypoint_hold_seconds": float(vehicle.get("waypoint_hold_seconds", 0.35)),
         "waypoint_position_tolerance_m": 0.35,
         "waypoint_speed_tolerance_mps": 0.25,
         "waypoint_stable_window_seconds": 0.5,
@@ -376,6 +424,7 @@ def main() -> int:
     semantic = json.loads((map_root / "gazebo" / "semantic.json").read_text(encoding="utf-8"))
     profile = VEHICLE_PROFILES[args.vehicle_model]
     vehicle = dict(profile)
+    velocity_m_s = min(args.velocity_m_s, float(profile.get("cruise_speed_m_s", math.inf)))
     if args.vehicle_model == "x500-depth":
         if args.vehicle_package is None:
             raise ValueError("X500 qualification needs --vehicle-package")
@@ -383,7 +432,7 @@ def main() -> int:
     autopilot_model = str(profile["autopilot_model"])
     autostart = str(profile["autostart"])
     route, track, spawn, points = route_contract(
-        map_root, args.cruise_altitude_m, args.velocity_m_s, vehicle
+        map_root, args.cruise_altitude_m, velocity_m_s, vehicle
     )
     from dronedream_agent_core.collision import validate_route_clearance
     from dronedream_agent_core.contracts import GraphRoute
@@ -408,9 +457,10 @@ def main() -> int:
             "kp_xy": 1.0,
             "kd_xy": 0.2,
             "ki_xy": 0.05,
-            "vel_limit": args.velocity_m_s,
-            "accel_limit": 0.8,
+            "vel_limit": velocity_m_s,
+            "accel_limit": float(profile.get("accel_limit_m_s2", 0.8)),
             "disturbance_rejection": 0.5,
+            "px4_parameter_overrides": profile.get("px4_parameter_overrides", {}),
         },
     )
     write_json(
@@ -447,7 +497,12 @@ def main() -> int:
     if args.vehicle_model == "standard-vtol":
         export_standard_vtol_gazebo_artifact(vehicle_dir)
     elif args.vehicle_model != "x500-depth":
-        export_runtime_vehicle(vehicle_dir, str(profile["source_model"]))
+        source_model = str(profile["source_model"])
+        export_runtime_vehicle(
+            vehicle_dir,
+            source_model,
+            perception_payload=bool(profile.get("perception_payload", False)),
+        )
     else:
         support.export_my_drone_gazebo_artifact(vehicle_dir)
     partition = f"dronedream_{semantic['scene_id'].replace('-', '_')}_{os.getpid()}"
@@ -534,7 +589,7 @@ def main() -> int:
             # distance/speed estimate, so budget both distance and point count.
             timeout_seconds = max(
                 300.0,
-                route_distance / max(0.5, args.velocity_m_s) * 3.0 + 180.0,
+                route_distance / max(0.5, velocity_m_s) * 3.0 + 180.0,
                 len(points) * 8.0 + 180.0,
             )
             executor = subprocess.Popen(  # noqa: S603 - repository executor, fixed argv, no shell.

@@ -98,6 +98,7 @@ class ControllerParams:
     vel_limit: float
     accel_limit: float
     disturbance_rejection: float
+    px4_parameter_overrides: dict[str, float] | None = None
 
 
 @dataclass(frozen=True)
@@ -182,6 +183,8 @@ class OffboardClientProtocol(Protocol):
         self,
         timeout_seconds: float,
     ) -> PositionVelocityNed: ...
+
+    async def sample_heading_deg(self, timeout_seconds: float) -> float: ...
 
     async def close(self) -> None: ...
 
@@ -381,6 +384,22 @@ class MavsdkOffboardClient:
                 f"PX4 position/velocity telemetry timeout after {timeout_seconds:g}s"
             ) from None
 
+    async def sample_heading_deg(self, timeout_seconds: float) -> float:
+        async def _sample() -> float:
+            async for attitude in self._require_system().telemetry.attitude_euler():
+                heading_deg = float(attitude.yaw_deg)
+                if not math.isfinite(heading_deg):
+                    raise RuntimeError("PX4 heading telemetry is not finite")
+                return heading_deg
+            raise RuntimeError("PX4 attitude telemetry stream ended without a sample")
+
+        try:
+            return await asyncio.wait_for(_sample(), timeout=timeout_seconds)
+        except TimeoutError:
+            raise TimeoutError(
+                f"PX4 heading telemetry timeout after {timeout_seconds:g}s"
+            ) from None
+
     async def close(self) -> None:
         system = self._system
         self._system = None
@@ -413,6 +432,7 @@ class FakeOffboardClient:
             {"num_satellites": 10, "fix_type": 3, "fix_type_name": "FIX_3D"}
         ]
         self.position_velocity_samples: list[PositionVelocityNed] = []
+        self.heading_deg = 0.0
 
     async def connect(self, connection_url: str) -> None:
         _ = connection_url
@@ -497,6 +517,10 @@ class FakeOffboardClient:
             east_m_s=0.0,
             down_m_s=0.0,
         )
+
+    async def sample_heading_deg(self, timeout_seconds: float) -> float:
+        _ = timeout_seconds
+        return self.heading_deg
 
     async def close(self) -> None:
         self.closed = True
@@ -1299,6 +1323,14 @@ def load_controller_params(path: Path) -> ControllerParams:
     payload = _load_bounded_json(path, label="controller_params.json")
     if not isinstance(payload, dict):
         raise ValueError("controller_params.json must be an object")
+    overrides = payload.get("px4_parameter_overrides")
+    if overrides is not None:
+        if not isinstance(overrides, dict):
+            raise ValueError("px4_parameter_overrides must be an object")
+        overrides = {
+            str(name): _finite_float(value, f"px4_parameter_overrides.{name}")
+            for name, value in overrides.items()
+        }
     params = ControllerParams(
         kp_xy=_finite_float(payload.get("kp_xy", 1.0), "kp_xy"),
         kd_xy=_finite_float(payload.get("kd_xy", 0.2), "kd_xy"),
@@ -1309,6 +1341,7 @@ def load_controller_params(path: Path) -> ControllerParams:
             payload.get("disturbance_rejection", 0.5),
             "disturbance_rejection",
         ),
+        px4_parameter_overrides=overrides,
     )
     if min(params.kp_xy, params.kd_xy, params.ki_xy) < 0:
         raise ValueError("controller gains must be non-negative")
@@ -2343,6 +2376,15 @@ async def run_executor(
                 "PX4 returned non-armable readiness; sensor degradation must never "
                 "bypass the preflight safety gate"
             )
+        if controller_params and controller_params.px4_parameter_overrides:
+            timing["px4_parameter_overrides"] = await _await_with_abort_polling(
+                _set_float_parameters_verified(
+                    client,
+                    controller_params.px4_parameter_overrides,
+                ),
+                abort_check=check_external_abort,
+            )
+            _log(log_path, "PX4 airframe parameter overrides applied and read back")
         if isinstance(gps_profile, dict):
             check_external_abort()
             baseline_satellites = await _await_with_abort_polling(
@@ -2393,11 +2435,32 @@ async def run_executor(
             "east_m_s": takeoff_origin.east_m_s,
             "down_m_s": takeoff_origin.down_m_s,
         }
+        try:
+            check_external_abort()
+            measured_heading_deg = await _await_with_abort_polling(
+                client.sample_heading_deg(min(2.0, takeoff_timeout_seconds)),
+                abort_check=check_external_abort,
+            )
+        except ExternalSafetyAbort:
+            takeoff_gate["status"] = "failed"
+            takeoff_gate["failure_reason"] = "external_safety_abort"
+            raise
+        except BaseException as exc:
+            takeoff_gate["status"] = "failed"
+            takeoff_gate["failure_reason"] = "initial_heading_telemetry_unavailable"
+            takeoff_gate["heading_telemetry_error"] = f"{type(exc).__name__}: {exc}"
+            raise
+        takeoff_gate["heading_control"] = {
+            "policy": "measured_prearm_heading_hold",
+            "measured_heading_deg": measured_heading_deg,
+            "planned_heading_deg": schedule[0].yaw_deg,
+        }
+        _log(log_path, f"measured pre-arm heading {measured_heading_deg:.3f} deg")
         initial_hold = Setpoint(
             north_m=schedule[0].north_m,
             east_m=schedule[0].east_m,
             down_m=takeoff_origin.down_m,
-            yaw_deg=schedule[0].yaw_deg,
+            yaw_deg=measured_heading_deg,
         )
         check_external_abort()
         await _await_with_abort_polling(
@@ -2430,7 +2493,12 @@ async def run_executor(
         timing["offboard_start_t"] = time.monotonic() - exec_start
         _log(log_path, "offboard started")
 
-        takeoff_target = schedule[0]
+        takeoff_target = Setpoint(
+            north_m=schedule[0].north_m,
+            east_m=schedule[0].east_m,
+            down_m=schedule[0].down_m,
+            yaw_deg=measured_heading_deg,
+        )
         takeoff_origin_for_gate = takeoff_origin
         while True:
             runtime_replan, stabilized_setpoint = await _wait_for_takeoff_stability(

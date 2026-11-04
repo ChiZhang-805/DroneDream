@@ -389,6 +389,7 @@ def test_load_reference_track_and_controller_params(tmp_path: Path):
             "vel_limit": 2.5,
             "accel_limit": 1.0,
             "disturbance_rejection": 0.7,
+            "px4_parameter_overrides": {"CA_ROTOR0_PX": 0.35},
         },
     )
 
@@ -397,6 +398,7 @@ def test_load_reference_track_and_controller_params(tmp_path: Path):
 
     assert points[0].x == 1.0 and points[0].z == 3.0
     assert cfg.vel_limit == 2.5
+    assert cfg.px4_parameter_overrides == {"CA_ROTOR0_PX": 0.35}
 
 
 def test_executor_boolean_environment_parser_rejects_typos():

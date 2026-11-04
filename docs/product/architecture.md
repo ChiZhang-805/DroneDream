@@ -76,7 +76,7 @@ DroneDream 把用户的模糊自然语言任务转化为可确认、可执行、
 
 当前正式内置目录包含六张地图：Kumpula Campus、Meilahti Hospital Campus、Kalasatama Waterfront、Vuosaari Harbour、Suomenlinna Sea Fortress 和 Uutela Coastal Forest。机场、竞技场、campus、诊所、酒店、office、triple-h 等旧 Open-RMF 演示资产不能因历史数据库残留或可生成预览而重新列为当前可用地图。用户上传的资产需保留，但“已收到”不等于“已具备当前自然语言任务能力”。
 
-当前六机型×六地图的正式执行矩阵只开放 24 个精确配对：X500 Depth、X500 Front LiDAR、X500 Gimbal 和 Standard VTOL 各自覆盖六张地图。每个开放项绑定当前地图包、当前机型包、PX4 airframe、传感器、实际路线、参考轨迹、运行输入及真实 PX4/Gazebo 往返收据。Quadtailsitter 只在简化、非发布 Kumpula 候选上完成过往返，不能继承给当前正式地图，且缺少当前任务契约所需的感知来源；Tiltrotor 基线未离地。两者继续显示但不可作为任务选择。物理兼容、模型可加载或某次非发布变体飞行通过都不能继承或虚构缺失的资格与传感能力。
+当前六机型×六地图的正式执行矩阵开放 29 个精确配对：X500 Depth、X500 Front LiDAR、X500 Gimbal 和 Standard VTOL 各覆盖六张地图；Quadtailsitter 覆盖 Kumpula、Kalasatama、Vuosaari；Tiltrotor 的多旋翼地图模式覆盖 Kumpula、Vuosaari。每个开放项绑定当前地图包、当前机型包、PX4 airframe、传感器、实际路线、参考轨迹、运行输入及真实 PX4/Gazebo 往返收据。Quadtailsitter 与 Tiltrotor 均带实际前向彩色和深度传感器；Tiltrotor 使用真实机体、竖直旋翼和 Standard VTOL 4004 多旋翼分配器，固定翼转换另行验收。其余七个组合继续不可选，不能从模型可加载、其他地图通过或非发布变体继承资格。
 
 新增五张地图使用赫尔辛基开放数据的正射影像、建筑登记轮廓、道路、树木和生态网络，以 EPSG:3879 转换到各地图局部 ENU。地图卡片、Gazebo 场景、碰撞和规划必须来自同一份地图包。建筑轮廓应保留凹部、小建筑与庭院；建筑高度不能按飞行高度上限截断。有可匹配的官方实测高度时使用实测值，其余明确保留估算来源。道路投影交叉不证明桥梁、隧道在同一高度连通；缺少高程时不能自动连接。
 
@@ -114,7 +114,7 @@ Kumpula 同一高程的已观测道路、空地先求并集，再计算净空，
 
 自然语言验收与物理配对资格分开记录。确定性规划输入的真实飞行可以授予精确物理配对资格，但不得标记为自然语言成功。模型账户、网络或余额失败时保留失败收据，继续完成独立的物理和代码验证；不能静默改用其他项目凭据。
 
-当前资源首页展示 X500 Depth、X500 Front LiDAR、X500 Gimbal、Standard VTOL、Tiltrotor 和 Quadtailsitter 六款；完整来源目录有 13 款。卡片存在不代表已具备自然语言任务资格：X500 Depth 有 Kumpula 取送往返及长距离路线回执，其余五款首页机型仍缺各自完整的飞行契约与地图任务验收。X500 Flow 过去的依赖入口歧义和飞行契约缺失也不能因源模型能加载就视为解决。
+当前资源首页展示 X500 Depth、X500 Front LiDAR、X500 Gimbal、Standard VTOL、Tiltrotor 和 Quadtailsitter 六款；完整来源目录有 13 款。卡片存在不代表任意地图或自然语言任务均已取得资格，选择器只开放上述 29 个精确物理配对。确定性路线实飞资格与完整自然语言任务验收分开记录。X500 Flow 过去的依赖入口歧义和飞行契约缺失也不能因源模型能加载就视为解决。
 
 机型目录、资源哈希和桌面三维模型统一使用实际 Runtime 的 PX4 Gazebo 子模块提交 `e05f4312d3f28aa621157610584a4870406cb6d3`。桌面 GLB 从该提交的真实 SDF、网格、纹理和解析后的位姿生成，不能以手工拼装机翼或通用四旋翼替代真实模型。详情中的模型尺寸、干质量来自同一资产元数据；尺寸不是旋翼扫掠包络或飞行安全包络。全部 13 个来源包已核对依赖和摘要、关节连接及正定惯量，并经过 Gazebo 场景加载和桌面 GLB 重新导入检查；这不证明传感器数据流、飞控控制、载荷和任务飞行均通过。
 

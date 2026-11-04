@@ -107,7 +107,7 @@ Go to the building where the computer science labs are and collect the package.
 
 这五条资格证明的是各自正式地图包、X500 Depth 精确包和对应代表性路线的物理可执行性，不等于 411 个建筑交接点、任意自然语言任务或全部动态障碍条件均已逐点飞行验证。
 
-2026-11-04 扩展六机型×六地图复核使用同样的真实 PX4 SITL、Gazebo Harmonic、实际机型 SDF、地图碰撞、遥测、返航和落地门槛。X500 Depth、X500 Front LiDAR、X500 Gimbal、Standard VTOL 均为 6/6，当前正式包共 24/36 个精确配对实飞通过并写入发布索引。Quadtailsitter 只在简化、非发布 Kumpula 候选上往返通过，不能继承给正式地图，且当前机型包没有任务感知来源；其余五图未满足返航门槛，Meilahti 另有危险碰撞。Tiltrotor 的 Vuosaari 基线未离地，其他五图未重复。机器可读总表在 `TestRuns/aircraft-map-matrix/matrix-summary.json`。
+2026-11-04 六机型×六地图复核使用真实 PX4 SITL、Gazebo Harmonic、实际机型 SDF、当前地图碰撞、遥测、返航和落地门槛。X500 Depth、X500 Front LiDAR、X500 Gimbal、Standard VTOL 均为 6/6；Quadtailsitter 在 Kumpula、Kalasatama、Vuosaari 为 3/6；Tiltrotor 的多旋翼地图模式在 Kumpula、Vuosaari 为 2/6，合计 29/36 个精确配对。新增两款机型均实际挂载前向彩色与深度传感器，Gazebo 已观察到图像、深度与点云主题。Tiltrotor 地图模式使用真实 Tiltrotor 机体、竖直旋翼和 Standard VTOL 4004 多旋翼分配器；固定翼转换未验收，不得由本次结果继承。Tiltrotor–Kalasatama 因估计器姿态翻转失败，其余未开放组合仍保持不可选。最终 29 个组合均以当前六张地图源码重新打包并生成资格收据，机器可读索引在 `Agent-Core/app/desktop/src-tauri/resources/default-assets/index.json`，本轮实飞证据在 `TestRuns/aircraft-map-acceptance`。
 
 本轮物理运行均明确记录 `natural_language_acceptance: false`。另用自然、略含糊的 `Go have a look near the Chemicum handoff and come back.` 调用真实规划链；插件隔离器和精确资产已进入运行，但 DroneDream 专用 DeepSeek 账户返回 HTTP 402，因此自然语言验收为阻塞而不是通过。不得用单元测试、确定性路线或其他项目的 Key 补写成功结论。
 
