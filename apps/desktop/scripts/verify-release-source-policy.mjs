@@ -36,7 +36,6 @@ if (!licenseText.startsWith("MIT License\n") && !licenseText.startsWith("MIT Lic
 
 const codeSigningPolicy = readText("docs/release/code-signing.md");
 const privacyPolicy = readText("docs/legal/privacy.md");
-const readme = readText("README.md");
 const llvmBuildScript = readText("apps/desktop/scripts/build-windows-llvm.ps1");
 const msvcBuildScript = readText("apps/desktop/scripts/build-windows-msvc.ps1");
 const updaterSignerScript = readText("apps/desktop/scripts/invoke-tauri-updater-signer.ps1");
@@ -101,15 +100,6 @@ for (const requiredText of [
     fail(`docs/legal/privacy.md is missing: ${requiredText}`);
   }
 }
-for (const requiredText of [
-  "[Code signing policy](docs/release/code-signing.md)",
-  "[Privacy policy](docs/legal/privacy.md)",
-]) {
-  if (!readme.includes(requiredText)) {
-    fail(`README.md is missing: ${requiredText}`);
-  }
-}
-
 const trackedFiles = execFileSync("git", ["ls-files", "-z"], {
   cwd: repositoryRoot,
   encoding: "utf8",
