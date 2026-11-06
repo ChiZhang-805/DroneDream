@@ -445,6 +445,7 @@ describe("Settings update center", () => {
     }));
 
     expect(router.state.location.pathname).toBe("/desktop/setup");
+    expect(router.state.location.search).toBe("?required=runtime-base-upgrade");
     router.dispose();
   });
 

@@ -2583,7 +2583,7 @@ function SettingsDialog({
           <SettingsUpdateCenter
             onOpenRuntimeBase={() => {
               onClose();
-              navigate("/desktop/setup");
+              navigate("/desktop/setup?required=runtime-base-upgrade");
             }}
           />
           </section>

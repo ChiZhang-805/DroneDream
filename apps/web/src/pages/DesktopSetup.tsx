@@ -306,6 +306,11 @@ export function DesktopSetup() {
     getDesktopStartupGateSession,
   );
   const [searchParams] = useSearchParams();
+  const runtimeUpgradeRequested =
+    searchParams.get("required") === "runtime-base-upgrade";
+  const [runtimeUpgradeCheckPending, setRuntimeUpgradeCheckPending] = useState(
+    runtimeUpgradeRequested,
+  );
   const runtimeAccess = useDesktopRuntimeAccess();
   const { refresh: refreshRuntimeAccess } = runtimeAccess;
   const desktopAvailable = isDesktopRuntime();
@@ -383,6 +388,7 @@ export function DesktopSetup() {
       Boolean(signedInAccount) &&
       startupGate.accountId === signedInAccount?.id);
   const updaterBusy =
+    runtimeUpgradeCheckPending ||
     (["checking", "downloading"].includes(updater.status) && updater.updateRequired) ||
     updater.status === "installing" ||
     updater.status === "reconcilingEngine" ||
@@ -520,6 +526,17 @@ export function DesktopSetup() {
       componentMounted.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!runtimeUpgradeRequested) return undefined;
+    let active = true;
+    void checkForAppUpdates().finally(() => {
+      if (active) setRuntimeUpgradeCheckPending(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [checkForAppUpdates, runtimeUpgradeRequested]);
 
   useEffect(() => {
     if (!desktopAvailable || !runtimeAccess.snapshot) return;

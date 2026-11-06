@@ -1012,6 +1012,37 @@ describe("DesktopSetup", () => {
       .not.toBeInTheDocument();
   });
 
+  it("waits for the Runtime Base entry check before returning to the workspace", async () => {
+    let finishUpdateCheck!: () => void;
+    updaterState.current = {
+      ...updaterState.current,
+      checkForUpdates: vi.fn(() => new Promise<void>((resolve) => {
+        finishUpdateCheck = resolve;
+      })),
+    };
+    window.__TAURI__ = { core: { invoke: vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return runtime;
+      if (command === "get_runtime_install_progress") return idleInstallSnapshot;
+      if (command === "get_installer_runtime_intent") return noInstallerRuntimeIntent;
+      throw new Error(`Unexpected command: ${command}`);
+    }) } };
+
+    renderPage(
+      "en",
+      noInstallerRuntimeIntent,
+      noInstallerAutoStart,
+      false,
+      discardedInstallerIntent,
+      "/?required=runtime-base-upgrade",
+    );
+
+    await waitFor(() => expect(updaterState.current.checkForUpdates).toHaveBeenCalled());
+    expect(screen.getByTestId("current-route")).toHaveTextContent(/^\/$/u);
+
+    await act(async () => finishUpdateCheck());
+  });
+
   it("keeps checking through a transient system-probe timeout instead of showing an error", async () => {
     let prerequisiteAttempts = 0;
     const invoke = vi.fn(async (command: string) => {
