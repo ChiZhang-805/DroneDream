@@ -457,10 +457,7 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
       updateRef.current = null;
       await previousUpdate?.close();
       if (generation !== checkGenerationRef.current) return;
-      const update = await check({
-        timeout: 15_000,
-        allowDowngrades: false,
-      });
+      const update = await check({ timeout: 15_000 });
       if (generation !== checkGenerationRef.current) {
         await update?.close();
         return;
@@ -519,7 +516,7 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
     if (await restoreNativeAppUpdate()) return;
     const generation = ++checkGenerationRef.current;
     try {
-      const update = await check({ timeout: 15_000, allowDowngrades: false });
+      const update = await check({ timeout: 15_000 });
       if (generation !== checkGenerationRef.current || !enabled) {
         await update?.close();
         return;
