@@ -10,14 +10,39 @@ $privacyPolicyPath = Join-Path $repositoryRoot "docs/legal/privacy.md"
 $termsOfServicePath = Join-Path $repositoryRoot "docs/legal/terms.md"
 $release = Get-Content -LiteralPath $releaseConfigPath -Raw | ConvertFrom-Json
 $releaseEditionsOverride = $null
-if ($env:DRONEDREAM_RELEASE_TAG) {
-    $releaseTagOverride = [string]$env:DRONEDREAM_RELEASE_TAG
+$repository = if ($env:GITHUB_REPOSITORY) { [string]$env:GITHUB_REPOSITORY } else { "ChiZhang-805/DroneDream" }
+$releaseTagOverride = ([string]$env:DRONEDREAM_RELEASE_TAG).Trim()
+if (-not $releaseTagOverride -and $env:GITHUB_ACTIONS -ceq "true") {
+    $releaseListJson = & gh release list --repo $repository --limit 100 --json tagName,isDraft
+    if ($LASTEXITCODE -ne 0) { throw "Unable to list published synchronized releases." }
+    $releaseCandidates = @(
+        $releaseListJson | ConvertFrom-Json |
+            Where-Object { -not $_.isDraft } |
+            ForEach-Object {
+                $match = [regex]::Match(
+                    [string]$_.tagName,
+                    '^five-edition-v\d+\.\d+\.\d+-build-(?<build>[1-9][0-9]*)$'
+                )
+                if ($match.Success) {
+                    [pscustomobject]@{
+                        tagName = [string]$_.tagName
+                        buildNumber = [long]$match.Groups['build'].Value
+                    }
+                }
+            }
+    )
+    $latestRelease = $releaseCandidates |
+        Sort-Object -Property buildNumber -Descending |
+        Select-Object -First 1
+    if ($null -eq $latestRelease) { throw "No published synchronized software release was found." }
+    $releaseTagOverride = [string]$latestRelease.tagName
+}
+if ($releaseTagOverride) {
     if ($releaseTagOverride -cnotmatch '^five-edition-v(?<version>\d+\.\d+\.\d+)-build-(?<build>[1-9][0-9]*)$') {
         throw "Invalid synchronized release tag: $releaseTagOverride"
     }
     $releaseVersionOverride = [string]$Matches.version
     $releaseBuildOverride = [long]$Matches.build
-    $repository = if ($env:GITHUB_REPOSITORY) { [string]$env:GITHUB_REPOSITORY } else { "ChiZhang-805/DroneDream" }
     $releaseView = & gh release view $releaseTagOverride --repo $repository --json publishedAt,isDraft,assets
     if ($LASTEXITCODE -ne 0) { throw "Unable to read synchronized release $releaseTagOverride" }
     $publishedRelease = $releaseView | ConvertFrom-Json
