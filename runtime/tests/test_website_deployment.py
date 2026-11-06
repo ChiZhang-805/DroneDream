@@ -167,6 +167,12 @@ class WebsiteDeploymentContractTests(unittest.TestCase):
             workflow,
         )
 
+    def test_pages_deployment_allows_platform_queue_delay(self) -> None:
+        workflow = self.read(".github/workflows/pages.yml")
+
+        self.assertIn("timeout-minutes: 20", workflow)
+        self.assertIn("timeout: 1200000", workflow)
+
     def test_release_build_and_deploy_accept_edition_scoped_msvc_artifacts(self) -> None:
         pages_builder = self.read("apps/website/scripts/build-pages-site.ps1")
         release_builder = self.read("apps/website/scripts/build-release-site.ps1")
