@@ -1018,6 +1018,10 @@ describe("DesktopSetup", () => {
 
   it("waits for the Runtime Base entry check before returning to the workspace", async () => {
     let finishUpdateCheck!: () => void;
+    vi.stubEnv(
+      "VITE_RUNTIME_RELEASE_MANIFEST_URL",
+      "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.2-beta.1/runtime-release.json",
+    );
     updaterState.current = {
       ...updaterState.current,
       checkForUpdates: vi.fn(() => new Promise<void>((resolve) => {
@@ -1050,6 +1054,12 @@ describe("DesktopSetup", () => {
       expect(screen.getByTestId("current-route"))
         .toHaveAttribute("data-search", "?required=runtime-base-upgrade");
     });
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Upgrade Runtime Base" }))
+        .toBeEnabled();
+    });
+    expect(screen.getByRole("progressbar", { name: "Startup readiness progress" }))
+      .not.toHaveAttribute("aria-valuenow", "100");
   });
 
   it("keeps checking through a transient system-probe timeout instead of showing an error", async () => {

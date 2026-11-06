@@ -393,6 +393,8 @@ export function DesktopSetup() {
     updater.status === "installing" ||
     updater.status === "reconcilingEngine" ||
     updater.status === "installingComponents";
+  const runtimeUpgradeRequired =
+    updater.status === "runtimeBaseRequired" || runtimeUpgradeRequested;
   const updaterBlocksWorkspace =
     updaterBusy ||
     (["available", "ready"].includes(updater.status) && updater.updateRequired) ||
@@ -401,7 +403,7 @@ export function DesktopSetup() {
       "componentUpdateDeferred",
       "componentError",
     ].includes(updater.status) && updater.updateRequired) ||
-    updater.status === "runtimeBaseRequired";
+    runtimeUpgradeRequired;
   const updaterActionRequired =
     (["available", "ready"].includes(updater.status) && updater.updateRequired) ||
     ([
@@ -409,7 +411,7 @@ export function DesktopSetup() {
       "componentUpdateDeferred",
       "componentError",
     ].includes(updater.status) && updater.updateRequired) ||
-    updater.status === "runtimeBaseRequired";
+    runtimeUpgradeRequired;
   const localChecksReady =
     (!desktopAvailable || coreStartup === "ready") &&
     localRuntimeReady &&
@@ -856,7 +858,7 @@ export function DesktopSetup() {
   const beginRuntimeUpgrade = useCallback(async () => {
     if (
       !desktopAvailable ||
-      updater.status !== "runtimeBaseRequired" ||
+      !runtimeUpgradeRequired ||
       installState.commandBusy ||
       isActiveInstall(installState.snapshot) ||
       !state.runtimeFresh ||
@@ -886,6 +888,7 @@ export function DesktopSetup() {
     releaseManifestUrl,
     state.runtime,
     state.runtimeFresh,
+    runtimeUpgradeRequired,
     updater.status,
   ]);
 
@@ -1421,7 +1424,7 @@ export function DesktopSetup() {
             !postSignInBlocked &&
             !updaterBlocksWorkspace
           }
-          runtimeUpgradeRequired={updater.status === "runtimeBaseRequired"}
+          runtimeUpgradeRequired={runtimeUpgradeRequired}
           automaticStartPending={automaticStartPending}
           commandBusy={installState.commandBusy}
         >
@@ -1479,7 +1482,7 @@ export function DesktopSetup() {
               {t("updater.sidebarRetry")}
             </button>
           </div>
-        ) : updater.status === "runtimeBaseRequired" ? (
+        ) : runtimeUpgradeRequired ? (
           <div className="launcher-ready-actions">
             <button
               type="button"
