@@ -536,6 +536,19 @@ class SystemdContractTests(unittest.TestCase):
             dockerfile.index("systemctl enable dronedream-runtime-init.service"),
         )
 
+    def test_locked_python_downloads_tolerate_slow_package_delivery(self) -> None:
+        dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
+        self.assertIn("ARG PIP_DOWNLOAD_TIMEOUT=300", dockerfile)
+        self.assertIn("ARG PIP_DOWNLOAD_RETRIES=10", dockerfile)
+        self.assertIn(
+            '--timeout "${PIP_DOWNLOAD_TIMEOUT}" --retries "${PIP_DOWNLOAD_RETRIES}"',
+            dockerfile,
+        )
+        self.assertIn(
+            "-r /opt/dronedream/source/runtime/installer/locks/python-requirements.lock",
+            dockerfile,
+        )
+
     def test_runtime_diagnostic_tools_are_packaged_and_verified(self) -> None:
         dockerfile = (RUNTIME / "Dockerfile").read_text(encoding="utf-8")
         self.assertRegex(dockerfile, r"\biproute2\b")

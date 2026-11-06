@@ -17,6 +17,8 @@ ARG BACKEND_VERSION=0.1.0
 ARG WORKER_VERSION=0.1.0
 ARG MAVSDK_VERSION=3.15.3
 ARG PYULOG_VERSION=1.2.3
+ARG PIP_DOWNLOAD_TIMEOUT=300
+ARG PIP_DOWNLOAD_RETRIES=10
 ARG PX4_BUILD_JOBS=2
 ARG DRONEDREAM_UID=2000
 ARG DRONEDREAM_GID=2000
@@ -80,6 +82,7 @@ RUN test -n "${DRONEDREAM_SOURCE_COMMIT}" && \
     test -n "${DRONEDREAM_SOURCE_DATE_EPOCH}" && \
     python3 -m venv /opt/dronedream/venv && \
     /opt/dronedream/venv/bin/pip install --disable-pip-version-check --no-cache-dir \
+      --timeout "${PIP_DOWNLOAD_TIMEOUT}" --retries "${PIP_DOWNLOAD_RETRIES}" \
       -r /opt/dronedream/source/runtime/installer/locks/python-requirements.lock && \
     /opt/dronedream/venv/bin/pip install --disable-pip-version-check --no-cache-dir \
       --no-deps /opt/dronedream/source/server/api /opt/dronedream/source/server/worker && \
