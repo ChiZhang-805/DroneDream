@@ -621,6 +621,7 @@ export function DesktopSetup() {
 
   useEffect(() => {
     if (
+      !runtimeUpgradeRequested &&
       workspaceReady &&
       auth?.configured &&
       auth.account
@@ -631,6 +632,7 @@ export function DesktopSetup() {
     auth?.account,
     auth?.configured,
     navigate,
+    runtimeUpgradeRequested,
     workspaceReady,
   ]);
 

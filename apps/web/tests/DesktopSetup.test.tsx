@@ -500,7 +500,11 @@ function renderPage(
 
 function LocationProbe() {
   const location = useLocation();
-  return <output data-testid="current-route">{location.pathname}</output>;
+  return (
+    <output data-search={location.search} data-testid="current-route">
+      {location.pathname}
+    </output>
+  );
 }
 
 afterEach(() => {
@@ -1041,6 +1045,11 @@ describe("DesktopSetup", () => {
     expect(screen.getByTestId("current-route")).toHaveTextContent(/^\/$/u);
 
     await act(async () => finishUpdateCheck());
+    await waitFor(() => {
+      expect(screen.getByTestId("current-route")).toHaveTextContent(/^\/$/u);
+      expect(screen.getByTestId("current-route"))
+        .toHaveAttribute("data-search", "?required=runtime-base-upgrade");
+    });
   });
 
   it("keeps checking through a transient system-probe timeout instead of showing an error", async () => {
