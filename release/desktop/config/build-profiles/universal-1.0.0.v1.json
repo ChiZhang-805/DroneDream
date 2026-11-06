@@ -39,7 +39,7 @@
     "sourceFiles": [
       {
         "path": "apps/web/src/AppShell.tsx",
-        "sha256": "cbb4d46503431b6c4a8faea50c6b615d34e949346653fb60a46b1f58eeea4cd5"
+        "sha256": "4a8a8e9252368cd77fa01ec4e859dbd7a43a1e1075cca532ecd391b89a435316"
       },
       {
         "path": "apps/web/src/components/EditionSettingsSurface.tsx",
