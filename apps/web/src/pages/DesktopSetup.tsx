@@ -889,7 +889,6 @@ export function DesktopSetup() {
     state.runtime,
     state.runtimeFresh,
     runtimeUpgradeRequired,
-    updater.status,
   ]);
 
   const cancelInstall = useCallback(async () => {

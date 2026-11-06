@@ -73,7 +73,7 @@ jobs:
     name: Publish global website
     needs: build
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 20
     permissions:
       pages: write
       id-token: write
