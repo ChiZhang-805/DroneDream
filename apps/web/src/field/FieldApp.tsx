@@ -321,6 +321,7 @@ function FieldWorkspace({
     "installing",
     "reconcilingEngine",
     "installingComponents",
+    "preparingUpdate",
     "upgradingRuntime",
   ].includes(updater.status);
   const updateProgress = ["downloading", "installing", "upgradingRuntime"].includes(updater.status)

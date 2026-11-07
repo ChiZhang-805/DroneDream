@@ -553,6 +553,61 @@ describe("useAppUpdater", () => {
     hook.unmount();
   });
 
+  it("shows preparation immediately while the Runtime safety check is pending", async () => {
+    checkMock.mockResolvedValue(null);
+    getEnginePackStatusMock.mockResolvedValue({
+      supported: false,
+      updateRequired: true,
+      runtimeBaseUpgradeAvailable: true,
+      embeddedPackId: `sha256:${"3".repeat(64)}`,
+      embeddedSourceCommit: "4".repeat(40),
+      installedPackId: null,
+      installedSourceCommit: null,
+      message: "The installed Runtime Base predates Engine Pack updates.",
+    });
+
+    const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(hook.result.current.status).toBe("runtimeBaseRequired"));
+
+    const safetyCheck = deferred<{
+      runtimeName: string;
+      installed: boolean;
+      running: boolean;
+      ready: boolean;
+      version: string;
+      dataRoot: string;
+      components: never[];
+      diagnostics: never[];
+    }>();
+    probeRuntimeStatusMock.mockReturnValueOnce(safetyCheck.promise);
+    let install!: Promise<void>;
+    act(() => {
+      install = hook.result.current.installRuntimeBaseUpdate();
+    });
+
+    await waitFor(() => expect(hook.result.current.status).toBe("preparingUpdate"));
+    expect(hook.result.current.progress).toBeNull();
+    expect(startRuntimeUpgradeMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      safetyCheck.resolve({
+        runtimeName: "DroneDreamRuntime",
+        installed: true,
+        running: false,
+        ready: false,
+        version: "0.1.1",
+        dataRoot: "Q:\\DroneDream-Workspace\\Runtime",
+        components: [],
+        diagnostics: [],
+      });
+      await install;
+    });
+
+    expect(startRuntimeUpgradeMock).toHaveBeenCalledOnce();
+    expect(hook.result.current.status).toBe("upgradingRuntime");
+    hook.unmount();
+  });
+
   it("offers a Runtime Base upgrade inside the workspace when the active Engine Pack remains usable", async () => {
     checkMock.mockResolvedValue(null);
     getEnginePackStatusMock.mockResolvedValue({

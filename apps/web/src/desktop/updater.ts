@@ -38,6 +38,7 @@ export type AppUpdateStatus =
   | "installingComponents"
   | "componentUpdateDeferred"
   | "componentError"
+  | "preparingUpdate"
   | "upgradingRuntime"
   | "runtimeBaseAvailable"
   | "runtimeBaseRequired"
@@ -73,6 +74,7 @@ const CURRENT_STATE: AppUpdateState = {
 };
 
 export const AUTOMATIC_UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+export const UPDATE_SAFETY_CHECK_TIMEOUT_MS = 10_000;
 
 const ACTIVE_RUNTIME_UPGRADE_PHASES = new Set([
   "queued",
@@ -216,9 +218,25 @@ function isActiveExperimentDeferral(message: string): boolean {
   return message.includes("waiting for active experiments to finish");
 }
 
+async function updateSafetyStep<T>(operation: Promise<T>): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => {
+          reject(new Error("The active-experiment safety check timed out."));
+        }, UPDATE_SAFETY_CHECK_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
 export async function detectRunningUpdateBlock(): Promise<AppUpdateBlock | null> {
   try {
-    const runtime = await probeRuntimeStatus();
+    const runtime = await updateSafetyStep(probeRuntimeStatus());
     if (!runtime.installed || !runtime.running) return null;
     if (!runtime.ready) {
       return {
@@ -227,7 +245,11 @@ export async function detectRunningUpdateBlock(): Promise<AppUpdateBlock | null>
         message: "DroneDream could not verify whether the running Runtime has an active experiment. Stop the Runtime or try again after it becomes ready.",
       };
     }
-    const jobs = await apiClient.listJobs({ status: "RUNNING", page: 1, page_size: 100 });
+    const jobs = await updateSafetyStep(apiClient.listJobs({
+      status: "RUNNING",
+      page: 1,
+      page_size: 100,
+    }));
     if (jobs.items.length === 0) return null;
     const runningJobs = jobs.items.map((job) => ({
       id: job.id,
@@ -633,20 +655,32 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
       !["runtimeBaseAvailable", "runtimeBaseRequired"].includes(state.status)
       || installInFlightRef.current
     ) return;
-    const block = await detectRunningUpdateBlock();
-    if (block) {
-      setState((current) => ({ ...current, blockedActivity: block }));
-      return;
-    }
+    const requestedStatus = state.status;
     installInFlightRef.current = true;
     setState((current) => ({
       ...current,
-      status: "upgradingRuntime",
-      progress: 0,
+      status: "preparingUpdate",
+      progress: null,
       error: null,
       blockedActivity: null,
     }));
     try {
+      const block = await detectRunningUpdateBlock();
+      if (block) {
+        installInFlightRef.current = false;
+        setState((current) => ({
+          ...current,
+          status: requestedStatus,
+          progress: null,
+          blockedActivity: block,
+        }));
+        return;
+      }
+      setState((current) => ({
+        ...current,
+        status: "upgradingRuntime",
+        progress: 0,
+      }));
       const snapshot = await startRuntimeUpgrade({
         releaseManifestUrl: configuredRuntimeReleaseManifestUrl(),
       });

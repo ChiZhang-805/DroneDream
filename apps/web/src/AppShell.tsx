@@ -3865,6 +3865,7 @@ function AppShellContent() {
     "installing",
     "reconcilingEngine",
     "installingComponents",
+    "preparingUpdate",
     "upgradingRuntime",
   ].includes(updater.status);
   const sidebarUpdateProgress = [
@@ -3913,6 +3914,7 @@ function AppShellContent() {
     if (updater.status === "checking") return t("updater.checking");
     if (updater.status === "reconcilingEngine") return t("updater.engine");
     if (updater.status === "installingComponents") return t("updater.components");
+    if (updater.status === "preparingUpdate") return t("updater.checking");
     if (updater.status === "upgradingRuntime") return t("updater.sidebarRuntimeBase");
     if (updater.status === "ready") return t("updater.sidebarRestart");
     if (updater.status === "available") return t("updater.sidebarAvailable");

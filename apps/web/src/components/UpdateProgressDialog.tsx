@@ -14,6 +14,7 @@ const ACTIVE_UPDATE_STATES = new Set<AppUpdateStatus>([
   "installing",
   "reconcilingEngine",
   "installingComponents",
+  "preparingUpdate",
   "upgradingRuntime",
 ]);
 
