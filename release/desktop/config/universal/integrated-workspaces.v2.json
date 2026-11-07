@@ -73,7 +73,7 @@
     },
     {
       "path": "apps/web/src/field/field.css",
-      "sha256": "122fc3f26889d6446c8305eeda09c95a0c77d1db76bf733735b8b979824431fe",
+      "sha256": "de07198373ed20d93fbf74973dc8bd28fa8d0440f8b27504a19bcfe18104fdc7",
       "donorEdition": "field",
       "donorBlob": "49d715fd854354277352be5f77dfd2db5d06b51a",
       "integration": "semantic-field-settings-and-responsive-chrome"
@@ -122,7 +122,7 @@
     },
     {
       "path": "apps/web/src/field/FieldApp.tsx",
-      "sha256": "d875b167e5657dae619000c787fbcf9d4700f6df0be684bcc41a86306276d235",
+      "sha256": "8e1e11407c02df5d1879790b3f96ce374e5d85cea67129361d690768d3871569",
       "donorEdition": "field",
       "donorBlob": "5c4e3f01f16d831cdf0d995904c5b8b0a9b11c0d",
       "integration": "semantic-universal-shared-locale-adapter"
