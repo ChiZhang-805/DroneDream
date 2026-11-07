@@ -1016,6 +1016,52 @@ describe("DesktopSetup", () => {
       .not.toBeInTheDocument();
   });
 
+  it("automatically starts a Runtime Base upgrade opened from the account update button", async () => {
+    optionalAuthState.current = {
+      configured: true,
+      loading: false,
+      account: null,
+    };
+    updaterState.current = {
+      ...updaterState.current,
+      status: "runtimeBaseRequired",
+      updateRequired: true,
+    };
+    vi.stubEnv(
+      "VITE_RUNTIME_RELEASE_MANIFEST_URL",
+      "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.2-beta.1/runtime-release.json",
+    );
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "probe_system_prerequisites") return prerequisites;
+      if (command === "probe_runtime_status") return runtime;
+      if (command === "get_runtime_install_progress") return idleInstallSnapshot;
+      if (command === "get_installer_runtime_intent") return noInstallerRuntimeIntent;
+      if (command === "start_runtime_upgrade") {
+        return installSnapshot({ operationId: "runtime-upgrade-1" });
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+
+    renderPage(
+      "en",
+      noInstallerRuntimeIntent,
+      noInstallerAutoStart,
+      false,
+      discardedInstallerIntent,
+      "/?required=runtime-base-upgrade&autostart=1",
+    );
+
+    await waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("start_runtime_upgrade", {
+        request: {
+          releaseManifestUrl:
+            "https://github.com/ChiZhang-805/DroneDream/releases/download/runtime-v0.1.2-beta.1/runtime-release.json",
+        },
+      });
+    });
+  });
+
   it("waits for the Runtime Base entry check before returning to the workspace", async () => {
     let finishUpdateCheck!: () => void;
     vi.stubEnv(

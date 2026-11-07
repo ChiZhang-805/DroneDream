@@ -3,9 +3,33 @@ import { resolve } from "node:path";
 
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import postcss from "postcss";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as cloudModels from "../src/features/settings/cloudModelAccess";
+import type { AppUpdateStatus } from "../src/desktop/updater";
+
+const updaterState = vi.hoisted(() => ({
+  current: {
+    status: "current" as AppUpdateStatus,
+    availableVersion: null,
+    updateRequired: false,
+    progress: null,
+    error: null,
+    enginePack: null,
+    componentUpdates: null,
+    desktopRuntime: true,
+    checkForUpdates: vi.fn(async () => undefined),
+    installAvailableUpdate: vi.fn(async () => undefined),
+    installComponentUpdates: vi.fn(async () => undefined),
+    reconcileEnginePack: vi.fn(async () => undefined),
+    reconcileComponentPacks: vi.fn(async () => undefined),
+  },
+}));
+
+vi.mock("../src/desktop/updaterContext", () => ({
+  useAppUpdaterState: () => updaterState.current,
+}));
+
 import { FieldApp } from "../src/field/FieldApp";
 import type { FieldObservationState } from "../src/field/safety";
 
@@ -37,6 +61,78 @@ describe("FieldApp", () => {
       policy_version: 1,
       models: [],
     });
+    updaterState.current = {
+      ...updaterState.current,
+      status: "current",
+      progress: null,
+      error: null,
+      checkForUpdates: vi.fn(async () => undefined),
+      installAvailableUpdate: vi.fn(async () => undefined),
+      installComponentUpdates: vi.fn(async () => undefined),
+      reconcileEnginePack: vi.fn(async () => undefined),
+      reconcileComponentPacks: vi.fn(async () => undefined),
+    };
+  });
+
+  afterEach(() => {
+    delete window.__TAURI__;
+    vi.unstubAllEnvs();
+  });
+
+  it("keeps the blue account-adjacent update entry available when current", async () => {
+    window.__TAURI__ = { core: { invoke: vi.fn(async () => undefined) } };
+    await renderField();
+
+    const update = screen.getByRole("button", { name: "Check for updates" });
+    expect(update).toHaveClass("field-sidebar-update");
+    fireEvent.click(update);
+
+    expect(updaterState.current.checkForUpdates).toHaveBeenCalledOnce();
+  });
+
+  it("uses the same Field entry for component and Runtime Base updates", async () => {
+    const invoke = vi.fn(async (command: string) => {
+      if (command === "start_runtime_upgrade") {
+        return {
+          operationId: "runtime-upgrade-1",
+          phase: "completed",
+          bytesDownloaded: 1024,
+          bytesTotal: 1024,
+          currentPart: 1,
+          totalParts: 1,
+          message: "Runtime Base updated",
+          error: null,
+          resumable: false,
+          requiresRestart: false,
+          targetRoot: "Q:\\DroneDream-Workspace\\Runtime",
+          installedVersion: "0.1.2",
+          updatedAt: "2026-11-07T00:00:00Z",
+        };
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    window.__TAURI__ = { core: { invoke } };
+    vi.stubEnv(
+      "VITE_RUNTIME_RELEASE_MANIFEST_URL",
+      "https://updates.getdronedream.com/runtime/release-manifest.v1.json",
+    );
+    updaterState.current = {
+      ...updaterState.current,
+      status: "runtimeBaseRequired",
+      updateRequired: true,
+    };
+    await renderField();
+
+    fireEvent.click(screen.getByRole("button", { name: "Update Runtime Base" }));
+
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith(
+      "start_runtime_upgrade",
+      {
+        request: {
+          releaseManifestUrl: "https://updates.getdronedream.com/runtime/release-manifest.v1.json",
+        },
+      },
+    ));
   });
 
   it("opens Chatting first and exposes six true page controls", async () => {

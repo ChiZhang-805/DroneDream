@@ -895,7 +895,6 @@ function SettingsDialog({
   preferenceSaveQueueRef: MutableRefObject<Promise<boolean>>;
 }) {
   const { locale, interfaceLocale, setLocale, restoreLocale, t } = useI18n();
-  const navigate = useNavigate();
   const settingsCopy = SETTINGS_COPY[interfaceLocale];
   const editionTheme = useEditionTheme();
   const setCustomAccentPreference = editionTheme.setCustomAccent;
@@ -2580,12 +2579,7 @@ function SettingsDialog({
               </ul>
             ) : null}
           </section>
-          <SettingsUpdateCenter
-            onOpenRuntimeBase={() => {
-              onClose();
-              navigate("/desktop/setup?required=runtime-base-upgrade");
-            }}
-          />
+          <SettingsUpdateCenter />
           </section>
         </EditionSettingsPanel>
       ) : null}
@@ -3863,18 +3857,15 @@ function AppShellContent() {
     && !launcherMode;
   const accountDialogOpen = accountOpen || accountDialogRequired;
   const mobileMenuExpanded = mobileNavigationEnabled && mobileMenuOpen;
-  const sidebarUpdateVisible = desktopRuntime && [
-    "available",
-    "ready",
-    "downloading",
-    "installing",
-    "engineAvailable",
-  ].includes(updater.status);
+  const sidebarUpdateVisible = desktopRuntime;
   const sidebarUpdateBusy = [
+    "checking",
     "downloading",
     "installing",
+    "reconcilingEngine",
+    "installingComponents",
   ].includes(updater.status);
-  const sidebarUpdateProgress = sidebarUpdateBusy
+  const sidebarUpdateProgress = ["downloading", "installing"].includes(updater.status)
     ? Math.max(0, Math.min(100, Math.round(
         updater.progress ?? (updater.status === "installing" ? 100 : 0),
       )))
@@ -3908,23 +3899,49 @@ function AppShellContent() {
           ? FIELD_NAV_ITEMS
           : AUTONOMY_NAV_ITEMS
     : MODE_NAV_ITEMS[universalMode];
-  const sidebarUpdateLabel = sidebarUpdateBusy
-    ? `${t("updater.sidebarProgress")} ${sidebarUpdateProgress}%`
-    : updater.status === "ready"
-      ? t("updater.sidebarRestart")
-      : updater.error
-      ? t("updater.sidebarDeferred")
-      : t("updater.sidebarAvailable");
+  const sidebarUpdateLabel = (() => {
+    if (sidebarUpdateProgress !== null) {
+      return `${t("updater.sidebarProgress")} ${sidebarUpdateProgress}%`;
+    }
+    if (updater.status === "checking") return t("updater.checking");
+    if (updater.status === "reconcilingEngine") return t("updater.engine");
+    if (updater.status === "installingComponents") return t("updater.components");
+    if (updater.status === "ready") return t("updater.sidebarRestart");
+    if (updater.status === "available") return t("updater.sidebarAvailable");
+    if (updater.status === "engineAvailable") return t("updater.sidebarEngine");
+    if (updater.status === "componentAvailable") return t("updater.sidebarComponents");
+    if (["runtimeBaseAvailable", "runtimeBaseRequired"].includes(updater.status)) {
+      return t("updater.sidebarRuntimeBase");
+    }
+    if ([
+      "engineUpdateDeferred",
+      "engineError",
+      "componentUpdateDeferred",
+      "componentError",
+      "error",
+    ].includes(updater.status)) return t("updater.sidebarRetry");
+    return t("updater.sidebarCheck");
+  })();
   const sidebarUpdateDetails = sidebarUpdateBusy && updater.transfer?.downloadedBytes != null
     ? `${sidebarUpdateLabel} · ${(updater.transfer.downloadedBytes / 1048576).toFixed(1)}${updater.transfer.totalBytes ? ` / ${(updater.transfer.totalBytes / 1048576).toFixed(1)}` : ""} MB · ${((updater.transfer.bytesPerSecond ?? 0) / 1048576).toFixed(2)} MB/s`
     : sidebarUpdateLabel;
   const handleSidebarUpdate = useCallback(() => {
     if (["available", "ready"].includes(updater.status)) {
       void updater.installAvailableUpdate();
-    } else if (updater.status === "engineAvailable") {
+    } else if ([
+      "engineAvailable",
+      "engineUpdateDeferred",
+      "engineError",
+    ].includes(updater.status)) {
       void updater.reconcileEnginePack();
+    } else if (updater.status === "componentAvailable") {
+      void updater.installComponentUpdates();
+    } else if (["runtimeBaseAvailable", "runtimeBaseRequired"].includes(updater.status)) {
+      navigate("/desktop/setup?required=runtime-base-upgrade&autostart=1");
+    } else if (!sidebarUpdateBusy) {
+      void updater.checkForUpdates();
     }
-  }, [updater]);
+  }, [navigate, sidebarUpdateBusy, updater]);
   const openExternalNavigation = useCallback((
     event: MouseEvent<HTMLAnchorElement>,
     url: string,
@@ -4653,12 +4670,14 @@ function AppShellContent() {
                 disabled={sidebarUpdateBusy}
                 onClick={handleSidebarUpdate}
               >
-                {sidebarUpdateProgress === null ? (
-                  <Download aria-hidden="true" strokeWidth={2} />
-                ) : (
+                {sidebarUpdateProgress !== null ? (
                   <span className="app-update-progress" aria-hidden="true">
                     {sidebarUpdateProgress}%
                   </span>
+                ) : sidebarUpdateBusy ? (
+                  <LoaderCircle className="is-spinning" aria-hidden="true" strokeWidth={2} />
+                ) : (
+                  <Download aria-hidden="true" strokeWidth={2} />
                 )}
               </button>
             ) : null}

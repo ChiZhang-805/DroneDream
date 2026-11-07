@@ -1,14 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { createRef } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ComponentUpdateReport } from "../src/desktop/bridge";
 import type { AppUpdateStatus } from "../src/desktop/updater";
-
-const bridgeMocks = vi.hoisted(() => ({
-  startRuntimeUpgrade: vi.fn(async () => undefined),
-}));
 
 const updaterState = vi.hoisted(() => ({
   current: {
@@ -26,11 +22,6 @@ const updaterState = vi.hoisted(() => ({
     reconcileEnginePack: vi.fn(async () => undefined),
     reconcileComponentPacks: vi.fn(async () => undefined),
   },
-}));
-
-vi.mock("../src/desktop/bridge", async (importOriginal) => ({
-  ...await importOriginal<typeof import("../src/desktop/bridge")>(),
-  startRuntimeUpgrade: bridgeMocks.startRuntimeUpgrade,
 }));
 
 vi.mock("../src/desktop/updaterContext", () => ({
@@ -111,7 +102,7 @@ describe("Field settings update center", () => {
     expect(screen.queryByText(/engine-pack-manager\.py/)).not.toBeInTheDocument();
   });
 
-  it("offers the signed application installer from the standalone Field surface", () => {
+  it("reports a signed application update without installing it from settings", () => {
     updaterState.current = {
       ...updaterState.current,
       status: "available",
@@ -125,12 +116,13 @@ describe("Field settings update center", () => {
     expect(screen.getByRole("status", {
       name: "software version state: old-version · v1.0.1",
     })).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "Install update" }));
+    fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
 
-    expect(updaterState.current.installAvailableUpdate).toHaveBeenCalledOnce();
+    expect(updaterState.current.installAvailableUpdate).not.toHaveBeenCalled();
+    expect(updaterState.current.checkForUpdates).toHaveBeenCalledOnce();
   });
 
-  it("offers a routine Engine Pack update from inside the workspace", () => {
+  it("reports a routine Engine Pack update without installing it from settings", () => {
     updaterState.current = {
       ...updaterState.current,
       status: "engineAvailable",
@@ -139,16 +131,13 @@ describe("Field settings update center", () => {
     renderSettings();
     fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
 
-    fireEvent.click(screen.getByRole("button", { name: "Update Engine Pack" }));
+    fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
 
-    expect(updaterState.current.reconcileEnginePack).toHaveBeenCalledOnce();
+    expect(updaterState.current.reconcileEnginePack).not.toHaveBeenCalled();
+    expect(updaterState.current.checkForUpdates).toHaveBeenCalledOnce();
   });
 
-  it("starts the native Runtime Base upgrade with Simplified Chinese feedback", async () => {
-    vi.stubEnv(
-      "VITE_RUNTIME_RELEASE_MANIFEST_URL",
-      "https://updates.getdronedream.com/runtime/release-manifest.v1.json",
-    );
+  it("reports a Runtime Base upgrade in Simplified Chinese without installing it", () => {
     updaterState.current = {
       ...updaterState.current,
       status: "runtimeBaseRequired",
@@ -158,15 +147,8 @@ describe("Field settings update center", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "Runtime" }));
     expect(screen.getByRole("heading", { name: "软件更新" })).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "升级 Runtime Base" }));
+    fireEvent.click(screen.getByRole("button", { name: "检查更新" }));
 
-    await waitFor(() => {
-      expect(bridgeMocks.startRuntimeUpgrade).toHaveBeenCalledWith({
-        releaseManifestUrl:
-          "https://updates.getdronedream.com/runtime/release-manifest.v1.json",
-      });
-    });
-    expect(await screen.findByText("Runtime Base 升级已启动，请保持 DroneDream 打开。"))
-      .toBeVisible();
+    expect(updaterState.current.checkForUpdates).toHaveBeenCalledOnce();
   });
 });

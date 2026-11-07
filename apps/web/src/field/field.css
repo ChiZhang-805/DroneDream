@@ -4080,8 +4080,8 @@ body:has(.field-app),
   border: 0;
   border-radius: 50%;
   color: #fff;
-  background: linear-gradient(135deg, var(--dd-brand-start), var(--dd-brand-end));
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--dd-brand-start) 28%, transparent);
+  background: linear-gradient(135deg, #2d8cea, #4b6ff1);
+  box-shadow: 0 8px 20px rgb(45 140 234 / 28%);
   place-items: center;
   cursor: pointer;
 }

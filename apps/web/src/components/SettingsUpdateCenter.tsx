@@ -31,12 +31,8 @@ function safeUpdateError(
 }
 
 export function SettingsUpdateCenter({
-  onOpenRuntimeBase,
-  runtimeBaseActionDisabled = false,
   runtime,
 }: {
-  onOpenRuntimeBase: () => void | Promise<void>;
-  runtimeBaseActionDisabled?: boolean;
   runtime?: RuntimeStatusReport | null;
 }) {
   const { locale, t } = useI18n();
@@ -90,91 +86,56 @@ export function SettingsUpdateCenter({
   let stateValue = copy.current;
   let tone: SettingsUpdateTone = "current";
   let StatusIcon: LucideIcon = CircleCheckBig;
-  let actionLabel: string | null = t("settings.updates.checkNow");
-  let action: (() => void | Promise<void>) | null = () => { void updater.checkForUpdates(); };
-  let actionPrimary = false;
-  let actionDisabled = false;
 
   if (updater.status === "checking") {
     stateValue = copy.checking;
     tone = "busy";
     StatusIcon = RefreshCcw;
-    actionLabel = t("updater.checking");
-    action = null;
-    actionDisabled = true;
   } else if (updater.status === "available" || updater.status === "ready") {
     stateValue = `${copy.oldVersion}${updater.availableVersion ? ` · v${updater.availableVersion}` : ""}`;
     tone = "attention";
     StatusIcon = Download;
-    actionLabel = updater.status === "ready"
-      ? t("updater.sidebarRestart")
-      : localizedError
-      ? t("settings.updates.retry")
-      : t("settings.updates.installApp");
-    action = () => { void updater.installAvailableUpdate(); };
-    actionPrimary = updater.updateRequired;
   } else if (updater.status === "downloading") {
     stateValue = `${copy.downloading}${progress === null ? "" : ` · ${progress}%`}`;
     tone = "busy";
     StatusIcon = Download;
-    actionLabel = null;
-    action = null;
   } else if (updater.status === "installing") {
     stateValue = `${copy.installing}${progress === null ? "" : ` · ${progress}%`}`;
     tone = "busy";
     StatusIcon = RefreshCcw;
-    actionLabel = null;
-    action = null;
   } else if (updater.status === "reconcilingEngine") {
     stateValue = copy.reconciling;
     tone = "busy";
     StatusIcon = RefreshCcw;
-    actionLabel = null;
-    action = null;
   } else if (updater.status === "engineAvailable") {
     stateValue = copy.engineAvailable;
     tone = "attention";
     StatusIcon = Download;
-    actionLabel = t("settings.updates.installEngine");
-    action = () => { void updater.reconcileEnginePack(); };
   } else if (updater.status === "engineUpdateDeferred") {
     stateValue = copy.deferred;
     tone = "attention";
     StatusIcon = RefreshCcw;
-    actionLabel = t("settings.updates.retry");
-    action = () => { void updater.reconcileEnginePack(); };
   } else if (updater.status === "engineError") {
     stateValue = copy.engineFailed;
     tone = "error";
     StatusIcon = CircleAlert;
-    actionLabel = t("settings.updates.retry");
-    action = () => { void updater.reconcileEnginePack(); };
   } else if (updater.status === "componentAvailable") {
     const versions = [...new Set(candidates.map((candidate) => `v${candidate.version}`))];
     stateValue = `${copy.oldVersion}${versions.length > 0 ? ` · ${versions.join(" / ")}` : ""}`;
     tone = "attention";
     StatusIcon = Download;
-    actionLabel = t("settings.updates.installPacks");
-    action = () => { void updater.installComponentUpdates(); };
-    actionPrimary = candidates.some((candidate) => candidate.urgency === "required");
   } else if (updater.status === "installingComponents") {
     stateValue = `${copy.installing}${progress === null ? "" : ` · ${progress}%`}`;
     tone = "busy";
     StatusIcon = RefreshCcw;
-    actionLabel = null;
-    action = null;
   } else if (updater.status === "componentUpdateDeferred") {
     stateValue = copy.deferred;
     tone = "attention";
     StatusIcon = RefreshCcw;
-    actionLabel = t("settings.updates.retry");
-    action = () => { void updater.checkForUpdates(); };
   } else if (updater.status === "componentError") {
     stateValue = copy.componentFailed;
     tone = "error";
     StatusIcon = CircleAlert;
-    actionLabel = t("settings.updates.retry");
-    action = () => { void updater.checkForUpdates(); };
   } else if (
     updater.status === "runtimeBaseAvailable" ||
     updater.status === "runtimeBaseRequired"
@@ -184,17 +145,19 @@ export function SettingsUpdateCenter({
       : copy.runtimeAvailable;
     tone = updater.status === "runtimeBaseRequired" ? "error" : "attention";
     StatusIcon = Download;
-    actionLabel = t("settings.updates.openRuntimeBase");
-    action = onOpenRuntimeBase;
-    actionPrimary = updater.status === "runtimeBaseRequired";
-    actionDisabled = runtimeBaseActionDisabled;
   } else if (updater.status === "error") {
     stateValue = copy.failed;
     tone = "error";
     StatusIcon = CircleAlert;
-    actionLabel = t("settings.updates.retry");
-    action = () => { void updater.checkForUpdates(); };
   }
+
+  const updateBusy = [
+    "checking",
+    "downloading",
+    "installing",
+    "reconcilingEngine",
+    "installingComponents",
+  ].includes(updater.status);
 
   const unknown = locale === "zh-CN" ? "未检查" : "Not checked";
   const versionRows = [
@@ -210,14 +173,13 @@ export function SettingsUpdateCenter({
     <section className="settings-update-center settings-runtime-module" aria-labelledby="settings-updates-title">
       <div className="settings-update-heading">
         <h3 id="settings-updates-title">{t("settings.updates.title")}</h3>
-        {actionLabel ? (
+        {!updateBusy ? (
           <button
             type="button"
-            className={`btn settings-update-action${actionPrimary ? " btn-primary" : ""}`}
-            disabled={actionDisabled}
-            onClick={() => { void action?.(); }}
+            className="btn settings-update-action"
+            onClick={() => { void updater.checkForUpdates(); }}
           >
-            {actionLabel}
+            {t("settings.updates.checkNow")}
           </button>
         ) : null}
       </div>

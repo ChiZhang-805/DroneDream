@@ -308,6 +308,8 @@ export function DesktopSetup() {
   const [searchParams] = useSearchParams();
   const runtimeUpgradeRequested =
     searchParams.get("required") === "runtime-base-upgrade";
+  const runtimeUpgradeAutoStartRequested =
+    searchParams.get("autostart") === "1";
   const [runtimeUpgradeCheckPending, setRuntimeUpgradeCheckPending] = useState(
     runtimeUpgradeRequested,
   );
@@ -327,6 +329,7 @@ export function DesktopSetup() {
   const installerDiscardSucceeded = useRef(false);
   const componentMounted = useRef(false);
   const selectedDriveRef = useRef("");
+  const runtimeUpgradeAutoStartAttempted = useRef(false);
   const [state, setState] = useState<ProbeState>(() => ({
     ...INITIAL_STATE,
     loading: desktopAvailable,
@@ -889,6 +892,33 @@ export function DesktopSetup() {
     state.runtime,
     state.runtimeFresh,
     runtimeUpgradeRequired,
+  ]);
+
+  useEffect(() => {
+    if (
+      !runtimeUpgradeAutoStartRequested ||
+      runtimeUpgradeAutoStartAttempted.current ||
+      !desktopAvailable ||
+      !runtimeUpgradeRequired ||
+      installState.commandBusy ||
+      isActiveInstall(installState.snapshot) ||
+      !state.runtimeFresh ||
+      state.runtime?.installed !== true ||
+      !releaseManifestUrl
+    ) return;
+
+    runtimeUpgradeAutoStartAttempted.current = true;
+    void beginRuntimeUpgrade();
+  }, [
+    beginRuntimeUpgrade,
+    desktopAvailable,
+    installState.commandBusy,
+    installState.snapshot,
+    releaseManifestUrl,
+    runtimeUpgradeAutoStartRequested,
+    runtimeUpgradeRequired,
+    state.runtime,
+    state.runtimeFresh,
   ]);
 
   const cancelInstall = useCallback(async () => {

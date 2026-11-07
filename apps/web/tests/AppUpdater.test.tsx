@@ -186,13 +186,35 @@ describe("workspace sidebar version module", () => {
     expect(screen.queryByText("DroneDream 1.0.0")).not.toBeInTheDocument();
     expect(document.querySelector(".app-version-pill")).toBeNull();
     expect(screen.getByRole("button", { name: "Account" })).toBeVisible();
-    expect(screen.queryByRole("button", { name: "Update DroneDream" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
+    expect(updaterState.current.checkForUpdates).toHaveBeenCalledOnce();
     expect(screen.queryByRole("button", { name: "Account options" })).toBeNull();
 
     router.dispose();
   });
 
-  it("shows a compact account-adjacent update action only when an update is ready", () => {
+  it("starts the Runtime Base flow from the same account-adjacent action", () => {
+    updaterState.current = {
+      ...updaterState.current,
+      status: "runtimeBaseRequired",
+      updateRequired: true,
+    };
+    installReadyDesktopBridge();
+    window.history.replaceState(null, "", "/?docsPreview=1");
+    const { router } = renderDashboard();
+
+    fireEvent.click(screen.getByRole("button", {
+      name: "Update DroneDream Runtime Base",
+    }));
+
+    expect(router.state.location.pathname).toBe("/desktop/setup");
+    expect(router.state.location.search).toBe(
+      "?required=runtime-base-upgrade&autostart=1",
+    );
+    router.dispose();
+  });
+
+  it("uses the persistent account-adjacent action for an application update", () => {
     const installAvailableUpdate = vi.fn(async () => undefined);
     updaterState.current = {
       ...updaterState.current,
@@ -213,7 +235,8 @@ describe("workspace sidebar version module", () => {
     router.dispose();
   });
 
-  it("reserves the account-adjacent download action for application updates", () => {
+  it("uses the same account-adjacent action for component updates", () => {
+    const installComponentUpdates = vi.fn(async () => undefined);
     updaterState.current = {
       ...updaterState.current,
       status: "componentAvailable",
@@ -223,17 +246,22 @@ describe("workspace sidebar version module", () => {
         expiresAt: "2026-08-23T00:00:00Z",
         candidates: [],
       },
+      installComponentUpdates,
     };
     installReadyDesktopBridge();
     window.history.replaceState(null, "", "/?docsPreview=1");
     const { router } = renderDashboard();
 
-    expect(document.querySelector(".app-update-button")).toBeNull();
+    const update = screen.getByRole("button", {
+      name: "Update DroneDream workflows and assets",
+    });
+    fireEvent.click(update);
+    expect(installComponentUpdates).toHaveBeenCalledOnce();
 
     router.dispose();
   });
 
-  it("keeps generic update failures in settings without showing a download icon", async () => {
+  it("retries generic update failures from the account-adjacent action", async () => {
     const checkForUpdates = vi.fn(async () => undefined);
     updaterState.current = {
       ...updaterState.current,
@@ -246,11 +274,12 @@ describe("workspace sidebar version module", () => {
     const { router } = renderDashboard();
 
     expect(screen.queryByRole("button", { name: "Account options" })).toBeNull();
-    expect(document.querySelector(".app-update-button")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Retry DroneDream update" }));
+    expect(checkForUpdates).toHaveBeenCalledOnce();
 
     const dialog = await openRuntimeSettings();
-    fireEvent.click(within(dialog).getByRole("button", { name: "Retry" }));
-    expect(checkForUpdates).toHaveBeenCalledOnce();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Check for updates" }));
+    expect(checkForUpdates).toHaveBeenCalledTimes(2);
 
     router.dispose();
   });
@@ -348,7 +377,7 @@ describe("Settings update center", () => {
     router.dispose();
   });
 
-  it("shows required application updates and invokes the signed installer", async () => {
+  it("shows required application updates but keeps installation in the sidebar", async () => {
     const installAvailableUpdate = vi.fn(async () => undefined);
     updaterState.current = {
       ...updaterState.current,
@@ -365,13 +394,14 @@ describe("Settings update center", () => {
     expect(within(dialog).getByRole("status", {
       name: "software version state: old-version · v1.0.1",
     })).toBeVisible();
-    fireEvent.click(within(dialog).getByRole("button", { name: "Install update" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Check for updates" }));
 
-    expect(installAvailableUpdate).toHaveBeenCalledOnce();
+    expect(installAvailableUpdate).not.toHaveBeenCalled();
+    expect(updaterState.current.checkForUpdates).toHaveBeenCalledOnce();
     router.dispose();
   });
 
-  it("summarizes the signed pack version and installs the selected update set", async () => {
+  it("summarizes the signed pack version but keeps installation in the sidebar", async () => {
     const installComponentUpdates = vi.fn(async () => undefined);
     updaterState.current = {
       ...updaterState.current,
@@ -404,9 +434,10 @@ describe("Settings update center", () => {
     expect(within(dialog).getByRole("status", {
       name: "software version state: old-version · v1.2.0",
     })).toBeVisible();
-    fireEvent.click(within(dialog).getByRole("button", { name: "Install pack updates" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Check for updates" }));
 
-    expect(installComponentUpdates).toHaveBeenCalledOnce();
+    expect(installComponentUpdates).not.toHaveBeenCalled();
+    expect(updaterState.current.checkForUpdates).toHaveBeenCalledOnce();
     router.dispose();
   });
 
@@ -429,7 +460,7 @@ describe("Settings update center", () => {
     router.dispose();
   });
 
-  it("opens the Runtime Base upgrade entry for an incompatible manager", async () => {
+  it("reports a Runtime Base upgrade without turning settings into an installer", async () => {
     updaterState.current = {
       ...updaterState.current,
       status: "runtimeBaseRequired",
@@ -440,12 +471,10 @@ describe("Settings update center", () => {
     const { router } = renderDashboard();
 
     const dialog = await openRuntimeSettings();
-    fireEvent.click(within(dialog).getByRole("button", {
-      name: "Open Runtime Base upgrade",
-    }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Check for updates" }));
 
-    expect(router.state.location.pathname).toBe("/desktop/setup");
-    expect(router.state.location.search).toBe("?required=runtime-base-upgrade");
+    expect(updaterState.current.checkForUpdates).toHaveBeenCalledOnce();
+    expect(router.state.location.pathname).toBe("/dashboard");
     router.dispose();
   });
 

@@ -30,9 +30,9 @@ import {
   SettingsLanguageRegionIcon,
   SettingsToggle,
 } from "../components/SettingsPrimitives";
-import { isDesktopRuntime, startRuntimeUpgrade } from "../desktop/bridge";
+import { isDesktopRuntime } from "../desktop/bridge";
 import { useModelAccess } from "../features/settings/ModelAccessContext";
-import { localeSafeError, type InterfaceLocale } from "../i18n/I18nProvider";
+import { type InterfaceLocale } from "../i18n/I18nProvider";
 import type { FieldLocale } from "./catalog";
 
 const ECE498BH_COURSE_URL =
@@ -270,18 +270,6 @@ function readInterfaceLocale(fallback: FieldLocale): InterfaceLocale {
   return fallback;
 }
 
-function configuredRuntimeReleaseManifestUrl(): string | null {
-  const configured = import.meta.env.VITE_RUNTIME_RELEASE_MANIFEST_URL?.trim();
-  if (!configured) return null;
-  try {
-    const url = new URL(configured);
-    if (url.protocol !== "https:" || url.username || url.password) return null;
-    return url.toString();
-  } catch {
-    return null;
-  }
-}
-
 export function FieldSettingsDialog({
   closeRef,
   initialTab = "general",
@@ -331,11 +319,6 @@ export function FieldSettingsDialog({
   );
   const [memoryDefaults, setMemoryDefaults] = useState<FieldMemoryDefaults>(readFieldMemoryDefaults);
   const [memorySaveMessage, setMemorySaveMessage] = useState<string | null>(null);
-  const [runtimeUpgradeBusy, setRuntimeUpgradeBusy] = useState(false);
-  const [runtimeUpgradeNotice, setRuntimeUpgradeNotice] = useState<{
-    tone: "success" | "error";
-    text: string;
-  } | null>(null);
   const modelAccess = useModelAccess();
   const copy = COPY[interfaceLocale === "zh-CN" ? "zh-CN" : "en"];
   const modelSummary = modelAccess.settings.accessMode === "platform"
@@ -425,32 +408,6 @@ export function FieldSettingsDialog({
       setMemorySaveMessage(interfaceLocale === "zh-CN" ? "已保存此模块。" : "This section has been saved.");
     } catch {
       setMemorySaveMessage(interfaceLocale === "zh-CN" ? "保存失败，请重试。" : "Save failed. Try again.");
-    }
-  };
-
-  const beginRuntimeBaseUpgrade = async () => {
-    if (runtimeUpgradeBusy) return;
-    const releaseManifestUrl = configuredRuntimeReleaseManifestUrl();
-    if (!releaseManifestUrl) {
-      setRuntimeUpgradeNotice({ tone: "error", text: copy.runtimeUpgradeUnavailable });
-      return;
-    }
-
-    setRuntimeUpgradeBusy(true);
-    setRuntimeUpgradeNotice(null);
-    try {
-      await startRuntimeUpgrade({ releaseManifestUrl });
-      setRuntimeUpgradeNotice({ tone: "success", text: copy.runtimeUpgradeStarted });
-    } catch (error) {
-      setRuntimeUpgradeNotice({
-        tone: "error",
-        text: localeSafeError(error, interfaceLocale, {
-          zh: "Runtime Base 升级未能启动。",
-          en: "The Runtime Base upgrade could not start.",
-        }),
-      });
-    } finally {
-      setRuntimeUpgradeBusy(false);
     }
   };
 
@@ -737,18 +694,7 @@ export function FieldSettingsDialog({
             <div><dt>{copy.quorum}</dt><dd>{copy.missing}</dd></div>
             <div><dt>{copy.authority}</dt><dd><ShieldCheck aria-hidden="true" />{copy.denied}</dd></div>
           </dl>
-          <SettingsUpdateCenter
-            onOpenRuntimeBase={beginRuntimeBaseUpgrade}
-            runtimeBaseActionDisabled={runtimeUpgradeBusy}
-          />
-          {runtimeUpgradeNotice ? (
-            <p
-              className={`field-runtime-upgrade-notice ${runtimeUpgradeNotice.tone}`}
-              role={runtimeUpgradeNotice.tone === "error" ? "alert" : "status"}
-            >
-              {runtimeUpgradeNotice.text}
-            </p>
-          ) : null}
+          <SettingsUpdateCenter />
         </section>
       </EditionSettingsPanel>
     </EditionSettingsSurface>
