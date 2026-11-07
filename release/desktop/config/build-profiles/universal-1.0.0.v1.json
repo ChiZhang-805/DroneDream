@@ -39,7 +39,7 @@
     "sourceFiles": [
       {
         "path": "apps/web/src/AppShell.tsx",
-        "sha256": "f63d035750c188b710c9d50c65fffb6ddbb3bd98d1bab0e7decc36dcbdea6e3f"
+        "sha256": "1d6a0c482d01874ab5262de8862269e7173e2dfe2a57abc177c77fda301386fa"
       },
       {
         "path": "apps/web/src/components/EditionSettingsSurface.tsx",
@@ -104,7 +104,7 @@
   "integratedWorkspaceUiContract": {
     "contractId": "dronedream-universal-integrated-workspaces/v2",
     "manifest": "release/desktop/config/universal/integrated-workspaces.v2.json",
-    "sha256": "817e771eda36f75c9e90295a4eab74eca82a5c378c5b51cd926e563a4dc5d531",
+    "sha256": "80a780b4371e2e0a2931e23b30a3710266ffbcdf93c1fb8e4167292014ccc3fe",
     "sourceFileCount": 12,
     "workspaceModes": [
       "sim",
