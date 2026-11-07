@@ -12,11 +12,14 @@ import {
   isDesktopRuntime,
   listenAppUpdateProgress,
   probeRuntimeStatus,
+  getRuntimeInstallProgress,
+  startRuntimeUpgrade,
   type ComponentUpdateId,
   type ComponentUpdateCandidate,
   type ComponentUpdateReport,
   type EnginePackStatus,
   type NativeAppUpdateProgress,
+  type RuntimeInstallSnapshot,
 } from "./bridge";
 import { apiClient } from "../api/client";
 
@@ -35,6 +38,7 @@ export type AppUpdateStatus =
   | "installingComponents"
   | "componentUpdateDeferred"
   | "componentError"
+  | "upgradingRuntime"
   | "runtimeBaseAvailable"
   | "runtimeBaseRequired"
   | "error";
@@ -69,6 +73,37 @@ const CURRENT_STATE: AppUpdateState = {
 };
 
 export const AUTOMATIC_UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+const ACTIVE_RUNTIME_UPGRADE_PHASES = new Set([
+  "queued",
+  "verifyingManifest",
+  "downloading",
+  "verifyingArchive",
+  "backingUp",
+  "importing",
+  "starting",
+  "healthChecking",
+  "restoring",
+]);
+
+function configuredRuntimeReleaseManifestUrl(): string | undefined {
+  const configured = import.meta.env.VITE_RUNTIME_RELEASE_MANIFEST_URL?.trim();
+  if (!configured) return undefined;
+  try {
+    const url = new URL(configured);
+    if (url.protocol !== "https:" || url.username || url.password) return undefined;
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function runtimeUpgradePercent(snapshot: RuntimeInstallSnapshot): number | null {
+  if (!snapshot.bytesTotal || snapshot.bytesTotal <= 0) return null;
+  return Math.max(0, Math.min(100, Math.round(
+    (snapshot.bytesDownloaded / snapshot.bytesTotal) * 100,
+  )));
+}
 
 const COMPONENT_INSTALL_ORDER: ComponentUpdateId[] = [
   "capability-pack",
@@ -273,63 +308,7 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
     try {
       let report = await checkSignedComponentUpdates(componentCatalogUrl());
       if (generation !== undefined && generation !== checkGenerationRef.current) return;
-      let candidates = report.candidates.filter((candidate) => candidate.available);
-      const automaticCandidates = candidates.filter((candidate) => {
-        if (candidate.installMode !== "automatic") return false;
-        return candidate.dependencies.every((dependency) => {
-          const pendingDependency = candidates.find((entry) => (
-            entry.componentId === dependency.componentId
-          ));
-          return !pendingDependency || pendingDependency.installMode === "automatic";
-        });
-      });
-      if (automaticCandidates.length > 0 && !installInFlightRef.current) {
-        const automaticIds = orderComponentUpdates(automaticCandidates);
-        installInFlightRef.current = true;
-        setState({
-          status: "installingComponents",
-          availableVersion: null,
-          updateRequired: automaticCandidates.some((candidate) => (
-            candidate.urgency === "required"
-          )),
-          progress: 0,
-          error: null,
-          enginePack: enginePack ?? null,
-          componentUpdates: report,
-        });
-        try {
-          await ensureAppUpdateIdle();
-          for (let index = 0; index < automaticIds.length; index += 1) {
-            await installComponentUpdate(automaticIds[index], componentCatalogUrl());
-            setState((current) => ({
-              ...current,
-              progress: Math.round(((index + 1) / automaticIds.length) * 100),
-            }));
-          }
-          report = await checkSignedComponentUpdates(componentCatalogUrl());
-          if (generation !== undefined && generation !== checkGenerationRef.current) return;
-          candidates = report.candidates.filter((candidate) => candidate.available);
-        } catch (error) {
-          if (generation !== undefined && generation !== checkGenerationRef.current) return;
-          const message = errorMessage(error);
-          setState({
-            status: isActiveExperimentDeferral(message)
-              ? "componentUpdateDeferred"
-              : "componentError",
-            availableVersion: null,
-            updateRequired: automaticCandidates.some((candidate) => (
-              candidate.urgency === "required"
-            )),
-            progress: null,
-            error: message,
-            enginePack: enginePack ?? null,
-            componentUpdates: report,
-          });
-          return;
-        } finally {
-          installInFlightRef.current = false;
-        }
-      }
+      const candidates = report.candidates.filter((candidate) => candidate.available);
       if (candidates.length === 0) {
         setState({
           ...CURRENT_STATE,
@@ -367,7 +346,7 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
     quiet = false,
   ): Promise<EnginePackStatus | null> => {
     if (!desktopRuntime || import.meta.env.MODE === "test") return null;
-    if (!quiet) {
+    if (activateRoutineUpdate && !quiet) {
       setState((current) => ({
         ...current,
         status: "reconcilingEngine",
@@ -397,11 +376,11 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
         });
         return null;
       }
-      if (observed.updateRequired && !startupRequired && !activateRoutineUpdate) {
+      if (observed.updateRequired && !activateRoutineUpdate) {
         setState({
           status: "engineAvailable",
           availableVersion: null,
-          updateRequired: false,
+          updateRequired: startupRequired,
           progress: null,
           error: null,
           enginePack: observed,
@@ -438,9 +417,20 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
   }, [desktopRuntime]);
 
   const reconcileEnginePack = useCallback(async (generation?: number) => {
-    const current = await ensureEnginePackCurrent(generation, true);
-    if (!current) return;
-    await reconcileComponentPacks(generation, current);
+    if (installInFlightRef.current) return;
+    const block = await detectRunningUpdateBlock();
+    if (block) {
+      setState((current) => ({ ...current, blockedActivity: block }));
+      return;
+    }
+    installInFlightRef.current = true;
+    try {
+      const current = await ensureEnginePackCurrent(generation, true);
+      if (!current) return;
+      await reconcileComponentPacks(generation, current);
+    } finally {
+      installInFlightRef.current = false;
+    }
   }, [ensureEnginePackCurrent, reconcileComponentPacks]);
 
   const checkForUpdates = useCallback(async () => {
@@ -522,7 +512,9 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
         return;
       }
       if (!update) {
-        await ensureEnginePackCurrent(generation, false, true);
+        const enginePack = await ensureEnginePackCurrent(generation, false, true);
+        if (!enginePack || generation !== checkGenerationRef.current) return;
+        await reconcileComponentPacks(generation, enginePack);
         return;
       }
       await updateRef.current?.close();
@@ -537,20 +529,11 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
         componentUpdates: null,
         blockedActivity: null,
       });
-      installInFlightRef.current = true;
-      try {
-        await installAppUpdateInBackground(applyNativeAppUpdateProgress, false);
-        setState((current) => ({ ...current, status: "ready", progress: 100 }));
-      } catch (error) {
-        setState((current) => ({ ...current, status: "available", progress: null, error: errorMessage(error) }));
-      } finally {
-        installInFlightRef.current = false;
-      }
     } catch {
       // Scheduled checks are deliberately invisible. The next six-hour poll,
       // an explicit settings check, or the next authenticated launch retries.
     }
-  }, [applyNativeAppUpdateProgress, desktopRuntime, enabled, ensureEnginePackCurrent, restoreNativeAppUpdate]);
+  }, [desktopRuntime, enabled, ensureEnginePackCurrent, reconcileComponentPacks, restoreNativeAppUpdate]);
 
   const installAvailableUpdate = useCallback(async () => {
     const prepared = state.status === "ready";
@@ -559,13 +542,6 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
       || installInFlightRef.current
     ) return;
     installInFlightRef.current = true;
-    setState((current) => ({
-      ...current,
-      status: "downloading",
-      progress: 0,
-      error: null,
-      blockedActivity: null,
-    }));
     try {
       const initialBlock = await detectRunningUpdateBlock();
       if (initialBlock) {
@@ -577,6 +553,13 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
         }));
         return;
       }
+      setState((current) => ({
+        ...current,
+        status: "downloading",
+        progress: 0,
+        error: null,
+        blockedActivity: null,
+      }));
       await installAppUpdateInBackground(applyNativeAppUpdateProgress);
     } catch (error) {
       const lateBlock = await detectRunningUpdateBlock();
@@ -608,13 +591,19 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
     if (componentIds.length === 0) return;
 
     installInFlightRef.current = true;
-    setState((current) => ({
-      ...current,
-      status: "installingComponents",
-      progress: 0,
-      error: null,
-    }));
     try {
+      const block = await detectRunningUpdateBlock();
+      if (block) {
+        setState((current) => ({ ...current, blockedActivity: block }));
+        return;
+      }
+      setState((current) => ({
+        ...current,
+        status: "installingComponents",
+        progress: 0,
+        error: null,
+        blockedActivity: null,
+      }));
       await ensureAppUpdateIdle();
       for (let index = 0; index < componentIds.length; index += 1) {
         await installComponentUpdate(componentIds[index], componentCatalogUrl());
@@ -638,6 +627,89 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
       installInFlightRef.current = false;
     }
   }, [reconcileComponentPacks, state.componentUpdates, state.enginePack, state.status]);
+
+  const installRuntimeBaseUpdate = useCallback(async () => {
+    if (
+      !["runtimeBaseAvailable", "runtimeBaseRequired"].includes(state.status)
+      || installInFlightRef.current
+    ) return;
+    const block = await detectRunningUpdateBlock();
+    if (block) {
+      setState((current) => ({ ...current, blockedActivity: block }));
+      return;
+    }
+    installInFlightRef.current = true;
+    setState((current) => ({
+      ...current,
+      status: "upgradingRuntime",
+      progress: 0,
+      error: null,
+      blockedActivity: null,
+    }));
+    try {
+      const snapshot = await startRuntimeUpgrade({
+        releaseManifestUrl: configuredRuntimeReleaseManifestUrl(),
+      });
+      setState((current) => ({
+        ...current,
+        progress: runtimeUpgradePercent(snapshot),
+      }));
+    } catch (error) {
+      installInFlightRef.current = false;
+      setState((current) => ({
+        ...current,
+        status: "runtimeBaseAvailable",
+        progress: null,
+        error: errorMessage(error),
+      }));
+    }
+  }, [state.status]);
+
+  useEffect(() => {
+    if (state.status !== "upgradingRuntime") return undefined;
+    let disposed = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      try {
+        const snapshot = await getRuntimeInstallProgress();
+        if (disposed) return;
+        const active = ACTIVE_RUNTIME_UPGRADE_PHASES.has(snapshot.phase);
+        setState((current) => ({
+          ...current,
+          progress: runtimeUpgradePercent(snapshot),
+          error: snapshot.error?.message ?? null,
+        }));
+        if (active) {
+          timer = setTimeout(() => { void poll(); }, 1_000);
+          return;
+        }
+        installInFlightRef.current = false;
+        if (snapshot.phase === "completed") {
+          void checkForUpdates();
+        } else {
+          setState((current) => ({
+            ...current,
+            status: "runtimeBaseAvailable",
+            progress: null,
+          }));
+        }
+      } catch (error) {
+        if (disposed) return;
+        installInFlightRef.current = false;
+        setState((current) => ({
+          ...current,
+          status: "runtimeBaseAvailable",
+          progress: null,
+          error: errorMessage(error),
+        }));
+      }
+    };
+    timer = setTimeout(() => { void poll(); }, 500);
+    return () => {
+      disposed = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [checkForUpdates, state.status]);
 
   useEffect(() => {
     if (!desktopRuntime || import.meta.env.MODE === "test") return undefined;
@@ -704,6 +776,7 @@ export function useAppUpdater(options: { enabled?: boolean } = {}) {
     desktopRuntime,
     checkForUpdates,
     installAvailableUpdate,
+    installRuntimeBaseUpdate,
     dismissBlockedActivity,
     installComponentUpdates,
     reconcileEnginePack,

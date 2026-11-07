@@ -7,12 +7,14 @@ const {
   ensureAppUpdateIdleMock,
   getAppUpdateProgressMock,
   getEnginePackStatusMock,
+  getRuntimeInstallProgressMock,
   installAppUpdateInBackgroundMock,
   installEmbeddedEnginePackMock,
   installComponentUpdateMock,
   listJobsMock,
   listenAppUpdateProgressMock,
   probeRuntimeStatusMock,
+  startRuntimeUpgradeMock,
   relaunchMock,
   stopRuntimeForExitMock,
 } = vi.hoisted(() => ({
@@ -21,12 +23,14 @@ const {
   ensureAppUpdateIdleMock: vi.fn(),
   getAppUpdateProgressMock: vi.fn(),
   getEnginePackStatusMock: vi.fn(),
+  getRuntimeInstallProgressMock: vi.fn(),
   installAppUpdateInBackgroundMock: vi.fn(),
   installEmbeddedEnginePackMock: vi.fn(),
   installComponentUpdateMock: vi.fn(),
   listJobsMock: vi.fn(),
   listenAppUpdateProgressMock: vi.fn(),
   probeRuntimeStatusMock: vi.fn(),
+  startRuntimeUpgradeMock: vi.fn(),
   relaunchMock: vi.fn(),
   stopRuntimeForExitMock: vi.fn(),
 }));
@@ -43,11 +47,13 @@ vi.mock("../src/desktop/bridge", () => ({
   checkComponentUpdates: checkComponentUpdatesMock,
   getAppUpdateProgress: getAppUpdateProgressMock,
   getEnginePackStatus: getEnginePackStatusMock,
+  getRuntimeInstallProgress: getRuntimeInstallProgressMock,
   installAppUpdateInBackground: installAppUpdateInBackgroundMock,
   installEmbeddedEnginePack: installEmbeddedEnginePackMock,
   installComponentUpdate: installComponentUpdateMock,
   listenAppUpdateProgress: listenAppUpdateProgressMock,
   probeRuntimeStatus: probeRuntimeStatusMock,
+  startRuntimeUpgrade: startRuntimeUpgradeMock,
   stopRuntimeForExit: stopRuntimeForExitMock,
 }));
 vi.mock("../src/api/client", () => ({
@@ -122,6 +128,20 @@ beforeEach(() => {
     message: null,
   });
   installEmbeddedEnginePackMock.mockReset();
+  getRuntimeInstallProgressMock.mockReset();
+  getRuntimeInstallProgressMock.mockResolvedValue({
+    phase: "completed",
+    bytesDownloaded: 1,
+    bytesTotal: 1,
+    error: null,
+  });
+  startRuntimeUpgradeMock.mockReset();
+  startRuntimeUpgradeMock.mockResolvedValue({
+    phase: "queued",
+    bytesDownloaded: 0,
+    bytesTotal: 1,
+    error: null,
+  });
   installAppUpdateInBackgroundMock.mockReset();
   installAppUpdateInBackgroundMock.mockImplementation(async (onProgress: (event: {
     phase: string; progress: number; attempt: number;
@@ -237,7 +257,7 @@ describe("useAppUpdater", () => {
     installAppUpdateInBackgroundMock.mockImplementation((_progress, install = true) => install ? installing.promise : Promise.resolve());
     checkMock.mockResolvedValue(availableUpdate);
     const hook = renderHook(() => useAppUpdater());
-    await waitFor(() => expect(hook.result.current.status).toBe("ready"));
+    await waitFor(() => expect(hook.result.current.status).toBe("available"));
 
     let firstInstall!: Promise<void>;
     let secondInstall!: Promise<void>;
@@ -245,15 +265,15 @@ describe("useAppUpdater", () => {
       firstInstall = hook.result.current.installAvailableUpdate();
       secondInstall = hook.result.current.installAvailableUpdate();
     });
-    await waitFor(() => expect(installAppUpdateInBackgroundMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(installAppUpdateInBackgroundMock).toHaveBeenCalledOnce());
 
     installing.resolve();
     await act(async () => Promise.all([firstInstall, secondInstall]));
-    expect(installAppUpdateInBackgroundMock).toHaveBeenCalledTimes(2);
+    expect(installAppUpdateInBackgroundMock).toHaveBeenCalledOnce();
     hook.unmount();
   });
 
-  it("downloads silently but does not install or relaunch while a Runtime experiment is active", async () => {
+  it("does not download or install while a Runtime experiment is active", async () => {
     const availableUpdate = update("1.0.0");
     checkMock.mockResolvedValue(availableUpdate);
     probeRuntimeStatusMock.mockResolvedValue({
@@ -273,13 +293,13 @@ describe("useAppUpdater", () => {
       total: 1,
     });
     const hook = renderHook(() => useAppUpdater());
-    await waitFor(() => expect(hook.result.current.status).toBe("ready"));
+    await waitFor(() => expect(hook.result.current.status).toBe("available"));
 
     await act(async () => hook.result.current.installAvailableUpdate());
 
-    expect(installAppUpdateInBackgroundMock).toHaveBeenCalledExactlyOnceWith(expect.any(Function), false);
+    expect(installAppUpdateInBackgroundMock).not.toHaveBeenCalled();
     expect(stopRuntimeForExitMock).not.toHaveBeenCalled();
-    expect(hook.result.current.status).toBe("ready");
+    expect(hook.result.current.status).toBe("available");
     expect(hook.result.current.blockedActivity).toMatchObject({
       kind: "running",
       runningJobs: [{ id: "job-running", name: "Office delivery" }],
@@ -291,11 +311,11 @@ describe("useAppUpdater", () => {
     const availableUpdate = update("1.0.2");
     checkMock.mockResolvedValue(availableUpdate);
     const hook = renderHook(() => useAppUpdater());
-    await waitFor(() => expect(hook.result.current.status).toBe("ready"));
+    await waitFor(() => expect(hook.result.current.status).toBe("available"));
 
     await act(async () => hook.result.current.installAvailableUpdate());
 
-    expect(installAppUpdateInBackgroundMock).toHaveBeenCalledTimes(2);
+    expect(installAppUpdateInBackgroundMock).toHaveBeenCalledOnce();
     expect(hook.result.current.progress).toBe(100);
     expect(hook.result.current.status).toBe("installing");
     expect(probeRuntimeStatusMock).toHaveBeenCalledOnce();
@@ -316,6 +336,8 @@ describe("useAppUpdater", () => {
       ({ enabled }) => useAppUpdater({ enabled }),
       { initialProps: { enabled: true } },
     );
+    await waitFor(() => expect(hook.result.current.status).toBe("available"));
+    act(() => { void hook.result.current.installAvailableUpdate(); });
     await waitFor(() => expect(hook.result.current.progress).toBe(41));
 
     hook.rerender({ enabled: false });
@@ -386,20 +408,19 @@ describe("useAppUpdater", () => {
     hook.unmount();
   });
 
-  it("retries a failed background download on the next scheduled check", async () => {
+  it("scheduled checks advertise updates without downloading them", async () => {
     const schedule = vi.spyOn(window, "setInterval");
     const first = update("1.0.1");
     checkMock.mockResolvedValueOnce(first).mockResolvedValue(update("1.0.2"));
-    installAppUpdateInBackgroundMock.mockRejectedValueOnce(new Error("Download unavailable"));
     const hook = renderHook(() => useAppUpdater());
-    await waitFor(() => expect(hook.result.current.error).toBe("Download unavailable"));
+    await waitFor(() => expect(hook.result.current.status).toBe("available"));
     const callback = schedule.mock.calls.find((call) => call[1] === 6 * 60 * 60 * 1000)?.[0];
     expect(typeof callback).toBe("function");
     await act(async () => { await (callback as () => Promise<void>)(); });
-    await waitFor(() => expect(hook.result.current.status).toBe("ready"));
+    await waitFor(() => expect(hook.result.current.status).toBe("available"));
     expect(checkMock).toHaveBeenCalledTimes(2);
     expect(first.close).toHaveBeenCalledOnce();
-    expect(installAppUpdateInBackgroundMock).toHaveBeenCalledTimes(2);
+    expect(installAppUpdateInBackgroundMock).not.toHaveBeenCalled();
     hook.unmount();
     schedule.mockRestore();
   });
@@ -453,12 +474,33 @@ describe("useAppUpdater", () => {
     hook.unmount();
   });
 
+  it("requires a click before installing the first supported Engine Pack", async () => {
+    checkMock.mockResolvedValue(null);
+    getEnginePackStatusMock.mockResolvedValue({
+      supported: true,
+      updateRequired: true,
+      startupRequired: true,
+      embeddedPackId: `sha256:${"3".repeat(64)}`,
+      embeddedSourceCommit: "4".repeat(40),
+      installedPackId: null,
+      installedSourceCommit: null,
+      message: null,
+    });
+
+    const hook = renderHook(() => useAppUpdater());
+    await waitFor(() => expect(hook.result.current.status).toBe("engineAvailable"));
+
+    expect(hook.result.current.updateRequired).toBe(true);
+    expect(installEmbeddedEnginePackMock).not.toHaveBeenCalled();
+    hook.unmount();
+  });
+
   it("advertises an app update without letting Engine Pack reconciliation strand recovery", async () => {
     const availableUpdate = update("1.0.2");
     checkMock.mockResolvedValue(availableUpdate);
 
     const hook = renderHook(() => useAppUpdater());
-    await waitFor(() => expect(hook.result.current.status).toBe("ready"));
+    await waitFor(() => expect(hook.result.current.status).toBe("available"));
 
     expect(hook.result.current.enginePack).toBeNull();
     expect(getEnginePackStatusMock).not.toHaveBeenCalled();
@@ -651,7 +693,6 @@ describe("useAppUpdater", () => {
 
     const hook = renderHook(() => useAppUpdater());
     await waitFor(() => expect(checkMock).toHaveBeenCalledOnce());
-    await act(async () => hook.result.current.checkForUpdates());
     await waitFor(() => expect(hook.result.current.status).toBe("componentAvailable"));
     await act(async () => hook.result.current.installComponentUpdates());
 
@@ -665,7 +706,7 @@ describe("useAppUpdater", () => {
     hook.unmount();
   });
 
-  it("installs signed automatic capability updates without silently downloading assets", async () => {
+  it("does not install automatic capability updates before the user asks", async () => {
     vi.stubEnv("VITE_COMPONENT_UPDATE_CATALOG_ENABLED", "true");
     checkMock.mockResolvedValue(null);
     const automatic = {
@@ -685,9 +726,7 @@ describe("useAppUpdater", () => {
         available: true,
       }],
     };
-    checkComponentUpdatesMock
-      .mockResolvedValueOnce(automatic)
-      .mockResolvedValueOnce({ ...automatic, candidates: [] });
+    checkComponentUpdatesMock.mockResolvedValue(automatic);
     installComponentUpdateMock.mockResolvedValue({
       componentId: "capability-pack",
       packId: `sha256:${"8".repeat(64)}`,
@@ -699,12 +738,9 @@ describe("useAppUpdater", () => {
     const hook = renderHook(() => useAppUpdater());
     await waitFor(() => expect(checkMock).toHaveBeenCalledOnce());
     await act(async () => hook.result.current.checkForUpdates());
-    await waitFor(() => expect(hook.result.current.status).toBe("current"));
+    await waitFor(() => expect(hook.result.current.status).toBe("componentAvailable"));
 
-    expect(installComponentUpdateMock).toHaveBeenCalledWith(
-      "capability-pack",
-      undefined,
-    );
+    expect(installComponentUpdateMock).not.toHaveBeenCalled();
     hook.unmount();
   });
 

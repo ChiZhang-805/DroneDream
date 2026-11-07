@@ -17,14 +17,12 @@ import {
 
 import type { SettingsSurfaceTabId } from "../components/EditionSettingsSurface";
 import { UpdateBlockedDialog } from "../components/UpdateBlockedDialog";
+import { UpdateProgressDialog } from "../components/UpdateProgressDialog";
 import {
   discoverFieldDevices,
-  getRuntimeInstallProgress,
   isDesktopRuntime,
-  startRuntimeUpgrade,
   type FieldDeviceDiscoveryReport,
   type FieldParameterSnapshot,
-  type RuntimeInstallSnapshot,
 } from "../desktop/bridge";
 import { useOptionalAuth } from "../features/auth/AuthContext";
 import { useAppUpdaterState } from "../desktop/updaterContext";
@@ -230,37 +228,6 @@ function fieldPlanName(value: string | undefined): "Free" | "Plus" | "Pro" | nul
   return null;
 }
 
-const ACTIVE_RUNTIME_UPGRADE_PHASES = new Set([
-  "queued",
-  "verifyingManifest",
-  "downloading",
-  "verifyingArchive",
-  "backingUp",
-  "importing",
-  "starting",
-  "healthChecking",
-  "restoring",
-]);
-
-function configuredRuntimeReleaseManifestUrl(): string | null {
-  const configured = import.meta.env.VITE_RUNTIME_RELEASE_MANIFEST_URL?.trim();
-  if (!configured) return null;
-  try {
-    const url = new URL(configured);
-    if (url.protocol !== "https:" || url.username || url.password) return null;
-    return url.toString();
-  } catch {
-    return null;
-  }
-}
-
-function runtimeUpgradePercent(snapshot: RuntimeInstallSnapshot): number | null {
-  if (!snapshot.bytesTotal || snapshot.bytesTotal <= 0) return null;
-  return Math.max(0, Math.min(100, Math.round(
-    (snapshot.bytesDownloaded / snapshot.bytesTotal) * 100,
-  )));
-}
-
 export interface FieldAppProps {
   initialLocale?: FieldLocale;
   initialObservationState?: FieldObservationState;
@@ -318,9 +285,6 @@ function FieldWorkspace({
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [signOutPending, setSignOutPending] = useState(false);
   const [signOutError, setSignOutError] = useState(false);
-  const [runtimeUpgradeBusy, setRuntimeUpgradeBusy] = useState(false);
-  const [runtimeUpgradeProgress, setRuntimeUpgradeProgress] = useState<number | null>(null);
-  const [runtimeUpgradeFailed, setRuntimeUpgradeFailed] = useState(false);
   const [managedUsage, setManagedUsage] = useState<ManagedModelUsageSnapshot | null>(null);
   const pageRef = useRef<HTMLDivElement>(null);
   const applicationSurfaceRef = useRef<HTMLDivElement>(null);
@@ -329,7 +293,6 @@ function FieldWorkspace({
   const settingsCloseRef = useRef<HTMLButtonElement>(null);
   const auth = useOptionalAuth();
   const updater = useAppUpdaterState();
-  const checkForUpdates = updater.checkForUpdates;
   const copy = COPY[locale];
   const navigationLabel = embeddedInLab ? copy.navLab : copy.navField;
   const scanUnavailable = embeddedInLab
@@ -352,21 +315,20 @@ function FieldWorkspace({
     ? fieldPlanName(managedUsage?.plan.id)
     : "Local";
   const updateVisible = isDesktopRuntime();
-  const updateBusy = runtimeUpgradeBusy || [
+  const updateBusy = [
     "checking",
     "downloading",
     "installing",
     "reconcilingEngine",
     "installingComponents",
+    "upgradingRuntime",
   ].includes(updater.status);
-  const updateProgress = runtimeUpgradeBusy
-    ? runtimeUpgradeProgress
-    : ["downloading", "installing"].includes(updater.status)
+  const updateProgress = ["downloading", "installing", "upgradingRuntime"].includes(updater.status)
     ? Math.max(0, Math.min(100, Math.round(updater.progress ?? 0)))
     : null;
   const updateLabel = updateBusy
     ? `${copy.updateProgress}${updateProgress === null ? "" : ` ${updateProgress}%`}`
-    : runtimeUpgradeFailed
+    : updater.error && ["runtimeBaseAvailable", "runtimeBaseRequired"].includes(updater.status)
       ? copy.updateRetry
       : updater.status === "available" || updater.status === "ready"
         ? copy.updateAvailable
@@ -382,7 +344,6 @@ function FieldWorkspace({
 
   const handleSidebarUpdate = useCallback(async () => {
     if (updateBusy) return;
-    setRuntimeUpgradeFailed(false);
     if (["available", "ready"].includes(updater.status)) {
       await updater.installAvailableUpdate();
       return;
@@ -396,65 +357,11 @@ function FieldWorkspace({
       return;
     }
     if (["runtimeBaseAvailable", "runtimeBaseRequired"].includes(updater.status)) {
-      const releaseManifestUrl = configuredRuntimeReleaseManifestUrl();
-      if (!releaseManifestUrl) {
-        setRuntimeUpgradeFailed(true);
-        return;
-      }
-      setRuntimeUpgradeBusy(true);
-      setRuntimeUpgradeProgress(null);
-      try {
-        const snapshot = await startRuntimeUpgrade({ releaseManifestUrl });
-        setRuntimeUpgradeProgress(runtimeUpgradePercent(snapshot));
-        if (!ACTIVE_RUNTIME_UPGRADE_PHASES.has(snapshot.phase)) {
-          setRuntimeUpgradeBusy(false);
-          if (snapshot.phase === "failed" || snapshot.phase === "cancelled") {
-            setRuntimeUpgradeFailed(true);
-          } else {
-            void updater.checkForUpdates();
-          }
-        }
-      } catch {
-        setRuntimeUpgradeBusy(false);
-        setRuntimeUpgradeFailed(true);
-      }
+      await updater.installRuntimeBaseUpdate();
       return;
     }
     await updater.checkForUpdates();
   }, [updateBusy, updater]);
-
-  useEffect(() => {
-    if (!runtimeUpgradeBusy) return undefined;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const poll = async () => {
-      try {
-        const snapshot = await getRuntimeInstallProgress();
-        if (cancelled) return;
-        setRuntimeUpgradeProgress(runtimeUpgradePercent(snapshot));
-        if (ACTIVE_RUNTIME_UPGRADE_PHASES.has(snapshot.phase)) {
-          timer = setTimeout(() => { void poll(); }, 1_000);
-          return;
-        }
-        setRuntimeUpgradeBusy(false);
-        if (snapshot.phase === "failed" || snapshot.phase === "cancelled") {
-          setRuntimeUpgradeFailed(true);
-        } else {
-          void checkForUpdates();
-        }
-      } catch {
-        if (!cancelled) {
-          setRuntimeUpgradeBusy(false);
-          setRuntimeUpgradeFailed(true);
-        }
-      }
-    };
-    timer = setTimeout(() => { void poll(); }, 1_000);
-    return () => {
-      cancelled = true;
-      if (timer) clearTimeout(timer);
-    };
-  }, [checkForUpdates, runtimeUpgradeBusy]);
 
   useEffect(() => {
     if (!auth?.account) {
@@ -804,6 +711,11 @@ function FieldWorkspace({
         block={updater.blockedActivity}
         locale={locale}
         onClose={updater.dismissBlockedActivity}
+      />
+      <UpdateProgressDialog
+        locale={locale}
+        progress={updateProgress ?? updater.progress}
+        status={updater.status}
       />
     </div>
   );

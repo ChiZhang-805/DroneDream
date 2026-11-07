@@ -20,6 +20,7 @@ const updaterState = vi.hoisted(() => ({
     desktopRuntime: true,
     checkForUpdates: vi.fn(async () => undefined),
     installAvailableUpdate: vi.fn(async () => undefined),
+    installRuntimeBaseUpdate: vi.fn(async () => undefined),
     installComponentUpdates: vi.fn(async () => undefined),
     reconcileEnginePack: vi.fn(async () => undefined),
     reconcileComponentPacks: vi.fn(async () => undefined),
@@ -194,10 +195,12 @@ describe("workspace sidebar version module", () => {
   });
 
   it("starts the Runtime Base flow from the same account-adjacent action", () => {
+    const installRuntimeBaseUpdate = vi.fn(async () => undefined);
     updaterState.current = {
       ...updaterState.current,
       status: "runtimeBaseRequired",
       updateRequired: true,
+      installRuntimeBaseUpdate,
     };
     installReadyDesktopBridge();
     window.history.replaceState(null, "", "/?docsPreview=1");
@@ -207,10 +210,8 @@ describe("workspace sidebar version module", () => {
       name: "Update DroneDream Runtime Base",
     }));
 
-    expect(router.state.location.pathname).toBe("/desktop/setup");
-    expect(router.state.location.search).toBe(
-      "?required=runtime-base-upgrade&autostart=1",
-    );
+    expect(installRuntimeBaseUpdate).toHaveBeenCalledOnce();
+    expect(router.state.location.pathname).toBe("/dashboard");
     router.dispose();
   });
 
@@ -298,6 +299,8 @@ describe("workspace sidebar version module", () => {
     expect(progress).toBeDisabled();
     expect(progress).toHaveTextContent("42%");
     expect(progress.querySelector("svg")).toBeNull();
+    expect(screen.getByRole("dialog", { name: "Updating DroneDream" })).toBeVisible();
+    expect(screen.getByRole("progressbar", { name: "Updating DroneDream" })).toHaveValue(42);
 
     router.dispose();
   });

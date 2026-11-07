@@ -64,6 +64,7 @@ import { AssistantModelPicker } from "./components/AssistantModelPicker";
 import { CustomModelSettingsPanel } from "./components/CustomModelSettingsPanel";
 import { SettingsUpdateCenter } from "./components/SettingsUpdateCenter";
 import { UpdateBlockedDialog } from "./components/UpdateBlockedDialog";
+import { UpdateProgressDialog } from "./components/UpdateProgressDialog";
 import {
   EditionSettingsPanel,
   EditionSettingsSurface,
@@ -3864,10 +3865,16 @@ function AppShellContent() {
     "installing",
     "reconcilingEngine",
     "installingComponents",
+    "upgradingRuntime",
   ].includes(updater.status);
-  const sidebarUpdateProgress = ["downloading", "installing"].includes(updater.status)
+  const sidebarUpdateProgress = [
+    "downloading",
+    "installing",
+    "installingComponents",
+    "upgradingRuntime",
+  ].includes(updater.status) && updater.progress !== null
     ? Math.max(0, Math.min(100, Math.round(
-        updater.progress ?? (updater.status === "installing" ? 100 : 0),
+        updater.progress,
       )))
     : null;
 
@@ -3906,6 +3913,7 @@ function AppShellContent() {
     if (updater.status === "checking") return t("updater.checking");
     if (updater.status === "reconcilingEngine") return t("updater.engine");
     if (updater.status === "installingComponents") return t("updater.components");
+    if (updater.status === "upgradingRuntime") return t("updater.sidebarRuntimeBase");
     if (updater.status === "ready") return t("updater.sidebarRestart");
     if (updater.status === "available") return t("updater.sidebarAvailable");
     if (updater.status === "engineAvailable") return t("updater.sidebarEngine");
@@ -3937,11 +3945,11 @@ function AppShellContent() {
     } else if (updater.status === "componentAvailable") {
       void updater.installComponentUpdates();
     } else if (["runtimeBaseAvailable", "runtimeBaseRequired"].includes(updater.status)) {
-      navigate("/desktop/setup?required=runtime-base-upgrade&autostart=1");
+      void updater.installRuntimeBaseUpdate();
     } else if (!sidebarUpdateBusy) {
       void updater.checkForUpdates();
     }
-  }, [navigate, sidebarUpdateBusy, updater]);
+  }, [sidebarUpdateBusy, updater]);
   const openExternalNavigation = useCallback((
     event: MouseEvent<HTMLAnchorElement>,
     url: string,
@@ -4766,6 +4774,11 @@ function AppShellContent() {
         block={updater.blockedActivity}
         locale={locale}
         onClose={updater.dismissBlockedActivity}
+      />
+      <UpdateProgressDialog
+        locale={locale}
+        progress={sidebarUpdateProgress ?? updater.progress}
+        status={updater.status}
       />
       </div>
     </EditionThemeProvider>

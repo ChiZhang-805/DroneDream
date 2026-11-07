@@ -1,0 +1,99 @@
+.update-progress-backdrop {
+  position: fixed;
+  z-index: 1800;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1.25rem;
+  background: rgba(235, 229, 240, 0.56);
+  backdrop-filter: blur(16px) saturate(112%);
+}
+
+.update-progress-dialog {
+  box-sizing: border-box;
+  width: min(28rem, 100%);
+  padding: 1.35rem 1.4rem 1.25rem;
+  border: 1px solid rgba(108, 75, 135, 0.14);
+  border-radius: 1.25rem;
+  color: #241b2a;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 1.5rem 4rem rgba(49, 31, 58, 0.18);
+}
+
+.update-progress-dialog header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.15rem;
+}
+
+.update-progress-dialog h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.update-progress-icon {
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  place-items: center;
+  border-radius: 50%;
+  color: #ffffff;
+  background: #3478f6;
+}
+
+.update-progress-icon svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.update-progress-track {
+  height: 0.46rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e9e3ee;
+}
+
+.update-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #3478f6, #7657f6);
+  transition: width 180ms ease-out;
+}
+
+.update-progress-track span.is-indeterminate {
+  width: 38%;
+  animation: update-progress-slide 1.1s ease-in-out infinite;
+}
+
+.update-progress-native {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+}
+
+.update-progress-value {
+  display: block;
+  margin-top: 0.55rem;
+  color: #5f5366;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+@keyframes update-progress-slide {
+  from { transform: translateX(-105%); }
+  to { transform: translateX(275%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .update-progress-track span.is-indeterminate {
+    animation: none;
+    transform: translateX(80%);
+  }
+}

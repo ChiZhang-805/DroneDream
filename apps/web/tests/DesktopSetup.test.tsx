@@ -49,6 +49,7 @@ const updaterState = vi.hoisted(() => ({
     desktopRuntime: true,
     checkForUpdates: vi.fn(async () => undefined),
     installAvailableUpdate: vi.fn(async () => undefined),
+    installRuntimeBaseUpdate: vi.fn(async () => undefined),
     installComponentUpdates: vi.fn(async () => undefined),
     reconcileEnginePack: vi.fn(async () => undefined),
     reconcileComponentPacks: vi.fn(async () => undefined),

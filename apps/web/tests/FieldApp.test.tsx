@@ -20,6 +20,7 @@ const updaterState = vi.hoisted(() => ({
     desktopRuntime: true,
     checkForUpdates: vi.fn(async () => undefined),
     installAvailableUpdate: vi.fn(async () => undefined),
+    installRuntimeBaseUpdate: vi.fn(async () => undefined),
     installComponentUpdates: vi.fn(async () => undefined),
     reconcileEnginePack: vi.fn(async () => undefined),
     reconcileComponentPacks: vi.fn(async () => undefined),
@@ -68,6 +69,7 @@ describe("FieldApp", () => {
       error: null,
       checkForUpdates: vi.fn(async () => undefined),
       installAvailableUpdate: vi.fn(async () => undefined),
+      installRuntimeBaseUpdate: vi.fn(async () => undefined),
       installComponentUpdates: vi.fn(async () => undefined),
       reconcileEnginePack: vi.fn(async () => undefined),
       reconcileComponentPacks: vi.fn(async () => undefined),
@@ -91,48 +93,19 @@ describe("FieldApp", () => {
   });
 
   it("uses the same Field entry for component and Runtime Base updates", async () => {
-    const invoke = vi.fn(async (command: string) => {
-      if (command === "start_runtime_upgrade") {
-        return {
-          operationId: "runtime-upgrade-1",
-          phase: "completed",
-          bytesDownloaded: 1024,
-          bytesTotal: 1024,
-          currentPart: 1,
-          totalParts: 1,
-          message: "Runtime Base updated",
-          error: null,
-          resumable: false,
-          requiresRestart: false,
-          targetRoot: "Q:\\DroneDream-Workspace\\Runtime",
-          installedVersion: "0.1.2",
-          updatedAt: "2026-11-07T00:00:00Z",
-        };
-      }
-      throw new Error(`Unexpected command: ${command}`);
-    });
-    window.__TAURI__ = { core: { invoke } };
-    vi.stubEnv(
-      "VITE_RUNTIME_RELEASE_MANIFEST_URL",
-      "https://updates.getdronedream.com/runtime/release-manifest.v1.json",
-    );
+    window.__TAURI__ = { core: { invoke: vi.fn(async () => undefined) } };
+    const installRuntimeBaseUpdate = vi.fn(async () => undefined);
     updaterState.current = {
       ...updaterState.current,
       status: "runtimeBaseRequired",
       updateRequired: true,
+      installRuntimeBaseUpdate,
     };
     await renderField();
 
     fireEvent.click(screen.getByRole("button", { name: "Update Runtime Base" }));
 
-    await waitFor(() => expect(invoke).toHaveBeenCalledWith(
-      "start_runtime_upgrade",
-      {
-        request: {
-          releaseManifestUrl: "https://updates.getdronedream.com/runtime/release-manifest.v1.json",
-        },
-      },
-    ));
+    await waitFor(() => expect(installRuntimeBaseUpdate).toHaveBeenCalledOnce());
   });
 
   it("opens Chatting first and exposes six true page controls", async () => {

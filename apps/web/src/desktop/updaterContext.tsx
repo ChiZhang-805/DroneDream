@@ -19,6 +19,7 @@ const FALLBACK: AppUpdaterState = {
   desktopRuntime: false,
   checkForUpdates: async () => undefined,
   installAvailableUpdate: async () => undefined,
+  installRuntimeBaseUpdate: async () => undefined,
   dismissBlockedActivity: () => undefined,
   installComponentUpdates: async () => undefined,
   reconcileEnginePack: async () => undefined,
