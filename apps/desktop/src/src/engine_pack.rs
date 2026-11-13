@@ -112,7 +112,18 @@ struct EnginePackManifestIdentity {
     kind: String,
     pack_id: String,
     source: EnginePackManifestSource,
+    edition_profile: EnginePackEditionProfile,
     runtime_compatibility: EnginePackRuntimeCompatibility,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct EnginePackEditionProfile {
+    profile_id: String,
+}
+
+fn full_engine_profile(profile: &str) -> bool {
+    matches!(profile, "unified-sim-lab" | "autonomy-full")
 }
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
@@ -306,6 +317,25 @@ fn embedded_update_required(
             );
         }
         return Ok(false);
+    }
+    // Editions share one Runtime. Full profiles contain the same source payload,
+    // while SIM and FIELD deliberately package narrower subsets. A current full
+    // pack must not be replaced by one of those subsets just to change its ID.
+    if embedded.source == installed.source
+        && embedded.runtime_compatibility == installed.runtime_compatibility
+        && embedded.edition_profile != installed.edition_profile
+    {
+        let requested = embedded.edition_profile.profile_id.as_str();
+        let active = installed.edition_profile.profile_id.as_str();
+        if full_engine_profile(active)
+            && (full_engine_profile(requested)
+                || matches!(requested, "sim-only" | "field-lightweight"))
+        {
+            return Ok(false);
+        }
+        if full_engine_profile(requested) && matches!(active, "sim-only" | "field-lightweight") {
+            return Ok(true);
+        }
     }
     if embedded.source.source_date_epoch == installed.source.source_date_epoch {
         return Err(
@@ -594,8 +624,10 @@ fn status() -> Result<EnginePackStatus, String> {
             let installed_identity = installed_manifest_identity(receipt)?;
             let update_required =
                 embedded_update_required(&embedded_identity, &installed_identity)?;
-            installed_is_newer =
-                !update_required && installed_identity.pack_id != embedded_identity.pack_id;
+            installed_is_newer = !update_required
+                && (installed_identity.source.source_date_epoch
+                    > embedded_identity.source.source_date_epoch
+                    || installed_identity.schema_version > embedded_identity.schema_version);
             update_required
         }
         None => true,
@@ -680,7 +712,7 @@ fn write_verified(path: &Path, bytes: &[u8]) -> Result<(), String> {
 }
 
 #[cfg(target_os = "windows")]
-fn windows_path_to_wsl(path: &Path) -> Result<String, String> {
+pub(crate) fn windows_path_to_wsl(path: &Path) -> Result<String, String> {
     let raw = path
         .to_str()
         .ok_or_else(|| "Engine Pack cache path is not valid Unicode.".to_string())?;
@@ -964,6 +996,9 @@ mod tests {
                 git_commit: source_commit.to_string(),
                 source_date_epoch,
             },
+            edition_profile: EnginePackEditionProfile {
+                profile_id: "unified-sim-lab".to_string(),
+            },
             runtime_compatibility: EnginePackRuntimeCompatibility {
                 runtime_product_id: "DroneDreamRuntime".to_string(),
                 runtime_version: "0.1.2".to_string(),
@@ -1022,6 +1057,41 @@ mod tests {
 
         assert!(embedded_update_required(&first, &same_time).is_err());
         assert!(embedded_update_required(&first, &conflicting_source).is_err());
+    }
+
+    #[test]
+    fn same_release_full_pack_serves_all_editions_without_profile_churn() {
+        let full = release_identity(
+            2,
+            &format!("sha256:{}", "1".repeat(64)),
+            &"a".repeat(40),
+            100,
+        );
+        for profile in ["sim-only", "field-lightweight", "autonomy-full"] {
+            let mut edition = release_identity(
+                2,
+                &format!("sha256:{}", "2".repeat(64)),
+                &"a".repeat(40),
+                100,
+            );
+            edition.edition_profile.profile_id = profile.to_string();
+            assert!(!embedded_update_required(&edition, &full).unwrap());
+            assert_eq!(
+                embedded_update_required(&full, &edition).unwrap(),
+                !full_engine_profile(profile)
+            );
+        }
+        let conflicting = release_identity(
+            2,
+            &format!("sha256:{}", "3".repeat(64)),
+            &"a".repeat(40),
+            100,
+        );
+        assert!(embedded_update_required(&conflicting, &full).is_err());
+        let mut unrelated = conflicting;
+        unrelated.edition_profile.profile_id = "sim-only".to_string();
+        unrelated.source.git_commit = "b".repeat(40);
+        assert!(embedded_update_required(&unrelated, &full).is_err());
     }
 
     #[test]

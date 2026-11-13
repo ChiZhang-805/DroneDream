@@ -137,6 +137,9 @@ impl InstallerBootstrapResult {
 
 enum EarlyCommand {
     None,
+    UpgradeRuntimeFromArchive {
+        archive: String,
+    },
     ConsolidateStorage,
     Seal {
         mode: InstallerMode,
@@ -165,6 +168,10 @@ pub(crate) fn handle_early_command_line() -> Result<bool, String> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match parse_early_command(&args)? {
         EarlyCommand::None => Ok(false),
+        EarlyCommand::UpgradeRuntimeFromArchive { archive } => {
+            crate::runtime_installer::upgrade_runtime_from_archive(&archive)?;
+            Ok(true)
+        }
         EarlyCommand::ConsolidateStorage => {
             crate::runtime_installer::consolidate_runtime_storage()?;
             Ok(true)
@@ -214,6 +221,17 @@ fn parse_early_command(args: &[String]) -> Result<EarlyCommand, String> {
         return Ok(EarlyCommand::None);
     };
     match command {
+        "--upgrade-runtime-from-archive" => {
+            if args.len() != 2 || args[1].trim().is_empty() {
+                return Err(
+                    "--upgrade-runtime-from-archive requires one signed release archive path."
+                        .to_string(),
+                );
+            }
+            Ok(EarlyCommand::UpgradeRuntimeFromArchive {
+                archive: args[1].clone(),
+            })
+        }
         "--consolidate-runtime-storage" => {
             if args.len() != 1 {
                 return Err("--consolidate-runtime-storage accepts no arguments.".to_string());
@@ -318,6 +336,9 @@ fn parse_early_command(args: &[String]) -> Result<EarlyCommand, String> {
         value if value.starts_with("--seal-installer-handoff") => Err(
             "Malformed --seal-installer-handoff command; refusing to create a receipt.".to_string(),
         ),
+        value if value.starts_with("--upgrade-runtime-from-archive") => {
+            Err("Malformed --upgrade-runtime-from-archive command.".to_string())
+        }
         value
             if value.starts_with("--begin-runtime-quiesce")
                 || value.starts_with("--end-runtime-quiesce")
@@ -1897,6 +1918,16 @@ mod tests {
             "unknown".to_string(),
         ])
         .is_err());
+    }
+
+    #[test]
+    fn offline_archive_cli_requires_one_path_without_opening_a_webview() {
+        assert!(matches!(
+            parse_early_command(&["--upgrade-runtime-from-archive".into(), "Q:\\Build\\Runtime.tar".into()]).unwrap(),
+            EarlyCommand::UpgradeRuntimeFromArchive { archive } if archive == "Q:\\Build\\Runtime.tar"
+        ));
+        assert!(parse_early_command(&["--upgrade-runtime-from-archive".into()]).is_err());
+        assert!(parse_early_command(&["--upgrade-runtime-from-archive=bad".into()]).is_err());
     }
 
     #[test]

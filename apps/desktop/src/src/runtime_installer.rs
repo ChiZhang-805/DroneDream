@@ -2336,6 +2336,7 @@ trait WslExecutor: Send + Sync {
         _cancel: &AtomicBool,
     ) -> Result<(), InstallFailure>;
     fn bootstrap_imported_runtime(&self) -> Result<(), InstallFailure>;
+    fn restore_user_state(&self, backup: &Path) -> Result<(), InstallFailure>;
     fn start(&self, cancel: &AtomicBool) -> Result<(), InstallFailure>;
     fn terminate(&self) -> Result<(), InstallFailure>;
     fn unregister(&self) -> Result<(), InstallFailure>;
@@ -2662,6 +2663,27 @@ impl WslExecutor for ProductionWslExecutor {
             )
         })?;
         self.start_until(cancel, deadline)
+    }
+
+    fn restore_user_state(&self, backup: &Path) -> Result<(), InstallFailure> {
+        let backup = crate::engine_pack::windows_path_to_wsl(backup)
+            .map_err(|error| fail("upgrade_user_state", error, false))?;
+        self.run_exact(
+            "Runtime user state migration",
+            &[
+                "--distribution",
+                RUNTIME_NAME,
+                "--user",
+                "root",
+                "--exec",
+                "/usr/bin/python3",
+                "-c",
+                include_str!("../../../../runtime/scripts/restore-runtime-user-state.py"),
+                &backup,
+            ],
+            None,
+            IMPORT_TIMEOUT,
+        )
     }
 
     fn terminate(&self) -> Result<(), InstallFailure> {
@@ -3191,6 +3213,13 @@ impl WslExecutor for ProductionWslExecutor {
             false,
         ))
     }
+    fn restore_user_state(&self, _: &Path) -> Result<(), InstallFailure> {
+        Err(fail(
+            "unsupported_platform",
+            "The runtime installer supports Windows only.",
+            false,
+        ))
+    }
     fn start(&self, _: &AtomicBool) -> Result<(), InstallFailure> {
         Err(fail(
             "unsupported_platform",
@@ -3418,6 +3447,101 @@ fn run_production_upgrade(
     manifest_url: String,
     cancel: Arc<AtomicBool>,
 ) -> Result<InstallSuccess, InstallFailure> {
+    run_production_upgrade_with_archive(installer, manifest_url, cancel, None)
+}
+
+/// Developer maintenance uses the same signed manifest, ownership lease,
+/// rollback transaction and readiness gate as an in-app Runtime upgrade.
+pub(crate) fn upgrade_runtime_from_archive(archive: &str) -> Result<(), String> {
+    let installer = RuntimeInstaller::default();
+    let _operation = installer.prepare_installer_operation()?;
+    crate::engine_pack::ensure_app_update_idle()?;
+    installer.update(|snapshot| {
+        snapshot.operation_id = Some(format!("offline-upgrade-{}", uuid::Uuid::new_v4()));
+    });
+    let (finished, stopped) = std::sync::mpsc::channel::<()>();
+    let observer = installer.clone();
+    let progress = std::thread::spawn(move || {
+        while matches!(
+            stopped.recv_timeout(Duration::from_secs(5)),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+        ) {
+            if let Ok(snapshot) = serde_json::to_string(&observer.snapshot()) {
+                println!("{snapshot}");
+            }
+        }
+    });
+    let result = run_production_upgrade_with_archive(
+        &installer,
+        DEFAULT_RELEASE_MANIFEST_URL.to_string(),
+        Arc::new(AtomicBool::new(false)),
+        Some(Path::new(archive)),
+    );
+    let _ = finished.send(());
+    let _ = progress.join();
+    let success = result.map_err(|failure| format!("{}: {}", failure.code, failure.message))?;
+    println!("Runtime {} installed and ready.", success.version);
+    if let Some(warning) = success.cleanup_warning {
+        eprintln!("{warning}");
+    }
+    Ok(())
+}
+
+fn verify_offline_archive(
+    archive: &Path,
+    target: &Path,
+    manifest: &ReleaseManifest,
+    cancel: &AtomicBool,
+) -> Result<File, InstallFailure> {
+    let metadata = fs::symlink_metadata(archive)
+        .map_err(|error| fail("offline_archive", error.to_string(), false))?;
+    if !archive.is_absolute()
+        || !metadata.is_file()
+        || metadata.file_type().is_symlink()
+        || metadata.len() != manifest.artifact.size_bytes
+    {
+        return Err(fail("offline_archive", "The offline archive must be an ordinary absolute file matching the signed release size.", false));
+    }
+    let resolved = archive
+        .canonicalize()
+        .map_err(|error| fail("offline_archive", error.to_string(), false))?;
+    let target = target
+        .canonicalize()
+        .map_err(|error| fail("offline_archive", error.to_string(), false))?;
+    if resolved.starts_with(target) {
+        return Err(fail(
+            "offline_archive",
+            "The offline archive must be outside the Runtime installation directory.",
+            false,
+        ));
+    }
+    let mut options = OpenOptions::new();
+    options.read(true);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        // Keep verified bytes immutable until WSL finishes reading the archive.
+        options.share_mode(1);
+    }
+    let guard = options
+        .open(archive)
+        .map_err(|error| fail("offline_archive", error.to_string(), false))?;
+    if compute_file_sha256(archive, cancel)? != manifest.artifact.sha256 {
+        return Err(fail(
+            "offline_archive_hash",
+            "The offline archive does not match the signed Runtime release SHA-256.",
+            false,
+        ));
+    }
+    Ok(guard)
+}
+
+fn run_production_upgrade_with_archive(
+    installer: &RuntimeInstaller,
+    manifest_url: String,
+    cancel: Arc<AtomicBool>,
+    offline_archive: Option<&Path>,
+) -> Result<InstallSuccess, InstallFailure> {
     installer.update(|snapshot| {
         snapshot.phase = RuntimeInstallPhase::VerifyingManifest;
         snapshot.message =
@@ -3477,6 +3601,41 @@ fn run_production_upgrade(
     persist_signed_release_metadata(&artifact_root, &raw_manifest, &raw_signature)?;
     let manifest_sha256 = hex::encode(Sha256::digest(&raw_manifest));
     let archive_path = artifact_root.join(format!("{}.staging", manifest.artifact.filename));
+    if let Some(offline_archive) = offline_archive {
+        installer.update(|snapshot| {
+            snapshot.phase = RuntimeInstallPhase::VerifyingArchive;
+            snapshot.message = Some(
+                "Verifying the offline archive against the signed Runtime release...".to_string(),
+            );
+        });
+        let _archive_guard =
+            verify_offline_archive(offline_archive, Path::new(&target), &manifest, &cancel)?;
+        crate::runtime::validate_runtime_install_target_free_bytes(
+            &target,
+            manifest.requirements.minimum_free_bytes,
+            0,
+        )
+        .map_err(|error| fail("insufficient_upgrade_storage", error, false))?;
+        let smoke_report =
+            transport.fetch(&manifest.smoke.report_url, MAX_SMOKE_REPORT_BYTES, &cancel)?;
+        verify_bytes_sha256(&smoke_report, &manifest.smoke.report_sha256, "smoke report")?;
+        let mut success = run_upgrade_replace(
+            installer,
+            Path::new(&target),
+            &manifest,
+            &manifest_sha256,
+            offline_archive,
+            &executor,
+            &cancel,
+            &old_build_id,
+            &old_version,
+        )?;
+        success.cleanup_warning = join_cleanup_warnings([
+            success.cleanup_warning,
+            cleanup_successful_install(Path::new(&target), &manifest, &archive_path),
+        ]);
+        return Ok(success);
+    }
     load_or_initialize_resume(&artifact_root, &archive_path, &manifest, &manifest_sha256)?;
     let storage_credit = resumable_storage_credit(Path::new(&target), &manifest, &manifest_sha256)?;
     let upgrade_required = manifest
@@ -5315,6 +5474,11 @@ fn run_upgrade_replace(
             snapshot.message = Some("Starting the upgraded Runtime Base...".to_string());
         });
         executor.bootstrap_imported_runtime()?;
+        installer.update(|snapshot| {
+            snapshot.message =
+                Some("Restoring existing accounts and workspace data...".to_string());
+        });
+        executor.restore_user_state(&backup_path)?;
         executor.start(cancel)?;
         installer.update(|snapshot| {
             snapshot.phase = RuntimeInstallPhase::HealthChecking;
@@ -6718,6 +6882,7 @@ mod tests {
         leave_unexpected_import_file: bool,
         fail_import_with_foreign_registration: bool,
         fail_export: bool,
+        fail_user_state_restore: bool,
         cancel_during_import: bool,
         preparation_requires_restart: bool,
         imports: usize,
@@ -6842,6 +7007,21 @@ mod tests {
             let mut state = self.state.lock().unwrap();
             state.starts += 1;
             state.lifecycle_events.push("start".to_string());
+            Ok(())
+        }
+
+        fn restore_user_state(&self, _: &Path) -> Result<(), InstallFailure> {
+            let mut state = self.state.lock().unwrap();
+            state
+                .lifecycle_events
+                .push("restore-user-state".to_string());
+            if state.fail_user_state_restore {
+                return Err(fail(
+                    "fake_user_state",
+                    "injected user state migration failure",
+                    false,
+                ));
+            }
             Ok(())
         }
 
@@ -7520,6 +7700,58 @@ mod tests {
             ["terminate", "export", "start", "health"]
         );
         assert!(state.registered);
+    }
+
+    #[test]
+    fn upgrade_migrates_user_state_before_start_and_rolls_back_a_failed_migration() {
+        for fail_restore in [false, true] {
+            let sandbox = Sandbox::new();
+            let target = sandbox.target();
+            let manifest = fixture_manifest(b"new-runtime");
+            let cache = initialize_runtime_download_cache(&target).unwrap();
+            let archive = cache.join("artifacts").join("new-runtime.tar");
+            fs::write(&archive, b"new-runtime").unwrap();
+            let wsl = FakeWsl::default();
+            {
+                let mut state = wsl.state.lock().unwrap();
+                state.registered = true;
+                state.registration_owned_by_attempt = true;
+                state.installed_build_id = Some("old-build".to_string());
+                state.installed_version = Some("1.2.2".to_string());
+                state.fail_user_state_restore = fail_restore;
+            }
+            let result = run_upgrade_replace(
+                &RuntimeInstaller::default(),
+                &target,
+                &manifest,
+                &digest(&serde_jcs::to_vec(&manifest).unwrap()),
+                &archive,
+                &wsl,
+                &AtomicBool::new(false),
+                "old-build",
+                "1.2.2",
+            );
+            let state = wsl.state.lock().unwrap();
+            let restored = state
+                .lifecycle_events
+                .iter()
+                .position(|event| event == "restore-user-state")
+                .unwrap();
+            let started = state
+                .lifecycle_events
+                .iter()
+                .position(|event| event == "start")
+                .unwrap();
+            assert!(restored < started);
+            if fail_restore {
+                assert_eq!(result.unwrap_err().code, "fake_user_state");
+                assert_eq!(state.installed_version.as_deref(), Some("1.2.2"));
+                assert_eq!(state.imports, 2);
+            } else {
+                assert_eq!(result.unwrap().version, "1.2.3");
+                assert_eq!(state.imports, 1);
+            }
+        }
     }
 
     #[test]
@@ -8284,5 +8516,55 @@ mod tests {
         .unwrap_err();
         assert_eq!(error.code, "part_hash_mismatch");
         assert_eq!(wsl.state.lock().unwrap().imports, 0);
+    }
+
+    #[test]
+    fn offline_archive_requires_signed_size_and_digest() {
+        let sandbox = Sandbox::new();
+        let target = sandbox.target();
+        fs::create_dir(&target).unwrap();
+        let archive = sandbox.0.join("release.tar");
+        let expected = b"signed runtime";
+        let manifest = fixture_manifest(expected);
+        fs::write(&archive, expected).unwrap();
+        let guard =
+            verify_offline_archive(&archive, &target, &manifest, &AtomicBool::new(false)).unwrap();
+        #[cfg(target_os = "windows")]
+        assert!(OpenOptions::new().write(true).open(&archive).is_err());
+        drop(guard);
+        fs::write(&archive, b"signed runtimf").unwrap();
+        assert_eq!(
+            verify_offline_archive(&archive, &target, &manifest, &AtomicBool::new(false))
+                .unwrap_err()
+                .code,
+            "offline_archive_hash"
+        );
+        fs::write(&archive, b"short").unwrap();
+        assert_eq!(
+            verify_offline_archive(&archive, &target, &manifest, &AtomicBool::new(false))
+                .unwrap_err()
+                .code,
+            "offline_archive"
+        );
+    }
+
+    #[test]
+    fn offline_archive_cannot_be_inside_the_runtime_being_replaced() {
+        let sandbox = Sandbox::new();
+        let target = sandbox.target();
+        fs::create_dir(&target).unwrap();
+        let archive = target.join("release.tar");
+        fs::write(&archive, b"runtime").unwrap();
+        assert_eq!(
+            verify_offline_archive(
+                &archive,
+                &target,
+                &fixture_manifest(b"runtime"),
+                &AtomicBool::new(false)
+            )
+            .unwrap_err()
+            .code,
+            "offline_archive"
+        );
     }
 }

@@ -65,6 +65,30 @@ journey all pass for the exact immutable installer bytes.
 
 ## Runtime failure diagnostics and retention
 
+Developer maintenance can install a previously downloaded official Runtime
+archive without opening WebView2, logging in, or clicking the workspace updater:
+`drone-dream-desktop.exe --upgrade-runtime-from-archive "Q:\DroneDream-Workspace\Build\Release-Staging\runtime-v0.1.2-beta.1\DroneDreamRuntime-0.1.2-amd64.tar"`.
+The command fetches the compiled production release manifest and detached
+signature, verifies the full archive digest, and holds the shared Runtime
+operation lease. It uses the normal backup, replacement, health-check and
+rollback transaction; it does not import WSL directly or weaken release trust.
+The supplied archive remains outside the managed Runtime directory and is
+preserved. Normal customer updates still begin only after the user clicks the
+blue account-side download button.
+
+Both online and offline Base upgrades restore the existing Runtime database,
+artifacts, home workspace and application signing secret from the verified
+rollback export before starting the new services. New Runtime code, execution
+paths, identity and Engine Pack receipt come from the new release. Migration
+failure enters the same automatic rollback as an unhealthy replacement.
+
+On a shared Runtime, full Engine Packs (`unified-sim-lab` and `autonomy-full`)
+also satisfy the narrower SIM and FIELD profiles from the exact same source
+commit and Runtime compatibility contract. Their distinct profile IDs do not
+mean competing updates. A narrow pack may be replaced by the full pack from
+that release; a full pack is preserved when another edition checks for updates.
+Conflicting packs within the same profile remain an error.
+
 If the imported distribution starts but does not become ready, the desktop
 installer distinguishes three outcomes instead of reporting every timeout as
 the same failure: a Runtime-internal service failure, a healthy Runtime that
