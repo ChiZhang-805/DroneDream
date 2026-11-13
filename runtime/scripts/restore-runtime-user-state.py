@@ -31,7 +31,6 @@ def restore_user_state(
                 if not member.isfile() or member.size > 1024 * 1024:
                     raise ValueError("Runtime backup environment is invalid")
                 source = archive.extractfile(member)
-                assert source is not None
                 lines = source.read().decode("utf-8").splitlines()
                 secrets = [line for line in lines if line.startswith("APP_SECRET_KEY=")]
                 if len(secrets) != 1:
