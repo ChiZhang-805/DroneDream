@@ -4663,16 +4663,18 @@ function expectLowercaseHex(
 }
 
 function normalizeRequestedTargetRoot(value: string): string {
-  const match = /^([a-z]):\\DroneDream\\?$/iu.exec(value.trim());
-  if (!match) {
-    throw new Error("targetRoot must be a drive root such as E:\\DroneDream");
-  }
-  return `${match[1].toUpperCase()}:\\DroneDream`;
+  const match = /^([a-z]):\\(DroneDream(?:-Workspace\\Runtime|\\Runtime)?)\\?$/iu.exec(value.trim());
+  if (!match) throw new Error("Choose a dedicated DroneDream Runtime directory.");
+  const suffix = match[2].toLowerCase();
+  const directory = suffix === "dronedream" ? "DroneDream"
+    : suffix.startsWith("dronedream-workspace") ? "DroneDream-Workspace\\Runtime"
+    : "DroneDream\\Runtime";
+  return `${match[1].toUpperCase()}:\\${directory}`;
 }
 
 function expectCanonicalRuntimeTargetRoot(value: unknown, path: string): string {
   const targetRoot = expectSafeNonEmptyString(value, path);
-  if (!/^[A-Z]:\\DroneDream$/u.test(targetRoot)) {
+  if (!/^[A-Z]:\\DroneDream(?:-Workspace\\Runtime|\\Runtime)?$/u.test(targetRoot)) {
     throw new Error(`${path} must be a canonical path such as E:\\DroneDream`);
   }
   return targetRoot;

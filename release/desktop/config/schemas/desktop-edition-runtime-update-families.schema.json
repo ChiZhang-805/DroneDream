@@ -42,7 +42,7 @@
         "operationLeaseFileName": {"const": "runtime-operation-v1.lock"},
         "legacyCompatibilityLeaseRelativePath": {"const": "io.dronedream.desktop/runtime-operation-v1.lock"},
         "legacyCompatibilityLeaseRequired": {"const": true},
-        "downloadCacheDirectoryName": {"const": "DroneDream.download-cache"},
+        "downloadCacheDirectoryName": {"const": "Downloads"},
         "diagnosticsRootDirectoryName": {"const": "diagnostics"},
         "editionUninstallMayRemoveRuntime": {"const": false},
         "editionOperationsMayUseIndependentLocks": {"const": false}

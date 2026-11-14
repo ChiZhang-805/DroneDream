@@ -75,7 +75,7 @@ def validate_contract(document: Any) -> dict[str, Any]:
             "io.dronedream.desktop/runtime-operation-v1.lock"
         ),
         "legacyCompatibilityLeaseRequired": True,
-        "downloadCacheDirectoryName": "DroneDream.download-cache",
+        "downloadCacheDirectoryName": "Downloads",
         "diagnosticsRootDirectoryName": "diagnostics",
         "editionUninstallMayRemoveRuntime": False,
         "editionOperationsMayUseIndependentLocks": False,

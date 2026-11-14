@@ -1905,7 +1905,7 @@ mod tests {
             EarlyCommand::Seal {
                 mode: InstallerMode::Custom,
                 target_root: Some(ref target)
-            } if target == r"E:\DroneDream-Workspace\Runtime"
+            } if target == r"E:\DroneDream\Runtime"
         ));
         assert!(parse_early_command(&[
             "--seal-installer-handoff".to_string(),

@@ -1014,119 +1014,164 @@ pub(crate) fn consolidate_runtime_storage() -> Result<(), String> {
             return Err("Finish the pending Runtime upgrade before moving storage.".to_string());
         }
         let old = crate::runtime::registered_runtime_target()?.ok_or("Runtime is not installed")?;
-        let target = crate::runtime::normalize_windows_target(&old[..2])?;
+        let drive = &old[..2];
+        let target = crate::runtime::normalize_windows_target(drive)?;
         if old.eq_ignore_ascii_case(&target) {
-            if Path::new(&format!("{}\\DroneDream.download-cache", &old[..2])).exists() {
-                return Err("Runtime is already in the workspace, but its legacy cache still needs recovery.".to_string());
-            }
-            return Ok(());
+            let old_cache = PathBuf::from(format!(r"{drive}\DroneDream-Workspace\Runtime"));
+            return finish_runtime_cache_move(&old_cache, Path::new(&target));
         }
-        if !old.eq_ignore_ascii_case(&format!("{}\\DroneDream", &old[..2])) {
-            return Err(
-                "Only the legacy product Runtime directory can be consolidated.".to_string(),
-            );
+        // WSL cannot move a distribution inside its own import directory.
+        if old.eq_ignore_ascii_case(&format!(r"{drive}\DroneDream")) {
+            let staging = format!(r"{drive}\DroneDream-Workspace\Runtime");
+            move_owned_runtime_storage(&old, &staging)?;
+            move_owned_runtime_storage(&staging, &target)
+        } else {
+            move_owned_runtime_storage(&old, &target)
         }
-        let old = PathBuf::from(old);
-        let target = PathBuf::from(target);
-        let old_cache = crate::runtime_cache::validate_managed_cache(&old)?;
+    })
+}
+
+#[cfg(target_os = "windows")]
+fn finish_runtime_cache_move(old: &Path, target: &Path) -> Result<(), String> {
+    let old_candidate = crate::runtime_cache::runtime_download_cache_root(
+        old.to_str().ok_or("Invalid old Runtime path")?,
+    );
+    if old_candidate.exists() {
+        let old_cache = crate::runtime_cache::validate_managed_cache(old)?;
         let new_cache = crate::runtime_cache::runtime_download_cache_root(
             target.to_str().ok_or("Invalid Runtime path")?,
         );
-        let partial_move = runtime_disk_moved_to_target(&old, &target);
-        for destination in [&target, &new_cache] {
-            if destination.exists() && !(destination == &target && partial_move) {
+        if new_cache.exists() {
+            return Err(
+                "Both Runtime download directories exist. Their contents have been preserved."
+                    .to_string(),
+            );
+        }
+        let before = storage_inventory(&old_cache)?;
+        fs::rename(&old_cache, &new_cache).map_err(|error| error.to_string())?;
+        if storage_inventory(&new_cache)? != before {
+            return Err("Runtime download files changed during the move.".to_string());
+        }
+        crate::runtime_cache::validate_managed_cache(target)?;
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn move_owned_runtime_storage(old: &str, target: &str) -> Result<(), String> {
+    let old = PathBuf::from(old);
+    let target = PathBuf::from(target);
+    let old_cache = crate::runtime_cache::validate_managed_cache(&old)?;
+    let new_cache = crate::runtime_cache::runtime_download_cache_root(
+        target.to_str().ok_or("Invalid Runtime path")?,
+    );
+    for entry in fs::read_dir(&old).map_err(|error| error.to_string())? {
+        let entry = entry.map_err(|error| error.to_string())?;
+        if entry.file_name() != "ext4.vhdx" && entry.file_name() != ".dronedream-runtime-root.json"
+        {
+            return Err(format!(
+                "Unexpected file in the Runtime import directory: {}",
+                entry.path().display()
+            ));
+        }
+    }
+    let partial_move = runtime_disk_moved_to_target(&old, &target);
+    for destination in [&target, &new_cache] {
+        if destination.exists() && !(destination == &target && partial_move) {
+            return Err(format!(
+                "Destination already exists: {}",
+                destination.display()
+            ));
+        }
+        for parent in destination.ancestors().skip(1) {
+            if let Ok(metadata) = fs::symlink_metadata(parent) {
+                if !metadata.is_dir() || crate::runtime_cache::is_link_like(&metadata) {
+                    return Err(format!(
+                        "Storage parent is not a real directory: {}",
+                        parent.display()
+                    ));
+                }
+            }
+        }
+    }
+    ProductionWslExecutor
+        .terminate()
+        .map_err(|error| error.message)?;
+    let before = if partial_move {
+        combined_storage_inventory(&old, &target)?
+    } else {
+        storage_inventory(&old)?
+    };
+    let cache_before = storage_inventory(&old_cache)?;
+    println!(
+        "Runtime: {} files, {} bytes; cache: {} files, {} bytes",
+        before.len(),
+        before.values().map(|v| v.0).sum::<u64>(),
+        cache_before.len(),
+        cache_before.values().map(|v| v.0).sum::<u64>()
+    );
+    fs::create_dir_all(target.parent().ok_or("Missing Runtime parent")?)
+        .map_err(|error| error.to_string())?;
+    fs::create_dir_all(new_cache.parent().ok_or("Missing cache parent")?)
+        .map_err(|error| error.to_string())?;
+    if partial_move {
+        crate::runtime::repair_runtime_registration_after_partial_move(
+            old.to_str().ok_or("Invalid legacy Runtime path")?,
+            target.to_str().ok_or("Invalid Runtime target")?,
+        )?;
+    } else {
+        let mut command = windows_command("wsl.exe");
+        command.args([
+            "--manage",
+            "DroneDreamRuntime",
+            "--move",
+            target.to_str().ok_or("Invalid Runtime target")?,
+        ]);
+        let output = command_output(command, Duration::from_secs(300), "Runtime storage move")?;
+        if !output.status.success() {
+            if runtime_disk_moved_to_target(&old, &target) {
+                crate::runtime::repair_runtime_registration_after_partial_move(
+                    old.to_str().ok_or("Invalid legacy Runtime path")?,
+                    target.to_str().ok_or("Invalid Runtime target")?,
+                )?;
+            } else {
                 return Err(format!(
-                    "Destination already exists: {}",
-                    destination.display()
+                    "WSL could not move Runtime storage (exit {:?}); existing data was preserved.",
+                    output.status.code()
                 ));
             }
-            for parent in destination.ancestors().skip(1) {
-                if let Ok(metadata) = fs::symlink_metadata(parent) {
-                    if !metadata.is_dir() || crate::runtime_cache::is_link_like(&metadata) {
-                        return Err(format!(
-                            "Storage parent is not a real directory: {}",
-                            parent.display()
-                        ));
-                    }
-                }
+        }
+    }
+    // WSL versions may leave the product marker beside the old VHDX location.
+    if old.exists() {
+        for entry in fs::read_dir(&old).map_err(|error| error.to_string())? {
+            let entry = entry.map_err(|error| error.to_string())?;
+            let destination = target.join(entry.file_name());
+            if destination.exists() {
+                return Err(
+                    "Runtime move left conflicting metadata; both copies were preserved."
+                        .to_string(),
+                );
             }
+            fs::rename(entry.path(), destination).map_err(|error| error.to_string())?;
         }
-        ProductionWslExecutor
-            .terminate()
-            .map_err(|error| error.message)?;
-        let before = if partial_move {
-            combined_storage_inventory(&old, &target)?
-        } else {
-            storage_inventory(&old)?
-        };
-        let cache_before = storage_inventory(&old_cache)?;
-        println!(
-            "Runtime: {} files, {} bytes; cache: {} files, {} bytes",
-            before.len(),
-            before.values().map(|v| v.0).sum::<u64>(),
-            cache_before.len(),
-            cache_before.values().map(|v| v.0).sum::<u64>()
-        );
-        fs::create_dir_all(target.parent().ok_or("Missing workspace parent")?)
-            .map_err(|error| error.to_string())?;
-        fs::create_dir_all(new_cache.parent().ok_or("Missing cache parent")?)
-            .map_err(|error| error.to_string())?;
-        if partial_move {
-            crate::runtime::repair_runtime_registration_after_partial_move(
-                old.to_str().ok_or("Invalid legacy Runtime path")?,
-                target.to_str().ok_or("Invalid Runtime target")?,
-            )?;
-        } else {
-            let mut command = windows_command("wsl.exe");
-            command.args([
-                "--manage",
-                "DroneDreamRuntime",
-                "--move",
-                target.to_str().ok_or("Invalid Runtime target")?,
-            ]);
-            let output = command_output(command, Duration::from_secs(300), "Runtime storage move")?;
-            if !output.status.success() {
-                if runtime_disk_moved_to_target(&old, &target) {
-                    crate::runtime::repair_runtime_registration_after_partial_move(
-                        old.to_str().ok_or("Invalid legacy Runtime path")?,
-                        target.to_str().ok_or("Invalid Runtime target")?,
-                    )?;
-                } else {
-                    return Err(format!("WSL could not move Runtime storage (exit {:?}); existing data was preserved.", output.status.code()));
-                }
-            }
-        }
-        // WSL versions may leave the product marker beside the old VHDX location.
-        if old.exists() {
-            for entry in fs::read_dir(&old).map_err(|error| error.to_string())? {
-                let entry = entry.map_err(|error| error.to_string())?;
-                let destination = target.join(entry.file_name());
-                if destination.exists() {
-                    return Err(
-                        "Runtime move left conflicting metadata; both copies were preserved."
-                            .to_string(),
-                    );
-                }
-                fs::rename(entry.path(), destination).map_err(|error| error.to_string())?;
-            }
-        }
-        if storage_inventory(&target)? != before {
-            return Err("Runtime storage inventory changed during the move; inspect both locations before continuing.".to_string());
-        }
-        if !crate::runtime::runtime_registration_matches_target(target.to_str().unwrap())? {
-            return Err("WSL did not register the new Runtime location.".to_string());
-        }
-        crate::runtime::validate_installed_runtime_ownership()?;
-        fs::rename(&old_cache, &new_cache).map_err(|error| error.to_string())?;
-        if storage_inventory(&new_cache)? != cache_before {
-            return Err("Runtime cache inventory changed during the move.".to_string());
-        }
-        crate::runtime_cache::validate_managed_cache(&target)?;
-        if old.exists() {
-            fs::remove_dir(&old).map_err(|error| error.to_string())?;
-        }
-        Ok(())
-    })
+    }
+    if storage_inventory(&target)? != before {
+        return Err("Runtime storage inventory changed during the move; inspect both locations before continuing.".to_string());
+    }
+    if !crate::runtime::runtime_registration_matches_target(target.to_str().unwrap())? {
+        return Err("WSL did not register the new Runtime location.".to_string());
+    }
+    crate::runtime::validate_installed_runtime_ownership()?;
+    fs::rename(&old_cache, &new_cache).map_err(|error| error.to_string())?;
+    if storage_inventory(&new_cache)? != cache_before {
+        return Err("Runtime cache inventory changed during the move.".to_string());
+    }
+    crate::runtime_cache::validate_managed_cache(&target)?;
+    if old.exists() {
+        fs::remove_dir(&old).map_err(|error| error.to_string())?;
+    }
+    Ok(())
 }
 
 #[cfg(target_os = "windows")]

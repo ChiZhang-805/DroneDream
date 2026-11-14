@@ -12,9 +12,7 @@ independent verification before publication.
 The Windows installer downloads a dedicated WSL2 distribution; it never
 moves, upgrades, or unregisters an existing Ubuntu distribution. A user may
 choose any suitable fixed NTFS drive. `X:\DroneDream` in the signed manifest
-is a drive-letter placeholder, not a hard-coded installation path; on the
-current development machine the desktop planner may recommend
-`E:\DroneDream`.
+is a legacy manifest hint. Fresh installations default to the system drive and upgrades resolve the registered WSL directory.
 
 This document covers the release assets consumed by the installer-driven,
 one-confirmation Windows flow. The manifest embedded inside the rootfs remains
@@ -28,7 +26,7 @@ not the PX4/Gazebo rootfs. A fresh interactive install offers **Install all
 The first two choices show and validate the target before the user confirms;
 the third never creates a Runtime download request. The desktop application
 defaults to `%LOCALAPPDATA%\DroneDream`, while the Runtime is isolated at the
-fixed `X:\DroneDream` path and uses `X:\DroneDream.download-cache` for resumable
+fixed `X:\DroneDream\Runtime` path and uses `X:\DroneDream\Downloads` for resumable
 staging.
 
 The current beta artifact recorded by the release fixture is 6,116,882,432
@@ -98,7 +96,7 @@ a bounded snapshot of the managed systemd units, their recent journals,
 listening sockets, WSL networking, and the Runtime-internal readiness response.
 
 The report is written as an ordinary file below the marker-owned sibling cache:
-`X:\DroneDream.download-cache\diagnostics\runtime-health-<timestamp>-<id>.log`.
+`X:\DroneDream\Downloads\diagnostics\runtime-health-<timestamp>-<id>.log`.
 It is never written below `%TEMP%`, the desktop-program directory, or the WSL
 import target. The writer revalidates the cache marker, rejects links and
 reparse points, requires the diagnostics directory and report to resolve

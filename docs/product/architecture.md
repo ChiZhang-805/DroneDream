@@ -30,8 +30,8 @@ DroneDream 把用户的模糊自然语言任务转化为可确认、可执行、
 | `DroneDream` | 五个桌面版本共用的前端、桌面宿主、后端服务及项目记忆。 |
 | `Build` | 构建输出、发布暂存、正式插件和模型包；不是源码事实源。 |
 | `TestRuns` | 跨工作树验收证据和复验收据。每次真实运行使用新目录，禁止覆盖失败证据。 |
-| `Q:\DroneDream-Workspace\Runtime` | 应用管理的 DroneDreamRuntime WSL/VHDX。不是源码树，只能通过产品的 Runtime installer/manager 修改。 |
-| `Q:\DroneDream-Workspace\Caches\Runtime` | Runtime 可续传下载缓存，必须与 Runtime 导入目录分开。 |
+| `Q:\DroneDream\Runtime` | 应用管理的 DroneDreamRuntime WSL/VHDX。不是源码树，只能通过产品的 Runtime installer/manager 修改。 |
+| `Q:\DroneDream\Downloads` | Runtime 可续传下载缓存，必须与 Runtime 导入目录分开。 |
 
 五个桌面版本为 Universal、SIM、LAB、FIELD 和 AGENT。登录或注册成功后必须进入当前版本自己的 Chatbot。软件内使用邮箱和密码直接登录；浏览器网站可以继续提供浏览器登录。五版共存时，启动、更新和退出必须按实际安装目录及会话身份隔离，不能因可执行文件同名而结束其他版本。
 

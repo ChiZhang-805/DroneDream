@@ -304,7 +304,7 @@ const missingRuntime: RuntimeStatusReport = {
 
 const plan: RuntimeInstallPlan = {
   runtimeName: "DroneDreamRuntime",
-  targetRoot: "E:\\DroneDream",
+  targetRoot: "E:\\DroneDream\\Runtime",
   estimatedDownloadBytes: 8 * 1024 ** 3,
   estimatedInstalledBytes: 24 * 1024 ** 3,
   requiresAdministrator: true,
@@ -405,7 +405,7 @@ function installSnapshot(
     error: null,
     resumable: true,
     requiresRestart: false,
-    targetRoot: "E:\\DroneDream",
+    targetRoot: "E:\\DroneDream\\Runtime",
     installedVersion: null,
     updatedAt: "2026-07-12T10:00:00Z",
     ...overrides,
@@ -1257,13 +1257,13 @@ describe("DesktopSetup", () => {
       {
         status: "ready",
         mode: "install-all",
-        targetRoot: "E:\\DroneDream",
+        targetRoot: "E:\\DroneDream\\Runtime",
         message: "Install everything was confirmed.",
       },
       {
         disposition: "started",
         mode: "install-all",
-        targetRoot: "E:\\DroneDream",
+        targetRoot: "E:\\DroneDream\\Runtime",
         snapshot: automaticSnapshot,
         message: "The confirmed installation started.",
       },
@@ -1291,7 +1291,7 @@ describe("DesktopSetup", () => {
       undefined,
     );
     expect(invoke).toHaveBeenCalledWith("get_runtime_install_plan", {
-      targetRoot: "E:\\DroneDream",
+      targetRoot: "E:\\DroneDream\\Runtime",
     });
     expect(invoke).not.toHaveBeenCalledWith(
       "start_runtime_install",
@@ -1325,13 +1325,13 @@ describe("DesktopSetup", () => {
       {
         status: "ready",
         mode: "install-all",
-        targetRoot: "E:\\DroneDream",
+        targetRoot: "E:\\DroneDream\\Runtime",
         message: null,
       },
       {
         disposition: "started",
         mode: "install-all",
-        targetRoot: "E:\\DroneDream",
+        targetRoot: "E:\\DroneDream\\Runtime",
         snapshot: automaticSnapshot,
         message: null,
       },
@@ -1339,7 +1339,7 @@ describe("DesktopSetup", () => {
 
     await waitFor(() => expect(invoke).toHaveBeenCalledWith(
       "get_runtime_install_plan",
-      { targetRoot: "E:\\DroneDream" },
+      { targetRoot: "E:\\DroneDream\\Runtime" },
     ));
     expect(page.installerInvoke).not.toHaveBeenCalled();
 
@@ -1375,7 +1375,7 @@ describe("DesktopSetup", () => {
       {
         status: "ready",
         mode: "install-all",
-        targetRoot: "E:\\DroneDream",
+        targetRoot: "E:\\DroneDream\\Runtime",
         message: null,
       },
       pendingAutoStart,
@@ -1429,7 +1429,7 @@ describe("DesktopSetup", () => {
       {
         status: "ready",
         mode: "install-all",
-        targetRoot: "E:\\DroneDream",
+        targetRoot: "E:\\DroneDream\\Runtime",
         message: null,
       },
       pendingAutoStart,
@@ -1445,7 +1445,7 @@ describe("DesktopSetup", () => {
     resolveAutoStart({
       disposition: "started",
       mode: "install-all",
-      targetRoot: "E:\\DroneDream",
+      targetRoot: "E:\\DroneDream\\Runtime",
       snapshot: activeSnapshot,
       message: null,
     });
@@ -1491,7 +1491,7 @@ describe("DesktopSetup", () => {
       {
         status: "ready",
         mode: "install-all",
-        targetRoot: "E:\\DroneDream",
+        targetRoot: "E:\\DroneDream\\Runtime",
         message: null,
       },
       pendingAutoStart,
@@ -1520,7 +1520,7 @@ describe("DesktopSetup", () => {
       resolveAutoStart({
         disposition: "started",
         mode: "install-all",
-        targetRoot: "E:\\DroneDream",
+        targetRoot: "E:\\DroneDream\\Runtime",
         snapshot: activeSnapshot,
         message: null,
       });
@@ -1565,7 +1565,7 @@ describe("DesktopSetup", () => {
       {
         status: "ready",
         mode: "custom",
-        targetRoot: "E:\\DroneDream",
+        targetRoot: "E:\\DroneDream\\Runtime",
         message: null,
       },
       pendingAutoStart,
@@ -1618,7 +1618,7 @@ describe("DesktopSetup", () => {
       if (command === "probe_runtime_status") return missingRuntime;
       if (command === "get_runtime_install_progress") return idleInstallSnapshot;
       if (command === "get_runtime_install_plan") {
-        if (args?.targetRoot === "E:\\DroneDream") {
+        if (args?.targetRoot === "E:\\DroneDream\\Runtime") {
           planCalls += 1;
           if (planCalls === 1) {
             throw new Error("The confirmed E: drive was removed.");
@@ -1636,13 +1636,13 @@ describe("DesktopSetup", () => {
       {
         status: "ready",
         mode: "custom",
-        targetRoot: "E:\\DroneDream",
+        targetRoot: "E:\\DroneDream\\Runtime",
         message: null,
       },
       {
         disposition: "started",
         mode: "custom",
-        targetRoot: "E:\\DroneDream",
+        targetRoot: "E:\\DroneDream\\Runtime",
         snapshot: automaticSnapshot,
         message: null,
       },
@@ -1650,7 +1650,7 @@ describe("DesktopSetup", () => {
 
     expect(await screen.findByText(/confirmed E: drive was removed/i)).toBeInTheDocument();
     expect(screen.getByText("Automatic setup needs attention")).toBeInTheDocument();
-    expect(screen.getAllByText("E:\\DroneDream")).not.toHaveLength(0);
+    expect(screen.getAllByText("E:\\DroneDream\\Runtime")).not.toHaveLength(0);
     expect(screen.getByRole("button", { name: "Cancel automatic installation" }))
       .toBeEnabled();
     expect(page.installerInvoke).not.toHaveBeenCalled();
@@ -1680,7 +1680,7 @@ describe("DesktopSetup", () => {
       {
         status: "ready",
         mode: "install-all",
-        targetRoot: "E:\\DroneDream",
+        targetRoot: "E:\\DroneDream\\Runtime",
         message: null,
       },
       {
@@ -1694,7 +1694,7 @@ describe("DesktopSetup", () => {
 
     expect(await screen.findByText(/system probe unavailable/i)).toBeInTheDocument();
     expect(screen.getByText("Automatic setup needs attention")).toBeInTheDocument();
-    expect(screen.getByText("E:\\DroneDream")).toBeInTheDocument();
+    expect(screen.getByText("E:\\DroneDream\\Runtime")).toBeInTheDocument();
     expect(page.installerInvoke).not.toHaveBeenCalled();
     const cancel = screen.getByRole("button", {
       name: "Cancel automatic installation",
@@ -1740,7 +1740,7 @@ describe("DesktopSetup", () => {
       if (command === "start_runtime_install") {
         return installSnapshot({
           phase: "queued",
-          targetRoot: "E:\\DroneDream",
+          targetRoot: "E:\\DroneDream\\Runtime",
           bytesDownloaded: 0,
           currentPart: null,
           totalParts: null,
@@ -1759,7 +1759,7 @@ describe("DesktopSetup", () => {
 
     expect(invoke).toHaveBeenCalledWith("start_runtime_install", {
       request: {
-        targetRoot: "E:\\DroneDream",
+        targetRoot: "E:\\DroneDream\\Runtime",
         releaseManifestUrl:
           "https://downloads.example.test/dronedream/runtime-manifest.json",
       },
@@ -1794,13 +1794,13 @@ describe("DesktopSetup", () => {
       {
         status: "ready",
         mode: "install-all",
-        targetRoot: "E:\\DroneDream",
+        targetRoot: "E:\\DroneDream\\Runtime",
         message: null,
       },
       {
         disposition: "started",
         mode: "install-all",
-        targetRoot: "E:\\DroneDream",
+        targetRoot: "E:\\DroneDream\\Runtime",
         snapshot: { ...activeSnapshot, phase: "teleporting" },
         message: null,
       },
@@ -1835,13 +1835,13 @@ describe("DesktopSetup", () => {
       {
         status: "ready",
         mode: "install-all",
-        targetRoot: "E:\\DroneDream",
+        targetRoot: "E:\\DroneDream\\Runtime",
         message: null,
       },
       {
         disposition: "started",
         mode: "install-all",
-        targetRoot: "E:\\DroneDream",
+        targetRoot: "E:\\DroneDream\\Runtime",
         snapshot: null,
         message: null,
       },
@@ -1966,12 +1966,12 @@ describe("DesktopSetup", () => {
     const page = renderPage("en", {
       status: "ready",
       mode: "install-all",
-      targetRoot: "E:\\DroneDream",
+      targetRoot: "E:\\DroneDream\\Runtime",
       message: null,
     }, {
       disposition: "started",
       mode: "install-all",
-      targetRoot: "E:\\DroneDream",
+      targetRoot: "E:\\DroneDream\\Runtime",
       snapshot: cleanupFailure,
       message: null,
     });
@@ -2025,12 +2025,12 @@ describe("DesktopSetup", () => {
     const page = renderPage("en", {
       status: "ready",
       mode: "install-all",
-      targetRoot: "E:\\DroneDream",
+      targetRoot: "E:\\DroneDream\\Runtime",
       message: null,
     }, {
       disposition: "started",
       mode: "install-all",
-      targetRoot: "E:\\DroneDream",
+      targetRoot: "E:\\DroneDream\\Runtime",
       snapshot: cleanupFailure,
       message: null,
     });
@@ -2133,13 +2133,13 @@ describe("DesktopSetup", () => {
       {
         status: "ready",
         mode: "custom",
-        targetRoot: "E:\\DroneDream",
+        targetRoot: "E:\\DroneDream\\Runtime",
         message: "Custom installation was confirmed.",
       },
       {
         disposition: "resumed",
         mode: "custom",
-        targetRoot: "E:\\DroneDream",
+        targetRoot: "E:\\DroneDream\\Runtime",
         snapshot: resumedSnapshot,
         message: "The interrupted installation resumed.",
       },
@@ -2198,7 +2198,7 @@ describe("DesktopSetup", () => {
     expect(await screen.findByText("Preparing installation")).toBeInTheDocument();
     expect(invoke).toHaveBeenCalledWith("start_runtime_install", {
       request: {
-        targetRoot: "E:\\DroneDream",
+        targetRoot: "E:\\DroneDream\\Runtime",
         releaseManifestUrl:
           "https://downloads.example.test/dronedream/runtime-manifest.json",
       },
@@ -2388,12 +2388,12 @@ describe("DesktopSetup", () => {
     const page = renderPage("en", {
       status: "ready",
       mode: "install-all",
-      targetRoot: "E:\\DroneDream",
+      targetRoot: "E:\\DroneDream\\Runtime",
       message: "Runtime setup is ready to continue after restart.",
     }, {
       disposition: "resumed",
       mode: "install-all",
-      targetRoot: "E:\\DroneDream",
+      targetRoot: "E:\\DroneDream\\Runtime",
       snapshot: waitingForRestart,
       message: null,
     });
@@ -2442,7 +2442,7 @@ describe("DesktopSetup", () => {
       "get_runtime_install_plan",
       undefined,
     );
-    expect(screen.getAllByText("E:\\DroneDream").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("E:\\DroneDream\\Runtime").length).toBeGreaterThan(0);
   });
 
   it("does not offer paths that are not fixed local drive roots", async () => {

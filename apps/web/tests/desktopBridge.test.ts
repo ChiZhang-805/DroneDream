@@ -713,6 +713,16 @@ describe("desktop bridge", () => {
     await expect(probeRuntimeStatus()).rejects.toThrow(/required component .* is missing/i);
   });
 
+  it.each(["E:\\DroneDream\\Runtime", "E:\\DroneDream-Workspace\\Runtime"])(
+    "keeps the dedicated Runtime path %s across the desktop bridge",
+    async (targetRoot) => {
+      const invoke = vi.fn();
+      window.__TAURI__ = { core: { invoke } };
+      invoke.mockResolvedValueOnce({ ...installPlan, targetRoot });
+      expect((await getRuntimeInstallPlan(targetRoot)).targetRoot).toBe(targetRoot);
+    },
+  );
+
   it("rejects an install plan for a different or non-canonical target", async () => {
     const invoke = vi.fn();
     window.__TAURI__ = { core: { invoke } };
@@ -729,7 +739,7 @@ describe("desktop bridge", () => {
 
     invoke.mockClear();
     await expect(getRuntimeInstallPlan("E:\\Users")).rejects.toThrow(
-      /must be a drive root/i,
+      /dedicated DroneDream Runtime directory/i,
     );
     expect(invoke).not.toHaveBeenCalled();
   });

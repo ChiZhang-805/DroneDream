@@ -174,7 +174,7 @@ function fixedDiskOptions(disks: DiskInfo[]): DiskInfo[] {
   }
   return [...unique.values()].sort((left, right) => {
     if (left.isSystemDrive !== right.isSystemDrive) {
-      return left.isSystemDrive ? 1 : -1;
+      return left.isSystemDrive ? -1 : 1;
     }
     return right.freeBytes - left.freeBytes || left.drive.localeCompare(right.drive);
   });
@@ -189,7 +189,7 @@ function chooseRuntimeDrive(disks: DiskInfo[], currentDrive: string): string {
 
 function runtimeTargetRoot(drive: string): string | undefined {
   const normalized = drive.trim().toUpperCase();
-  return /^[A-Z]:$/.test(normalized) ? `${normalized}\\DroneDream-Workspace\\Runtime` : undefined;
+  return /^[A-Z]:$/.test(normalized) ? `${normalized}\\DroneDream\\Runtime` : undefined;
 }
 
 async function getSettledInstallPlan(

@@ -349,7 +349,14 @@ Var DroneDreamValidatePathOnly
       Goto dronedream_plan_retry_or_fail
     ${EndIf}
     StrCpy $DroneDreamPlanBlockerCode "$6"
-    StrCpy $7 "$2\DroneDream"
+    StrCpy $7 "$2\DroneDream\Runtime"
+    ; The planner can report a previously registered Runtime on this drive.
+    ${If} $DroneDreamPlanCanInstall == "0"
+      ${If} $DroneDreamPlanTarget == "$2\DroneDream"
+      ${OrIf} $DroneDreamPlanTarget == "$2\DroneDream-Workspace\Runtime"
+        StrCpy $7 "$DroneDreamPlanTarget"
+      ${EndIf}
+    ${EndIf}
     ${If} $1 != "1"
     ${OrIf} $3 != "8589934592"
     ${OrIf} $4 != "25769803776"

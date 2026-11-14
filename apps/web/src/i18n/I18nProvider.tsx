@@ -403,7 +403,7 @@ const enTranslations = {
     "desktop.diagnosticsTitle": "Runtime diagnostics",
     "desktop.storageTitle": "Choose runtime storage",
     "desktop.storageDesc":
-      "DroneDream first recommends a writable non-system NTFS disk with at least 52 GiB free (8 GiB download, 24 GiB runtime, and 20 GiB reserve), then falls back to the Windows system disk. It creates a dedicated folder and never reuses a personal WSL distribution.",
+      "The Windows system drive is the default. You can choose another writable NTFS drive with at least 52 GiB available (8 GiB download, 24 GiB Runtime, and 20 GiB reserve). Updates use the existing installation.",
     "desktop.storageDrive": "Runtime disk",
     "desktop.storageTarget": "Runtime folder",
     "desktop.storageNoDisk": "No eligible fixed local disk was detected.",
@@ -2042,7 +2042,7 @@ const zhTranslations = {
     "desktop.componentDetail.accountSessionApiReady": "运行环境支持浏览器向桌面端安全回传账户。",
     "desktop.diagnosticsTitle": "运行环境诊断",
     "desktop.storageTitle": "选择运行环境存储位置",
-    "desktop.storageDesc": "DroneDream 会优先推荐可写、至少有 52 GiB 空间的非系统 NTFS 固定磁盘（8 GiB 下载、24 GiB 运行环境、20 GiB 安装后余量）；没有符合条件的非系统盘时才回退到 Windows 系统盘。它会创建独立专用目录，不会复用用户个人的 WSL 发行版。",
+    "desktop.storageDesc": "默认使用 Windows 系统盘，也可选择其他至少有 52 GiB 可用空间的 NTFS 固定磁盘（下载 8 GiB、运行环境 24 GiB、预留 20 GiB）。更新沿用已有安装目录。",
     "desktop.storageDrive": "运行环境磁盘",
     "desktop.storageTarget": "运行环境目录",
     "desktop.storageNoDisk": "未检测到可用的本地固定磁盘。",

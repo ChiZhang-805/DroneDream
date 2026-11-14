@@ -91,11 +91,15 @@ fn runtime_download_cache_root_path(target_root: &Path) -> PathBuf {
         .and_then(|name| name.to_str())
         .is_some_and(|name| name.eq_ignore_ascii_case("Runtime"))
     {
-        return target_root
-            .parent()
-            .unwrap_or_else(|| Path::new(""))
-            .join("Caches")
-            .join("Runtime");
+        let parent = target_root.parent().unwrap_or_else(|| Path::new(""));
+        if parent
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case("DroneDream"))
+        {
+            return parent.join("Downloads");
+        }
+        return parent.join("Caches").join("Runtime");
     }
     target_root
         .parent()

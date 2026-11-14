@@ -22,10 +22,10 @@ commands under `apps/web/` continue to work unchanged.
   installer records one narrowly scoped, current-user handoff; after the app
   renders the confirmed plan, it atomically consumes that handoff and starts
   runtime setup without requiring a second install click.
-- A fixed-disk selector that derives the isolated `X:\DroneDream` runtime path
+- A fixed-disk selector that derives the isolated `X:\DroneDream\Runtime` runtime path
   and recalculates the install plan without accepting arbitrary directories.
-  The native default chooser prefers a safe writable non-system disk with NTFS
-  and at least 52 GiB free, then falls back to the Windows system disk. This
+  The native chooser prefers the Windows system disk if it is writable NTFS
+  with at least 52 GiB free. Users can choose another eligible disk. This
   reserves 8 GiB for the download, 24 GiB for the installed runtime, and
   20 GiB of post-install host headroom.
 - Read-only `probe_runtime_status` and `get_runtime_install_plan` commands. The
@@ -56,10 +56,10 @@ The desktop program and simulation runtime are deliberately separate:
   from a packaged app cannot redirect the destination into that app's private
   cache.
 - `DroneDreamRuntime` is a separate signed WSL2 image. Its location is always
-  the fixed safe path `X:\DroneDream` on the selected local fixed NTFS drive;
+  the fixed safe path `X:\DroneDream\Runtime` on the selected local fixed NTFS drive;
   custom mode selects only `X:`, never an arbitrary directory. Resumable
   download data is stored in the separately owned sibling
-  `X:\DroneDream.download-cache`.
+  `X:\DroneDream\Downloads`.
 - The current signed beta rootfs is about **6.1 GB** (about 5.7 GiB). The
   planner reserves 8 GiB for download/staging, estimates 24 GiB installed,
   keeps 20 GiB of post-install headroom, and therefore requires at least
@@ -112,14 +112,14 @@ than replacing files underneath it.
 
 After its fail-closed operation and handoff checks, uninstalling the desktop
 program deliberately preserves the `DroneDreamRuntime` WSL distribution, its
-selected `X:\DroneDream` data, and its download cache. Removing the Runtime is a
+selected `X:\DroneDream\Runtime` data, and its download cache. Removing the Runtime is a
 separate destructive action and is never implied by desktop uninstall.
 
 When Runtime startup reaches the health-check stage but cannot become ready,
 DroneDream captures bounded systemd, journal, WSL-network, and Windows-localhost
 evidence before rolling back a distribution created by that failed attempt.
 The validated report path is shown in the error dialog and lives under
-`X:\DroneDream.download-cache\diagnostics`; it therefore survives rollback and
+`X:\DroneDream\Downloads\diagnostics`; it therefore survives rollback and
 ordinary desktop uninstall together with the resumable download cache. Reports
 are capped at 512 KiB each, ten files, and 5 MiB total, with credential-like
 lines redacted. See `../../docs/development/14-runtime-release.md` for the complete ownership
@@ -194,8 +194,8 @@ The global API is available only inside Tauri. Browser builds remain ordinary
 web builds, and their runtime-setup view is read-only: it never invokes native
 probe, install, cancel, start, or repair commands. Omitting `targetRoot` from an
 install-plan request asks the native probe to choose the fixed NTFS drive using
-the non-system-first safety policy above. The desktop setup page adopts that
-recommendation, then sends an explicit `X:\DroneDream` path after the user
+the system-drive-first safety policy above. The desktop setup page adopts that
+recommendation, then sends an explicit `X:\DroneDream\Runtime` path after the user
 chooses a disk. The release URL is not user-entered; production builds take it
 from `VITE_RUNTIME_RELEASE_MANIFEST_URL` in `apps/web/.env.production` and reject
 missing, credential-bearing, or non-HTTPS values.
@@ -337,7 +337,7 @@ start and repair refuse an unowned or mismatched WSL registration. Users should
 never create or edit that receipt by hand.
 
 Downloads use the strictly named same-drive sibling
-`X:\DroneDream.download-cache`, not a child of `X:\DroneDream`. This keeps the
+`X:\DroneDream\Downloads`, not a child of `X:\DroneDream\Runtime`. This keeps the
 WSL import target empty across retries and application restarts. The cache has
 its own ownership marker and accepts cleanup entries only below its
 `artifacts` directory; absolute paths, parent traversal, duplicate entries,
@@ -352,7 +352,7 @@ The installer-driven importer accepts only canonical signed release metadata
 from its compiled trusted Ed25519 keyring, HTTPS artifact URLs, contiguous
 parts smaller than 2 GiB, and a release that declares successful PX4 SITL,
 Gazebo, and parameter-readback smoke tests. It imports the archive with WSL2
-into the installer-confirmed fixed NTFS `X:\DroneDream` root, starts the managed
+into the installer-confirmed fixed NTFS `X:\DroneDream\Runtime` root, starts the managed
 services, and performs the identity/readiness checks above. If installation
 fails after this attempt creates `DroneDreamRuntime`, rollback may unregister
 only that exact new distribution; pre-existing distributions are left

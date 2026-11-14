@@ -1970,6 +1970,9 @@ fn base_plan(
 
 #[cfg(target_os = "windows")]
 fn default_target_root() -> Result<String, String> {
+    if let Some(installed) = registered_runtime_target()? {
+        return Ok(installed);
+    }
     let report = probe_fixed_local_drives()?;
     let system_drive = std::env::var("SystemDrive")
         .map_err(|_| "Windows did not report its system drive.".to_string())?;
@@ -1984,7 +1987,7 @@ fn default_target_root() -> Result<String, String> {
 
 fn no_eligible_target_message() -> String {
     format!(
-        "No safe writable fixed NTFS drive has at least {} GiB of free or authenticated resumable capacity. DroneDream checks non-system drives first, then the Windows system drive.",
+        "No safe writable fixed NTFS drive has at least {} GiB of free or authenticated resumable capacity. DroneDream checks the Windows system drive first.",
         MINIMUM_FREE_BYTES / GIB
     )
 }
@@ -2098,7 +2101,7 @@ where
         })
         .collect::<Vec<_>>();
 
-    // A qualifying non-system disk keeps the Windows/WSL system volume clean.
+    // Prefer the Windows system volume for a new installation.
     // Within each class, prefer more headroom and use the drive letter only as
     // a deterministic tie-breaker.
     eligible.sort_by(|left, right| {
@@ -2120,8 +2123,8 @@ where
             .map(|target| storage_credit(&target))
             .unwrap_or(0)
             .saturating_add(right.free_bytes);
-        left_is_system
-            .cmp(&right_is_system)
+        right_is_system
+            .cmp(&left_is_system)
             .then_with(|| right_capacity.cmp(&left_capacity))
             .then_with(|| left.drive.cmp(&right.drive))
     });
@@ -2456,24 +2459,18 @@ pub(crate) fn normalize_windows_target(value: &str) -> Result<String, String> {
     } else {
         trimmed[3..].trim_matches('\\')
     };
-    let legacy = suffix.eq_ignore_ascii_case("DroneDream");
-    if !suffix.is_empty()
-        && !legacy
-        && !suffix.eq_ignore_ascii_case(r"DroneDream-Workspace\Runtime")
-    {
-        return Err(
-            "Choose a drive; DroneDream uses X:\\DroneDream-Workspace\\Runtime.".to_string(),
-        );
-    }
-
+    let directory = if suffix.is_empty() || suffix.eq_ignore_ascii_case(r"DroneDream\Runtime") {
+        r"DroneDream\Runtime"
+    } else if suffix.eq_ignore_ascii_case(r"DroneDream-Workspace\Runtime") {
+        r"DroneDream-Workspace\Runtime"
+    } else if suffix.eq_ignore_ascii_case("DroneDream") {
+        "DroneDream"
+    } else {
+        return Err(r"Choose a drive. The Runtime installs in X:\DroneDream\Runtime.".to_string());
+    };
     Ok(format!(
-        "{}:\\{}",
-        trimmed[..1].to_ascii_uppercase(),
-        if legacy {
-            "DroneDream"
-        } else {
-            r"DroneDream-Workspace\Runtime"
-        }
+        "{}:\\{directory}",
+        trimmed[..1].to_ascii_uppercase()
     ))
 }
 
@@ -2735,8 +2732,12 @@ mod tests {
             "E:\\DroneDream"
         );
         assert_eq!(
+            normalize_windows_target(r"E:\DroneDream-Workspace\Runtime").unwrap(),
+            r"E:\DroneDream-Workspace\Runtime"
+        );
+        assert_eq!(
             normalize_windows_target("e:").unwrap(),
-            "E:\\DroneDream-Workspace\\Runtime"
+            "E:\\DroneDream\\Runtime"
         );
     }
 
@@ -2772,7 +2773,7 @@ mod tests {
 
     #[cfg(target_os = "windows")]
     #[test]
-    fn default_target_prefers_a_safe_qualifying_non_system_drive() {
+    fn default_target_prefers_the_eligible_system_drive() {
         let gib = 1024 * 1024 * 1024;
         let drives = vec![
             DriveProbe {
@@ -2800,14 +2801,14 @@ mod tests {
 
         assert_eq!(
             select_default_target(&drives, "c:", |_| true).as_deref(),
-            Some("E:\\DroneDream-Workspace\\Runtime")
+            Some("C:\\DroneDream\\Runtime")
         );
         assert!(select_default_target(&drives, "", |_| true).is_none());
     }
 
     #[cfg(target_os = "windows")]
     #[test]
-    fn default_target_recommends_observed_e_drive_even_when_c_has_more_space() {
+    fn default_target_uses_system_drive_when_both_are_eligible() {
         let gib = 1024 * 1024 * 1024;
         let drives = vec![
             DriveProbe {
@@ -2830,7 +2831,7 @@ mod tests {
 
         assert_eq!(
             select_default_target(&drives, "C:", |_| true).as_deref(),
-            Some("E:\\DroneDream-Workspace\\Runtime")
+            Some("C:\\DroneDream\\Runtime")
         );
     }
 
@@ -2876,7 +2877,7 @@ mod tests {
             select_default_target_from_report(&report, "C:", |_| true, |_| 0)
                 .unwrap()
                 .as_deref(),
-            Some("E:\\DroneDream-Workspace\\Runtime")
+            Some("E:\\DroneDream\\Runtime")
         );
     }
 
@@ -2938,20 +2939,20 @@ mod tests {
                 &drives,
                 "C:",
                 |_| true,
-                |target| if target == "E:\\DroneDream-Workspace\\Runtime" {
+                |target| if target == "E:\\DroneDream\\Runtime" {
                     8 * gib
                 } else {
                     0
                 },
             )
             .as_deref(),
-            Some("E:\\DroneDream-Workspace\\Runtime")
+            Some("E:\\DroneDream\\Runtime")
         );
     }
 
     #[cfg(target_os = "windows")]
     #[test]
-    fn default_target_skips_unsafe_non_system_targets_then_falls_back_to_system() {
+    fn default_target_skips_an_unsafe_system_drive() {
         let gib = 1024 * 1024 * 1024;
         let drives = vec![
             DriveProbe {
@@ -2973,18 +2974,12 @@ mod tests {
         let mut inspected = Vec::new();
         let selected = select_default_target(&drives, "C:", |target| {
             inspected.push(target.to_string());
-            target.starts_with("C:")
+            target.starts_with("E:")
         });
-        assert_eq!(
-            selected.as_deref(),
-            Some("C:\\DroneDream-Workspace\\Runtime")
-        );
+        assert_eq!(selected.as_deref(), Some("E:\\DroneDream\\Runtime"));
         assert_eq!(
             inspected,
-            vec![
-                "E:\\DroneDream-Workspace\\Runtime",
-                "C:\\DroneDream-Workspace\\Runtime"
-            ]
+            vec!["C:\\DroneDream\\Runtime", "E:\\DroneDream\\Runtime"]
         );
     }
 
