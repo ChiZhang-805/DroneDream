@@ -1077,7 +1077,14 @@ fn move_owned_runtime_storage(old: &str, target: &str) -> Result<(), String> {
     }
     let partial_move = runtime_disk_moved_to_target(&old, &target);
     for destination in [&target, &new_cache] {
-        if destination.exists() && !(destination == &target && partial_move) {
+        // WSL may create an empty destination before reporting a sharing violation.
+        let retryable_target = destination == &target
+            && fs::symlink_metadata(destination).is_ok_and(|metadata| {
+                metadata.is_dir() && !crate::runtime_cache::is_link_like(&metadata)
+            })
+            && (partial_move
+                || fs::read_dir(destination).is_ok_and(|mut entries| entries.next().is_none()));
+        if destination.exists() && !retryable_target {
             return Err(format!(
                 "Destination already exists: {}",
                 destination.display()
@@ -1135,6 +1142,14 @@ fn move_owned_runtime_storage(old: &str, target: &str) -> Result<(), String> {
                     target.to_str().ok_or("Invalid Runtime target")?,
                 )?;
             } else {
+                let diagnostics = format!(
+                    "{} {}",
+                    decode_diagnostic_output(&output.stdout),
+                    decode_diagnostic_output(&output.stderr)
+                );
+                if diagnostics.contains("ERROR_SHARING_VIOLATION") {
+                    return Err("Windows is still using the Runtime disk. Close active WSL sessions and retry the move.".to_string());
+                }
                 return Err(format!(
                     "WSL could not move Runtime storage (exit {:?}); existing data was preserved.",
                     output.status.code()
