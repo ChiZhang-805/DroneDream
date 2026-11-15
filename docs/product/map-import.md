@@ -1,5 +1,18 @@
 # Desktop map upload contract
 
+## Available maps
+
+Open **Autonomy → Maps** to choose a scene. Each map below links to its geography, sources and simulation coverage.
+
+- [Kumpula Campus](../../server/api/app/autonomy/assets/kumpula-campus/gazebo/README.md)
+- [Meilahti Hospital Campus](../../server/api/app/autonomy/assets/meilahti-hospital-campus/gazebo/README.md)
+- [Kalasatama Waterfront](../../server/api/app/autonomy/assets/kalasatama-waterfront/gazebo/README.md)
+- [Vuosaari Harbour](../../server/api/app/autonomy/assets/vuosaari-harbour/gazebo/README.md)
+- [Suomenlinna Sea Fortress](../../server/api/app/autonomy/assets/suomenlinna-sea-fortress/gazebo/README.md)
+- [Uutela Coastal Forest](../../server/api/app/autonomy/assets/uutela-coastal-forest/gazebo/README.md)
+
+## Import a map
+
 The UI is a compact checklist, with no help prose or required/optional badges.
 Technical requirements belong here and in the parser, not in the dialog.
 

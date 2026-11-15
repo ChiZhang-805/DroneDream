@@ -8,7 +8,7 @@ DroneDream is a unified workspace for natural-language drone missions and PX4 pa
 
 ## Flight Agent
 
-The Flight Agent interprets a natural-language command, builds the task, and lets the LLM select one to four route-planning algorithms that are actually available for the current map, aircraft, geometry, risk, and time budget. Dijkstra, A*, Weighted A*, Bidirectional Dijkstra, 3D A*, and 3D Theta* produce candidates; deterministic clearance, collision, trajectory, and execution gates retain final veto authority before mandatory PX4 and Gazebo simulation or flight.
+The Flight Agent interprets a natural-language command, builds the task, and lets the LLM select one to four route-planning algorithms that are actually available for the current map, aircraft, geometry, risk, and time budget. Dijkstra, A*, Weighted A*, Bidirectional Dijkstra, 3D A*, and 3D Theta* produce candidates; deterministic clearance, collision, trajectory, and execution gates retain final veto authority before mandatory PX4 and Gazebo simulation or flight. [Explore the six Helsinki maps.](docs/product/map-import.md#available-maps)
 
 <p align="center">
   <img src="shared/brand/readme/flight-agent.png" alt="DroneDream Flight Agent framework" width="100%" />
