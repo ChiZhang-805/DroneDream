@@ -32,7 +32,8 @@ use windows_sys::{
         UI::{
             HiDpi::{GetDpiForWindow, GetSystemMetricsForDpi, SystemParametersInfoForDpi},
             Input::KeyboardAndMouse::{
-                SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VK_CONTROL,
+                GetActiveWindow, GetFocus, SendInput, SetActiveWindow, SetFocus, INPUT, INPUT_0,
+                INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VK_CONTROL,
             },
             Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindowSubclass},
             WindowsAndMessaging::*,
@@ -42,6 +43,7 @@ use windows_sys::{
 
 const BAR: windows_sys::core::PCWSTR = w!("DroneDream.CaptionMenu");
 const APPLY_PENDING: u32 = WM_APP + 1;
+const RESTORE_OWNER: u32 = WM_APP + 2;
 const BACK: usize = 101;
 const FORWARD: usize = 102;
 const SIDEBAR: usize = 103;
@@ -67,6 +69,7 @@ struct Strip {
     brush: Cell<HBRUSH>,
     state: Cell<MenuState>,
     tracking: Cell<bool>,
+    previous_focus: Cell<HWND>,
     pending: Cell<Option<MenuState>>,
 }
 
@@ -97,6 +100,7 @@ impl Strip {
             send_action,
             state: Cell::new(MenuState::default()),
             tracking: Cell::new(false),
+            previous_focus: Cell::new(null_mut()),
             pending: Cell::new(None),
             brush: Cell::new(brush),
             names,
@@ -465,6 +469,11 @@ unsafe extern "system" fn owner_proc(
         RemoveWindowSubclass(hwnd, Some(owner_proc), id);
         return DefSubclassProc(hwnd, msg, w, l);
     }
+    if msg == WM_ACTIVATE && w & 0xffff == WA_INACTIVE as usize && l as HWND == bar {
+        if let Some((_, strip)) = strip_for(hwnd) {
+            (*strip).previous_focus.set(GetFocus());
+        }
+    }
     let result = DefSubclassProc(hwnd, msg, w, l);
     if msg == WM_ENABLE && IsWindow(bar) != 0 {
         windows_sys::Win32::UI::Input::KeyboardAndMouse::EnableWindow(bar, (w != 0) as i32);
@@ -505,6 +514,18 @@ unsafe fn edit_shortcut(owner: HWND, key: u16) {
         input(VK_CONTROL, KEYEVENTF_KEYUP),
     ];
     SendInput(keys.len() as u32, keys.as_ptr(), size_of::<INPUT>() as i32);
+}
+
+// Windows enters a real native menu loop only for an active window. Activate
+// the strip during tracking, then return keyboard input to the WebView control.
+unsafe fn restore_owner(owner: HWND, bar: HWND, strip: &Strip) {
+    if GetActiveWindow() == bar && GetForegroundWindow() == bar {
+        SetActiveWindow(owner);
+        let previous = strip.previous_focus.replace(null_mut());
+        if GetActiveWindow() == owner && !previous.is_null() && IsChild(owner, previous) != 0 {
+            SetFocus(previous);
+        }
+    }
 }
 
 unsafe extern "system" fn bar_proc(
@@ -549,6 +570,7 @@ unsafe extern "system" fn bar_proc(
         WM_ENTERMENULOOP => strip.tracking.set(true),
         WM_EXITMENULOOP => {
             strip.tracking.set(false);
+            PostMessageW(hwnd, RESTORE_OWNER, 0, 0);
             if strip.pending.get().is_some() {
                 PostMessageW(hwnd, APPLY_PENDING, 0, 0);
             }
@@ -559,7 +581,11 @@ unsafe extern "system" fn bar_proc(
             }
             return 0;
         }
-        WM_MOUSEACTIVATE => return MA_NOACTIVATE as isize,
+        RESTORE_OWNER => {
+            restore_owner(owner, hwnd, strip);
+            return 0;
+        }
+        WM_MOUSEACTIVATE => return MA_ACTIVATE as isize,
         WM_ERASEBKGND => {
             let mut r = RECT::default();
             GetClientRect(hwnd, &mut r);
@@ -567,6 +593,7 @@ unsafe extern "system" fn bar_proc(
             return 1;
         }
         WM_COMMAND => {
+            restore_owner(owner, hwnd, strip);
             let command = w & 0xffff;
             match command {
                 BACK | FORWARD | SIDEBAR | SETTINGS => {
@@ -652,7 +679,7 @@ unsafe fn attach_to(owner: HWND, send_action: Box<dyn Fn(&str)>) -> Result<(), S
         };
         RegisterClassW(&wc);
         let bar = CreateWindowExW(
-            WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE,
+            WS_EX_TOOLWINDOW,
             class,
             w!("DroneDream menu"),
             WS_POPUP,
@@ -782,7 +809,10 @@ pub(crate) fn focus_caption_menu(window: WebviewWindow, mnemonic: String) -> Res
         .run_on_main_thread(move || unsafe {
             if let Ok(hwnd) = own.hwnd() {
                 let bar = GetPropW(hwnd.0.cast(), BAR) as HWND;
-                if !bar.is_null() {
+                if !bar.is_null()
+                    && (GetForegroundWindow() == hwnd.0.cast() || GetForegroundWindow() == bar)
+                {
+                    SetActiveWindow(bar);
                     PostMessageW(bar, WM_SYSCOMMAND, SC_KEYMENU as usize, key as isize);
                 }
             }
@@ -889,6 +919,11 @@ mod tests {
             assert_eq!(
                 GetWindowLongW(owner, GWL_STYLE) as u32 & WS_OVERLAPPEDWINDOW,
                 WS_OVERLAPPEDWINDOW
+            );
+            assert_eq!(
+                GetWindowLongW(bar, GWL_EXSTYLE) as u32 & WS_EX_NOACTIVATE,
+                0,
+                "Windows must be able to activate the menu host on a real click"
             );
             let menu = GetMenu(bar);
             assert_eq!(GetMenuItemCount(menu), 7);
