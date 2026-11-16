@@ -12,6 +12,14 @@ pub(crate) fn apply(window: &tauri::WebviewWindow, edition: &str) -> Result<(), 
     let rgb = u32::from_str_radix(surface.trim_start_matches('#'), 16)
         .map_err(|error| error.to_string())?;
     let colorref = rgb.swap_bytes() >> 8;
+    let own = window.clone();
+    window
+        .run_on_main_thread(move || {
+            if let Ok(hwnd) = own.hwnd() {
+                unsafe { crate::caption_menu::color(hwnd.0.cast(), colorref) }
+            }
+        })
+        .map_err(|error| error.to_string())?;
     let hwnd = window.hwnd().map_err(|error| error.to_string())?;
     // DWM retains the native system menu, caption buttons, snapping and corner treatment.
     let result = unsafe {

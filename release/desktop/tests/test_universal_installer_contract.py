@@ -207,8 +207,9 @@ def test_universal_profile_binds_fixed_identity_and_denies_frontend_authority() 
         "pending-exact-desktop-runtime-red-validation"
     )
     source_files = shared_ui["sourceFiles"]  # type: ignore[index]
-    assert len(source_files) == 9
+    assert len(source_files) == 10
     assert "apps/web/src/theme/desktop-frame.css" in {entry["path"] for entry in source_files}
+    assert "apps/web/src/desktop/captionMenu.ts" in {entry["path"] for entry in source_files}
     for source_file in source_files:
         path = ROOT / source_file["path"]
         assert path.is_file()

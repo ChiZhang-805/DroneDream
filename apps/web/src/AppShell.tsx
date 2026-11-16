@@ -1,3 +1,4 @@
+import { captionHistory, useCaptionMenu } from "./desktop/captionMenu";
 import {
   Fragment,
   useCallback,
@@ -3793,6 +3794,7 @@ function AppShellContent() {
     };
   }, [auth.account?.id, desktopRuntime]);
   const { locale, t } = useI18n();
+  const [captionSidebarHidden, setCaptionSidebarHidden] = useState(false);
   const accountCopy = ACCOUNT_COPY[locale];
   const mobileNavigationEnabled = useSyncExternalStore(
     subscribeToMobileNavigation,
@@ -4421,6 +4423,15 @@ function AppShellContent() {
     </div>
   ) : null;
 
+  const historyDirections = desktopRuntime ? captionHistory() : { back: false, forward: false };
+  const captionCanNavigate = !launcherMode && !settingsWorkspaceOpen && !launcherSettingsOpen && !accountDialogOpen && !sidebarUpdateBusy;
+  useCaptionMenu(desktopRuntime, locale, {
+    back: settingsWorkspaceOpen ? closeSettingsWorkspace : captionCanNavigate && historyDirections.back ? () => navigate(-1) : undefined,
+    forward: captionCanNavigate && historyDirections.forward ? () => navigate(1) : undefined,
+    sidebar: captionCanNavigate ? () => setCaptionSidebarHidden(hidden => !hidden) : undefined,
+    settings: !settingsWorkspaceOpen && !launcherSettingsOpen && !accountDialogOpen && !sidebarUpdateBusy ? () => openSettingsWorkspace() : undefined,
+  }, captionSidebarHidden);
+
   if (desktopRuntime && !launcherMode
       && (coreStartup !== "ready" || startupGate.status !== "ready")) {
     return <Navigate to="/desktop/setup" replace />;
@@ -4494,7 +4505,7 @@ function AppShellContent() {
 
   return (
     <EditionThemeProvider edition={activeThemeEdition}>
-      <div className={`app-shell${experimentWizardMode ? " app-shell-wizard" : ""}`}>
+      <div className={`app-shell${experimentWizardMode ? " app-shell-wizard" : ""}`} data-sidebar-hidden={captionSidebarHidden || undefined}>
       <a
         className="skip-link"
         href="#main-content"

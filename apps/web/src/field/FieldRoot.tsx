@@ -1,3 +1,4 @@
+import { useCaptionMenu } from "../desktop/captionMenu";
 import { Settings } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 
@@ -306,7 +307,12 @@ export function FieldRoot() {
     };
   }, []);
 
-  if (entered || (authCompleted && account && progress === 100)) {
+  const inWorkspace = entered || Boolean(authCompleted && account && progress === 100);
+  useCaptionMenu(!inWorkspace, locale, {
+    back: settingsPresentation === "workspace" ? () => setSettingsPresentation("closed") : undefined,
+    settings: settingsPresentation === "closed" ? () => { setSettingsInitialTab("general"); setSettingsPresentation("workspace"); } : undefined,
+  });
+  if (inWorkspace) {
     return (
       <Suspense fallback={null}>
         <FieldApp

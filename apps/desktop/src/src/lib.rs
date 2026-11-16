@@ -4,6 +4,8 @@ mod app_update;
 mod browser_auth;
 mod browser_auth_audit;
 mod browser_auth_vault;
+#[cfg(target_os = "windows")]
+mod caption_menu;
 mod component_update;
 mod desktop_api_bridge;
 mod distribution_plan;
@@ -39,6 +41,17 @@ mod runtime_installer;
 mod runtime_keepalive;
 mod webview2_preflight;
 mod window_chrome;
+#[cfg(not(target_os = "windows"))]
+mod caption_menu {
+    #[tauri::command]
+    pub(crate) fn configure_caption_menu(state: serde_json::Value) {
+        let _ = state;
+    }
+    #[tauri::command]
+    pub(crate) fn focus_caption_menu(mnemonic: String) {
+        let _ = mnemonic;
+    }
+}
 #[cfg(target_os = "windows")]
 mod window_placement;
 
@@ -107,6 +120,9 @@ pub fn run() {
             }
             #[cfg(target_os = "windows")]
             if let Some(window) = app.get_webview_window("main") {
+                if let Err(error) = caption_menu::attach(&window) {
+                    eprintln!("Could not create caption menu: {error}");
+                }
                 if let Err(error) =
                     window_chrome::apply(&window, env!("DRONEDREAM_DESKTOP_EDITION_ID"))
                 {
@@ -130,6 +146,8 @@ pub fn run() {
     #[cfg(dronedream_field)]
     let builder = builder.invoke_handler(tauri::generate_handler![
         window_chrome::set_edition_caption,
+        caption_menu::configure_caption_menu,
+        caption_menu::focus_caption_menu,
         app_update::download_install_app_update,
         app_update::get_app_update_progress,
         browser_auth::begin_browser_auth,
@@ -190,6 +208,8 @@ pub fn run() {
     #[cfg(all(dronedream_hardware_domain, not(dronedream_lab), not(dronedream_field)))]
     let builder = builder.invoke_handler(tauri::generate_handler![
         window_chrome::set_edition_caption,
+        caption_menu::configure_caption_menu,
+        caption_menu::focus_caption_menu,
         app_update::download_install_app_update,
         app_update::get_app_update_progress,
         browser_auth::begin_browser_auth,
@@ -250,6 +270,8 @@ pub fn run() {
     #[cfg(dronedream_lab)]
     let builder = builder.invoke_handler(tauri::generate_handler![
         window_chrome::set_edition_caption,
+        caption_menu::configure_caption_menu,
+        caption_menu::focus_caption_menu,
         app_update::download_install_app_update,
         app_update::get_app_update_progress,
         browser_auth::begin_browser_auth,
@@ -311,6 +333,8 @@ pub fn run() {
     #[cfg(all(not(dronedream_hardware_domain), not(dronedream_field)))]
     let builder = builder.invoke_handler(tauri::generate_handler![
         window_chrome::set_edition_caption,
+        caption_menu::configure_caption_menu,
+        caption_menu::focus_caption_menu,
         app_update::download_install_app_update,
         app_update::get_app_update_progress,
         browser_auth::begin_browser_auth,

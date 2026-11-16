@@ -1,3 +1,4 @@
+import { useCaptionMenu, usePageHistory } from "../desktop/captionMenu";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Bot,
@@ -266,7 +267,8 @@ function FieldWorkspace({
 }: FieldAppProps) {
   const presentationEdition = embeddedInLab ? "lab" as const : hardwareDomainEdition;
   const [locale, setLocale] = useState<FieldLocale>(initialLocale ?? savedLocale);
-  const [activePage, setActivePage] = useState<FieldPageId>("assistant");
+  const { page: activePage, select: setActivePage, back, forward } = usePageHistory<FieldPageId>("assistant");
+  const [captionSidebarHidden, setCaptionSidebarHidden] = useState(false);
   const [observationState, setObservationState] = useState<FieldObservationState>(initialObservationState);
   const [selectedPackId, setSelectedPackId] = useState(FIRST_FIELD_PACK.packId);
   const [selectedControllerKey, setSelectedControllerKey] = useState(
@@ -395,7 +397,7 @@ function FieldWorkspace({
 
   useEffect(() => {
     if (activePageOverride) setActivePage(activePageOverride);
-  }, [activePageOverride]);
+  }, [activePageOverride, setActivePage]);
 
   useEffect(() => {
     if (focusOnMount) pageRef.current?.focus({ preventScroll: true });
@@ -456,6 +458,13 @@ function FieldWorkspace({
     setSettingsWorkspaceOpen(false);
     window.requestAnimationFrame(() => settingsButtonRef.current?.focus());
   };
+
+  useCaptionMenu(!embeddedInConsole && !embeddedInLab, locale, {
+    back: settingsWorkspaceOpen ? closeSettingsWorkspace : !updateBusy ? back : undefined,
+    forward: !settingsWorkspaceOpen && !updateBusy ? forward : undefined,
+    sidebar: !settingsWorkspaceOpen && !updateBusy ? () => setCaptionSidebarHidden(hidden => !hidden) : undefined,
+    settings: !settingsWorkspaceOpen && !updateBusy ? () => openSettingsWorkspace() : undefined,
+  }, captionSidebarHidden);
 
   const signOut = async () => {
     if (!auth?.account || signOutPending) return;
@@ -581,6 +590,7 @@ function FieldWorkspace({
   return (
     <div
       className={`field-app${embeddedInLab ? " field-app-embedded-lab" : ""}${embeddedInConsole ? " field-app-embedded-console" : ""}`}
+      data-sidebar-hidden={captionSidebarHidden || undefined}
       data-brand-edition={presentationEdition}
       data-authority="false"
       data-validated-pack-count={decision.validatedPackCount}

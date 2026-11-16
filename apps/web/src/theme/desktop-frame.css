@@ -45,3 +45,16 @@
 :root[data-desktop-frame] .app-shell-launcher {
   clip-path: inset(4px var(--desktop-frame-gap) var(--desktop-frame-gap) round var(--desktop-panel-radius));
 }
+
+:root[data-desktop-frame] .app-shell[data-sidebar-hidden],
+:root[data-desktop-frame] .field-app[data-sidebar-hidden] .field-layout {
+  grid-template-columns: minmax(0, 1fr);
+}
+:root[data-desktop-frame] .app-shell[data-sidebar-hidden] > .app-sidebar,
+:root[data-desktop-frame] .field-app[data-sidebar-hidden] .field-layout > .field-sidebar {
+  display: none;
+}
+:root[data-desktop-frame] .app-shell[data-sidebar-hidden] > .app-body,
+:root[data-desktop-frame] .field-app[data-sidebar-hidden] .field-layout > .field-main {
+  margin-left: var(--desktop-frame-gap);
+}
