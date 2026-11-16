@@ -1691,7 +1691,7 @@ function SettingsDialog({
               ))}
             </div>
           </div>
-          <div className="quick-settings-item quick-settings-appearance">
+          {!isDesktopRuntime() && <div className="quick-settings-item quick-settings-appearance">
             <span>{quickCopy.appearance}</span>
             <div
               className="quick-settings-appearance-options"
@@ -1717,7 +1717,7 @@ function SettingsDialog({
                 <span>{quickCopy.light}</span>
               </button>
             </div>
-          </div>
+          </div>}
           {auth.account || docsPreview ? (
             <>
               <div className="quick-settings-item quick-settings-memory">
@@ -1850,7 +1850,7 @@ function SettingsDialog({
               ))}
             </fieldset>
           </div>
-          <div className="settings-general-card settings-interface-card">
+          {!isDesktopRuntime() && <div className="settings-general-card settings-interface-card">
             <div className="settings-card-heading">
               <span><SlidersHorizontal aria-hidden="true" />{settingsCopy.interface}</span>
             </div>
@@ -1880,7 +1880,7 @@ function SettingsDialog({
                 <i aria-hidden="true">✓</i>
               </button>
             </div>
-          </div>
+          </div>}
           <div className="settings-general-card settings-notification-card">
             <div className="settings-card-heading">
               <span><Bell aria-hidden="true" />{settingsCopy.notifications}</span>

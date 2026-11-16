@@ -1,12 +1,9 @@
-import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { act, cleanup, render, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { BrandEditionId } from "../src/brand/edition-brand.generated";
 import { EditionThemeProvider, useEditionTheme } from "../src/theme/EditionThemeProvider";
-
-const nativeWindow = vi.hoisted(() => ({ setTheme: vi.fn<(theme: string) => Promise<void>>(async () => undefined) }));
-vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => nativeWindow }));
 
 const editions = ["universal", "sim", "lab", "field", "autonomy"] as const;
 
@@ -20,7 +17,6 @@ function renderTheme(edition: BrandEditionId) {
 
 beforeEach(() => {
   window.localStorage.clear();
-  nativeWindow.setTheme.mockClear();
   vi.stubGlobal("matchMedia", vi.fn((query: string) => ({
     matches: query === "(prefers-color-scheme: dark)",
     addEventListener: vi.fn(),
@@ -82,16 +78,16 @@ describe("appearance at app launch", () => {
     expect(result.current.appearancePreference).toBe("light");
   });
 
-  it("starts native window chrome in light mode and follows only this session's changes", async () => {
-    window.__TAURI__ = { core: { invoke: vi.fn() } };
-    const first = renderTheme("autonomy");
-    await waitFor(() => expect(nativeWindow.setTheme).toHaveBeenLastCalledWith("light"));
-    act(() => first.result.current.setAppearance("dark"));
-    await waitFor(() => expect(nativeWindow.setTheme).toHaveBeenLastCalledWith("dark"));
-    first.unmount();
-
-    renderTheme("autonomy");
-    await waitFor(() => expect(nativeWindow.setTheme).toHaveBeenLastCalledWith("light"));
-    expect(nativeWindow.setTheme).toHaveBeenCalledTimes(3);
+  it("keeps the native caption and workspace on the same edition under a dark OS", async () => {
+    const invoke = vi.fn().mockResolvedValue(undefined);
+    window.__TAURI__ = { core: { invoke } };
+    const view = render(<EditionThemeProvider edition="universal">{null}</EditionThemeProvider>);
+    for (const edition of editions) {
+      view.rerender(<EditionThemeProvider edition={edition}>{null}</EditionThemeProvider>);
+      await waitFor(() => expect(invoke).toHaveBeenLastCalledWith("set_edition_caption", { edition }));
+      expect(document.documentElement.dataset.brandEdition).toBe(edition);
+      expect(document.documentElement).toHaveAttribute("data-desktop-frame");
+      expect(document.documentElement.style.colorScheme).toBe("light");
+    }
   });
 });

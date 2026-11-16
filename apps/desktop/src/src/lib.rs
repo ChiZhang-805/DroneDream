@@ -38,6 +38,7 @@ mod runtime_cache;
 mod runtime_installer;
 mod runtime_keepalive;
 mod webview2_preflight;
+mod window_chrome;
 #[cfg(target_os = "windows")]
 mod window_placement;
 
@@ -106,6 +107,11 @@ pub fn run() {
             }
             #[cfg(target_os = "windows")]
             if let Some(window) = app.get_webview_window("main") {
+                if let Err(error) =
+                    window_chrome::apply(&window, env!("DRONEDREAM_DESKTOP_EDITION_ID"))
+                {
+                    eprintln!("Could not apply the edition caption: {error}");
+                }
                 if let Err(error) = window_placement::clamp_to_nearest_work_area(&window) {
                     eprintln!("Could not clamp main window to its work area: {error}");
                 }
@@ -123,6 +129,7 @@ pub fn run() {
 
     #[cfg(dronedream_field)]
     let builder = builder.invoke_handler(tauri::generate_handler![
+        window_chrome::set_edition_caption,
         app_update::download_install_app_update,
         app_update::get_app_update_progress,
         browser_auth::begin_browser_auth,
@@ -182,6 +189,7 @@ pub fn run() {
 
     #[cfg(all(dronedream_hardware_domain, not(dronedream_lab), not(dronedream_field)))]
     let builder = builder.invoke_handler(tauri::generate_handler![
+        window_chrome::set_edition_caption,
         app_update::download_install_app_update,
         app_update::get_app_update_progress,
         browser_auth::begin_browser_auth,
@@ -241,6 +249,7 @@ pub fn run() {
 
     #[cfg(dronedream_lab)]
     let builder = builder.invoke_handler(tauri::generate_handler![
+        window_chrome::set_edition_caption,
         app_update::download_install_app_update,
         app_update::get_app_update_progress,
         browser_auth::begin_browser_auth,
@@ -301,6 +310,7 @@ pub fn run() {
 
     #[cfg(all(not(dronedream_hardware_domain), not(dronedream_field)))]
     let builder = builder.invoke_handler(tauri::generate_handler![
+        window_chrome::set_edition_caption,
         app_update::download_install_app_update,
         app_update::get_app_update_progress,
         browser_auth::begin_browser_auth,

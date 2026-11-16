@@ -20,6 +20,11 @@ on:
         required: false
         type: boolean
         default: false
+      build_handoff:
+        description: Build the five release candidates together on a clean Windows runner
+        required: false
+        type: boolean
+        default: false
       release_tag:
         description: Draft five-edition release to sign and publish; leave empty to build a validation installer
         required: false
@@ -393,6 +398,34 @@ jobs:
             -NativeSensorRuntime (Join-Path $env:GITHUB_WORKSPACE 'artifacts/native-runtime/native-sensors') `
             -PayloadPlacementRuntime (Join-Path $env:GITHUB_WORKSPACE 'artifacts/native-runtime/payload-placement') `
             -CameraClockRuntime (Join-Path $env:GITHUB_WORKSPACE 'artifacts/native-runtime/camera-clock')
+
+      - name: Build five-edition handoff
+        if: ${{ inputs.build_handoff && github.ref == 'refs/heads/main' }}
+        shell: pwsh
+        env:
+          DRONEDREAM_OAUTH_CLIENT_ID_UNIVERSAL: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_UNIVERSAL }}
+          DRONEDREAM_OAUTH_CLIENT_ID_SIM: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_SIM }}
+          DRONEDREAM_OAUTH_CLIENT_ID_LAB: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_LAB }}
+          DRONEDREAM_OAUTH_CLIENT_ID_FIELD: ${{ vars.DRONEDREAM_OAUTH_CLIENT_ID_FIELD }}
+        run: |
+          $storage = Join-Path $env:RUNNER_TEMP 'five-edition'
+          Remove-Item Env:RUSTFLAGS,Env:CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
+          ./apps/desktop/scripts/build-five-edition-installers.ps1 `
+            -Edition all -AllowUnsignedUpdater -StorageRoot $storage `
+            -AgentCoreRepository (Join-Path $env:GITHUB_WORKSPACE 'artifacts/agent-core-source')
+          # The release builder tidies generated inputs between editions. Restore
+          # the icons for the installed-window smoke test below.
+          python tools/build-brand-assets.py --edition "${{ steps.release.outputs.edition_id }}"
+
+      - name: Upload five-edition handoff for the release signer
+        if: ${{ inputs.build_handoff && github.ref == 'refs/heads/main' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: five-edition-handoff
+          path: ${{ runner.temp }}/five-edition/codex-builds/core-five-msvc/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3
 
       - name: Stage verified Core into product
         shell: pwsh

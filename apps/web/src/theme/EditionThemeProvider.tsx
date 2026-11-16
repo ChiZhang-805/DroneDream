@@ -11,7 +11,8 @@ import {
 } from "react";
 
 import type { BrandEditionId } from "../brand/edition-brand.generated";
-import { isDesktopRuntime } from "../desktop/bridge";
+import { isDesktopRuntime, setEditionCaption } from "../desktop/bridge";
+import "./desktop-frame.css";
 import { applyUniversalMode } from "../features/distribution/universalMode";
 import {
   appReducedMotionEnabled,
@@ -63,8 +64,10 @@ export function EditionThemeProvider({
   edition: BrandEditionId;
   children: ReactNode;
 }) {
-  const [appearancePreference, setAppearanceState] =
+  const desktop = isDesktopRuntime();
+  const [browserAppearance, setAppearanceState] =
     useState<AppearancePreference>(DEFAULT_APPEARANCE);
+  const appearancePreference = desktop ? DEFAULT_APPEARANCE : browserAppearance;
   const [customAccent, setCustomAccentState] = useState(storedCustomAccent);
   const reducedMotion = useSyncExternalStore(
     subscribeToAppReducedMotion,
@@ -74,8 +77,8 @@ export function EditionThemeProvider({
   const setAppearance = useCallback((next: AppearancePreference) => {
     // Do not restore or replace legacy persisted appearance: every new launch
     // starts light, while language and other durable preferences stay intact.
-    setAppearanceState(next);
-  }, []);
+    if (!desktop) setAppearanceState(next);
+  }, [desktop]);
   const setCustomAccent = useCallback((next: string) => {
     if (!/^#[0-9a-f]{6}$/iu.test(next)) return;
     const normalized = next.toLowerCase();
@@ -95,25 +98,17 @@ export function EditionThemeProvider({
   }), [appearance, appearancePreference, customAccent, edition, resetAppearance, setAppearance, setCustomAccent]);
   useLayoutEffect(() => {
     applyUniversalMode(edition);
+    document.documentElement.toggleAttribute("data-desktop-frame", desktop);
     document.documentElement.dataset.ddAppearance = appearance;
     document.documentElement.dataset.ddReducedMotion = String(reducedMotion);
     document.documentElement.style.colorScheme = appearance;
     document.documentElement.style.removeProperty("--dd-brand-start");
     document.documentElement.style.removeProperty("--dd-brand-middle");
     document.documentElement.style.removeProperty("--dd-brand-end");
-  }, [appearance, edition, reducedMotion]);
+  }, [appearance, desktop, edition, reducedMotion]);
   useEffect(() => {
-    if (!isDesktopRuntime()) return;
-    let active = true;
-    void import("@tauri-apps/api/window")
-      .then(({ getCurrentWindow }) => {
-        if (active) return getCurrentWindow().setTheme(appearance);
-      })
-      .catch(() => {
-        // Native chrome failure must not prevent the in-app theme from changing.
-      });
-    return () => { active = false; };
-  }, [appearance]);
+    if (desktop) void setEditionCaption(edition).catch(console.warn);
+  }, [desktop, edition]);
   return (
     <EditionThemeContext.Provider value={theme}>
       {children}

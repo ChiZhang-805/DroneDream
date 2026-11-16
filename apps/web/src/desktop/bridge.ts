@@ -1026,6 +1026,10 @@ export function isDesktopRuntime(): boolean {
   return getTauriCore() !== null;
 }
 
+export async function setEditionCaption(edition: string): Promise<void> {
+  await getTauriCore()?.invoke("set_edition_caption", { edition });
+}
+
 export interface LabCalibrationMetricsRequest {
   trackingRmseM: number;
   maxErrorM: number;

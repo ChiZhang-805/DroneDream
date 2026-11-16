@@ -1,0 +1,43 @@
+/* The Windows caption and the exposed workspace frame share the edition surface. */
+:root[data-desktop-frame] {
+  --desktop-frame-gap: 8px;
+  --desktop-panel-radius: 18px;
+  --desktop-panel-edge: color-mix(in srgb, var(--dd-brand-dark-surface) 14%, white);
+}
+
+:root[data-desktop-frame] #root,
+:root[data-desktop-frame] .app-shell:not(.app-shell-launcher),
+:root[data-desktop-frame] .app-shell > .app-sidebar,
+:root[data-desktop-frame] .settings-workspace-host .settings-workspace-surface,
+:root[data-desktop-frame] .settings-workspace-surface > .settings-workspace-sidebar,
+:root[data-desktop-frame] .field-app:not(.field-app-embedded-lab, .field-app-embedded-console) :is(.field-layout, .field-sidebar, .field-topbar) {
+  background: var(--dd-brand-light-surface);
+}
+
+:root[data-desktop-frame] .app-shell > .app-sidebar,
+:root[data-desktop-frame] .settings-workspace-surface > .settings-workspace-sidebar {
+  border-right: 0;
+}
+
+:root[data-desktop-frame] .app-shell:not(.app-shell-launcher) > .app-body,
+:root[data-desktop-frame] .settings-workspace-surface > .settings-workspace-content,
+:root[data-desktop-frame] .field-app:not(.field-app-embedded-lab, .field-app-embedded-console) .field-layout > .field-main {
+  align-self: stretch;
+  min-height: 0;
+  height: auto;
+  width: auto;
+  min-width: 0;
+  margin: var(--desktop-frame-gap) var(--desktop-frame-gap) var(--desktop-frame-gap) 0;
+  border: 1px solid var(--desktop-panel-edge);
+  border-radius: var(--desktop-panel-radius);
+  background-color: white;
+  overflow: clip;
+}
+
+:root[data-desktop-frame] .settings-workspace-surface > .settings-workspace-content {
+  overflow: auto;
+}
+
+:root[data-desktop-frame] .app-shell-launcher {
+  clip-path: inset(4px var(--desktop-frame-gap) var(--desktop-frame-gap) round var(--desktop-panel-radius));
+}

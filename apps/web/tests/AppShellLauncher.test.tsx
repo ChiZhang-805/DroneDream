@@ -280,7 +280,7 @@ describe("desktop launcher chrome", () => {
     fireEvent.click(settings);
     expect(settings).toHaveAttribute("aria-expanded", "true");
     const quickSettings = await screen.findByRole("dialog", { name: "Settings" });
-    expect(within(quickSettings).getByRole("group", { name: "Appearance" })).toBeVisible();
+    expect(within(quickSettings).queryByRole("group", { name: "Appearance" })).not.toBeInTheDocument();
     expect(within(quickSettings).queryByRole("button", { name: "All settings" }))
       .not.toBeInTheDocument();
     expect(quickSettings.querySelector(".quick-settings-leading-label > svg"))
@@ -289,6 +289,7 @@ describe("desktop launcher chrome", () => {
       .not.toBeInTheDocument();
     openAppSettings("general");
     const workspace = await screen.findByRole("region", { name: "Settings" });
+    expect(within(workspace).queryByRole("button", { name: "Dark" })).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Settings" })).not.toBeInTheDocument();
     expect(within(workspace).getByRole("button", { name: "English" })).toHaveAttribute(
       "aria-pressed",
