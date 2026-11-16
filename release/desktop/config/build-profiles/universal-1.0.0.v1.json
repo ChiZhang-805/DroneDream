@@ -39,7 +39,7 @@
     "sourceFiles": [
       {
         "path": "apps/web/src/AppShell.tsx",
-        "sha256": "1d6a0c482d01874ab5262de8862269e7173e2dfe2a57abc177c77fda301386fa"
+        "sha256": "3a91a348fc9f414e8f028216361d238d3261ceec2064b9f4e0d08e805c4b2b41"
       },
       {
         "path": "apps/web/src/components/EditionSettingsSurface.tsx",
@@ -63,7 +63,11 @@
       },
       {
         "path": "apps/web/src/theme/EditionThemeProvider.tsx",
-        "sha256": "87fb50375c5003a7b9946959821d032523ee716ae7d4a054304fdae1dfe1bd7f"
+        "sha256": "68e5f3103db261f72fa6bdc18ade1e62f5f4b53a7b9a20445348460a2ced337b"
+      },
+      {
+        "path": "apps/web/src/theme/desktop-frame.css",
+        "sha256": "d05176ed266f3fdbbfad690808bcefb76d1e0a32e77fa805c7693af88df3a855"
       },
       {
         "path": "apps/web/src/theme/editionTheme.ts",

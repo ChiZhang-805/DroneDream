@@ -184,8 +184,8 @@ foreach ($expectedRef in @($sharedUi.sourceFiles)) {
     }
     $sharedUiSourceRefs += $actualRef
 }
-if ($sharedUiSourceRefs.Count -ne 8) {
-    throw "Universal shared UI contract must bind exactly eight source files."
+if ($sharedUiSourceRefs.Count -ne 9) {
+    throw "Universal shared UI contract must bind exactly nine source files."
 }
 $currentUiFile = Get-Item -LiteralPath $CurrentUiEvidencePath
 if ($currentUiFile.PSIsContainer -or $currentUiFile.Length -gt 4MB -or
