@@ -112,7 +112,7 @@
   "integratedWorkspaceUiContract": {
     "contractId": "dronedream-universal-integrated-workspaces/v2",
     "manifest": "release/desktop/config/universal/integrated-workspaces.v2.json",
-    "sha256": "80a780b4371e2e0a2931e23b30a3710266ffbcdf93c1fb8e4167292014ccc3fe",
+    "sha256": "1754ab60e7cd3130735ef4d61335ae47e928ea8f815a500b954c833f610c1967",
     "sourceFileCount": 12,
     "workspaceModes": [
       "sim",
