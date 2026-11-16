@@ -8,14 +8,16 @@ use std::{
 use tauri::{Emitter, WebviewWindow};
 use windows_sys::Win32::{
     Graphics::Gdi::{
-        CreatePen, GetStockObject, GetSysColor, GetSysColorBrush, LineTo, MoveToEx, RoundRect,
-        SelectObject, COLOR_GRAYTEXT, COLOR_HIGHLIGHT, COLOR_HIGHLIGHTTEXT, COLOR_MENUTEXT,
-        NULL_BRUSH, PS_SOLID,
+        CreateFontIndirectW, CreatePen, DrawTextW, GetDC, GetStockObject, GetSysColor,
+        GetTextExtentPoint32W, LineTo, MoveToEx, ReleaseDC, RoundRect, SelectObject, SetBkMode,
+        SetTextColor, COLOR_GRAYTEXT, COLOR_HIGHLIGHT, COLOR_HIGHLIGHTTEXT, COLOR_MENU,
+        COLOR_MENUTEXT, DT_CENTER, DT_HIDEPREFIX, DT_SINGLELINE, DT_VCENTER, HDC, NULL_BRUSH,
+        NULL_PEN, PS_SOLID, TRANSPARENT,
     },
     UI::{
-        Accessibility::{MSAAMENUINFO, MSAA_MENU_SIG},
+        Accessibility::{HCF_HIGHCONTRASTON, HIGHCONTRASTW, MSAAMENUINFO, MSAA_MENU_SIG},
         Controls::{
-            DRAWITEMSTRUCT, MEASUREITEMSTRUCT, ODS_DISABLED, ODS_GRAYED, ODS_HOTLIGHT,
+            DRAWITEMSTRUCT, MEASUREITEMSTRUCT, ODS_DISABLED, ODS_GRAYED, ODS_HOTLIGHT, ODS_NOACCEL,
             ODS_SELECTED, ODT_MENU,
         },
     },
@@ -23,12 +25,12 @@ use windows_sys::Win32::{
 use windows_sys::{
     w,
     Win32::{
-        Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, WPARAM},
+        Foundation::{HWND, LPARAM, LRESULT, POINT, RECT, SIZE, WPARAM},
         Graphics::Gdi::{
             ClientToScreen, CreateSolidBrush, DeleteObject, FillRect, InvalidateRect, HBRUSH,
         },
         UI::{
-            HiDpi::{GetDpiForWindow, GetSystemMetricsForDpi},
+            HiDpi::{GetDpiForWindow, GetSystemMetricsForDpi, SystemParametersInfoForDpi},
             Input::KeyboardAndMouse::{
                 SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VK_CONTROL,
             },
@@ -60,7 +62,8 @@ pub(crate) struct MenuState {
 
 struct Strip {
     send_action: Box<dyn Fn(&str)>,
-    icon_names: [MSAAMENUINFO; 6],
+    names: [MSAAMENUINFO; 14],
+    surface: Cell<u32>,
     brush: Cell<HBRUSH>,
     state: Cell<MenuState>,
     tracking: Cell<bool>,
@@ -69,28 +72,26 @@ struct Strip {
 
 impl Strip {
     fn new(send_action: Box<dyn Fn(&str)>, brush: HBRUSH) -> Self {
-        let icon_names = [
-            "Back",
-            "Forward",
-            "Toggle Sidebar",
-            "后退",
-            "前进",
-            "切换侧栏",
+        let names = [
+            w!("Back"),
+            w!("Forward"),
+            w!("Toggle Sidebar"),
+            w!("File"),
+            w!("Edit"),
+            w!("View"),
+            w!("Help"),
+            w!("后退"),
+            w!("前进"),
+            w!("切换侧栏"),
+            w!("文件"),
+            w!("编辑"),
+            w!("视图"),
+            w!("帮助"),
         ]
-        .map(|text| {
-            let ptr = match text {
-                "Back" => w!("Back"),
-                "Forward" => w!("Forward"),
-                "Toggle Sidebar" => w!("Toggle Sidebar"),
-                "后退" => w!("后退"),
-                "前进" => w!("前进"),
-                _ => w!("切换侧栏"),
-            };
-            MSAAMENUINFO {
-                dwMSAASignature: MSAA_MENU_SIG as u32,
-                cchWText: text.encode_utf16().count() as u32,
-                pszWText: ptr.cast_mut(),
-            }
+        .map(|name| MSAAMENUINFO {
+            dwMSAASignature: MSAA_MENU_SIG as u32,
+            cchWText: unsafe { windows_sys::Win32::Globalization::lstrlenW(name) } as u32,
+            pszWText: name.cast_mut(),
         });
         Self {
             send_action,
@@ -98,48 +99,193 @@ impl Strip {
             tracking: Cell::new(false),
             pending: Cell::new(None),
             brush: Cell::new(brush),
-            icon_names,
+            names,
+            surface: Cell::new(0xffffff),
         }
     }
 }
 
-// Reserve the system menu's normal line height. Draw the three line icons in
-// device pixels, keeping menu highlight, disabled states and accessible names.
-unsafe fn draw_icon(hwnd: HWND, draw: &DRAWITEMSTRUCT, brush: HBRUSH) {
-    let r = draw.rcItem;
-    let hot = draw.itemState & (ODS_SELECTED | ODS_HOTLIGHT) != 0;
-    let disabled = draw.itemState & (ODS_DISABLED | ODS_GRAYED) != 0;
-    FillRect(
-        draw.hDC,
-        &r,
-        if hot {
-            GetSysColorBrush(COLOR_HIGHLIGHT)
-        } else {
-            brush
-        },
-    );
-    let ink = GetSysColor(if disabled {
-        COLOR_GRAYTEXT
-    } else if hot {
-        COLOR_HIGHLIGHTTEXT
-    } else {
-        COLOR_MENUTEXT
+const TITLES: [[&str; 4]; 2] = [
+    ["&File", "&Edit", "&View", "&Help"],
+    ["文件(&F)", "编辑(&E)", "视图(&V)", "帮助(&H)"],
+];
+
+fn blend(background: u32, foreground: u32, percent: u32) -> u32 {
+    let mut result = 0;
+    for shift in [0, 8, 16] {
+        let base = (background >> shift) & 255;
+        let ink = (foreground >> shift) & 255;
+        result |= ((base * (100 - percent) + ink * percent + 50) / 100) << shift;
+    }
+    result
+}
+
+unsafe fn high_contrast() -> bool {
+    let mut contrast = HIGHCONTRASTW {
+        cbSize: size_of::<HIGHCONTRASTW>() as u32,
+        ..Default::default()
+    };
+    SystemParametersInfoW(
+        SPI_GETHIGHCONTRAST,
+        contrast.cbSize,
+        std::ptr::from_mut(&mut contrast).cast(),
+        0,
+    ) != 0
+        && contrast.dwFlags & HCF_HIGHCONTRASTON != 0
+}
+
+unsafe fn with_menu_font<T>(dc: HDC, dpi: u32, draw: impl FnOnce() -> T) -> T {
+    let mut metrics = NONCLIENTMETRICSW {
+        cbSize: size_of::<NONCLIENTMETRICSW>() as u32,
+        ..Default::default()
+    };
+    if SystemParametersInfoForDpi(
+        SPI_GETNONCLIENTMETRICS,
+        metrics.cbSize,
+        std::ptr::from_mut(&mut metrics).cast(),
+        0,
+        dpi,
+    ) == 0
+    {
+        return draw();
+    }
+    let font = CreateFontIndirectW(&metrics.lfMenuFont);
+    if font.is_null() {
+        return draw();
+    }
+    let old = SelectObject(dc, font);
+    let result = draw();
+    SelectObject(dc, old);
+    DeleteObject(font);
+    result
+}
+
+fn item_index(strip: &Strip, data: usize) -> Option<usize> {
+    strip
+        .names
+        .iter()
+        .position(|name| std::ptr::from_ref(name) as usize == data)
+}
+
+unsafe fn item_width(hwnd: HWND, dpi: u32, index: usize) -> u32 {
+    let column = index % 7;
+    if column < 3 {
+        return 22 * dpi / 96;
+    }
+    let text = wide(&TITLES[index / 7][column - 3].replace('&', ""));
+    let dc = GetDC(hwnd);
+    let mut size = SIZE::default();
+    with_menu_font(dc, dpi, || {
+        GetTextExtentPoint32W(dc, text.as_ptr(), (text.len() - 1) as i32, &mut size);
     });
+    ReleaseDC(hwnd, dc);
+    size.cx.max(0) as u32 + 8 * dpi / 96
+}
+
+unsafe fn draw_item(hwnd: HWND, draw: &DRAWITEMSTRUCT, strip: &Strip, index: usize) {
+    let column = index % 7;
+    let dc = draw.hDC;
+    let r = draw.rcItem;
+    let selected = draw.itemState & ODS_SELECTED != 0;
+    let hot = selected || draw.itemState & ODS_HOTLIGHT != 0;
+    let disabled = draw.itemState & (ODS_DISABLED | ODS_GRAYED) != 0;
+    let contrast = high_contrast();
+    let base = if contrast {
+        GetSysColor(COLOR_MENU)
+    } else {
+        strip.surface.get()
+    };
+    let foreground = GetSysColor(COLOR_MENUTEXT);
+    let ink = if contrast {
+        GetSysColor(if disabled {
+            COLOR_GRAYTEXT
+        } else if hot {
+            COLOR_HIGHLIGHTTEXT
+        } else {
+            COLOR_MENUTEXT
+        })
+    } else {
+        blend(
+            base,
+            foreground,
+            if disabled {
+                40
+            } else if hot {
+                85
+            } else {
+                66
+            },
+        )
+    };
     let dpi = GetDpiForWindow(hwnd) as i32;
+    let px = |n: i32| (n * dpi + 48) / 96;
+    let bg = CreateSolidBrush(base);
+    FillRect(dc, &r, bg);
+    DeleteObject(bg);
+    if hot && !disabled {
+        let fill = CreateSolidBrush(if contrast {
+            GetSysColor(COLOR_HIGHLIGHT)
+        } else {
+            blend(base, foreground, if selected { 13 } else { 7 })
+        });
+        let old_brush = SelectObject(dc, fill);
+        let old_pen = SelectObject(dc, GetStockObject(NULL_PEN));
+        RoundRect(
+            dc,
+            r.left + px(2),
+            r.top + px(2),
+            r.right - px(2),
+            r.bottom - px(2),
+            px(8),
+            px(8),
+        );
+        SelectObject(dc, old_pen);
+        SelectObject(dc, old_brush);
+        DeleteObject(fill);
+    }
+    if column < 3 {
+        draw_icon(dc, r, ink, dpi, column);
+    } else {
+        let old_mode = SetBkMode(dc, TRANSPARENT as i32);
+        let old_color = SetTextColor(dc, ink);
+        let title = TITLES[index / 7][column - 3];
+        let hide = draw.itemState & ODS_NOACCEL != 0;
+        let title = if hide {
+            title.split('(').next().unwrap_or(title)
+        } else {
+            title
+        };
+        let text = wide(title);
+        let mut bounds = r;
+        with_menu_font(dc, dpi as u32, || {
+            DrawTextW(
+                dc,
+                text.as_ptr(),
+                -1,
+                &mut bounds,
+                DT_SINGLELINE | DT_CENTER | DT_VCENTER | if hide { DT_HIDEPREFIX } else { 0 },
+            );
+        });
+        SetTextColor(dc, old_color);
+        SetBkMode(dc, old_mode);
+    }
+}
+
+unsafe fn draw_icon(dc: HDC, r: RECT, ink: u32, dpi: i32, index: usize) {
     let px = |n: i32| (n * dpi + 48) / 96;
     let cx = (r.left + r.right) / 2;
     let cy = (r.top + r.bottom) / 2;
     let pen = CreatePen(PS_SOLID, px(1).max(1), ink);
-    let old_pen = SelectObject(draw.hDC, pen);
-    let old_brush = SelectObject(draw.hDC, GetStockObject(NULL_BRUSH));
+    let old_pen = SelectObject(dc, pen);
+    let old_brush = SelectObject(dc, GetStockObject(NULL_BRUSH));
     let line = |x, y, x2, y2| {
-        MoveToEx(draw.hDC, x, y, null_mut());
-        LineTo(draw.hDC, x2, y2);
+        MoveToEx(dc, x, y, null_mut());
+        LineTo(dc, x2, y2);
     };
-    match draw.itemID as usize {
-        SIDEBAR => {
+    match index {
+        2 => {
             RoundRect(
-                draw.hDC,
+                dc,
                 cx - px(7),
                 cy - px(6),
                 cx + px(7) + 1,
@@ -150,15 +296,15 @@ unsafe fn draw_icon(hwnd: HWND, draw: &DRAWITEMSTRUCT, brush: HBRUSH) {
             line(cx - px(2), cy - px(6), cx - px(2), cy + px(6));
         }
         id => {
-            let dir = if id == BACK { -1 } else { 1 };
+            let dir = if id == 0 { -1 } else { 1 };
             let tip = cx + dir * px(6);
             line(cx - dir * px(6), cy, tip, cy);
             line(tip - dir * px(5), cy - px(5), tip, cy);
             line(tip, cy, tip - dir * px(5), cy + px(5));
         }
     }
-    SelectObject(draw.hDC, old_brush);
-    SelectObject(draw.hDC, old_pen);
+    SelectObject(dc, old_brush);
+    SelectObject(dc, old_pen);
     DeleteObject(pen);
 }
 
@@ -174,7 +320,7 @@ unsafe fn make_menu(s: MenuState, strip: &Strip) -> HMENU {
     let label = |en, zh| if s.chinese { zh } else { en };
     let root = CreateMenu();
     for (index, id) in [BACK, FORWARD, SIDEBAR].into_iter().enumerate() {
-        let info = &strip.icon_names[index + if s.chinese { 3 } else { 0 }];
+        let info = &strip.names[index + if s.chinese { 7 } else { 0 }];
         AppendMenuW(root, MF_OWNERDRAW, id, std::ptr::from_ref(info).cast());
     }
     let file = CreatePopupMenu();
@@ -219,13 +365,18 @@ unsafe fn make_menu(s: MenuState, strip: &Strip) -> HMENU {
         ABOUT,
         label("&About DroneDream", "关于 DroneDream(&A)"),
     );
-    for (menu, en, zh) in [
-        (file, "&File", "文件(&F)"),
-        (edit, "&Edit", "编辑(&E)"),
-        (view, "&View", "视图(&V)"),
-        (help, "&Help", "帮助(&H)"),
-    ] {
-        item(root, MF_POPUP, menu as usize, label(en, zh));
+    for (i, menu) in [file, edit, view, help].into_iter().enumerate() {
+        let title = TITLES[s.chinese as usize][i];
+        item(root, MF_POPUP, menu as usize, title);
+        let name = &strip.names[if s.chinese { 7 } else { 0 } + i + 3];
+        let info = MENUITEMINFOW {
+            cbSize: size_of::<MENUITEMINFOW>() as u32,
+            fMask: MIIM_FTYPE | MIIM_DATA,
+            fType: MFT_OWNERDRAW,
+            dwItemData: std::ptr::from_ref(name) as usize,
+            ..Default::default()
+        };
+        SetMenuItemInfoW(root, (i + 3) as u32, 1, &info);
     }
     for (menu, id, enabled) in [
         (file, SETTINGS, s.can_settings),
@@ -286,13 +437,16 @@ unsafe fn place(owner: HWND, bar: HWND) {
         return;
     }
     let width = last.right - first.left + 8 * (dpi as i32) / 96;
+    // USER32 paints a separator immediately below the menu items. End the host
+    // at the row's last visible pixel and let the original caption fill the rest.
+    let row_height = (last.bottom - first.top).clamp(1, height);
     SetWindowPos(
         bar,
         null_mut(),
         origin.x,
-        origin.y - height,
+        origin.y - (height + row_height) / 2,
         width,
-        height,
+        row_height,
         SWP_NOACTIVATE | SWP_NOZORDER | SWP_SHOWWINDOW,
     );
 }
@@ -366,17 +520,30 @@ unsafe extern "system" fn bar_proc(
     match msg {
         WM_MEASUREITEM => {
             let m = &mut *(l as *mut MEASUREITEMSTRUCT);
-            if m.CtlType == ODT_MENU && (BACK..=SIDEBAR).contains(&(m.itemID as usize)) {
-                m.itemWidth = 22 * GetDpiForWindow(hwnd) / 96;
-                m.itemHeight = GetSystemMetricsForDpi(SM_CYMENU, GetDpiForWindow(hwnd)) as u32;
-                return 1;
+            if m.CtlType == ODT_MENU {
+                if let Some(index) = item_index(strip, m.itemData) {
+                    let dpi = GetDpiForWindow(hwnd);
+                    m.itemHeight = GetSystemMetricsForDpi(SM_CYMENU, dpi) as u32;
+                    m.itemWidth = item_width(hwnd, dpi, index);
+                    return 1;
+                }
             }
         }
         WM_DRAWITEM => {
             let d = &*(l as *const DRAWITEMSTRUCT);
-            if d.CtlType == ODT_MENU && (BACK..=SIDEBAR).contains(&(d.itemID as usize)) {
-                draw_icon(hwnd, d, strip.brush.get());
-                return 1;
+            if d.CtlType == ODT_MENU {
+                if let Some(index) = item_index(strip, d.itemData) {
+                    draw_item(hwnd, d, strip, index);
+                    return 1;
+                }
+            }
+        }
+        WM_MENUCHAR if l as HMENU == GetMenu(hwnd) => {
+            if let Some(index) = "fevh"
+                .bytes()
+                .position(|ch| u32::from(ch) == ((w as u32 & 0xffff) | 0x20))
+            {
+                return ((MNC_EXECUTE << 16) | (index as u32 + 3)) as LRESULT;
             }
         }
         WM_ENTERMENULOOP => strip.tracking.set(true),
@@ -546,6 +713,7 @@ pub(crate) unsafe fn color(owner: HWND, value: u32) {
         let strip = &*data;
         let next = CreateSolidBrush(value);
         if !next.is_null() {
+            strip.surface.set(value);
             let old = strip.brush.replace(next);
             paint_menu(bar, next);
             DeleteObject(old);
@@ -627,6 +795,69 @@ mod tests {
     use super::*;
     use std::rc::Rc;
 
+    // Capture a genuine menu row, then ask the same owner-draw callback to paint
+    // the Help item in the two states Windows sends during mouse/menu tracking.
+    unsafe fn verify_caption_pixels(bar: HWND, owner: HWND) {
+        use windows_sys::Win32::{
+            Graphics::Gdi::{CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, GetPixel},
+            Storage::Xps::PrintWindow,
+        };
+        if high_contrast() {
+            return;
+        }
+        let base = 0xfff5f8;
+        color(owner, base);
+        let mut row = RECT::default();
+        GetWindowRect(bar, &mut row);
+        let width = row.right - row.left;
+        let height = row.bottom - row.top;
+        let screen = GetDC(bar);
+        let dc = CreateCompatibleDC(screen);
+        let bitmap = CreateCompatibleBitmap(screen, width, height);
+        let old = SelectObject(dc, bitmap);
+        assert_ne!(PrintWindow(bar, dc, 2), 0);
+        for x in 0..width {
+            assert_eq!(GetPixel(dc, x, height - 1), base, "divider at x={x}");
+        }
+        let mut help = RECT::default();
+        GetMenuItemRect(bar, GetMenu(bar), 6, &mut help);
+        help.left -= row.left;
+        help.right -= row.left;
+        help.top -= row.top;
+        help.bottom -= row.top;
+        let (_, strip) = strip_for(owner).unwrap();
+        let name = &(*strip).names[13];
+        let scaled = |n| (n * GetDpiForWindow(bar) as i32 + 48) / 96;
+        for (state, pct) in [(ODS_HOTLIGHT, 7), (ODS_SELECTED, 13)] {
+            let d = DRAWITEMSTRUCT {
+                CtlType: ODT_MENU,
+                itemState: state,
+                rcItem: help,
+                hDC: dc,
+                itemData: std::ptr::from_ref(name) as usize,
+                ..Default::default()
+            };
+            assert_eq!(
+                SendMessageW(bar, WM_DRAWITEM, 0, std::ptr::from_ref(&d) as LPARAM),
+                1
+            );
+            let mid = (help.left + help.right) / 2;
+            assert_eq!(GetPixel(dc, mid, help.top), base);
+            assert_eq!(
+                GetPixel(dc, help.left + scaled(2), help.top + scaled(2)),
+                base
+            );
+            assert_eq!(
+                GetPixel(dc, mid, help.top + scaled(3)),
+                blend(base, GetSysColor(COLOR_MENUTEXT), pct)
+            );
+        }
+        SelectObject(dc, old);
+        DeleteObject(bitmap);
+        DeleteDC(dc);
+        ReleaseDC(bar, screen);
+    }
+
     #[test]
     fn caption_tracks_the_decorated_owner_and_dispatches_localized_commands() {
         unsafe {
@@ -691,15 +922,26 @@ mod tests {
             GetWindowRect(bar, &mut br);
             let mut origin = POINT::default();
             ClientToScreen(owner, &mut origin);
-            assert_eq!((br.left, br.bottom), (origin.x, origin.y));
+            assert_eq!(br.left, origin.x);
+            let caption_height = GetSystemMetricsForDpi(SM_CYCAPTION, GetDpiForWindow(owner));
+            assert!(br.top >= origin.y - caption_height && br.bottom <= origin.y);
             assert_ne!(IsWindowVisible(bar), 0);
             let mut last = RECT::default();
             assert_ne!(GetMenuItemRect(bar, menu, 6, &mut last), 0);
-            assert!(last.right <= br.right && last.top >= br.top && last.bottom <= br.bottom);
+            assert!(last.right <= br.right && last.top >= br.top);
+            assert_eq!(
+                last.bottom, br.bottom,
+                "the native separator must be outside the strip"
+            );
+            assert_eq!(
+                SendMessageW(bar, WM_MENUCHAR, b'h' as usize, menu as LPARAM),
+                ((MNC_EXECUTE << 16) | 6) as LRESULT
+            );
             let x = (last.right + last.left) / 2;
             let y = (last.bottom + last.top) / 2;
             let lp = (((y as u32 & 0xffff) << 16) | (x as u32 & 0xffff)) as LPARAM;
             assert_eq!(SendMessageW(bar, WM_NCHITTEST, 0, lp), HTMENU as LRESULT);
+            verify_caption_pixels(bar, owner);
             SendMessageW(bar, WM_COMMAND, SETTINGS, 0);
             assert_eq!(*received.borrow(), ["settings"]);
             ShowWindow(owner, SW_MINIMIZE);
