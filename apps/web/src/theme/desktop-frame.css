@@ -19,6 +19,10 @@
   border-right: 0;
 }
 
+:root[data-desktop-frame] .field-app:not(.field-app-embedded-lab, .field-app-embedded-console) .field-application-surface > .field-layout {
+  height: 100%;
+}
+
 :root[data-desktop-frame] .app-shell:not(.app-shell-launcher) > .app-body,
 :root[data-desktop-frame] .settings-workspace-surface > .settings-workspace-content,
 :root[data-desktop-frame] .field-app:not(.field-app-embedded-lab, .field-app-embedded-console) .field-layout > .field-main {

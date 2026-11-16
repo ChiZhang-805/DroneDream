@@ -67,7 +67,7 @@
       },
       {
         "path": "apps/web/src/theme/desktop-frame.css",
-        "sha256": "d05176ed266f3fdbbfad690808bcefb76d1e0a32e77fa805c7693af88df3a855"
+        "sha256": "5737030687976cd5029fde841288fc7e5bac5e39d5453d6868e8b67d09dfa4a8"
       },
       {
         "path": "apps/web/src/theme/editionTheme.ts",
