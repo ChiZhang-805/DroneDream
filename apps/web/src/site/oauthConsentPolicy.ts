@@ -19,6 +19,10 @@ const DESKTOP_REDIRECTS = new Map([
     "http://127.0.0.1:49214/desktop-auth/autonomy/callback",
     { edition: "AGENT", product: "DroneDream · AGENT" },
   ],
+  [
+    "http://127.0.0.1:49215/desktop-auth/coco/callback",
+    { edition: "CoCo", product: "CoCo for Windows" },
+  ],
 ] as const);
 
 export function authorizationIdFromLocation(): string | null {
